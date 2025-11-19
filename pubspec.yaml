@@ -1,8 +1,8 @@
-name: cupertino_native_better
+name: cupertino_native_plus
 description: "Native Liquid Glass widgets for iOS and macOS with pixel-perfect fidelity. Fixed version with improved iOS 26+ detection."
 version: 0.0.7
-repository: https://github.com/yourusername/cupertino_native_better
-issue_tracker: https://github.com/yourusername/cupertino_native_better/issues
+repository: https://github.com/emirgunumdogdu/cupertino_native_better
+issue_tracker: https://github.com/emirgunumdogdu/cupertino_native_better/issues
 
 environment:
   sdk: ^3.9.0
