@@ -704,6 +704,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let title = title {
         cfg.title = title
       }
+
+      // Configure single-line text with ellipsis truncation
+      cfg.titleLineBreakMode = .byTruncatingTail
+
       if let image = image {
         cfg.image = image
       }
@@ -740,6 +744,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       button.configuration = cfg
     } else {
       button.setTitle(title, for: .normal)
+
+      // Configure titleLabel to prevent text wrapping (default: single line)
+      button.titleLabel?.lineBreakMode = .byTruncatingTail
+      button.titleLabel?.numberOfLines = 1
+
       button.setImage(image, for: .normal)
       if iconOnly {
         button.contentEdgeInsets = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
