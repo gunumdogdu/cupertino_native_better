@@ -67,6 +67,12 @@ class CNButtonConfig {
   /// Only applies on iOS 26+ and macOS 26+ when using glass styles.
   final bool glassEffectInteractive;
 
+  /// Maximum number of lines for button text.
+  ///
+  /// Defaults to 1 to prevent text wrapping. Set to null for unlimited lines.
+  /// When limited, text will be truncated with ellipsis if too long.
+  final int? maxLines;
+
   const CNButtonConfig({
     this.padding,
     this.borderRadius,
@@ -79,6 +85,7 @@ class CNButtonConfig {
     this.glassEffectUnionId,
     this.glassEffectId,
     this.glassEffectInteractive = true,
+    this.maxLines = 1,
   });
 }
 
@@ -871,7 +878,11 @@ class _CNButtonState extends State<CNButton> {
                 iconWidget,
                 if (widget.config.imagePadding != null)
                   SizedBox(width: widget.config.imagePadding!),
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
               ],
             );
             break;
@@ -879,7 +890,11 @@ class _CNButtonState extends State<CNButton> {
             child = Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
                 if (widget.config.imagePadding != null)
                   SizedBox(width: widget.config.imagePadding!),
                 iconWidget,
@@ -893,7 +908,11 @@ class _CNButtonState extends State<CNButton> {
                 iconWidget,
                 if (widget.config.imagePadding != null)
                   SizedBox(height: widget.config.imagePadding!),
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
               ],
             );
             break;
@@ -901,7 +920,11 @@ class _CNButtonState extends State<CNButton> {
             child = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
                 if (widget.config.imagePadding != null)
                   SizedBox(height: widget.config.imagePadding!),
                 iconWidget,
@@ -910,7 +933,11 @@ class _CNButtonState extends State<CNButton> {
             break;
         }
       } else {
-        child = Text(widget.label ?? '');
+        child = Text(
+          widget.label ?? '',
+          maxLines: widget.config.maxLines,
+          overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+        );
       }
     }
 
@@ -991,7 +1018,11 @@ class _CNButtonState extends State<CNButton> {
                 iconWidget,
                 if (widget.config.imagePadding != null)
                   SizedBox(width: widget.config.imagePadding!),
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
               ],
             );
             break;
@@ -999,7 +1030,11 @@ class _CNButtonState extends State<CNButton> {
             child = Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
                 if (widget.config.imagePadding != null)
                   SizedBox(width: widget.config.imagePadding!),
                 iconWidget,
@@ -1013,7 +1048,11 @@ class _CNButtonState extends State<CNButton> {
                 iconWidget,
                 if (widget.config.imagePadding != null)
                   SizedBox(height: widget.config.imagePadding!),
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
               ],
             );
             break;
@@ -1021,7 +1060,11 @@ class _CNButtonState extends State<CNButton> {
             child = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(widget.label ?? ''),
+                Text(
+                  widget.label ?? '',
+                  maxLines: widget.config.maxLines,
+                  overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+                ),
                 if (widget.config.imagePadding != null)
                   SizedBox(height: widget.config.imagePadding!),
                 iconWidget,
@@ -1030,7 +1073,11 @@ class _CNButtonState extends State<CNButton> {
             break;
         }
       } else {
-        child = Text(widget.label ?? '');
+        child = Text(
+          widget.label ?? '',
+          maxLines: widget.config.maxLines,
+          overflow: widget.config.maxLines != null ? TextOverflow.ellipsis : null,
+        );
       }
     }
 
