@@ -1,0 +1,15 @@
+include: package:flutter_lints/flutter.yaml
+
+# Additional information about this file can be found at
+# https://dart.dev/guides/language/analysis-options
+
+linter:
+  rules:
+    # Require documentation comments for all public APIs in the package.
+    public_member_api_docs: true
+
+analyzer:
+  exclude:
+    # Exclude example app from the strict public API doc lint to focus on the
+    # package's public surface under lib/.
+    - example/**
