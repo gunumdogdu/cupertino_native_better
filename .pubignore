@@ -1,0 +1,20 @@
+# Build outputs
+example/build/
+example/.dart_tool/
+.dart_tool/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Generated files
+*.g.dart
+*.freezed.dart
+
+# Test outputs
+coverage/
