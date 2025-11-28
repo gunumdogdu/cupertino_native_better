@@ -18,6 +18,15 @@
 - Switch, Slider, Popup Menu, Segmented Control, Tab Bar previews
 - Popup menu opened state preview
 
+### Test Suite Updates
+
+- **Added**: Comprehensive widget tests for CNSearchBar, CNFloatingIsland, CNGlassButtonGroup
+- **Added**: Controller tests for CNSearchBarController, CNFloatingIslandController, CNSliderController
+- **Added**: Data model tests for CNButtonData, CNButtonDataConfig, CNSymbol, CNImageAsset
+- **Updated**: Platform and method channel tests with error handling and null response tests
+- **Updated**: Enum tests for all new enums (CNGlassEffect, CNGlassEffectShape, CNSpotlightMode, etc.)
+- **Total**: 82 tests covering all major components and APIs
+
 ---
 
 ## 1.0.6
