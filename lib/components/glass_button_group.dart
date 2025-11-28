@@ -303,7 +303,10 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
                     capturedContext,
                   )
                 // ignore: use_build_context_synchronously
-                : await _buttonDataToMapAsync(widget.buttons[i], capturedContext);
+                : await _buttonDataToMapAsync(
+                    widget.buttons[i],
+                    capturedContext,
+                  );
             if (!mounted) return;
             await ch.invokeMethod('updateButton', {
               'index': i,

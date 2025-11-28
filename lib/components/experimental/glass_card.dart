@@ -86,9 +86,10 @@ class _CNGlassCardState extends State<CNGlassCard>
       vsync: this,
       duration: const Duration(seconds: 3),
     );
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     if (widget.breathing) {
       _controller.repeat(reverse: true);
@@ -137,9 +138,7 @@ class _CNGlassCardState extends State<CNGlassCard>
   }
 
   void _updateSpotlightMode() {
-    _channel?.invokeMethod('setSpotlightMode', {
-      'mode': widget.spotlight.name,
-    });
+    _channel?.invokeMethod('setSpotlightMode', {'mode': widget.spotlight.name});
   }
 
   void _updateTouchPosition(Offset localPosition) {
@@ -206,9 +205,11 @@ class _CNGlassCardState extends State<CNGlassCard>
 
   @override
   Widget build(BuildContext context) {
-    final isIOSOrMacOS = defaultTargetPlatform == TargetPlatform.iOS ||
+    final isIOSOrMacOS =
+        defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
-    final shouldUseNative = isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+    final shouldUseNative =
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
 
     // Use native implementation for iOS 26+ with spotlight support
     if (shouldUseNative && widget.spotlight != CNSpotlightMode.none) {
@@ -220,7 +221,8 @@ class _CNGlassCardState extends State<CNGlassCard>
   }
 
   Widget _buildNativeGlassCard(BuildContext context) {
-    final effectiveSpotlightColor = widget.spotlightColor ?? widget.tint ?? Colors.white;
+    final effectiveSpotlightColor =
+        widget.spotlightColor ?? widget.tint ?? Colors.white;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -270,13 +272,8 @@ class _CNGlassCardState extends State<CNGlassCard>
 
     return Stack(
       children: [
-        Positioned.fill(
-          child: IgnorePointer(child: platformView),
-        ),
-        Padding(
-          padding: widget.padding,
-          child: widget.child,
-        ),
+        Positioned.fill(child: IgnorePointer(child: platformView)),
+        Padding(padding: widget.padding, child: widget.child),
       ],
     );
   }
@@ -309,10 +306,7 @@ class _CNGlassCardState extends State<CNGlassCard>
         tint: widget.tint,
         interactive: widget.interactive,
       ),
-      child: Padding(
-        padding: widget.padding,
-        child: widget.child,
-      ),
+      child: Padding(padding: widget.padding, child: widget.child),
     );
 
     // Wrap with spotlight if enabled
@@ -330,8 +324,7 @@ class _CNGlassCardState extends State<CNGlassCard>
   }
 
   Widget _buildFlutterSpotlight(Widget card) {
-    final effectiveColor =
-        widget.spotlightColor ?? widget.tint ?? Colors.white;
+    final effectiveColor = widget.spotlightColor ?? widget.tint ?? Colors.white;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -363,8 +356,9 @@ class _CNGlassCardState extends State<CNGlassCard>
                         duration: const Duration(milliseconds: 80),
                         curve: Curves.easeOut,
                         decoration: BoxDecoration(
-                          borderRadius:
-                              BorderRadius.circular(widget.cornerRadius),
+                          borderRadius: BorderRadius.circular(
+                            widget.cornerRadius,
+                          ),
                           gradient: RadialGradient(
                             center: Alignment(
                               (_effectiveSpotlightPosition!.dx /
@@ -378,8 +372,9 @@ class _CNGlassCardState extends State<CNGlassCard>
                             ),
                             radius: widget.spotlightRadius,
                             colors: [
-                              effectiveColor
-                                  .withValues(alpha: widget.spotlightIntensity),
+                              effectiveColor.withValues(
+                                alpha: widget.spotlightIntensity,
+                              ),
                               Colors.transparent,
                             ],
                           ),
@@ -404,8 +399,9 @@ class _CNGlassCardState extends State<CNGlassCard>
             borderRadius: BorderRadius.circular(widget.cornerRadius),
             boxShadow: [
               BoxShadow(
-                color: (widget.tint ?? CupertinoColors.systemBlue)
-                    .withValues(alpha: 0.3 * _animation.value),
+                color: (widget.tint ?? CupertinoColors.systemBlue).withValues(
+                  alpha: 0.3 * _animation.value,
+                ),
                 blurRadius: 20 * _animation.value,
                 spreadRadius: 2 * _animation.value,
               ),

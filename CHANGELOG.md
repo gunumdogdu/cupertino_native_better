@@ -1,8 +1,16 @@
+## 1.1.2
+
+### Fixes
+
+- **Fixed**: Dart formatter compliance for full 50/50 pub.dev analysis score
+
+---
+
 ## 1.1.1
 
 ### Fixes
 
-- **Fixed**: Resolved `use_build_context_synchronously` lint warnings for full pub.dev analysis score
+- **Fixed**: Resolved `use_build_context_synchronously` lint warnings
 
 ---
 
