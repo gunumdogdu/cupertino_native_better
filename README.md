@@ -206,7 +206,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.1.4
+  cupertino_native_better: ^1.1.5
 ```
 
 ## Usage
@@ -471,7 +471,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.1.4
+   cupertino_native_better: ^1.1.5
    ```
 
 2. Update imports:
