@@ -673,6 +673,42 @@ channel.setMethodCallHandler { [weak self] call, result in
           if #available(iOS 13.0, *) { self.container.overrideUserInterfaceStyle = isDark ? .dark : .light }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+      case "setBadges":
+        // Lightweight badge-only update without rebuilding items
+        if let args = call.arguments as? [String: Any], let badges = args["badges"] as? [String] {
+          self.currentBadges = badges
+          // Update single bar
+          if let bar = self.tabBar, let items = bar.items {
+            for (i, item) in items.enumerated() {
+              if i < badges.count && !badges[i].isEmpty {
+                item.badgeValue = badges[i]
+              } else {
+                item.badgeValue = nil
+              }
+            }
+          }
+          // Update split bars
+          if let left = self.tabBarLeft, let leftItems = left.items,
+             let right = self.tabBarRight, let rightItems = right.items {
+            let leftEnd = leftItems.count
+            for (i, item) in leftItems.enumerated() {
+              if i < badges.count && !badges[i].isEmpty {
+                item.badgeValue = badges[i]
+              } else {
+                item.badgeValue = nil
+              }
+            }
+            for (i, item) in rightItems.enumerated() {
+              let badgeIndex = leftEnd + i
+              if badgeIndex < badges.count && !badges[badgeIndex].isEmpty {
+                item.badgeValue = badges[badgeIndex]
+              } else {
+                item.badgeValue = nil
+              }
+            }
+          }
+          result(nil)
+        } else { result(FlutterError(code: "bad_args", message: "Missing badges", details: nil)) }
       case "refresh":
         // Force refresh for label rendering on iOS < 16
         // UITabBar only fully layouts labels when items are selected

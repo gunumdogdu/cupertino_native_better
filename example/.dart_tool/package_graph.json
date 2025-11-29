@@ -1,18 +1,20 @@
 {
   "roots": [
-    "cupertino_native_better"
+    "cupertino_native_better_example"
   ],
   "packages": [
     {
-      "name": "cupertino_native_better",
-      "version": "1.1.9",
+      "name": "cupertino_native_better_example",
+      "version": "1.0.0+1",
       "dependencies": [
-        "flutter",
-        "plugin_platform_interface"
+        "cupertino_icons",
+        "cupertino_native_better",
+        "flutter"
       ],
       "devDependencies": [
         "flutter_lints",
-        "flutter_test"
+        "flutter_test",
+        "integration_test"
       ]
     },
     {
@@ -41,10 +43,27 @@
       ]
     },
     {
-      "name": "plugin_platform_interface",
-      "version": "2.1.8",
+      "name": "integration_test",
+      "version": "0.0.0",
       "dependencies": [
-        "meta"
+        "flutter",
+        "flutter_driver",
+        "flutter_test",
+        "path",
+        "vm_service"
+      ]
+    },
+    {
+      "name": "cupertino_icons",
+      "version": "1.0.8",
+      "dependencies": []
+    },
+    {
+      "name": "cupertino_native_better",
+      "version": "1.1.9",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
       ]
     },
     {
@@ -149,6 +168,33 @@
       ]
     },
     {
+      "name": "vm_service",
+      "version": "15.0.2",
+      "dependencies": []
+    },
+    {
+      "name": "flutter_driver",
+      "version": "0.0.0",
+      "dependencies": [
+        "file",
+        "flutter",
+        "flutter_test",
+        "fuchsia_remote_debug_protocol",
+        "matcher",
+        "meta",
+        "path",
+        "vm_service",
+        "webdriver"
+      ]
+    },
+    {
+      "name": "plugin_platform_interface",
+      "version": "2.1.8",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
       "name": "sky_engine",
       "version": "0.0.0",
       "dependencies": []
@@ -223,8 +269,49 @@
       ]
     },
     {
-      "name": "vm_service",
-      "version": "15.0.2",
+      "name": "webdriver",
+      "version": "3.1.0",
+      "dependencies": [
+        "matcher",
+        "path",
+        "stack_trace",
+        "sync_http"
+      ]
+    },
+    {
+      "name": "fuchsia_remote_debug_protocol",
+      "version": "0.0.0",
+      "dependencies": [
+        "meta",
+        "process",
+        "vm_service"
+      ]
+    },
+    {
+      "name": "file",
+      "version": "7.0.1",
+      "dependencies": [
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "sync_http",
+      "version": "0.3.1",
+      "dependencies": []
+    },
+    {
+      "name": "process",
+      "version": "5.0.5",
+      "dependencies": [
+        "file",
+        "path",
+        "platform"
+      ]
+    },
+    {
+      "name": "platform",
+      "version": "3.1.6",
       "dependencies": []
     }
   ],

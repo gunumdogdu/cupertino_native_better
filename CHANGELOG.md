@@ -1,3 +1,19 @@
+## 1.1.9
+
+### New Features
+
+- **Added**: Lightweight `setBadges` method for CNTabBar to update badge values without rebuilding the entire tab bar
+  - Previously, badge updates required recreating all tab bar items which caused visible flicker
+  - New implementation only updates `badgeValue` on existing UITabBarItems for smooth, instant badge changes
+  - Automatically detected when only badges changed (not labels, icons, or symbols) and uses fast path
+
+### Improvements
+
+- **Optimized**: CNTabBar now detects badge-only updates in `_syncPropsToNativeIfNeeded()` and calls lightweight native `setBadges` method instead of full `setItems` rebuild
+- **Performance**: Badge updates are now instant with no view recreation or animation interruption
+
+---
+
 ## 1.1.8
 
 ### Fixes

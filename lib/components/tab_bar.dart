@@ -482,11 +482,28 @@ class _CNTabBarState extends State<CNTabBar> {
         .toList();
     final badges = widget.items.map((e) => e.badge ?? '').toList();
 
+    // Fast path: if ONLY badges changed, use lightweight setBadges method
+    final badgesChanged = _lastBadges?.join('|') != badges.join('|');
+    final labelsChanged = _lastLabels?.join('|') != labels.join('|');
+    final symbolsChanged = _lastSymbols?.join('|') != symbols.join('|');
+    final activeSymbolsChanged =
+        _lastActiveSymbols?.join('|') != activeSymbols.join('|');
+
+    if (badgesChanged &&
+        !labelsChanged &&
+        !symbolsChanged &&
+        !activeSymbolsChanged) {
+      // Only badges changed - use lightweight update
+      await ch.invokeMethod('setBadges', {'badges': badges});
+      _lastBadges = badges;
+      return;
+    }
+
     // Check if basic properties changed
-    if (_lastLabels?.join('|') != labels.join('|') ||
-        _lastSymbols?.join('|') != symbols.join('|') ||
-        _lastActiveSymbols?.join('|') != activeSymbols.join('|') ||
-        _lastBadges?.join('|') != badges.join('|')) {
+    if (labelsChanged ||
+        symbolsChanged ||
+        activeSymbolsChanged ||
+        badgesChanged) {
       // Re-render custom icons if items changed
       final iconBytes = await _renderCustomIcons();
       final customIconBytes = iconBytes[0];
