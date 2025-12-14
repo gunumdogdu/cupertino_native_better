@@ -315,10 +315,49 @@ class _CNTabBarState extends State<CNTabBar> {
             if (!snapshot.hasData) {
               return SizedBox(height: widget.height);
             }
+            // If search is active and we have a searchItem, show Flutter search overlay
+            if (_isSearchActive && _hasSearch) {
+              return _buildNativeWithSearchOverlay(context, snapshot.data!);
+            }
             return snapshot.data!;
           },
         );
       },
+    );
+  }
+
+  /// Build native tab bar with Flutter search overlay when search is active
+  Widget _buildNativeWithSearchOverlay(BuildContext context, Widget nativeTabBar) {
+    final tintColor = _effectiveTint ?? CupertinoTheme.of(context).primaryColor;
+    final style = widget.searchItem?.style ?? const CNTabBarSearchStyle();
+    final buttonSize = style.buttonSize ?? 44.0;
+    final iconSize = style.iconSize ?? 20.0;
+    final spacing = style.spacing ?? 12.0;
+    final searchBarHeight = style.searchBarHeight ?? 44.0;
+    // Calculate proper height to fit search bar without clipping
+    final contentPadding =
+        style.contentPadding ??
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 4);
+    final totalHeight = searchBarHeight + contentPadding.vertical;
+
+    return Container(
+      height: widget.height ?? totalHeight,
+      padding: contentPadding,
+      child: Row(
+        children: [
+          // Left side: Collapsed tabs showing current selected tab
+          _buildCollapsedTabsIndicator(
+            context,
+            tintColor,
+            buttonSize,
+            iconSize,
+            style,
+          ),
+          SizedBox(width: spacing),
+          // Right side: Expanded search bar
+          _buildExpandedSearchBar(context, tintColor, style),
+        ],
+      ),
     );
   }
 
@@ -473,6 +512,7 @@ class _CNTabBarState extends State<CNTabBar> {
       if (_hasSearch) ...{
         'hasSearch': true,
         'searchPlaceholder': widget.searchItem!.placeholder,
+        'searchLabel': widget.searchItem!.label,
         'searchSymbol': widget.searchItem!.icon?.name ?? 'magnifyingglass',
         'searchActiveSymbol':
             widget.searchItem!.activeIcon?.name ??
@@ -899,6 +939,74 @@ class _CNTabBarState extends State<CNTabBar> {
     );
   }
 
+  /// Build collapsed tabs indicator showing current tab - tap to dismiss search
+  Widget _buildCollapsedTabsIndicator(
+    BuildContext context,
+    Color tintColor,
+    double buttonSize,
+    double iconSize,
+    CNTabBarSearchStyle style,
+  ) {
+    // Show current selected tab's icon with dismiss functionality
+    final currentItem = widget.items[widget.currentIndex];
+    final currentIcon = currentItem.icon?.name ??
+        currentItem.activeIcon?.name ??
+        'circle';
+
+    return GestureDetector(
+      onTap: () {
+        // Unfocus and close keyboard first
+        _searchFocusNode?.unfocus();
+        setState(() {
+          _isSearchActive = false;
+          _searchText = '';
+        });
+        widget.searchItem?.onSearchActiveChanged?.call(false);
+        widget.searchController?.updateFromNative(isActive: false);
+        // Notify native iOS to deactivate search
+        _channel?.invokeMethod('deactivateSearch');
+      },
+      child: Container(
+        height: buttonSize,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey6.resolveFrom(context),
+          borderRadius: BorderRadius.circular(buttonSize / 2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Show current tab icon
+            CNIcon(
+              symbol: CNSymbol(currentIcon),
+              size: iconSize,
+              color: tintColor,
+            ),
+            if (currentItem.label != null && currentItem.label!.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Text(
+                currentItem.label!,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: tintColor,
+                ),
+              ),
+            ],
+            const SizedBox(width: 4),
+            // Chevron down to indicate tap to dismiss
+            Icon(
+              CupertinoIcons.chevron_down,
+              size: 12,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Old method kept for Flutter fallback compatibility
   Widget _buildCollapsedTabIndicator(
     BuildContext context,
     Color tintColor,
@@ -918,6 +1026,8 @@ class _CNTabBarState extends State<CNTabBar> {
         setState(() => _isSearchActive = false);
         widget.searchItem?.onSearchActiveChanged?.call(false);
         widget.searchController?.updateFromNative(isActive: false);
+        // Notify native iOS to deactivate search
+        _channel?.invokeMethod('deactivateSearch');
       },
       child: Container(
         width: buttonSize,

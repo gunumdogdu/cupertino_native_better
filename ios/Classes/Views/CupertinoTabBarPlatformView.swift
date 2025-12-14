@@ -104,10 +104,19 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     super.init()
 
     container.backgroundColor = .clear
+    container.clipsToBounds = true // Prevent shadow leakage
+    container.layer.shadowOpacity = 0 // Explicitly disable layer shadow
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     let appearance: UITabBarAppearance? = {
-    if #available(iOS 13.0, *) { let ap = UITabBarAppearance(); ap.configureWithDefaultBackground(); return ap }
+    if #available(iOS 13.0, *) {
+      let ap = UITabBarAppearance()
+      ap.configureWithTransparentBackground()
+      // Remove shadow to prevent shadow appearing over modals/bottom sheets
+      ap.shadowColor = .clear
+      ap.shadowImage = UIImage()
+      return ap
+    }
     return nil
   }()
     func buildItems(_ range: Range<Int>) -> [UITabBarItem] {
@@ -158,10 +167,12 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBarLeft = left; tabBarRight = right
       left.translatesAutoresizingMaskIntoConstraints = false
       right.translatesAutoresizingMaskIntoConstraints = false
+      left.clipsToBounds = true; right.clipsToBounds = true // Prevent shadow leakage
+      left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
       left.delegate = self; right.delegate = self
       if let bg = bg { left.barTintColor = bg; right.barTintColor = bg }
       if #available(iOS 10.0, *), let tint = tint { left.tintColor = tint; right.tintColor = tint }
-      if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap } }
+      if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap; if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap; right.scrollEdgeAppearance = ap } } }
       
       left.items = buildItems(0..<leftEnd)
       right.items = buildItems(leftEnd..<count)
@@ -261,6 +272,8 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBar = bar
       bar.delegate = self
       bar.translatesAutoresizingMaskIntoConstraints = false
+      bar.clipsToBounds = true // Prevent shadow leakage from tab bar itself
+      bar.layer.shadowOpacity = 0
       if let bg = bg { bar.barTintColor = bg }
       if #available(iOS 10.0, *), let tint = tint { bar.tintColor = tint }
       if let ap = appearance { if #available(iOS 13.0, *) { bar.standardAppearance = ap; if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap } } }
@@ -452,7 +465,13 @@ channel.setMethodCallHandler { [weak self] call, result in
           let imageAssetFormats = self.currentImageAssetFormats
           let activeImageAssetFormats = self.currentActiveImageAssetFormats
           let appearance: UITabBarAppearance? = {
-            if #available(iOS 13.0, *) { let ap = UITabBarAppearance(); ap.configureWithDefaultBackground(); return ap }
+            if #available(iOS 13.0, *) {
+              let ap = UITabBarAppearance()
+              ap.configureWithTransparentBackground()
+              ap.shadowColor = .clear
+              ap.shadowImage = UIImage()
+              return ap
+            }
             return nil
           }()
           func buildItems(_ range: Range<Int>) -> [UITabBarItem] {
@@ -503,8 +522,10 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBarLeft = left; self.tabBarRight = right
             left.translatesAutoresizingMaskIntoConstraints = false
             right.translatesAutoresizingMaskIntoConstraints = false
+            left.clipsToBounds = true; right.clipsToBounds = true
+            left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
             left.delegate = self; right.delegate = self
-            if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap } }
+            if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap; if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap; right.scrollEdgeAppearance = ap } } }
             left.items = buildItems(0..<leftEnd)
             right.items = buildItems(leftEnd..<count)
             if selectedIndex < leftEnd, let items = left.items { left.selectedItem = items[selectedIndex]; right.selectedItem = nil }
@@ -591,6 +612,8 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBar = bar
             bar.delegate = self
             bar.translatesAutoresizingMaskIntoConstraints = false
+            bar.clipsToBounds = true
+            bar.layer.shadowOpacity = 0
             if let ap = appearance { if #available(iOS 13.0, *) { bar.standardAppearance = ap; if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap } } }
             bar.items = buildItems(0..<count)
             if let items = bar.items, selectedIndex >= 0, selectedIndex < items.count { bar.selectedItem = items[selectedIndex] }

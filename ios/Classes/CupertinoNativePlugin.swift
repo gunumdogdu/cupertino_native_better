@@ -43,6 +43,11 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     // Floating island (Dynamic Island style)
     let floatingIslandFactory = FloatingIslandFactory(messenger: registrar.messenger())
     registrar.register(floatingIslandFactory, withId: "CNFloatingIsland")
+
+    // Search scaffold (UITabBarController with UISearchController for iOS 26+ liquid glass)
+    // Factory is available on all iOS, runtime check happens inside
+    let searchScaffoldFactory = CNSearchScaffoldViewFactory(messenger: registrar.messenger())
+    registrar.register(searchScaffoldFactory, withId: "CNSearchScaffold")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

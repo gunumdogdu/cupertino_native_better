@@ -9,11 +9,11 @@ import 'demos/popup_menu_button.dart';
 import 'demos/button.dart';
 import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
+import 'demos/issues_test.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize platform version detection early
-  await PlatformVersion.initialize();
+  // No longer need to call PlatformVersion.initialize() - it auto-initializes!
   runApp(const MyApp());
 }
 
@@ -249,6 +249,21 @@ class HomePage extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute(builder: (_) => const OverlayTestPage()),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('Issues Test'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'exclamationmark.triangle',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(builder: (_) => const IssuesTestPage()),
                   );
                 },
               ),

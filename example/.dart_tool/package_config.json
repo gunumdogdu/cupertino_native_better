@@ -231,8 +231,8 @@
     }
   ],
   "generator": "pub",
-  "generatorVersion": "3.10.1",
+  "generatorVersion": "3.10.3",
   "flutterRoot": "file:///Users/emirgunumdogdu/development/flutter",
-  "flutterVersion": "3.38.3",
+  "flutterVersion": "3.38.4",
   "pubCache": "file:///Users/emirgunumdogdu/.pub-cache"
 }

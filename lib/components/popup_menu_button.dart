@@ -74,6 +74,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.height = 32.0,
     this.shrinkWrap = false,
     this.buttonStyle = CNButtonStyle.plain,
+    this.preserveTopToBottomOrder = false,
   }) : buttonIcon = null,
        buttonCustomIcon = null,
        buttonImageAsset = null,
@@ -91,6 +92,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.tint,
     double size = 44.0, // button diameter (width = height)
     this.buttonStyle = CNButtonStyle.glass,
+    this.preserveTopToBottomOrder = false,
   }) : buttonLabel = null,
        round = true,
        width = size,
@@ -140,6 +142,13 @@ class CNPopupMenuButton extends StatefulWidget {
 
   /// Visual style to apply to the button.
   final CNButtonStyle buttonStyle;
+
+  /// When true, items maintain top-to-bottom order even when menu opens upward.
+  ///
+  /// By default (false), iOS native behavior keeps the first item closest to
+  /// the button. When the menu opens upward, this means item 1 appears at the
+  /// bottom. Set to true to always display items 1,2,3,4 from top to bottom.
+  final bool preserveTopToBottomOrder;
 
   /// Whether this instance is configured as an icon button variant.
   bool get isIconButton =>
@@ -487,6 +496,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
         'buttonIconPaletteColors': capturedButtonPaletteColors,
       if (widget.buttonIcon?.gradient != null)
         'buttonIconGradientEnabled': widget.buttonIcon!.gradient,
+      'preserveTopToBottomOrder': widget.preserveTopToBottomOrder,
     };
 
     // Create a comprehensive key that includes all parameters affecting platform view creation

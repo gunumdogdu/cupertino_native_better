@@ -31,6 +31,7 @@ class CNTabBarSearchItem {
   const CNTabBarSearchItem({
     this.icon,
     this.activeIcon,
+    this.label = 'Search',
     this.placeholder = 'Search',
     this.onSearchChanged,
     this.onSearchSubmit,
@@ -48,6 +49,11 @@ class CNTabBarSearchItem {
   ///
   /// If not provided, uses [icon].
   final CNSymbol? activeIcon;
+
+  /// Label shown under the search icon button.
+  ///
+  /// Defaults to 'Search'. This matches the style of tab labels.
+  final String label;
 
   /// Placeholder text shown in the search bar when empty.
   ///
@@ -86,6 +92,7 @@ class CNTabBarSearchItem {
     return other is CNTabBarSearchItem &&
         other.icon == icon &&
         other.activeIcon == activeIcon &&
+        other.label == label &&
         other.placeholder == placeholder &&
         other.automaticallyActivatesSearch == automaticallyActivatesSearch &&
         other.style == style;
@@ -95,6 +102,7 @@ class CNTabBarSearchItem {
   int get hashCode => Object.hash(
     icon,
     activeIcon,
+    label,
     placeholder,
     automaticallyActivatesSearch,
     style,

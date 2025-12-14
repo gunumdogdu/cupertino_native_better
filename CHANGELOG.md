@@ -1,3 +1,37 @@
+## 1.3.0
+
+### New Features
+
+- **Added**: `CNToast` - Toast notification widget with Liquid Glass effects
+  - Static methods: `show()`, `success()`, `error()`, `warning()`, `info()`, `loading()`
+  - Duration presets: short (2s), medium (3.5s), long (5s)
+  - Position options: top, center, bottom
+  - Auto-dismiss with queue management
+  - `CNLoadingToastHandle` for dismissing loading toasts
+
+- **Added**: `label` property to `CNTabBarSearchItem` for customizing the search tab label
+  - Defaults to 'Search' to match iOS native behavior
+
+### Improvements
+
+- **Enhanced**: `PlatformVersion` now auto-initializes on first access
+  - No longer need to call `await PlatformVersion.initialize()` in `main()`
+  - Just use `PlatformVersion.isIOS26OrLater` directly
+  - Old `initialize()` method kept for backwards compatibility (marked deprecated)
+
+- **Added**: New helper properties to `PlatformVersion`:
+  - `isIOS`, `isMacOS`, `isAndroid`, `isApple`
+  - `isIOSVersionInRange(min, max)`, `isMacOSVersionInRange(min, max)`
+
+### Bug Fixes
+
+- **Fixed**: Tab bar shadow artifact appearing over modals and bottom sheets (Issue #2)
+  - Changed `configureWithDefaultBackground()` to `configureWithTransparentBackground()`
+  - Added explicit shadow removal: `shadowColor = .clear`, `shadowImage = UIImage()`
+  - Added `container.clipsToBounds = true` and `layer.shadowOpacity = 0`
+
+---
+
 ## 1.2.0
 
 ### New Features

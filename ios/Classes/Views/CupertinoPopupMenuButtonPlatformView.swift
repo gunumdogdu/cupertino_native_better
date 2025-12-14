@@ -22,6 +22,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var itemPalettes: [[NSNumber]] = []
   private var itemGradients: [NSNumber?] = []
   private var iconScale: CGFloat = UIScreen.main.scale
+  private var preserveTopToBottomOrder: Bool = false
   // Track current button icon configuration to keep image across state updates
   private var btnIconName: String? = nil
   private var btnCustomIconBytes: Data? = nil
@@ -96,6 +97,9 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       if let gradients = dict["sfSymbolGradientEnabled"] as? [NSNumber?] { self.itemGradients = gradients }
       if let m = dict["buttonIconRenderingMode"] as? String { buttonIconMode = m }
       if let pal = dict["buttonIconPaletteColors"] as? [NSNumber] { buttonIconPalette = pal }
+      if let preserve = dict["preserveTopToBottomOrder"] as? NSNumber {
+        self.preserveTopToBottomOrder = preserve.boolValue
+      }
     }
 
     super.init()
@@ -261,14 +265,49 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private func rebuildMenu(defaultSizes: [Any]? = nil, defaultColors: [Any]? = nil) {
     // iOS 14+ native menu
     if #available(iOS 14.0, *) {
-      // Build grouped actions; inline groups render with native separators.
-      var groups: [[UIMenuElement]] = []
-      var current: [UIMenuElement] = []
-      let count = max(labels.count, max(symbols.count, dividers.count))
-      let flushGroup: () -> Void = {
-        if !current.isEmpty { groups.append(current); current = [] }
+      // If preserveTopToBottomOrder is enabled, use deferred menu to check position at display time
+      if preserveTopToBottomOrder {
+        let deferredElement = UIDeferredMenuElement.uncached { [weak self] completion in
+          guard let self = self else { completion([]); return }
+          let items = self.buildMenuItems(defaultSizes: defaultSizes, defaultColors: defaultColors)
+
+          // Check button position at display time
+          let buttonFrame = self.button.convert(self.button.bounds, to: nil)
+          let screenHeight = UIScreen.main.bounds.height
+          let opensUpward = buttonFrame.midY > screenHeight * 0.4
+
+          if opensUpward {
+            // Reverse groups AND items within each group
+            let reversed: [UIMenuElement] = items.reversed().map { element in
+              if let menu = element as? UIMenu {
+                return UIMenu(title: menu.title, options: menu.options, children: menu.children.reversed())
+              }
+              return element
+            }
+            completion(reversed)
+          } else {
+            completion(items)
+          }
+        }
+        button.menu = UIMenu(title: "", children: [deferredElement])
+        return
       }
-      for i in 0..<count {
+
+      // Standard menu building (native behavior)
+      let items = buildMenuItems(defaultSizes: defaultSizes, defaultColors: defaultColors)
+      button.menu = UIMenu(title: "", children: items)
+    }
+  }
+
+  @available(iOS 14.0, *)
+  private func buildMenuItems(defaultSizes: [Any]? = nil, defaultColors: [Any]? = nil) -> [UIMenuElement] {
+    var groups: [[UIMenuElement]] = []
+    var current: [UIMenuElement] = []
+    let count = max(labels.count, max(symbols.count, dividers.count))
+    let flushGroup: () -> Void = {
+      if !current.isEmpty { groups.append(current); current = [] }
+    }
+    for i in 0..<count {
         let isDiv = i < dividers.count ? dividers[i] : false
         if isDiv { flushGroup(); continue }
         let title = i < labels.count ? labels[i] : ""
@@ -408,12 +447,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         }
         current.append(action)
       }
-      flushGroup()
-      let children: [UIMenuElement] = groups.map { group in
-        UIMenu(title: "", options: .displayInline, children: group)
-      }
-      button.menu = UIMenu(title: "", children: children)
+    flushGroup()
+    let children: [UIMenuElement] = groups.map { group in
+      UIMenu(title: "", options: .displayInline, children: group)
     }
+    return children
   }
 
   @objc private func onButtonPressedLegacy(_ sender: UIButton) {

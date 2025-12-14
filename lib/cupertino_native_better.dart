@@ -6,17 +6,17 @@
 ///
 /// ## Getting Started
 ///
-/// Initialize the version detector early in your app:
+/// Just import and use! No initialization required:
 ///
 /// ```dart
 /// import 'package:cupertino_native_better/cupertino_native_better.dart';
 ///
-/// void main() async {
-///   WidgetsFlutterBinding.ensureInitialized();
-///   await PlatformVersion.initialize();
+/// void main() {
 ///   runApp(MyApp());
 /// }
 /// ```
+///
+/// PlatformVersion now auto-initializes on first access.
 ///
 /// ## Available Widgets
 ///
@@ -28,6 +28,8 @@
 /// - [CNPopupMenuButton] - Native popup menu
 /// - [CNSegmentedControl] - Native segmented control
 /// - [CNGlassButtonGroup] - Grouped buttons with unified glass effects
+/// - [CNSearchBar] - Expandable search bar with animations
+/// - [CNToast] - Toast notifications with glass effects
 /// - [LiquidGlassContainer] - Apply glass effects to any widget
 ///
 /// ## Platform Support
@@ -63,7 +65,9 @@ export 'components/segmented_control.dart';
 export 'components/glass_button_group.dart';
 export 'components/liquid_glass_container.dart';
 export 'components/search_bar.dart';
+export 'components/toast.dart';
 export 'components/floating_island.dart';
+export 'components/search_scaffold.dart';
 export 'components/experimental/glass_card.dart';
 
 // Styles

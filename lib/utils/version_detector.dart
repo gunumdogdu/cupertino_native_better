@@ -1,24 +1,29 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 
-/// Utility class for checking OS version with caching.
+/// Utility class for checking OS version with caching and auto-initialization.
 ///
-/// This class provides cached version detection to avoid repeated
-/// method channel calls. The version is fetched once and cached for
-/// the lifetime of the application.
+/// This class provides cached version detection that auto-initializes
+/// on first access - no manual initialization needed!
+///
+/// ```dart
+/// // OLD (required manual init):
+/// await PlatformVersion.initialize();
+/// if (PlatformVersion.isIOS26OrLater) { ... }
+///
+/// // NEW (auto-initializes):
+/// if (PlatformVersion.isIOS26OrLater) { ... }
+/// ```
 class PlatformVersion {
   static int? _cachedIOSVersion;
   static int? _cachedMacOSVersion;
   static bool _isInitialized = false;
 
-  /// Initializes version detection by fetching and caching the OS version.
+  /// Ensures platform info is initialized.
   ///
-  /// This should be called early in the app lifecycle, but can be called
-  /// multiple times safely - it will only fetch once.
-  ///
-  /// FIXED: Uses manual version detection instead of platform channel
-  /// to avoid null check errors in release builds.
-  static Future<void> initialize() async {
+  /// Called automatically by property accessors - no need to call manually.
+  /// Safe to call multiple times.
+  static void ensureInitialized() {
     if (_isInitialized) return;
 
     try {
@@ -44,6 +49,15 @@ class PlatformVersion {
     }
 
     _isInitialized = true;
+  }
+
+  /// Initializes version detection by fetching and caching the OS version.
+  ///
+  /// @Deprecated: No longer needed! PlatformVersion now auto-initializes.
+  /// This method is kept for backwards compatibility.
+  @Deprecated('No longer needed - PlatformVersion now auto-initializes on first access')
+  static Future<void> initialize() async {
+    ensureInitialized();
   }
 
   /// Manually gets iOS version by parsing Platform.operatingSystemVersion
@@ -87,68 +101,80 @@ class PlatformVersion {
     return null;
   }
 
-  /// Gets the cached iOS major version, or null if not iOS or not initialized.
-  static int? get iosVersion => _cachedIOSVersion;
+  /// Gets the iOS major version, auto-initializing if needed.
+  static int? get iosVersion {
+    ensureInitialized();
+    return _cachedIOSVersion;
+  }
 
-  /// Gets the cached macOS major version, or null if not macOS or not initialized.
-  static int? get macOSVersion => _cachedMacOSVersion;
+  /// Gets the macOS major version, auto-initializing if needed.
+  static int? get macOSVersion {
+    ensureInitialized();
+    return _cachedMacOSVersion;
+  }
 
-  /// Checks if the current iOS version is 26 or later.
+  /// Returns true if running on iOS 26 or later.
   ///
-  /// Returns false if not iOS or version detection failed.
-  ///
-  /// Note: Returns false if not initialized (safe fallback).
+  /// Auto-initializes on first access.
   static bool get isIOS26OrLater {
     if (!Platform.isIOS) return false;
-    if (!_isInitialized) {
-      // Silent fallback - initialization should happen in main()
-      return false;
-    }
+    ensureInitialized();
     return (_cachedIOSVersion ?? 0) >= 26;
   }
 
-  /// Checks if the current macOS version is 26 or later.
+  /// Returns true if running on macOS 26 or later.
   ///
-  /// Returns false if not macOS or version detection failed.
-  ///
-  /// Note: Returns false if not initialized (safe fallback).
+  /// Auto-initializes on first access.
   static bool get isMacOS26OrLater {
     if (!Platform.isMacOS) return false;
-    if (!_isInitialized) {
-      // Silent fallback - initialization should happen in main()
-      return false;
-    }
+    ensureInitialized();
     return (_cachedMacOSVersion ?? 0) >= 26;
   }
 
-  /// Checks if Liquid Glass effects should use native platform views.
+  /// Returns true if native Liquid Glass effects should be used.
   ///
-  /// Returns true only for iOS 26+ or macOS 26+.
-  ///
-  /// This will auto-initialize if not already initialized.
-  static bool get shouldUseNativeGlass {
-    if (!_isInitialized) {
-      // Auto-initialize synchronously returns false for safety
-      // The actual async initialization should happen in main()
-      return false;
-    }
-    return isIOS26OrLater || isMacOS26OrLater;
-  }
+  /// This is true only on iOS 26+ or macOS 26+.
+  /// Auto-initializes on first access.
+  static bool get shouldUseNativeGlass => isIOS26OrLater || isMacOS26OrLater;
 
-  /// Checks if the platform supports native Liquid Glass effects.
-  ///
-  /// This is an alias for [shouldUseNativeGlass] for clarity.
+  /// Alias for [shouldUseNativeGlass].
   static bool get supportsLiquidGlass => shouldUseNativeGlass;
 
-  /// Checks if the platform supports native SF Symbol rendering.
-  ///
-  /// SF Symbols are available on iOS 13+ and macOS 11+.
-  /// This always returns true for iOS/macOS regardless of initialization status,
-  /// since SF Symbols are universally supported on modern iOS/macOS versions.
-  ///
-  /// Use this for icon rendering instead of [shouldUseNativeGlass].
-  static bool get supportsSFSymbols {
-    return Platform.isIOS || Platform.isMacOS;
+  /// Returns true if SF Symbols are supported (iOS/macOS).
+  static bool get supportsSFSymbols => Platform.isIOS || Platform.isMacOS;
+
+  /// Returns true if running on iOS (any version).
+  static bool get isIOS => Platform.isIOS;
+
+  /// Returns true if running on macOS (any version).
+  static bool get isMacOS => Platform.isMacOS;
+
+  /// Returns true if running on Android.
+  static bool get isAndroid => Platform.isAndroid;
+
+  /// Returns true if running on Apple platform (iOS or macOS).
+  static bool get isApple => Platform.isIOS || Platform.isMacOS;
+
+  /// Checks if iOS version is in the specified range.
+  static bool isIOSVersionInRange(int min, [int? max]) {
+    if (!Platform.isIOS) return false;
+    ensureInitialized();
+    final version = _cachedIOSVersion ?? 0;
+    if (max != null) {
+      return version >= min && version <= max;
+    }
+    return version >= min;
+  }
+
+  /// Checks if macOS version is in the specified range.
+  static bool isMacOSVersionInRange(int min, [int? max]) {
+    if (!Platform.isMacOS) return false;
+    ensureInitialized();
+    final version = _cachedMacOSVersion ?? 0;
+    if (max != null) {
+      return version >= min && version <= max;
+    }
+    return version >= min;
   }
 
   /// Forces a refresh of the cached version (useful for testing).
