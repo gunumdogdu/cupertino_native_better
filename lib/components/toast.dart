@@ -120,17 +120,19 @@ class CNToast {
     Color? textColor,
     bool useGlassEffect = true,
   }) {
-    _queue.add(_ToastEntry(
-      context: context,
-      message: message,
-      icon: icon,
-      position: position,
-      duration: duration,
-      style: style,
-      backgroundColor: backgroundColor,
-      textColor: textColor,
-      useGlassEffect: useGlassEffect,
-    ));
+    _queue.add(
+      _ToastEntry(
+        context: context,
+        message: message,
+        icon: icon,
+        position: position,
+        duration: duration,
+        style: style,
+        backgroundColor: backgroundColor,
+        textColor: textColor,
+        useGlassEffect: useGlassEffect,
+      ),
+    );
 
     if (!_isShowing) {
       _showNext();
@@ -239,7 +241,8 @@ class CNToast {
     final handle = CNLoadingToastHandle._();
 
     final overlay = Overlay.of(context);
-    final shouldUseGlass = PlatformVersion.supportsLiquidGlass && useGlassEffect;
+    final shouldUseGlass =
+        PlatformVersion.supportsLiquidGlass && useGlassEffect;
 
     handle._overlayEntry = OverlayEntry(
       builder: (context) {
@@ -404,18 +407,12 @@ class _ToastOverlayState extends State<_ToastOverlay>
     _scaleAnimation = Tween<double>(
       begin: 0.8,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutBack,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
   }
@@ -429,30 +426,21 @@ class _ToastOverlayState extends State<_ToastOverlay>
   Color _getBackgroundColor(BuildContext context) {
     if (widget.backgroundColor != null) return widget.backgroundColor!;
 
-    final brightness = CupertinoTheme.of(context).brightness ?? Brightness.light;
+    final brightness =
+        CupertinoTheme.of(context).brightness ?? Brightness.light;
     final isDark = brightness == Brightness.dark;
 
     switch (widget.style) {
       case CNToastStyle.normal:
-        return isDark
-            ? const Color(0xE6333333)
-            : const Color(0xE6FFFFFF);
+        return isDark ? const Color(0xE6333333) : const Color(0xE6FFFFFF);
       case CNToastStyle.success:
-        return isDark
-            ? const Color(0xE6264D26)
-            : const Color(0xE6E8F5E9);
+        return isDark ? const Color(0xE6264D26) : const Color(0xE6E8F5E9);
       case CNToastStyle.error:
-        return isDark
-            ? const Color(0xE64D2626)
-            : const Color(0xE6FFEBEE);
+        return isDark ? const Color(0xE64D2626) : const Color(0xE6FFEBEE);
       case CNToastStyle.warning:
-        return isDark
-            ? const Color(0xE64D3D26)
-            : const Color(0xE6FFF3E0);
+        return isDark ? const Color(0xE64D3D26) : const Color(0xE6FFF3E0);
       case CNToastStyle.info:
-        return isDark
-            ? const Color(0xE626444D)
-            : const Color(0xE6E3F2FD);
+        return isDark ? const Color(0xE626444D) : const Color(0xE6E3F2FD);
     }
   }
 
@@ -472,10 +460,7 @@ class _ToastOverlayState extends State<_ToastOverlay>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.icon != null) ...[
-            widget.icon!,
-            const SizedBox(width: 12),
-          ],
+          if (widget.icon != null) ...[widget.icon!, const SizedBox(width: 12)],
           Flexible(
             child: Text(
               widget.message,

@@ -55,7 +55,9 @@ class PlatformVersion {
   ///
   /// @Deprecated: No longer needed! PlatformVersion now auto-initializes.
   /// This method is kept for backwards compatibility.
-  @Deprecated('No longer needed - PlatformVersion now auto-initializes on first access')
+  @Deprecated(
+    'No longer needed - PlatformVersion now auto-initializes on first access',
+  )
   static Future<void> initialize() async {
     ensureInitialized();
   }

@@ -9,7 +9,6 @@ import '../utils/icon_renderer.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import 'icon.dart';
-import 'native_tab_bar.dart';
 
 /// Immutable data describing a single tab bar item.
 class CNTabBarItem {
@@ -323,45 +322,6 @@ class _CNTabBarState extends State<CNTabBar> {
           },
         );
       },
-    );
-  }
-
-  /// Build native tab bar with Flutter search overlay when search is active
-  Widget _buildNativeWithSearchOverlay(BuildContext context, Widget nativeTabBar) {
-    final tintColor = _effectiveTint ?? CupertinoTheme.of(context).primaryColor;
-    final style = widget.searchItem?.style ?? const CNTabBarSearchStyle();
-    final buttonSize = style.buttonSize ?? 44.0;
-    final iconSize = style.iconSize ?? 20.0;
-    final spacing = style.spacing ?? 12.0;
-    final searchBarHeight = style.searchBarHeight ?? 36.0;
-    // Calculate proper height to fit search bar without clipping
-    final contentPadding =
-        style.contentPadding ??
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 6);
-    // Use the larger of widget.height or calculated height
-    final calculatedHeight = searchBarHeight + contentPadding.vertical;
-    final effectiveHeight = widget.height != null
-        ? (widget.height! > calculatedHeight ? widget.height! : calculatedHeight)
-        : calculatedHeight;
-
-    return Container(
-      height: effectiveHeight,
-      padding: contentPadding,
-      child: Row(
-        children: [
-          // Left side: Collapsed tabs showing current selected tab
-          _buildCollapsedTabsIndicator(
-            context,
-            tintColor,
-            buttonSize,
-            iconSize,
-            style,
-          ),
-          SizedBox(width: spacing),
-          // Right side: Expanded search bar
-          _buildExpandedSearchBar(context, tintColor, style),
-        ],
-      ),
     );
   }
 
@@ -939,77 +899,6 @@ class _CNTabBarState extends State<CNTabBar> {
                   ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// Build collapsed tabs indicator showing current tab - tap to dismiss search
-  Widget _buildCollapsedTabsIndicator(
-    BuildContext context,
-    Color tintColor,
-    double buttonSize,
-    double iconSize,
-    CNTabBarSearchStyle style,
-  ) {
-    // Show current selected tab's icon with dismiss functionality
-    final currentItem = widget.items[widget.currentIndex];
-    final currentIcon = currentItem.icon?.name ??
-        currentItem.activeIcon?.name ??
-        'circle';
-    // Match search bar height (36px default)
-    final indicatorHeight = style.searchBarHeight ?? 36.0;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque, // Ensure tap is detected
-      onTap: () {
-        // Unfocus and close keyboard first
-        _searchFocusNode?.unfocus();
-        setState(() {
-          _isSearchActive = false;
-          _searchText = '';
-        });
-        widget.searchItem?.onSearchActiveChanged?.call(false);
-        widget.searchController?.updateFromNative(isActive: false);
-        // Notify native iOS to deactivate search
-        _channel?.invokeMethod('deactivateSearch');
-      },
-      child: Container(
-        height: indicatorHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemGrey6.resolveFrom(context),
-          borderRadius: BorderRadius.circular(indicatorHeight / 2),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Show current tab icon
-            CNIcon(
-              symbol: CNSymbol(currentIcon),
-              size: iconSize * 0.9,
-              color: tintColor,
-            ),
-            if (currentItem.label != null && currentItem.label!.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Text(
-                currentItem.label!,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: tintColor,
-                ),
-              ),
-            ],
-            const SizedBox(width: 4),
-            // Chevron down to indicate tap to dismiss
-            Icon(
-              CupertinoIcons.chevron_down,
-              size: 11,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -2,6 +2,15 @@
 
 ### New Features
 
+- **Added**: `CNTabBarNative` - Native iOS 26 Tab Bar with full UITabBarController integration
+  - Uses native `UITabBarController` + `UISearchController` for authentic iOS 26 liquid glass effects
+  - `CNTabBarNative.enable()` / `CNTabBarNative.disable()` for app-level tab bar management
+  - `CNTab` class for tab configuration with SF Symbols and search tab support
+  - Callbacks: `onTabSelected`, `onSearchChanged`, `onSearchSubmitted`, `onSearchCancelled`, `onSearchActiveChanged`
+  - Full badge count support and dynamic styling
+
+- **Added**: `CNSearchScaffold` - Native search scaffold controller for standalone search UI
+
 - **Added**: `CNToast` - Toast notification widget with Liquid Glass effects
   - Static methods: `show()`, `success()`, `error()`, `warning()`, `info()`, `loading()`
   - Duration presets: short (2s), medium (3.5s), long (5s)
@@ -11,6 +20,11 @@
 
 - **Added**: `label` property to `CNTabBarSearchItem` for customizing the search tab label
   - Defaults to 'Search' to match iOS native behavior
+
+- **Added**: `preserveTopToBottomOrder` property to `CNPopupMenuButton` (Issue #3)
+  - When `true`, menu items maintain top-to-bottom order (1,2,3,4) regardless of menu direction
+  - Default `false` preserves native iOS behavior where item 1 stays closest to the button
+  - Uses `UIDeferredMenuElement.uncached` for dynamic position detection
 
 ### Improvements
 
@@ -25,10 +39,18 @@
 
 ### Bug Fixes
 
+- **Fixed**: `CNPopupMenuButton.icon` now respects the order defined in items (Issue #3)
+  - Added `preserveTopToBottomOrder` parameter to control item ordering behavior
+  - Native iOS behavior keeps first item closest to button; set `preserveTopToBottomOrder: true` for consistent top-to-bottom order
+
 - **Fixed**: Tab bar shadow artifact appearing over modals and bottom sheets (Issue #2)
   - Changed `configureWithDefaultBackground()` to `configureWithTransparentBackground()`
   - Added explicit shadow removal: `shadowColor = .clear`, `shadowImage = UIImage()`
   - Added `container.clipsToBounds = true` and `layer.shadowOpacity = 0`
+
+- **Fixed**: Search bar keyboard auto-opening behavior (Issue #1)
+  - `automaticallyActivatesSearch: false` now properly prevents keyboard from auto-opening
+  - This is native iOS behavior - the search bar expands but keyboard only opens on text field tap
 
 ---
 

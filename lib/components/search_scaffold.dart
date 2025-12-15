@@ -75,7 +75,10 @@ class CNSearchScaffold extends StatefulWidget {
     this.onSearchActiveChanged,
     this.searchPlaceholder = 'Search',
     this.searchController,
-  }) : assert(items.length == children.length, 'items and children must have same length'),
+  }) : assert(
+         items.length == children.length,
+         'items and children must have same length',
+       ),
        assert(items.length >= 2, 'Must have at least 2 items');
 
   /// Items to display in the tab bar.
@@ -211,7 +214,10 @@ class _CNSearchScaffoldState extends State<CNSearchScaffold> {
       'style': encodeStyle(context, tint: _effectiveTint)
         ..addAll({
           if (widget.unselectedTint != null)
-            'unselectedTint': resolveColorToArgb(widget.unselectedTint, context),
+            'unselectedTint': resolveColorToArgb(
+              widget.unselectedTint,
+              context,
+            ),
         }),
       'searchPlaceholder': widget.searchPlaceholder,
     };
@@ -343,9 +349,7 @@ class _CNSearchScaffoldState extends State<CNSearchScaffold> {
         activeColor: _effectiveTint,
       ),
       tabBuilder: (context, index) {
-        return CupertinoTabView(
-          builder: (context) => widget.children[index],
-        );
+        return CupertinoTabView(builder: (context) => widget.children[index]);
       },
     );
   }

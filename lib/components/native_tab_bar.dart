@@ -104,7 +104,8 @@ class CNTabBarNative {
       'selectedIndex': selectedIndex,
       'isDark': isDark ?? false,
       if (tintColor != null) 'tint': tintColor.toARGB32(),
-      if (unselectedTintColor != null) 'unselectedTint': unselectedTintColor.toARGB32(),
+      if (unselectedTintColor != null)
+        'unselectedTint': unselectedTintColor.toARGB32(),
     });
 
     _isEnabled = true;
@@ -164,7 +165,8 @@ class CNTabBarNative {
     if (!_isEnabled) return;
     await _channel.invokeMethod('setStyle', {
       if (tintColor != null) 'tint': tintColor.toARGB32(),
-      if (unselectedTintColor != null) 'unselectedTint': unselectedTintColor.toARGB32(),
+      if (unselectedTintColor != null)
+        'unselectedTint': unselectedTintColor.toARGB32(),
     });
   }
 
@@ -215,7 +217,17 @@ class CNTabBarNative {
   }
 }
 
-/// Configuration for a native tab
+/// Configuration for a native tab in [CNTabBarNative].
+///
+/// Each tab can have a title, SF Symbol icon, and optionally be marked as a search tab.
+///
+/// Example:
+/// ```dart
+/// CNTab(
+///   title: 'Home',
+///   sfSymbol: CNSymbol('house.fill'),
+/// )
+/// ```
 class CNTab {
   /// The title of the tab (shown below icon)
   final String title;
@@ -237,6 +249,7 @@ class CNTab {
   /// Badge count to display on the tab
   final int? badgeCount;
 
+  /// Creates a tab configuration for [CNTabBarNative].
   const CNTab({
     required this.title,
     this.sfSymbol,

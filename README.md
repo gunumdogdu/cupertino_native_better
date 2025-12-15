@@ -10,27 +10,19 @@ Native iOS 26+ **Liquid Glass** widgets for Flutter with pixel-perfect fidelity.
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/preview.jpg" alt="Preview" width="600"/>
 </p>
 
-## ⚠️ REQUIRED: Initialize Before Use
+## Quick Start
 
-**You MUST call `PlatformVersion.initialize()` before using any widgets!**
-
-Without initialization, the package cannot detect your iOS/macOS version and will **always fall back to old Cupertino buttons** - even on iOS 26+ devices.
+No initialization required! Just import and use:
 
 ```dart
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // REQUIRED: Initialize platform version detection
-  await PlatformVersion.initialize();
-
+void main() {
   runApp(MyApp());
 }
 ```
 
-> **Why is this required?**
-> The package needs to detect your OS version to decide whether to use native Liquid Glass (iOS 26+) or fallback widgets (iOS < 26). Without initialization, `PlatformVersion.shouldUseNativeGlass` always returns `false`.
+> **Note:** `PlatformVersion` auto-initializes on first access. No need to call `initialize()` anymore!
 
 ## Performance Best Practices
 
@@ -101,6 +93,8 @@ This approach works reliably in **both debug and release builds**.
 | `CNGlassButtonGroup` | Grouped buttons with unified glass blending | - |
 | `LiquidGlassContainer` | Apply Liquid Glass effects to any Flutter widget | - |
 | `CNGlassCard` | **(Experimental)** Pre-styled card with optional breathing glow animation | - |
+| `CNTabBarNative` | **iOS 26 Native Tab Bar** with UITabBarController + search | - |
+| `CNToast` | Toast notifications with Liquid Glass effects | - |
 
 ### Icon Support
 
@@ -200,6 +194,32 @@ CNTabBar(
 )
 ```
 
+### Native iOS 26 Tab Bar (CNTabBarNative)
+
+For full iOS 26 liquid glass tab bar experience with native UITabBarController:
+
+```dart
+@override
+void initState() {
+  super.initState();
+  CNTabBarNative.enable(
+    tabs: [
+      CNTab(title: 'Home', sfSymbol: CNSymbol('house.fill')),
+      CNTab(title: 'Search', sfSymbol: CNSymbol('magnifyingglass'), isSearchTab: true),
+      CNTab(title: 'Profile', sfSymbol: CNSymbol('person.fill')),
+    ],
+    onTabSelected: (index) => setState(() => _selectedTab = index),
+    onSearchChanged: (query) => filterResults(query),
+  );
+}
+
+@override
+void dispose() {
+  CNTabBarNative.disable();
+  super.dispose();
+}
+```
+
 ### Tab Bar with iOS 26 Search Tab
 
 The `CNTabBar` supports iOS 26's native search tab feature with animated expansion:
@@ -260,7 +280,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.2.0
+  cupertino_native_better: ^1.3.0
 ```
 
 ## Usage
@@ -525,7 +545,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.2.0
+   cupertino_native_better: ^1.3.0
    ```
 
 2. Update imports:
