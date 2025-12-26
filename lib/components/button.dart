@@ -111,7 +111,8 @@ class CNButton extends StatefulWidget {
     this.customIcon,
     this.imageAsset,
     this.config = const CNButtonConfig(),
-  }) : super();
+  }) : badgeCount = null,
+       super();
 
   /// Creates a round, icon-only variant of [CNButton].
   ///
@@ -119,6 +120,9 @@ class CNButton extends StatefulWidget {
   /// the button will be automatically sized to be circular based on the icon size.
   ///
   /// At least one of [icon], [customIcon], or [imageAsset] must be provided.
+  ///
+  /// Optionally, a [badgeCount] can be provided to display a notification badge
+  /// on the button (displayed as "99+" for counts > 99).
   const CNButton.icon({
     super.key,
     this.icon,
@@ -127,6 +131,7 @@ class CNButton extends StatefulWidget {
     this.onPressed,
     this.enabled = true,
     this.tint,
+    this.badgeCount,
     this.config = const CNButtonConfig(style: CNButtonStyle.glass),
   }) : label = null,
        assert(
@@ -159,6 +164,13 @@ class CNButton extends StatefulWidget {
   /// Accent/tint color.
   final Color? tint;
 
+  /// Optional badge count to display on icon buttons.
+  ///
+  /// Displays a notification badge with the count on the top-right corner
+  /// of the button. Counts > 99 are displayed as "99+".
+  /// Only applicable to icon-only buttons (CNButton.icon).
+  final int? badgeCount;
+
   /// Button configuration.
   final CNButtonConfig config;
 
@@ -189,6 +201,7 @@ class _CNButtonState extends State<CNButton> {
   String? _lastImageAssetPath;
   Uint8List? _lastImageAssetData;
   IconData? _lastCustomIcon;
+  int? _lastBadgeCount;
   Offset? _downPosition;
   bool _pressed = false;
 
@@ -409,6 +422,7 @@ class _CNButtonState extends State<CNButton> {
       if (widget.config.glassEffectId != null)
         'glassEffectId': widget.config.glassEffectId,
       'glassEffectInteractive': widget.config.glassEffectInteractive,
+      if (widget.badgeCount != null) 'badgeCount': widget.badgeCount,
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
@@ -537,6 +551,7 @@ class _CNButtonState extends State<CNButton> {
     _lastImageAssetPath = widget.imageAsset?.assetPath;
     _lastImageAssetData = widget.imageAsset?.imageData;
     _lastCustomIcon = widget.customIcon;
+    _lastBadgeCount = widget.badgeCount;
     // Always request intrinsic size to get both width and height
     // Use a small delay to ensure native view has finished layout
     Future.delayed(const Duration(milliseconds: 10), () {
@@ -823,6 +838,14 @@ class _CNButtonState extends State<CNButton> {
         _requestIntrinsicSize();
       }
     }
+
+    // Sync badge count
+    if (_lastBadgeCount != widget.badgeCount) {
+      await ch.invokeMethod('setBadgeCount', {
+        'badgeCount': widget.badgeCount,
+      });
+      _lastBadgeCount = widget.badgeCount;
+    }
   }
 
   Future<void> _syncBrightnessIfNeeded() async {
@@ -1002,7 +1025,7 @@ class _CNButtonState extends State<CNButton> {
               const EdgeInsets.symmetric(horizontal: 12, vertical: 8));
     final borderRadius = widget.config.borderRadius ?? defaultHeight / 2;
 
-    return SizedBox(
+    final button = SizedBox(
       height: defaultHeight,
       width: buttonWidth,
       child: CupertinoButton(
@@ -1019,6 +1042,19 @@ class _CNButtonState extends State<CNButton> {
         child: child,
       ),
     );
+
+    // Add badge if badgeCount is provided
+    if (widget.badgeCount != null && widget.badgeCount! > 0) {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          button,
+          _buildBadge(widget.badgeCount!),
+        ],
+      );
+    }
+
+    return button;
   }
 
   Widget _buildMaterialFallback(BuildContext context) {
@@ -1163,7 +1199,7 @@ class _CNButtonState extends State<CNButton> {
     }
 
     final defaultHeight = widget.config.minHeight ?? calculatedSize ?? 44.0;
-    return SizedBox(
+    final button = SizedBox(
       height: defaultHeight,
       width: widget.isIcon
           ? (widget.config.width ?? calculatedSize ?? defaultHeight)
@@ -1189,6 +1225,19 @@ class _CNButtonState extends State<CNButton> {
         ),
       ),
     );
+
+    // Add badge if badgeCount is provided
+    if (widget.badgeCount != null && widget.badgeCount! > 0) {
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          button,
+          _buildBadge(widget.badgeCount!),
+        ],
+      );
+    }
+
+    return button;
   }
 
   Color? _getCupertinoButtonColor(BuildContext context) {
@@ -1216,5 +1265,37 @@ class _CNButtonState extends State<CNButton> {
       default:
         return Colors.transparent;
     }
+  }
+
+  Widget _buildBadge(int count) {
+    // Format badge text (show "99+" for counts > 99)
+    final badgeText = count > 99 ? '99+' : count.toString();
+
+    return Positioned(
+      top: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemRed,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        constraints: const BoxConstraints(
+          minWidth: 20,
+          minHeight: 20,
+        ),
+        child: Center(
+          child: Text(
+            badgeText,
+            style: const TextStyle(
+              color: CupertinoColors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
   }
 }
