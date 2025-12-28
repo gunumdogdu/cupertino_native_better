@@ -90,7 +90,7 @@ This approach works reliably in **both debug and release builds**.
 | `CNPopupMenuButton` | Native popup menu with dividers, icons, and image assets | - |
 | `CNPopupMenuButton.icon` | Circular icon-only popup menu variant | - |
 | `CNSegmentedControl` | Native segmented control with SF Symbols support | - |
-| `CNGlassButtonGroup` | Grouped buttons with unified glass blending | - |
+| `CNGlassButtonGroup` | Grouped buttons with unified glass blending (tint color support) | - |
 | `LiquidGlassContainer` | Apply Liquid Glass effects to any Flutter widget | - |
 | `CNGlassCard` | **(Experimental)** Pre-styled card with optional breathing glow animation | - |
 | `CNTabBarNative` | **iOS 26 Native Tab Bar** with UITabBarController + search | - |
@@ -280,7 +280,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.3.0
+  cupertino_native_better: ^1.3.1
 ```
 
 ## Usage
@@ -545,7 +545,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.3.0
+   cupertino_native_better: ^1.3.1
    ```
 
 2. Update imports:

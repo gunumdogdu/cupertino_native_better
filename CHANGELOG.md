@@ -1,3 +1,13 @@
+## 1.3.1
+
+### Bug Fixes
+
+- **Fixed**: Tint color now works correctly when buttons are inside `CNGlassButtonGroup` (PR #8 by @anirudhrao-github)
+  - Previously, button tint colors were ignored when placed inside grouped glass buttons
+  - Now buttons properly inherit and display their configured tint colors within button groups
+
+---
+
 ## 1.3.0
 
 ### New Features
