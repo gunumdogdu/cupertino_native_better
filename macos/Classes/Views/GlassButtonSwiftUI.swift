@@ -26,15 +26,17 @@ struct GlassButtonSwiftUI: View {
       HStack(spacing: config.spacing) {
         if let icon = iconImage {
           Image(nsImage: icon)
+            .renderingMode(.template)
             .resizable()
             .scaledToFit()
             .frame(width: iconSize, height: iconSize)
+            .foregroundColor(tint != nil ? tint : iconColor)
         } else if let iconName = iconName {
           Image(systemName: iconName)
             .font(.system(size: iconSize))
             .foregroundColor(iconColor)
         }
-        
+
         if let title = title {
           Text(title)
             .foregroundColor(tint)

@@ -7,6 +7,8 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   private let container: UIView
   private var button: UIButton?
   private var hostingController: UIHostingController<AnyView>?
+  private var badgeView: UIView?
+  private var badgeLabel: UILabel?
   private var isEnabled: Bool = true
   private var currentButtonStyle: String = "automatic"
   private var usesSwiftUI: Bool = false
@@ -46,6 +48,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     var glassEffectUnionId: String? = nil
     var glassEffectId: String? = nil
     var glassEffectInteractive: Bool = false
+    var badgeCount: Int? = nil
 
     if let dict = args as? [String: Any] {
       if let t = dict["buttonTitle"] as? String { title = t }
@@ -83,6 +86,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let gueId = dict["glassEffectUnionId"] as? String { glassEffectUnionId = gueId }
       if let geId = dict["glassEffectId"] as? String { glassEffectId = geId }
       if let geInteractive = dict["glassEffectInteractive"] as? NSNumber { glassEffectInteractive = geInteractive.boolValue }
+      if let bc = dict["badgeCount"] as? NSNumber { badgeCount = bc.intValue }
     }
 
     super.init()
@@ -271,6 +275,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           uiButton.layoutIfNeeded()
         }
       }
+    }
+
+    // Add badge if badgeCount is provided
+    if let count = badgeCount, count > 0 {
+      addBadge(count: count)
     }
 
     channel.setMethodCallHandler { [weak self] call, result in
@@ -483,6 +492,23 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
               button.contentEdgeInsets = .zero
             }
           }
+          result(nil)
+        }
+      case "setBadgeCount":
+        if let args = call.arguments as? [String: Any] {
+          if let count = args["badgeCount"] as? NSNumber {
+            let intCount = count.intValue
+            if intCount > 0 {
+              self.addBadge(count: intCount)
+            } else {
+              self.removeBadge()
+            }
+          } else {
+            self.removeBadge()
+          }
+          result(nil)
+        } else {
+          self.removeBadge()
           result(nil)
         }
       default:
@@ -760,5 +786,62 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
 
   private static func createImageFromData(_ data: Data, format: String?, scale: CGFloat) -> UIImage? {
     return ImageUtils.createImageFromData(data, format: format, scale: scale)
+  }
+
+  // MARK: - Badge Management
+
+  private func addBadge(count: Int) {
+    // Remove existing badge first
+    removeBadge()
+
+    // Format badge text (show "99+" for counts > 99)
+    let badgeText = count > 99 ? "99+" : "\(count)"
+
+    // Create badge container
+    let badge = UIView()
+    badge.backgroundColor = .systemRed
+    badge.layer.cornerRadius = 10
+    badge.clipsToBounds = true
+    badge.translatesAutoresizingMaskIntoConstraints = false
+
+    // Create badge label
+    let label = UILabel()
+    label.text = badgeText
+    label.textColor = .white
+    label.font = .systemFont(ofSize: 12, weight: .semibold)
+    label.textAlignment = .center
+    label.translatesAutoresizingMaskIntoConstraints = false
+
+    badge.addSubview(label)
+    container.addSubview(badge)
+
+    // Store references
+    badgeView = badge
+    badgeLabel = label
+
+    // Layout constraints for label inside badge
+    NSLayoutConstraint.activate([
+      label.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 5),
+      label.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -5),
+      label.topAnchor.constraint(equalTo: badge.topAnchor, constant: 2),
+      label.bottomAnchor.constraint(equalTo: badge.bottomAnchor, constant: -2),
+    ])
+
+    // Badge positioning constraints (top-right corner)
+    NSLayoutConstraint.activate([
+      badge.topAnchor.constraint(equalTo: container.topAnchor, constant: 0),
+      badge.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: 0),
+      badge.heightAnchor.constraint(equalToConstant: 20),
+      badge.widthAnchor.constraint(greaterThanOrEqualToConstant: 20),
+    ])
+
+    // Bring badge to front
+    container.bringSubviewToFront(badge)
+  }
+
+  private func removeBadge() {
+    badgeView?.removeFromSuperview()
+    badgeView = nil
+    badgeLabel = nil
   }
 }
