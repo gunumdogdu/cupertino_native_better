@@ -23,7 +23,7 @@ class GlassButtonGroupViewModel: ObservableObject {
 struct GlassButtonGroupSwiftUI: View {
   @ObservedObject var viewModel: GlassButtonGroupViewModel
   @Namespace private var namespace
-  
+
   var body: some View {
     GlassEffectContainer(spacing: viewModel.spacingForGlass) {
       if viewModel.axis == .horizontal {
@@ -45,8 +45,15 @@ struct GlassButtonGroupSwiftUI: View {
               glassEffectInteractive: button.glassEffectInteractive,
               namespace: namespace,
               config: button.config,
-              badgeCount: button.badgeCount
+              badgeCount: nil // Don't show badge inside button
             )
+            .clipped(false) // Prevent clipping of badge
+            .overlay(alignment: .topTrailing) {
+              if let count = button.badgeCount, count > 0 {
+                BadgeView(count: count)
+                  .allowsHitTesting(false) // Let taps pass through to button
+              }
+            }
           }
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
@@ -69,8 +76,15 @@ struct GlassButtonGroupSwiftUI: View {
               glassEffectInteractive: button.glassEffectInteractive,
               namespace: namespace,
               config: button.config,
-              badgeCount: button.badgeCount
+              badgeCount: nil // Don't show badge inside button
             )
+            .clipped(false) // Prevent clipping of badge
+            .overlay(alignment: .topTrailing) {
+              if let count = button.badgeCount, count > 0 {
+                BadgeView(count: count)
+                  .allowsHitTesting(false) // Let taps pass through to button
+              }
+            }
           }
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
@@ -78,6 +92,27 @@ struct GlassButtonGroupSwiftUI: View {
     }
     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
     .ignoresSafeArea()
+  }
+}
+
+// Custom badge view to match iOS native badge style
+@available(iOS 26.0, *)
+struct BadgeView: View {
+  let count: Int
+
+  var body: some View {
+    Text(count > 99 ? "99+" : "\(count)")
+      .font(.system(size: 12, weight: .semibold))
+      .foregroundColor(.white)
+      .padding(.horizontal, count > 9 ? 5 : 0)
+      .frame(minWidth: 18, minHeight: 18)
+      .background(
+        Capsule()
+          .fill(Color.red)
+      )
+      .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1) // Native badge shadow
+      .offset(x: 6, y: -6) // Position badge slightly outside button
+      .zIndex(1000) // Ensure badge is always on top
   }
 }
 
