@@ -714,20 +714,20 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       container.addSubview(badgeView)
 
       // Position badge based on button index and axis
-      // This is approximate - we calculate where each button should be
+      // Badge overlaps slightly with button for native iOS appearance
       var badgeX: CGFloat = 0
       var badgeY: CGFloat = 0
 
       if axis == .horizontal {
         // Horizontal layout: divide width by button count
         let buttonWidth = containerBounds.width / CGFloat(buttonCount)
-        badgeX = (buttonWidth * CGFloat(index)) + buttonWidth - 6 // Top-right of button area
-        badgeY = 0 - 6 // Top edge
+        badgeX = (buttonWidth * CGFloat(index)) + buttonWidth - 12 // Closer to button edge
+        badgeY = -3 // Slight overlap at top
       } else {
         // Vertical layout: divide height by button count
         let buttonHeight = containerBounds.height / CGFloat(buttonCount)
-        badgeX = containerBounds.width - 6 // Right edge
-        badgeY = (buttonHeight * CGFloat(index)) - 6 // Top of button area
+        badgeX = containerBounds.width - 12 // Closer to right edge
+        badgeY = (buttonHeight * CGFloat(index)) - 3 // Slight overlap at top
       }
 
       NSLayoutConstraint.activate([
