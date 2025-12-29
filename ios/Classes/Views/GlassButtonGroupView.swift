@@ -87,6 +87,8 @@ struct GlassButtonGroupSwiftUI: View {
 class UIKitBadgeView: UIView {
   private let label = UILabel()
   private var count: Int = 0
+  private var widthConstraint: NSLayoutConstraint?
+  private var heightConstraint: NSLayoutConstraint?
 
   init(count: Int) {
     self.count = count
@@ -101,15 +103,6 @@ class UIKitBadgeView: UIView {
   private func setup() {
     // Configure badge appearance
     backgroundColor = .systemRed
-    layer.cornerRadius = 9 // Half of minHeight (18)
-    clipsToBounds = true
-
-    // Add shadow
-    layer.shadowColor = UIColor.black.cgColor
-    layer.shadowOpacity = 0.2
-    layer.shadowOffset = CGSize(width: 0, height: 1)
-    layer.shadowRadius = 2
-    layer.masksToBounds = false
 
     // Configure label
     label.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
@@ -118,13 +111,15 @@ class UIKitBadgeView: UIView {
     label.translatesAutoresizingMaskIntoConstraints = false
     addSubview(label)
 
-    // Label constraints
+    // Label constraints - centered with padding
     NSLayoutConstraint.activate([
-      label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: count > 9 ? 5 : 0),
-      label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: count > 9 ? -5 : 0),
-      label.centerYAnchor.constraint(equalTo: centerYAnchor)
+      label.centerXAnchor.constraint(equalTo: centerXAnchor),
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      label.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 4),
+      label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4)
     ])
 
+    translatesAutoresizingMaskIntoConstraints = false
     updateCount(count)
   }
 
@@ -133,14 +128,41 @@ class UIKitBadgeView: UIView {
     label.text = count > 99 ? "99+" : "\(count)"
     isHidden = count <= 0
 
-    // Update corner radius based on content width
-    layoutIfNeeded()
-    layer.cornerRadius = bounds.height / 2
-  }
+    // Remove old constraints
+    widthConstraint?.isActive = false
+    heightConstraint?.isActive = false
 
-  override var intrinsicContentSize: CGSize {
-    let width = max(18, label.intrinsicContentSize.width + (count > 9 ? 10 : 0))
-    return CGSize(width: width, height: 18)
+    // Calculate size based on count
+    let textSize = label.intrinsicContentSize
+    let badgeSize: CGSize
+
+    if count <= 9 {
+      // Single digit - perfect circle
+      let diameter: CGFloat = 18
+      badgeSize = CGSize(width: diameter, height: diameter)
+    } else {
+      // Multiple digits - pill shape
+      let width = max(textSize.width + 8, 18)
+      badgeSize = CGSize(width: width, height: 18)
+    }
+
+    // Apply size constraints
+    widthConstraint = widthAnchor.constraint(equalToConstant: badgeSize.width)
+    heightConstraint = heightAnchor.constraint(equalToConstant: badgeSize.height)
+    widthConstraint?.isActive = true
+    heightConstraint?.isActive = true
+
+    // Update corner radius to make it circular/pill-shaped
+    layer.cornerRadius = badgeSize.height / 2
+
+    // Shadow setup
+    layer.shadowColor = UIColor.black.cgColor
+    layer.shadowOpacity = 0.2
+    layer.shadowOffset = CGSize(width: 0, height: 1)
+    layer.shadowRadius = 2
+    layer.masksToBounds = false
+
+    setNeedsLayout()
   }
 }
 
@@ -541,8 +563,13 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     )
 
     viewModel.updateButton(at: index, with: buttonData)
+
+    // Update badges after button update
+    DispatchQueue.main.async { [weak self] in
+      self?.updateBadgePositions()
+    }
   }
-  
+
   private func updateButtons(_ buttonsData: [[String: Any]]) {
     var newButtons: [GlassButtonData] = []
     
@@ -656,8 +683,13 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     }
     
     viewModel.updateButtons(newButtons)
+
+    // Update badges after buttons update
+    DispatchQueue.main.async { [weak self] in
+      self?.updateBadgePositions()
+    }
   }
-  
+
   func view() -> UIView {
     return container
   }
