@@ -395,11 +395,14 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     hostingController.view.translatesAutoresizingMaskIntoConstraints = false
     container.addSubview(hostingController.view)
 
-    // Position hosting controller 3px down to leave room for badge overflow at top
-    // This ensures badges positioned at badgeY = -3 are still within container bounds
+    // Position hosting controller to leave room for badge overflow
+    // - 3px down from top (badge extends above buttons)
+    // - 0px from left (no left overflow)
+    // - 6px inset from right (badge extends 6px beyond last button)
+    // This ensures badges are positioned within container bounds for proper clipping
     NSLayoutConstraint.activate([
       hostingController.view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 0),
-      hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: 0),
+      hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6),
       hostingController.view.topAnchor.constraint(equalTo: container.topAnchor, constant: 3),
       hostingController.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: 0),
     ])
@@ -721,13 +724,16 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
 
       if axis == .horizontal {
         // Horizontal layout: divide width by button count
-        let buttonWidth = containerBounds.width / CGFloat(buttonCount)
+        // Account for 6px inset on the right (hosting controller is narrower than container)
+        let effectiveWidth = containerBounds.width - 6
+        let buttonWidth = effectiveWidth / CGFloat(buttonCount)
         badgeX = (buttonWidth * CGFloat(index)) + buttonWidth - 12 // Closer to button edge
         badgeY = 0 // Position at top - buttons are offset by 3px, so badge appears with -3px overlap
       } else {
         // Vertical layout: divide height by button count
         let buttonHeight = containerBounds.height / CGFloat(buttonCount)
-        badgeX = containerBounds.width - 12 // Closer to right edge
+        // Account for 6px inset on the right for vertical layout as well
+        badgeX = containerBounds.width - 12 - 6 // Adjust for hosting controller inset
         badgeY = (buttonHeight * CGFloat(index)) + 3 // Account for hosting controller 3px offset
       }
 
