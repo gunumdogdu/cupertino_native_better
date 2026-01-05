@@ -2,18 +2,25 @@ import SwiftUI
 import UIKit
 import Flutter
 
+enum ButtonDistribution: String {
+  case equal = "equal"
+  case natural = "natural"
+  case mixed = "mixed"
+}
+
 @available(iOS 26.0, *)
 class GlassButtonGroupViewModel: ObservableObject {
   @Published var buttons: [GlassButtonData] = []
   @Published var axis: Axis = .horizontal
   @Published var spacing: CGFloat = 8.0
   @Published var spacingForGlass: CGFloat = 40.0
-  
+  @Published var distribution: ButtonDistribution = .natural
+
   func updateButton(at index: Int, with buttonData: GlassButtonData) {
     guard index >= 0 && index < buttons.count else { return }
     buttons[index] = buttonData
   }
-  
+
   func updateButtons(_ newButtons: [GlassButtonData]) {
     buttons = newButtons
   }
@@ -48,9 +55,10 @@ struct GlassButtonGroupSwiftUI: View {
               config: button.config,
               badgeCount: nil // Badges rendered via UIKit
             )
+            .applyDistributionModifier(button: button, distribution: viewModel.distribution)
           }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+        .applyContainerFrameModifier(distribution: viewModel.distribution)
       } else {
         VStack(alignment: .center, spacing: viewModel.spacing) {
           ForEach(Array(viewModel.buttons.enumerated()), id: \.offset) { index, button in
@@ -72,13 +80,59 @@ struct GlassButtonGroupSwiftUI: View {
               config: button.config,
               badgeCount: nil // Badges rendered via UIKit
             )
+            .applyDistributionModifier(button: button, distribution: viewModel.distribution)
           }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+        .applyContainerFrameModifier(distribution: viewModel.distribution)
       }
     }
     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
     .ignoresSafeArea()
+  }
+}
+
+// Extension to apply distribution modifiers to individual buttons
+@available(iOS 26.0, *)
+extension View {
+  @ViewBuilder
+  func applyDistributionModifier(button: GlassButtonData, distribution: ButtonDistribution) -> some View {
+    switch distribution {
+    case .equal:
+      // Equal distribution: all buttons expand equally
+      self.frame(maxWidth: .infinity)
+    case .natural:
+      // Natural sizing: buttons use intrinsic size
+      self
+    case .mixed:
+      // Mixed: respect individual button's flexible property
+      if let flexible = button.config.flexible {
+        if flexible {
+          self.frame(maxWidth: .infinity)
+        } else {
+          self
+        }
+      } else {
+        // If flexible is nil, use natural sizing (text buttons flexible, icon-only fixed)
+        // Text buttons (title != nil) should be flexible by default
+        if button.title != nil {
+          self.frame(maxWidth: .infinity)
+        } else {
+          self
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  func applyContainerFrameModifier(distribution: ButtonDistribution) -> some View {
+    switch distribution {
+    case .equal:
+      // Equal distribution needs maxWidth to distribute space
+      self.frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+    case .natural, .mixed:
+      // Natural and mixed sizing should not force expansion at container level
+      self.frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
+    }
   }
 }
 
@@ -218,6 +272,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     var axis: Axis = .horizontal
     var spacing: CGFloat = 8.0
     var spacingForGlass: CGFloat = 40.0
+    var distribution: ButtonDistribution = .natural
     var isDark: Bool = false
     
     // Set up method channel for button callbacks and updates
@@ -320,7 +375,8 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
           let paddingVertical = (buttonDict["paddingVertical"] as? NSNumber).map { CGFloat(truncating: $0) }
           let minHeight = (buttonDict["minHeight"] as? NSNumber).map { CGFloat(truncating: $0) }
           let spacing = (buttonDict["imagePadding"] as? NSNumber).map { CGFloat(truncating: $0) }
-          
+          let flexible = (buttonDict["flexible"] as? NSNumber)?.boolValue
+
           // Create GlassButtonConfig with provided values or defaults
           let config = GlassButtonConfig(
             borderRadius: borderRadius,
@@ -331,7 +387,8 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
             horizontal: paddingHorizontal,
             vertical: paddingVertical,
             minHeight: minHeight ?? 44.0,
-            spacing: spacing ?? 8.0
+            spacing: spacing ?? 8.0,
+            flexible: flexible
           )
           
           let buttonData = GlassButtonData(
@@ -364,13 +421,17 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       if let spacingForGlassValue = dict["spacingForGlass"] as? NSNumber {
         spacingForGlass = CGFloat(truncating: spacingForGlassValue)
       }
+      if let distributionStr = dict["distribution"] as? String {
+        distribution = ButtonDistribution(rawValue: distributionStr) ?? .natural
+      }
     }
-    
+
     // Update view model with initial values
     viewModel.buttons = buttons
     viewModel.axis = axis
     viewModel.spacing = spacing
     viewModel.spacingForGlass = spacingForGlass
+    viewModel.distribution = distribution
     
     let swiftUIView = GlassButtonGroupSwiftUI(viewModel: viewModel)
     
@@ -531,7 +592,8 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     let paddingVertical = (buttonDict["paddingVertical"] as? NSNumber).map { CGFloat(truncating: $0) }
     let minHeight = (buttonDict["minHeight"] as? NSNumber).map { CGFloat(truncating: $0) }
     let spacing = (buttonDict["imagePadding"] as? NSNumber).map { CGFloat(truncating: $0) }
-    
+    let flexible = (buttonDict["flexible"] as? NSNumber)?.boolValue
+
     let config = GlassButtonConfig(
       borderRadius: borderRadius,
       top: paddingTop,
@@ -541,7 +603,8 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       horizontal: paddingHorizontal,
       vertical: paddingVertical,
       minHeight: minHeight ?? 44.0,
-      spacing: spacing ?? 8.0
+      spacing: spacing ?? 8.0,
+      flexible: flexible
     )
     
     let buttonCallback = buttonCallbacks[index] ?? { [weak self] in
@@ -653,7 +716,8 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       let paddingVertical = (buttonDict["paddingVertical"] as? NSNumber).map { CGFloat(truncating: $0) }
       let minHeight = (buttonDict["minHeight"] as? NSNumber).map { CGFloat(truncating: $0) }
       let spacing = (buttonDict["imagePadding"] as? NSNumber).map { CGFloat(truncating: $0) }
-      
+      let flexible = (buttonDict["flexible"] as? NSNumber)?.boolValue
+
       let config = GlassButtonConfig(
         borderRadius: borderRadius,
         top: paddingTop,
@@ -663,7 +727,8 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
         horizontal: paddingHorizontal,
         vertical: paddingVertical,
         minHeight: minHeight ?? 44.0,
-        spacing: spacing ?? 8.0
+        spacing: spacing ?? 8.0,
+        flexible: flexible
       )
       
       let buttonData = GlassButtonData(

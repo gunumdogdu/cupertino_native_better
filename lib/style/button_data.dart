@@ -145,6 +145,7 @@ class CNButtonDataConfig {
     this.glassEffectUnionId,
     this.glassEffectId,
     this.glassEffectInteractive = true,
+    this.flexible,
   });
 
   /// Fixed width for the button.
@@ -177,6 +178,18 @@ class CNButtonDataConfig {
   /// Whether the glass effect responds to touches.
   final bool glassEffectInteractive;
 
+  /// Whether the button should be flexible (expandable) in a button group.
+  ///
+  /// When true, the button can expand to take available space in a button group.
+  /// When false, the button maintains its intrinsic size.
+  ///
+  /// This only has an effect when used within [CNGlassButtonGroup] and when
+  /// the group's `distribution` is set to `CNButtonDistribution.mixed`.
+  ///
+  /// Defaults to null, which means the button will use natural sizing based
+  /// on its content (text buttons are flexible, icon-only buttons are fixed).
+  final bool? flexible;
+
   /// Creates a copy with the given fields replaced.
   CNButtonDataConfig copyWith({
     double? width,
@@ -189,6 +202,7 @@ class CNButtonDataConfig {
     String? glassEffectUnionId,
     String? glassEffectId,
     bool? glassEffectInteractive,
+    bool? flexible,
   }) {
     return CNButtonDataConfig(
       width: width ?? this.width,
@@ -202,6 +216,7 @@ class CNButtonDataConfig {
       glassEffectId: glassEffectId ?? this.glassEffectId,
       glassEffectInteractive:
           glassEffectInteractive ?? this.glassEffectInteractive,
+      flexible: flexible ?? this.flexible,
     );
   }
 }

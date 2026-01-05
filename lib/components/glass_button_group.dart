@@ -7,6 +7,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
 import '../channel/params.dart';
 import '../style/button_data.dart';
+import '../style/button_distribution.dart';
 import '../style/image_placement.dart';
 import 'button.dart';
 
@@ -54,12 +55,14 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// The [spacingForGlass] controls how Liquid Glass effects blend together.
   /// For proper blending, [spacingForGlass] should be larger than [spacing] so that
   /// glass effects merge when buttons are close together.
+  /// The [distribution] controls how buttons are sized within the group.
   const CNGlassButtonGroup({
     super.key,
     required this.buttons,
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
     this.spacingForGlass = 40.0,
+    this.distribution = CNButtonDistribution.natural,
   }) : _buttonWidgets = null;
 
   /// Creates a group from existing CNButton widgets.
@@ -74,6 +77,7 @@ class CNGlassButtonGroup extends StatefulWidget {
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
     this.spacingForGlass = 40.0,
+    this.distribution = CNButtonDistribution.natural,
   }) : buttons = const [],
        _buttonWidgets = buttonWidgets;
 
@@ -91,6 +95,14 @@ class CNGlassButtonGroup extends StatefulWidget {
 
   /// Spacing value for Liquid Glass blending (affects how glass effects merge).
   final double spacingForGlass;
+
+  /// Distribution mode for button sizing.
+  ///
+  /// Controls how buttons are sized and distributed within the group:
+  /// - [CNButtonDistribution.equal]: All buttons get equal space
+  /// - [CNButtonDistribution.natural]: Buttons use their intrinsic size (default)
+  /// - [CNButtonDistribution.mixed]: Respects individual button's `flexible` property
+  final CNButtonDistribution distribution;
 
   /// Returns the effective button count (from data or widgets).
   int get _effectiveButtonCount =>
@@ -156,6 +168,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
           'axis': widget.axis == Axis.horizontal ? 'horizontal' : 'vertical',
           'spacing': widget.spacing,
           'spacingForGlass': widget.spacingForGlass,
+          'distribution': widget.distribution.name,
           'isDark': ThemeHelper.isDark(context),
         };
 
@@ -551,6 +564,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.minHeight != null) 'minHeight': button.config.minHeight,
       if (button.config.imagePadding != null)
         'imagePadding': button.config.imagePadding,
+      if (button.config.flexible != null) 'flexible': button.config.flexible,
     };
   }
 
@@ -632,6 +646,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.minHeight != null) 'minHeight': button.config.minHeight,
       if (button.config.imagePadding != null)
         'imagePadding': button.config.imagePadding,
+      if (button.config.flexible != null) 'flexible': button.config.flexible,
     };
   }
 }

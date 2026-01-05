@@ -9,19 +9,22 @@ public struct GlassButtonConfig {
   let padding: EdgeInsets
   let minHeight: CGFloat
   let spacing: CGFloat
-  
+  let flexible: Bool?
+
   public init(
     borderRadius: CGFloat? = nil,
     padding: EdgeInsets = EdgeInsets(top: 8.0, leading: 12.0, bottom: 8.0, trailing: 12.0),
     minHeight: CGFloat = 44.0,
-    spacing: CGFloat = 8.0
+    spacing: CGFloat = 8.0,
+    flexible: Bool? = nil
   ) {
     self.borderRadius = borderRadius
     self.padding = padding
     self.minHeight = minHeight
     self.spacing = spacing
+    self.flexible = flexible
   }
-  
+
   /// Convenience initializer for individual padding values
   public init(
     borderRadius: CGFloat? = nil,
@@ -32,12 +35,14 @@ public struct GlassButtonConfig {
     horizontal: CGFloat? = nil,
     vertical: CGFloat? = nil,
     minHeight: CGFloat = 44.0,
-    spacing: CGFloat = 8.0
+    spacing: CGFloat = 8.0,
+    flexible: Bool? = nil
   ) {
     self.borderRadius = borderRadius
     self.minHeight = minHeight
     self.spacing = spacing
-    
+    self.flexible = flexible
+
     // Build EdgeInsets from provided values
     let defaultPadding = EdgeInsets(top: 8.0, leading: 12.0, bottom: 8.0, trailing: 12.0)
     self.padding = EdgeInsets(
