@@ -8,12 +8,12 @@ class GlassButtonGroupViewModel: ObservableObject {
   @Published var axis: Axis = .horizontal
   @Published var spacing: CGFloat = 8.0
   @Published var spacingForGlass: CGFloat = 40.0
-  
+
   func updateButton(at index: Int, with buttonData: GlassButtonData) {
     guard index >= 0 && index < buttons.count else { return }
     buttons[index] = buttonData
   }
-  
+
   func updateButtons(_ newButtons: [GlassButtonData]) {
     buttons = newButtons
   }
@@ -48,9 +48,10 @@ struct GlassButtonGroupSwiftUI: View {
               config: button.config,
               badgeCount: nil // Badges rendered via UIKit
             )
+            .fixedSize(horizontal: true, vertical: false)
           }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+        .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
       } else {
         VStack(alignment: .center, spacing: viewModel.spacing) {
           ForEach(Array(viewModel.buttons.enumerated()), id: \.offset) { index, button in
@@ -72,12 +73,13 @@ struct GlassButtonGroupSwiftUI: View {
               config: button.config,
               badgeCount: nil // Badges rendered via UIKit
             )
+            .fixedSize(horizontal: true, vertical: false)
           }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+        .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
       }
     }
-    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+    .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
     .ignoresSafeArea()
   }
 }
@@ -320,7 +322,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
           let paddingVertical = (buttonDict["paddingVertical"] as? NSNumber).map { CGFloat(truncating: $0) }
           let minHeight = (buttonDict["minHeight"] as? NSNumber).map { CGFloat(truncating: $0) }
           let spacing = (buttonDict["imagePadding"] as? NSNumber).map { CGFloat(truncating: $0) }
-          
+
           // Create GlassButtonConfig with provided values or defaults
           let config = GlassButtonConfig(
             borderRadius: borderRadius,
@@ -365,16 +367,17 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
         spacingForGlass = CGFloat(truncating: spacingForGlassValue)
       }
     }
-    
+
     // Update view model with initial values
     viewModel.buttons = buttons
     viewModel.axis = axis
     viewModel.spacing = spacing
     viewModel.spacingForGlass = spacingForGlass
-    
+
     let swiftUIView = GlassButtonGroupSwiftUI(viewModel: viewModel)
-    
+
     self.hostingController = UIHostingController(rootView: swiftUIView)
+
     self.hostingController.view.backgroundColor = .clear
     // Configure hosting controller to ignore safe areas and remove any padding
     if #available(iOS 11.0, *) {
@@ -406,7 +409,11 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       hostingController.view.topAnchor.constraint(equalTo: container.topAnchor, constant: 3),
       hostingController.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: 0),
     ])
-    
+
+    // Force immediate layout to ensure SwiftUI view calculates sizes correctly on first render
+    hostingController.view.setNeedsLayout()
+    hostingController.view.layoutIfNeeded()
+
     // Store axis and spacing for badge positioning
     self.axis = axis
     self.spacing = spacing
@@ -531,7 +538,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     let paddingVertical = (buttonDict["paddingVertical"] as? NSNumber).map { CGFloat(truncating: $0) }
     let minHeight = (buttonDict["minHeight"] as? NSNumber).map { CGFloat(truncating: $0) }
     let spacing = (buttonDict["imagePadding"] as? NSNumber).map { CGFloat(truncating: $0) }
-    
+
     let config = GlassButtonConfig(
       borderRadius: borderRadius,
       top: paddingTop,
@@ -653,7 +660,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       let paddingVertical = (buttonDict["paddingVertical"] as? NSNumber).map { CGFloat(truncating: $0) }
       let minHeight = (buttonDict["minHeight"] as? NSNumber).map { CGFloat(truncating: $0) }
       let spacing = (buttonDict["imagePadding"] as? NSNumber).map { CGFloat(truncating: $0) }
-      
+
       let config = GlassButtonConfig(
         borderRadius: borderRadius,
         top: paddingTop,
