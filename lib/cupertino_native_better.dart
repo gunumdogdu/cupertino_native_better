@@ -74,7 +74,6 @@ export 'components/experimental/glass_card.dart';
 // Styles
 export 'style/button_style.dart';
 export 'style/button_data.dart';
-export 'style/button_distribution.dart';
 export 'style/sf_symbol.dart';
 export 'style/image_placement.dart';
 export 'style/glass_effect.dart';

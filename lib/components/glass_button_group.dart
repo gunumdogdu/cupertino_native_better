@@ -7,7 +7,6 @@ import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
 import '../channel/params.dart';
 import '../style/button_data.dart';
-import '../style/button_distribution.dart';
 import '../style/image_placement.dart';
 import 'button.dart';
 
@@ -55,14 +54,12 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// The [spacingForGlass] controls how Liquid Glass effects blend together.
   /// For proper blending, [spacingForGlass] should be larger than [spacing] so that
   /// glass effects merge when buttons are close together.
-  /// The [distribution] controls how buttons are sized within the group.
   const CNGlassButtonGroup({
     super.key,
     required this.buttons,
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
     this.spacingForGlass = 40.0,
-    this.distribution = CNButtonDistribution.natural,
   }) : _buttonWidgets = null;
 
   /// Creates a group from existing CNButton widgets.
@@ -77,7 +74,6 @@ class CNGlassButtonGroup extends StatefulWidget {
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
     this.spacingForGlass = 40.0,
-    this.distribution = CNButtonDistribution.natural,
   }) : buttons = const [],
        _buttonWidgets = buttonWidgets;
 
@@ -95,14 +91,6 @@ class CNGlassButtonGroup extends StatefulWidget {
 
   /// Spacing value for Liquid Glass blending (affects how glass effects merge).
   final double spacingForGlass;
-
-  /// Distribution mode for button sizing.
-  ///
-  /// Controls how buttons are sized and distributed within the group:
-  /// - [CNButtonDistribution.equal]: All buttons get equal space
-  /// - [CNButtonDistribution.natural]: Buttons use their intrinsic size (default)
-  /// - [CNButtonDistribution.mixed]: Respects individual button's `flexible` property
-  final CNButtonDistribution distribution;
 
   /// Returns the effective button count (from data or widgets).
   int get _effectiveButtonCount =>
@@ -168,7 +156,6 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
           'axis': widget.axis == Axis.horizontal ? 'horizontal' : 'vertical',
           'spacing': widget.spacing,
           'spacingForGlass': widget.spacingForGlass,
-          'distribution': widget.distribution.name,
           'isDark': ThemeHelper.isDark(context),
         };
 
@@ -205,8 +192,10 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
                   ),
                 );
               } else {
-                // Calculate estimated width based on distribution mode
-                final estimatedWidth = _calculateEstimatedWidth() + 6.0; // Add 6px for badge overflow
+                final estimatedWidth =
+                    widget._effectiveButtonCount * 44.0 +
+                    ((widget._effectiveButtonCount - 1) * widget.spacing) +
+                    6.0; // Add 6px for badge overflow on right
                 return ClipRect(
                   child: SizedBox(
                     width: estimatedWidth,
@@ -241,116 +230,6 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       return widget.buttons.first.config.minHeight ?? 44.0;
     }
     return 44.0;
-  }
-
-  double _calculateEstimatedWidth() {
-    // Calculate total spacing between buttons
-    final totalSpacing = (widget._effectiveButtonCount - 1) * widget.spacing;
-
-    switch (widget.distribution) {
-      case CNButtonDistribution.equal:
-        // Equal distribution: all buttons get same width (44px baseline)
-        return widget._effectiveButtonCount * 44.0 + totalSpacing;
-
-      case CNButtonDistribution.natural:
-        // Natural sizing: estimate based on button content
-        double totalWidth = 0;
-
-        if (_usingWidgets) {
-          for (final button in widget._buttonWidgets!) {
-            totalWidth += _estimateButtonWidth(
-              hasLabel: button.label != null,
-              label: button.label,
-              iconSize: button.icon?.size ?? button.imageAsset?.size ?? 20.0,
-              padding: button.config.padding,
-            );
-          }
-        } else {
-          for (final button in widget.buttons) {
-            totalWidth += _estimateButtonWidth(
-              hasLabel: button.label != null,
-              label: button.label,
-              iconSize: button.icon?.size ?? button.imageAsset?.size ?? 20.0,
-              padding: button.config.padding,
-            );
-          }
-        }
-
-        return totalWidth + totalSpacing;
-
-      case CNButtonDistribution.mixed:
-        // Mixed: check each button's flexible property
-        double totalWidth = 0;
-
-        if (_usingWidgets) {
-          for (final button in widget._buttonWidgets!) {
-            final flexible = button.config.flexible;
-            if (flexible == true || (flexible == null && button.label != null)) {
-              // Flexible button: estimate larger width
-              totalWidth += _estimateButtonWidth(
-                hasLabel: button.label != null,
-                label: button.label,
-                iconSize: button.icon?.size ?? button.imageAsset?.size ?? 20.0,
-                padding: button.config.padding,
-              );
-            } else {
-              // Fixed button: use minimum width (44px for icon-only)
-              totalWidth += 44.0;
-            }
-          }
-        } else {
-          for (final button in widget.buttons) {
-            final flexible = button.config.flexible;
-            if (flexible == true || (flexible == null && button.label != null)) {
-              // Flexible button: estimate larger width
-              totalWidth += _estimateButtonWidth(
-                hasLabel: button.label != null,
-                label: button.label,
-                iconSize: button.icon?.size ?? button.imageAsset?.size ?? 20.0,
-                padding: button.config.padding,
-              );
-            } else {
-              // Fixed button: use minimum width (44px for icon-only)
-              totalWidth += 44.0;
-            }
-          }
-        }
-
-        return totalWidth + totalSpacing;
-    }
-  }
-
-  double _estimateButtonWidth({
-    required bool hasLabel,
-    String? label,
-    required double iconSize,
-    EdgeInsets? padding,
-  }) {
-    // Calculate actual horizontal padding (default is 12 left + 12 right = 24)
-    final horizontalPadding = padding != null
-        ? (padding.left + padding.right)
-        : 24.0;
-
-    if (!hasLabel) {
-      // Icon-only button: circular/square
-      // Width = icon size + horizontal padding
-      return iconSize + horizontalPadding;
-    } else {
-      // Text button with optional icon
-      // Use a more accurate text width estimation
-      // iOS SF Pro font at default size (~17pt) averages ~8.5px per character
-      // For button text (usually smaller, ~14-15pt), use ~7.5px per character
-      // Add extra width for button padding to prevent text truncation
-      final textWidth = (label?.length ?? 0) * 7.5;
-
-      // If there's an icon, add its width + spacing
-      final iconWidth = iconSize > 0 ? iconSize + 8.0 : 0;
-
-      // Add a small buffer (4px) to prevent text from being too tight
-      const buffer = 4.0;
-
-      return textWidth + iconWidth + horizontalPadding + buffer;
-    }
   }
 
   void _onCreated(int id) {
@@ -672,7 +551,6 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.minHeight != null) 'minHeight': button.config.minHeight,
       if (button.config.imagePadding != null)
         'imagePadding': button.config.imagePadding,
-      if (button.config.flexible != null) 'flexible': button.config.flexible,
     };
   }
 
@@ -754,7 +632,6 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.minHeight != null) 'minHeight': button.config.minHeight,
       if (button.config.imagePadding != null)
         'imagePadding': button.config.imagePadding,
-      if (button.config.flexible != null) 'flexible': button.config.flexible,
     };
   }
 }

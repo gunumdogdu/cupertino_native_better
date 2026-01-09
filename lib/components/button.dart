@@ -82,18 +82,6 @@ class CNButtonConfig {
   /// When limited, text will be truncated with ellipsis if too long.
   final int? maxLines;
 
-  /// Whether the button should be flexible (expandable) in a button group.
-  ///
-  /// When true, the button can expand to take available space in a button group.
-  /// When false, the button maintains its intrinsic size.
-  ///
-  /// This only has an effect when used within [CNGlassButtonGroup] and when
-  /// the group's `distribution` is set to `CNButtonDistribution.mixed`.
-  ///
-  /// Defaults to null, which means the button will use natural sizing based
-  /// on its content (text buttons are flexible, icon-only buttons are fixed).
-  final bool? flexible;
-
   /// Size for custom icons (when using [customIcon]).
   ///
   /// If null, defaults to 20.0 points.
@@ -115,7 +103,6 @@ class CNButtonConfig {
     this.glassEffectId,
     this.glassEffectInteractive = true,
     this.maxLines = 1,
-    this.flexible,
     this.customIconSize,
   });
 }
