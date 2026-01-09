@@ -48,9 +48,10 @@ struct GlassButtonGroupSwiftUI: View {
               config: button.config,
               badgeCount: nil // Badges rendered via UIKit
             )
+            .fixedSize(horizontal: true, vertical: false)
           }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+        .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
       } else {
         VStack(alignment: .center, spacing: viewModel.spacing) {
           ForEach(Array(viewModel.buttons.enumerated()), id: \.offset) { index, button in
@@ -72,12 +73,13 @@ struct GlassButtonGroupSwiftUI: View {
               config: button.config,
               badgeCount: nil // Badges rendered via UIKit
             )
+            .fixedSize(horizontal: true, vertical: false)
           }
         }
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+        .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
       }
     }
-    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .center)
+    .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
     .ignoresSafeArea()
   }
 }
