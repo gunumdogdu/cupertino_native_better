@@ -6,12 +6,24 @@
   - Allows customizing the size of custom icons (IconData) in buttons
   - Previously hardcoded to 20.0 points, now configurable
 
+- **Added**: `iconSize` property for `CNTabBar` to control SF Symbol icon sizes
+  - Supports dynamic icon sizing with automatic height adjustment
+  - Note: Icons above 30pt may have minor visual quirks due to UITabBar constraints
+
 ### Bug Fixes
 
 - **Fixed**: `CNGlassButtonGroup` no longer forces equal width on all buttons (PR #12 by @anirudhrao-github)
   - Buttons now use their intrinsic width based on content
   - Label buttons can now be wider than icon-only buttons in the same group
   - Uses SwiftUI `.fixedSize(horizontal: true, vertical: false)` for proper sizing
+
+- **Fixed**: `CNTabBar.onTap` now fires for reselects (Issue #13)
+  - Previously, tapping the already-selected tab did not trigger the callback
+  - Now all taps fire `onTap`, allowing scroll-to-top or navigation reset on reselect
+
+- **Fixed**: `CNTabBar` icon clipping on iOS 26+ Liquid Glass
+  - Disabled `clipsToBounds` on iOS 26+ to allow proper Liquid Glass pill overflow
+  - Tab bar height now adjusts dynamically based on icon size
 
 ### Improvements
 

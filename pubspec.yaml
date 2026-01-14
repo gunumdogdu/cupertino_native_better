@@ -13,6 +13,14 @@ topics:
   - liquid-glass
   - native-widgets
 
+screenshots:
+  - description: 'iOS 26 Liquid Glass buttons with native blur effects'
+    path: screenshots/button_preview.png
+  - description: 'Native tab bar with badges and glass styling'
+    path: screenshots/tab_bar_preview.png
+  - description: 'Native iOS slider with glass thumb effect'
+    path: screenshots/slider_preview.jpg
+
 environment:
   sdk: ^3.9.0
   flutter: '>=3.3.0'

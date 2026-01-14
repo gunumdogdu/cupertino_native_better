@@ -28,6 +28,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
   private var leftInsetVal: CGFloat = 0
   private var rightInsetVal: CGFloat = 0
   private var splitSpacingVal: CGFloat = 12 // Apple's recommended spacing for visual separation
+  private var currentIconSizes: [CGFloat] = [] // Track icon sizes for dynamic height calculation
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeTabBar_\(viewId)", binaryMessenger: messenger)
@@ -46,7 +47,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     var imageAssetFormats: [String] = []
     var activeImageAssetFormats: [String] = []
     var iconScale: CGFloat = UIScreen.main.scale
-    var sizes: [NSNumber] = [] // ignored; use system metrics
+    var sizes: [NSNumber?] = []
     var colors: [NSNumber] = [] // ignored; use tintColor
     var selectedIndex: Int = 0
     var isDark: Bool = false
@@ -81,7 +82,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       if let scale = dict["iconScale"] as? NSNumber {
         iconScale = CGFloat(truncating: scale)
       }
-      sizes = (dict["sfSymbolSizes"] as? [NSNumber]) ?? []
+      sizes = (dict["sfSymbolSizes"] as? [NSNumber?]) ?? []
       colors = (dict["sfSymbolColors"] as? [NSNumber]) ?? []
       if let v = dict["selectedIndex"] as? NSNumber { selectedIndex = v.intValue }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
@@ -104,7 +105,13 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     super.init()
 
     container.backgroundColor = .clear
-    container.clipsToBounds = true // Prevent shadow leakage
+    // On iOS 26+, the Liquid Glass tab bar needs to overflow slightly for the pill effect
+    // On older iOS, keep clipsToBounds to prevent visual artifacts
+    if #available(iOS 26.0, *) {
+      container.clipsToBounds = false
+    } else {
+      container.clipsToBounds = true // Prevent shadow leakage on older iOS
+    }
     container.layer.shadowOpacity = 0 // Explicitly disable layer shadow
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
@@ -134,9 +141,15 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
         } else if i < customIconBytes.count, let data = customIconBytes[i] {
           image = UIImage(data: data, scale: self.iconScale)?.withRenderingMode(.alwaysTemplate)
         } else if i < symbols.count && !symbols[i].isEmpty {
-          image = UIImage(systemName: symbols[i])
+          // Apply size configuration if specified
+          if i < sizes.count, let sizeNum = sizes[i], sizeNum.doubleValue > 0 {
+            let config = UIImage.SymbolConfiguration(pointSize: CGFloat(sizeNum.doubleValue))
+            image = UIImage(systemName: symbols[i], withConfiguration: config)
+          } else {
+            image = UIImage(systemName: symbols[i])
+          }
         }
-        
+
         // Selected image: Use active versions if available
         if i < activeImageAssetData.count, let data = activeImageAssetData[i] {
           selectedImage = Self.createImageFromData(data, format: (i < activeImageAssetFormats.count) ? activeImageAssetFormats[i] : nil, scale: iconScale)
@@ -145,15 +158,27 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
         } else if i < activeCustomIconBytes.count, let data = activeCustomIconBytes[i] {
           selectedImage = UIImage(data: data, scale: self.iconScale)?.withRenderingMode(.alwaysTemplate)
         } else if i < activeSymbols.count && !activeSymbols[i].isEmpty {
-          selectedImage = UIImage(systemName: activeSymbols[i])
+          // Apply size configuration if specified
+          if i < sizes.count, let sizeNum = sizes[i], sizeNum.doubleValue > 0 {
+            let config = UIImage.SymbolConfiguration(pointSize: CGFloat(sizeNum.doubleValue))
+            selectedImage = UIImage(systemName: activeSymbols[i], withConfiguration: config)
+          } else {
+            selectedImage = UIImage(systemName: activeSymbols[i])
+          }
         } else {
           selectedImage = image // Fallback to same image
         }
-        
+
         let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
         let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
         if i < badges.count && !badges[i].isEmpty {
           item.badgeValue = badges[i]
+        }
+        // Adjust title position for larger icons to prevent overlap
+        // Default icon size is ~25pt
+        if i < sizes.count, let sizeNum = sizes[i], sizeNum.doubleValue > 25 {
+          let offset = CGFloat(sizeNum.doubleValue - 25)
+          item.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: offset)
         }
         items.append(item)
       }
@@ -167,7 +192,12 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBarLeft = left; tabBarRight = right
       left.translatesAutoresizingMaskIntoConstraints = false
       right.translatesAutoresizingMaskIntoConstraints = false
-      left.clipsToBounds = true; right.clipsToBounds = true // Prevent shadow leakage
+      // On iOS 26+, allow overflow for Liquid Glass pill effect
+      if #available(iOS 26.0, *) {
+        left.clipsToBounds = false; right.clipsToBounds = false
+      } else {
+        left.clipsToBounds = true; right.clipsToBounds = true // Prevent shadow leakage
+      }
       left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
       left.delegate = self; right.delegate = self
       if let bg = bg { left.barTintColor = bg; right.barTintColor = bg }
@@ -272,7 +302,12 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBar = bar
       bar.delegate = self
       bar.translatesAutoresizingMaskIntoConstraints = false
-      bar.clipsToBounds = true // Prevent shadow leakage from tab bar itself
+      // On iOS 26+, allow overflow for Liquid Glass pill effect
+      if #available(iOS 26.0, *) {
+        bar.clipsToBounds = false
+      } else {
+        bar.clipsToBounds = true // Prevent shadow leakage on older iOS
+      }
       bar.layer.shadowOpacity = 0
       if let bg = bg { bar.barTintColor = bg }
       if #available(iOS 10.0, *), let tint = tint { bar.tintColor = tint }
@@ -324,13 +359,19 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     self.iconScale = iconScale
     self.leftInsetVal = leftInset
     self.rightInsetVal = rightInset
+    self.currentIconSizes = sizes.compactMap { $0 }.map { CGFloat(truncating: $0) }
 channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
       case "getIntrinsicSize":
         if let bar = self.tabBar ?? self.tabBarLeft ?? self.tabBarRight {
           let size = bar.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
-          result(["width": Double(size.width), "height": Double(size.height)])
+          // Adjust height for larger icons - default icon is ~25pt, default height is ~49pt
+          let defaultIconSize: CGFloat = 25.0
+          let maxIconSize = self.currentIconSizes.max() ?? defaultIconSize
+          let extraHeight = max(0, maxIconSize - defaultIconSize)
+          let dynamicHeight = size.height + extraHeight
+          result(["width": Double(size.width), "height": Double(dynamicHeight)])
         } else {
           result(["width": Double(self.container.bounds.width), "height": 50.0])
         }
@@ -340,6 +381,7 @@ channel.setMethodCallHandler { [weak self] call, result in
           let symbols = (args["sfSymbols"] as? [String]) ?? []
           let activeSymbols = (args["activeSfSymbols"] as? [String]) ?? []
           let badges = (args["badges"] as? [String]) ?? []
+          let sizes = (args["sfSymbolSizes"] as? [NSNumber?]) ?? []
           var customIconBytes: [Data?] = []
           var activeCustomIconBytes: [Data?] = []
           var imageAssetPaths: [String] = []
@@ -380,12 +422,14 @@ channel.setMethodCallHandler { [weak self] call, result in
           self.currentActiveImageAssetData = activeImageAssetData
           self.currentImageAssetFormats = imageAssetFormats
           self.currentActiveImageAssetFormats = activeImageAssetFormats
+          // Store icon sizes for dynamic height calculation
+          self.currentIconSizes = sizes.compactMap { $0?.doubleValue }.map { CGFloat($0) }
           func buildItems(_ range: Range<Int>) -> [UITabBarItem] {
             var items: [UITabBarItem] = []
             for i in range {
               var image: UIImage? = nil
               var selectedImage: UIImage? = nil
-              
+
               // Priority: imageAsset > customIconBytes > SF Symbol
               // Unselected image
               if i < imageAssetData.count, let data = imageAssetData[i] {
@@ -395,9 +439,15 @@ channel.setMethodCallHandler { [weak self] call, result in
               } else if i < customIconBytes.count, let data = customIconBytes[i] {
                 image = UIImage(data: data, scale: self.iconScale)?.withRenderingMode(.alwaysTemplate)
               } else if i < symbols.count && !symbols[i].isEmpty {
-                image = UIImage(systemName: symbols[i])
+                // Apply size configuration if specified
+                if i < sizes.count, let sizeNum = sizes[i], sizeNum.doubleValue > 0 {
+                  let config = UIImage.SymbolConfiguration(pointSize: CGFloat(sizeNum.doubleValue))
+                  image = UIImage(systemName: symbols[i], withConfiguration: config)
+                } else {
+                  image = UIImage(systemName: symbols[i])
+                }
               }
-              
+
               // Selected image: Use active versions if available
               if i < activeImageAssetData.count, let data = activeImageAssetData[i] {
                 selectedImage = Self.createImageFromData(data, format: (i < activeImageAssetFormats.count) ? activeImageAssetFormats[i] : nil, scale: self.iconScale)
@@ -406,7 +456,13 @@ channel.setMethodCallHandler { [weak self] call, result in
               } else if i < activeCustomIconBytes.count, let data = activeCustomIconBytes[i] {
                 selectedImage = UIImage(data: data, scale: self.iconScale)?.withRenderingMode(.alwaysTemplate)
               } else if i < activeSymbols.count && !activeSymbols[i].isEmpty {
-                selectedImage = UIImage(systemName: activeSymbols[i])
+                // Apply size configuration if specified
+                if i < sizes.count, let sizeNum = sizes[i], sizeNum.doubleValue > 0 {
+                  let config = UIImage.SymbolConfiguration(pointSize: CGFloat(sizeNum.doubleValue))
+                  selectedImage = UIImage(systemName: activeSymbols[i], withConfiguration: config)
+                } else {
+                  selectedImage = UIImage(systemName: activeSymbols[i])
+                }
               } else {
                 selectedImage = image // Fallback to same image
               }
@@ -415,6 +471,14 @@ channel.setMethodCallHandler { [weak self] call, result in
               let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
               if i < badges.count && !badges[i].isEmpty {
                 item.badgeValue = badges[i]
+              }
+              // Adjust title position for larger icons to prevent overlap
+              if i < sizes.count, let sizeNum = sizes[i] {
+                let pointSize = sizeNum.doubleValue
+                if pointSize > 25 {
+                  let offset = CGFloat(pointSize - 25)
+                  item.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: offset)
+                }
               }
               items.append(item)
             }
@@ -479,7 +543,7 @@ channel.setMethodCallHandler { [weak self] call, result in
             for i in range {
               var image: UIImage? = nil
               var selectedImage: UIImage? = nil
-              
+
               // Priority: imageAsset > customIconBytes > SF Symbol
               // Unselected image
               if i < imageAssetData.count, let data = imageAssetData[i] {
@@ -491,7 +555,7 @@ channel.setMethodCallHandler { [weak self] call, result in
               } else if i < symbols.count && !symbols[i].isEmpty {
                 image = UIImage(systemName: symbols[i])
               }
-              
+
               // Selected image: Use active versions if available
               if i < activeImageAssetData.count, let data = activeImageAssetData[i] {
                 selectedImage = Self.createImageFromData(data, format: (i < activeImageAssetFormats.count) ? activeImageAssetFormats[i] : nil, scale: self.iconScale)
@@ -504,7 +568,7 @@ channel.setMethodCallHandler { [weak self] call, result in
               } else {
                 selectedImage = image // Fallback to same image
               }
-              
+
               let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
               let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
               if i < badges.count && !badges[i].isEmpty {
@@ -522,7 +586,12 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBarLeft = left; self.tabBarRight = right
             left.translatesAutoresizingMaskIntoConstraints = false
             right.translatesAutoresizingMaskIntoConstraints = false
-            left.clipsToBounds = true; right.clipsToBounds = true
+            // On iOS 26+, allow overflow for Liquid Glass pill effect
+            if #available(iOS 26.0, *) {
+              left.clipsToBounds = false; right.clipsToBounds = false
+            } else {
+              left.clipsToBounds = true; right.clipsToBounds = true
+            }
             left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
             left.delegate = self; right.delegate = self
             if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap; if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap; right.scrollEdgeAppearance = ap } } }
@@ -612,7 +681,12 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBar = bar
             bar.delegate = self
             bar.translatesAutoresizingMaskIntoConstraints = false
-            bar.clipsToBounds = true
+            // On iOS 26+, allow overflow for Liquid Glass pill effect
+            if #available(iOS 26.0, *) {
+              bar.clipsToBounds = false
+            } else {
+              bar.clipsToBounds = true
+            }
             bar.layer.shadowOpacity = 0
             if let ap = appearance { if #available(iOS 13.0, *) { bar.standardAppearance = ap; if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap } } }
             bar.items = buildItems(0..<count)

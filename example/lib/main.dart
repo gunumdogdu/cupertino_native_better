@@ -11,6 +11,8 @@ import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
 import 'demos/native_tab_bar_demo.dart';
+import 'demos/bottom_nav_test.dart';
+import 'demos/bottom_nav_indexed_test.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -277,6 +279,36 @@ class HomePage extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute(builder: (_) => const IssuesTestPage()),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('Bottom Nav Test (Simple)'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'rectangle.bottomthird.inset.filled',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(builder: (_) => const BottomNavTestPage()),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('Bottom Nav Test (IndexedStack)'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'square.stack.3d.up',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(builder: (_) => const BottomNavIndexedTestPage()),
                   );
                 },
               ),

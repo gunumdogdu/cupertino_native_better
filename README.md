@@ -189,6 +189,7 @@ CNTabBar(
   ],
   currentIndex: _selectedIndex,
   onTap: (index) => setState(() => _selectedIndex = index),
+  iconSize: 25, // Optional: customize icon size (default ~25pt)
   split: true, // Separates tabs when scrolling
   rightCount: 1, // Number of tabs pinned to the right
 )

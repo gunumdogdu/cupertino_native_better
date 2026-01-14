@@ -205,6 +205,7 @@ class _CNTabBarState extends State<CNTabBar> {
   bool? _lastSplit;
   int? _lastRightCount;
   double? _lastSplitSpacing;
+  double? _lastIconSize;
 
   // Search state
   bool _isSearchActive = false;
@@ -611,7 +612,8 @@ class _CNTabBarState extends State<CNTabBar> {
     if (call.method == 'valueChanged') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
-      if (idx != null && idx != _lastIndex) {
+      if (idx != null) {
+        // Always fire onTap, even for reselects (Issue #13 fix)
         widget.onTap(idx);
         _lastIndex = idx;
       }
@@ -688,11 +690,15 @@ class _CNTabBarState extends State<CNTabBar> {
         return;
       }
 
+      // Check if iconSize changed
+      final iconSizeChanged = _lastIconSize != widget.iconSize;
+
       // Check if basic properties changed
       if (labelsChanged ||
           symbolsChanged ||
           activeSymbolsChanged ||
-          badgesChanged) {
+          badgesChanged ||
+          iconSizeChanged) {
         // Re-render custom icons if items changed
         final iconBytes = await _renderCustomIcons();
         final customIconBytes = iconBytes[0];
@@ -735,6 +741,11 @@ class _CNTabBarState extends State<CNTabBar> {
             )
             .toList();
 
+        // Compute icon sizes (fix for dynamic iconSize updates)
+        final sizes = widget.items
+            .map((e) => widget.iconSize ?? e.icon?.size ?? e.imageAsset?.size)
+            .toList();
+
         await ch.invokeMethod('setItems', {
           'labels': labels,
           'sfSymbols': symbols,
@@ -750,11 +761,13 @@ class _CNTabBarState extends State<CNTabBar> {
           'activeImageAssetFormats': activeImageAssetFormats,
           'iconScale': iconScale,
           'selectedIndex': widget.currentIndex,
+          'sfSymbolSizes': sizes,
         });
         _lastLabels = labels;
         _lastSymbols = symbols;
         _lastActiveSymbols = activeSymbols;
         _lastBadges = badges;
+        _lastIconSize = widget.iconSize;
         // Re-measure width in case content changed
         _requestIntrinsicSize();
       }
