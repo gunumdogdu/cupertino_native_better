@@ -100,24 +100,19 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
 
     // Use a Stack where the child determines the size
     // The platform view fills the child's bounds exactly
-    // Use Align with widthFactor and heightFactor null to size to child
-    // Then use StackFit.passthrough to size the Stack to its child
-    return Align(
-      alignment: Alignment.topLeft,
-      widthFactor: null,
-      heightFactor: null,
-      child: Stack(
-        clipBehavior: Clip.none,
-        fit: StackFit.passthrough,
-        children: [
-          // Glass effect background from native view - sized to match child
-          // Wrap in IgnorePointer so the platform view never intercepts touches
-          Positioned.fill(child: IgnorePointer(child: platformView)),
-          // Child content rendered on top - determines the size
-          // This will size the Stack, and Positioned.fill will match it
-          widget.child,
-        ],
-      ),
+    // StackFit.passthrough sizes the Stack to match the non-positioned child
+    // This allows parent widgets to control alignment via Center, Align, etc.
+    return Stack(
+      clipBehavior: Clip.none,
+      fit: StackFit.passthrough,
+      children: [
+        // Glass effect background from native view - sized to match child
+        // Wrap in IgnorePointer so the platform view never intercepts touches
+        Positioned.fill(child: IgnorePointer(child: platformView)),
+        // Child content rendered on top - determines the size
+        // This will size the Stack, and Positioned.fill will match it
+        widget.child,
+      ],
     );
   }
 

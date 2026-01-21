@@ -270,7 +270,10 @@ class _CNGlassCardState extends State<CNGlassCard>
             onPlatformViewCreated: _onPlatformViewCreated,
           );
 
+    // Use StackFit.passthrough so the Stack sizes to the child content
+    // This allows parent widgets to control alignment via Center, Align, etc.
     return Stack(
+      fit: StackFit.passthrough,
       children: [
         Positioned.fill(child: IgnorePointer(child: platformView)),
         Padding(padding: widget.padding, child: widget.child),
