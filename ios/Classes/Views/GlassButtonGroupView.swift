@@ -41,6 +41,7 @@ struct GlassButtonGroupSwiftUI: View {
               isRound: button.isRound,
               style: button.style,
               isEnabled: button.isEnabled,
+              isInteractive: button.isInteractive,
               onPressed: button.onPressed,
               glassEffectUnionId: button.glassEffectUnionId,
               glassEffectId: button.glassEffectId,
@@ -67,6 +68,7 @@ struct GlassButtonGroupSwiftUI: View {
               isRound: button.isRound,
               style: button.style,
               isEnabled: button.isEnabled,
+              isInteractive: button.isInteractive,
               onPressed: button.onPressed,
               glassEffectUnionId: button.glassEffectUnionId,
               glassEffectId: button.glassEffectId,
@@ -183,6 +185,7 @@ struct GlassButtonData: Identifiable {
   let isRound: Bool
   let style: String
   let isEnabled: Bool
+  let isInteractive: Bool
   let onPressed: () -> Void
   let glassEffectUnionId: String?
   let glassEffectId: String?
@@ -247,6 +250,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
           let disabledIconColor = (buttonDict["disabledIconColor"] as? NSNumber).map { Color(uiColor: Self.colorFromARGB($0.intValue)) }
           let tint = (buttonDict["tint"] as? NSNumber).map { Color(uiColor: Self.colorFromARGB($0.intValue)) }
           let isEnabled = (buttonDict["enabled"] as? NSNumber)?.boolValue ?? true
+          let isInteractive = (buttonDict["interaction"] as? NSNumber)?.boolValue ?? true
           let style = buttonDict["style"] as? String ?? "glass"
           let glassEffectUnionId = buttonDict["glassEffectUnionId"] as? String
           let glassEffectId = buttonDict["glassEffectId"] as? String
@@ -351,6 +355,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
             isRound: isRound,
             style: style,
             isEnabled: isEnabled,
+            isInteractive: isInteractive,
             onPressed: buttonCallback,
             glassEffectUnionId: glassEffectUnionId,
             glassEffectId: glassEffectId,
@@ -477,6 +482,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     let disabledIconColor = (buttonDict["disabledIconColor"] as? NSNumber).map { Color(uiColor: Self.colorFromARGB($0.intValue)) }
     let tint = (buttonDict["tint"] as? NSNumber).map { Color(uiColor: Self.colorFromARGB($0.intValue)) }
     let isEnabled = (buttonDict["enabled"] as? NSNumber)?.boolValue ?? true
+    let isInteractive = (buttonDict["interaction"] as? NSNumber)?.boolValue ?? true
     let style = buttonDict["style"] as? String ?? "glass"
     let glassEffectUnionId = buttonDict["glassEffectUnionId"] as? String
     let glassEffectId = buttonDict["glassEffectId"] as? String
@@ -572,6 +578,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       isRound: isRound,
       style: style,
       isEnabled: isEnabled,
+      isInteractive: isInteractive,
       onPressed: buttonCallback,
       glassEffectUnionId: glassEffectUnionId,
       glassEffectId: glassEffectId,
@@ -600,6 +607,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       let disabledIconColor = (buttonDict["disabledIconColor"] as? NSNumber).map { Color(uiColor: Self.colorFromARGB($0.intValue)) }
       let tint = (buttonDict["tint"] as? NSNumber).map { Color(uiColor: Self.colorFromARGB($0.intValue)) }
       let isEnabled = (buttonDict["enabled"] as? NSNumber)?.boolValue ?? true
+      let isInteractive = (buttonDict["interaction"] as? NSNumber)?.boolValue ?? true
       let style = buttonDict["style"] as? String ?? "glass"
       let glassEffectUnionId = buttonDict["glassEffectUnionId"] as? String
       let glassEffectId = buttonDict["glassEffectId"] as? String
@@ -692,6 +700,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
         isRound: isRound,
         style: style,
         isEnabled: isEnabled,
+        isInteractive: isInteractive,
         onPressed: buttonCallback,
         glassEffectUnionId: glassEffectUnionId,
         glassEffectId: glassEffectId,

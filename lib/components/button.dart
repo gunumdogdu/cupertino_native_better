@@ -95,6 +95,16 @@ class CNButtonConfig {
   /// This allows customizing the icon color for disabled buttons.
   final Color? disabledIconColor;
 
+  /// Whether the button responds to user interaction.
+  ///
+  /// When false, the button will not be tappable or respond to touches,
+  /// but will maintain its normal visual appearance (no opacity change).
+  /// This is different from [CNButton.enabled] which also applies
+  /// the system's disabled visual styling.
+  ///
+  /// Defaults to true.
+  final bool interaction;
+
   /// Creates a configuration for [CNButton].
   const CNButtonConfig({
     this.padding,
@@ -111,6 +121,7 @@ class CNButtonConfig {
     this.maxLines = 1,
     this.customIconSize,
     this.disabledIconColor,
+    this.interaction = true,
   });
 }
 
@@ -447,6 +458,7 @@ class _CNButtonState extends State<CNButton> {
       if (widget.config.disabledIconColor != null)
         'disabledIconColor':
             resolveColorToArgb(widget.config.disabledIconColor, context),
+      'interaction': widget.config.interaction,
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS

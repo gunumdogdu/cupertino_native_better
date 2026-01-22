@@ -154,6 +154,7 @@ class CNButtonDataConfig {
     this.glassEffectId,
     this.glassEffectInteractive = true,
     this.customIconSize,
+    this.interaction = true,
   });
 
   /// Fixed width for the button.
@@ -192,6 +193,16 @@ class CNButtonDataConfig {
   /// This only affects custom icons from IconData (CupertinoIcons, Icons, etc.).
   final double? customIconSize;
 
+  /// Whether the button responds to user interaction.
+  ///
+  /// When false, the button will not be tappable or respond to touches,
+  /// but will maintain its normal visual appearance (no opacity change).
+  /// This is different from [CNButtonData.enabled] which also applies
+  /// the system's disabled visual styling.
+  ///
+  /// Defaults to true.
+  final bool interaction;
+
   /// Creates a copy with the given fields replaced.
   CNButtonDataConfig copyWith({
     double? width,
@@ -205,6 +216,7 @@ class CNButtonDataConfig {
     String? glassEffectId,
     bool? glassEffectInteractive,
     double? customIconSize,
+    bool? interaction,
   }) {
     return CNButtonDataConfig(
       width: width ?? this.width,
@@ -219,6 +231,7 @@ class CNButtonDataConfig {
       glassEffectInteractive:
           glassEffectInteractive ?? this.glassEffectInteractive,
       customIconSize: customIconSize ?? this.customIconSize,
+      interaction: interaction ?? this.interaction,
     );
   }
 }

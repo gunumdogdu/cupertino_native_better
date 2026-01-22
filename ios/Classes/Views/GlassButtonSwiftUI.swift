@@ -15,6 +15,7 @@ struct GlassButtonSwiftUI: View {
   let isRound: Bool
   let style: String
   let isEnabled: Bool
+  let isInteractive: Bool
   let onPressed: () -> Void
   let glassEffectUnionId: String?
   let glassEffectId: String?
@@ -68,8 +69,8 @@ struct GlassButtonSwiftUI: View {
     }
     // Only apply system disabled styling if no custom disabledIconColor is provided
     // When disabledIconColor is set, we handle the visual state ourselves
-    .disabled(!isEnabled && disabledIconColor == nil)
-    .allowsHitTesting(isEnabled) // Prevent taps when disabled regardless of styling
+    .disabled(!isEnabled)
+    .allowsHitTesting(isEnabled && isInteractive) // Prevent taps when disabled or non-interactive
     .buttonStyle(NoHighlightButtonStyle())
     .badge(badgeCount != nil && badgeCount! > 0 ? (badgeCount! > 99 ? "99+" : "\(badgeCount!)") : nil)
   }

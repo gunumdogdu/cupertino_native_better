@@ -391,6 +391,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: button.config.glassEffectUnionId,
             glassEffectId: button.config.glassEffectId,
             glassEffectInteractive: button.config.glassEffectInteractive,
+            interaction: button.config.interaction,
           ),
         );
       } else {
@@ -413,6 +414,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: button.config.glassEffectUnionId,
             glassEffectId: button.config.glassEffectId,
             glassEffectInteractive: button.config.glassEffectInteractive,
+            interaction: button.config.interaction,
           ),
         );
       }
@@ -443,6 +445,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: data.config.glassEffectUnionId,
             glassEffectId: data.config.glassEffectId,
             glassEffectInteractive: data.config.glassEffectInteractive,
+            interaction: data.config.interaction,
           ),
         );
       } else {
@@ -467,6 +470,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: data.config.glassEffectUnionId,
             glassEffectId: data.config.glassEffectId,
             glassEffectInteractive: data.config.glassEffectInteractive,
+            interaction: data.config.interaction,
           ),
         );
       }
@@ -533,6 +537,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.glassEffectId != null)
         'glassEffectId': button.config.glassEffectId,
       'glassEffectInteractive': button.config.glassEffectInteractive,
+      'interaction': button.config.interaction,
       if (button.config.borderRadius != null)
         'borderRadius': button.config.borderRadius,
       if (button.config.padding != null) ...{
@@ -617,6 +622,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.glassEffectId != null)
         'glassEffectId': button.config.glassEffectId,
       'glassEffectInteractive': button.config.glassEffectInteractive,
+      'interaction': button.config.interaction,
       if (button.config.borderRadius != null)
         'borderRadius': button.config.borderRadius,
       if (button.config.padding != null) ...{

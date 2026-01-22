@@ -10,6 +10,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   private var badgeView: UIView?
   private var badgeLabel: UILabel?
   private var isEnabled: Bool = true
+  private var isInteractive: Bool = true
   private var currentButtonStyle: String = "automatic"
   private var usesSwiftUI: Bool = false
   private var makeRound: Bool = false
@@ -50,6 +51,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     var glassEffectInteractive: Bool = false
     var badgeCount: Int? = nil
     var disabledIconColor: UIColor? = nil
+    var interaction: Bool = true
 
     if let dict = args as? [String: Any] {
       if let t = dict["buttonTitle"] as? String { title = t }
@@ -89,10 +91,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let geInteractive = dict["glassEffectInteractive"] as? NSNumber { glassEffectInteractive = geInteractive.boolValue }
       if let bc = dict["badgeCount"] as? NSNumber { badgeCount = bc.intValue }
       if let dic = dict["disabledIconColor"] as? NSNumber { disabledIconColor = Self.colorFromARGB(dic.intValue) }
+      if let inter = dict["interaction"] as? NSNumber { interaction = inter.boolValue }
     }
 
     super.init()
 
+    self.isInteractive = interaction
     container.backgroundColor = .clear
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
@@ -200,6 +204,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         isRound: makeRound,
         style: buttonStyle,
         enabled: enabled,
+        interaction: interaction,
         glassEffectUnionId: glassEffectUnionId,
         glassEffectId: glassEffectId,
         glassEffectInteractive: glassEffectInteractive,
@@ -535,6 +540,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     isRound: Bool,
     style: String,
     enabled: Bool,
+    interaction: Bool,
     glassEffectUnionId: String?,
     glassEffectId: String?,
     glassEffectInteractive: Bool,
@@ -576,6 +582,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       let isRound: Bool
       let style: String
       let isEnabled: Bool
+      let isInteractive: Bool
       let onPressed: () -> Void
       let glassEffectUnionId: String?
       let glassEffectId: String?
@@ -595,6 +602,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           isRound: isRound,
           style: style,
           isEnabled: isEnabled,
+          isInteractive: isInteractive,
           onPressed: onPressed,
           glassEffectUnionId: glassEffectUnionId,
           glassEffectId: glassEffectId,
@@ -617,6 +625,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       isRound: isRound,
       style: style,
       isEnabled: enabled,
+      isInteractive: interaction,
       onPressed: { [weak self] in
         self?.onPressed(nil)
       },
@@ -659,7 +668,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   }
   
   @objc private func onPressed(_ sender: UIButton?) {
-    guard isEnabled else { return }
+    guard isEnabled && isInteractive else { return }
     channel.invokeMethod("pressed", arguments: nil)
   }
 
