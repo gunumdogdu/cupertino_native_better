@@ -661,6 +661,7 @@ class _ButtonSnapshot {
   final int? customIconHash;
   final String style;
   final bool enabled;
+  final bool interaction;
   final int? tint;
   final int? disabledIconColor;
   final int? badgeCount;
@@ -677,6 +678,7 @@ class _ButtonSnapshot {
     this.customIconHash,
     required this.style,
     required this.enabled,
+    required this.interaction,
     this.tint,
     this.disabledIconColor,
     this.badgeCount,
@@ -695,6 +697,7 @@ class _ButtonSnapshot {
       customIconHash: button.customIcon?.hashCode,
       style: button.config.style.name,
       enabled: button.enabled,
+      interaction: button.config.interaction,
       tint: button.tint?.toARGB32(),
       disabledIconColor: button.config.disabledIconColor?.toARGB32(),
       badgeCount: button.badgeCount,
@@ -714,6 +717,7 @@ class _ButtonSnapshot {
       customIconHash: button.customIcon?.hashCode,
       style: button.config.style.name,
       enabled: button.enabled,
+      interaction: button.config.interaction,
       tint: button.tint?.toARGB32(),
       disabledIconColor: button.disabledIconColor?.toARGB32(),
       badgeCount: button.badgeCount,
@@ -732,6 +736,7 @@ class _ButtonSnapshot {
         customIconHash == other.customIconHash &&
         style == other.style &&
         enabled == other.enabled &&
+        interaction == other.interaction &&
         tint == other.tint &&
         disabledIconColor == other.disabledIconColor &&
         badgeCount == other.badgeCount;
