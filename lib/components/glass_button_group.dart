@@ -391,6 +391,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: button.config.glassEffectUnionId,
             glassEffectId: button.config.glassEffectId,
             glassEffectInteractive: button.config.glassEffectInteractive,
+            interaction: button.config.interaction,
           ),
         );
       } else {
@@ -413,6 +414,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: button.config.glassEffectUnionId,
             glassEffectId: button.config.glassEffectId,
             glassEffectInteractive: button.config.glassEffectInteractive,
+            interaction: button.config.interaction,
           ),
         );
       }
@@ -443,6 +445,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: data.config.glassEffectUnionId,
             glassEffectId: data.config.glassEffectId,
             glassEffectInteractive: data.config.glassEffectInteractive,
+            interaction: data.config.interaction,
           ),
         );
       } else {
@@ -467,6 +470,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             glassEffectUnionId: data.config.glassEffectUnionId,
             glassEffectId: data.config.glassEffectId,
             glassEffectInteractive: data.config.glassEffectInteractive,
+            interaction: data.config.interaction,
           ),
         );
       }
@@ -530,6 +534,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.glassEffectId != null)
         'glassEffectId': button.config.glassEffectId,
       'glassEffectInteractive': button.config.glassEffectInteractive,
+      'interaction': button.config.interaction,
       if (button.config.borderRadius != null)
         'borderRadius': button.config.borderRadius,
       if (button.config.padding != null) ...{
@@ -611,6 +616,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.glassEffectId != null)
         'glassEffectId': button.config.glassEffectId,
       'glassEffectInteractive': button.config.glassEffectInteractive,
+      'interaction': button.config.interaction,
       if (button.config.borderRadius != null)
         'borderRadius': button.config.borderRadius,
       if (button.config.padding != null) ...{
@@ -649,6 +655,7 @@ class _ButtonSnapshot {
   final int? customIconHash;
   final String style;
   final bool enabled;
+  final bool interaction;
   final int? tint;
   final int? badgeCount;
 
@@ -664,6 +671,7 @@ class _ButtonSnapshot {
     this.customIconHash,
     required this.style,
     required this.enabled,
+    required this.interaction,
     this.tint,
     this.badgeCount,
   });
@@ -681,6 +689,7 @@ class _ButtonSnapshot {
       customIconHash: button.customIcon?.hashCode,
       style: button.config.style.name,
       enabled: button.enabled,
+      interaction: button.config.interaction,
       tint: button.tint?.toARGB32(),
       badgeCount: button.badgeCount,
     );
@@ -699,6 +708,7 @@ class _ButtonSnapshot {
       customIconHash: button.customIcon?.hashCode,
       style: button.config.style.name,
       enabled: button.enabled,
+      interaction: button.config.interaction,
       tint: button.tint?.toARGB32(),
       badgeCount: button.badgeCount,
     );
@@ -716,6 +726,7 @@ class _ButtonSnapshot {
         customIconHash == other.customIconHash &&
         style == other.style &&
         enabled == other.enabled &&
+        interaction == other.interaction &&
         tint == other.tint &&
         badgeCount == other.badgeCount;
   }

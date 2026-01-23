@@ -89,6 +89,16 @@ class CNButtonConfig {
   /// For SF Symbols, use [CNSymbol.size]. For image assets, use [CNImageAsset.size].
   final double? customIconSize;
 
+  /// Whether the button responds to user interaction.
+  ///
+  /// When false, the button will not be tappable or respond to touches,
+  /// but will maintain its normal visual appearance (no opacity change).
+  /// This is different from [CNButton.enabled] which also applies
+  /// the system's disabled visual styling.
+  ///
+  /// Defaults to true.
+  final bool interaction;
+
   /// Creates a configuration for [CNButton].
   const CNButtonConfig({
     this.padding,
@@ -104,6 +114,7 @@ class CNButtonConfig {
     this.glassEffectInteractive = true,
     this.maxLines = 1,
     this.customIconSize,
+    this.interaction = true,
   });
 }
 
@@ -218,6 +229,7 @@ class _CNButtonState extends State<CNButton> {
   Uint8List? _lastImageAssetData;
   IconData? _lastCustomIcon;
   int? _lastBadgeCount;
+  bool? _lastInteraction;
   Offset? _downPosition;
   bool _pressed = false;
 
@@ -437,6 +449,7 @@ class _CNButtonState extends State<CNButton> {
         'glassEffectId': widget.config.glassEffectId,
       'glassEffectInteractive': widget.config.glassEffectInteractive,
       if (widget.badgeCount != null) 'badgeCount': widget.badgeCount,
+      'interaction': widget.config.interaction,
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
@@ -515,12 +528,14 @@ class _CNButtonState extends State<CNButton> {
                 _intrinsicHeight != null)
             ? _intrinsicHeight!
             : defaultHeight;
-        return Listener(
+        final buttonWidget = Listener(
           onPointerDown: (e) {
+            if (!widget.config.interaction) return;
             _downPosition = e.position;
             _setPressed(true);
           },
           onPointerMove: (e) {
+            if (!widget.config.interaction) return;
             final start = _downPosition;
             if (start != null && _pressed) {
               final moved = (e.position - start).distance;
@@ -530,10 +545,12 @@ class _CNButtonState extends State<CNButton> {
             }
           },
           onPointerUp: (_) {
+            if (!widget.config.interaction) return;
             _setPressed(false);
             _downPosition = null;
           },
           onPointerCancel: (_) {
+            if (!widget.config.interaction) return;
             _setPressed(false);
             _downPosition = null;
           },
@@ -541,6 +558,16 @@ class _CNButtonState extends State<CNButton> {
             child: SizedBox(height: height, width: width, child: platformView),
           ),
         );
+
+        // Wrap in IgnorePointer when interaction is disabled to absorb all touches
+        if (!widget.config.interaction) {
+          return IgnorePointer(
+            ignoring: true,
+            child: buttonWidget,
+          );
+        }
+
+        return buttonWidget;
       },
     );
   }
@@ -566,6 +593,7 @@ class _CNButtonState extends State<CNButton> {
     _lastImageAssetData = widget.imageAsset?.imageData;
     _lastCustomIcon = widget.customIcon;
     _lastBadgeCount = widget.badgeCount;
+    _lastInteraction = widget.config.interaction;
     // Always request intrinsic size to get both width and height
     // Use a small delay to ensure native view has finished layout
     Future.delayed(const Duration(milliseconds: 10), () {
@@ -578,7 +606,7 @@ class _CNButtonState extends State<CNButton> {
   Future<dynamic> _onMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'pressed':
-        if (widget.enabled && widget.onPressed != null) {
+        if (widget.enabled && widget.config.interaction && widget.onPressed != null) {
           widget.onPressed!();
         }
         break;
@@ -859,6 +887,15 @@ class _CNButtonState extends State<CNButton> {
       await ch.invokeMethod('setBadgeCount', {'badgeCount': widget.badgeCount});
       _lastBadgeCount = widget.badgeCount;
     }
+
+    // Sync interaction state
+    if (_lastInteraction != widget.config.interaction) {
+      await ch.invokeMethod(
+        'setInteraction',
+        {'interaction': widget.config.interaction},
+      );
+      _lastInteraction = widget.config.interaction;
+    }
   }
 
   Future<void> _syncBrightnessIfNeeded() async {
@@ -1052,22 +1089,28 @@ class _CNButtonState extends State<CNButton> {
         borderRadius: BorderRadius.circular(borderRadius),
         pressedOpacity: 0.4, // Explicit press feedback
         color: _getCupertinoButtonColor(context),
-        onPressed: (widget.enabled && widget.onPressed != null)
+        onPressed: (widget.enabled && widget.config.interaction && widget.onPressed != null)
             ? widget.onPressed
             : null,
         child: child,
       ),
     );
 
+    // Wrap in IgnorePointer when interaction is disabled
+    Widget result = button;
+    if (!widget.config.interaction) {
+      result = IgnorePointer(ignoring: true, child: button);
+    }
+
     // Add badge if badgeCount is provided
     if (widget.badgeCount != null && widget.badgeCount! > 0) {
       return Stack(
         clipBehavior: Clip.none,
-        children: [button, _buildBadge(widget.badgeCount!)],
+        children: [result, _buildBadge(widget.badgeCount!)],
       );
     }
 
-    return button;
+    return result;
   }
 
   Widget _buildMaterialFallback(BuildContext context) {
@@ -1223,7 +1266,7 @@ class _CNButtonState extends State<CNButton> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: (widget.enabled && widget.onPressed != null)
+          onTap: (widget.enabled && widget.config.interaction && widget.onPressed != null)
               ? widget.onPressed
               : null,
           borderRadius: BorderRadius.circular(defaultHeight / 2),
@@ -1242,15 +1285,21 @@ class _CNButtonState extends State<CNButton> {
       ),
     );
 
+    // Wrap in IgnorePointer when interaction is disabled
+    Widget result = button;
+    if (!widget.config.interaction) {
+      result = IgnorePointer(ignoring: true, child: button);
+    }
+
     // Add badge if badgeCount is provided
     if (widget.badgeCount != null && widget.badgeCount! > 0) {
       return Stack(
         clipBehavior: Clip.none,
-        children: [button, _buildBadge(widget.badgeCount!)],
+        children: [result, _buildBadge(widget.badgeCount!)],
       );
     }
 
-    return button;
+    return result;
   }
 
   Color? _getCupertinoButtonColor(BuildContext context) {

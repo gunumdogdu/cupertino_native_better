@@ -14,6 +14,7 @@ struct GlassButtonSwiftUI: View {
   let isRound: Bool
   let style: String
   let isEnabled: Bool
+  let isInteractive: Bool
   let onPressed: () -> Void
   let glassEffectUnionId: String?
   let glassEffectId: String?
@@ -21,7 +22,12 @@ struct GlassButtonSwiftUI: View {
   var namespace: Namespace.ID
   let config: GlassButtonConfig
   let badgeCount: Int?
-  
+
+  /// Computes the effective icon color
+  private var effectiveIconColor: Color? {
+    return tint ?? iconColor
+  }
+
   var body: some View {
     Button(action: onPressed) {
       HStack(spacing: config.spacing) {
@@ -31,11 +37,11 @@ struct GlassButtonSwiftUI: View {
             .resizable()
             .scaledToFit()
             .frame(width: iconSize, height: iconSize)
-            .foregroundColor(tint != nil ? Color(tint!) : (iconColor != nil ? Color(iconColor!) : nil))
+            .foregroundColor(effectiveIconColor)
         } else if let iconName = iconName {
           Image(systemName: iconName)
             .font(.system(size: iconSize))
-            .foregroundColor(iconColor != nil ? Color(iconColor!) : nil)
+            .foregroundColor(effectiveIconColor)
         }
 
         if let title = title {
@@ -60,6 +66,8 @@ struct GlassButtonSwiftUI: View {
     .disabled(!isEnabled)
     .buttonStyle(NoHighlightButtonStyle())
     .badge(badgeCount != nil && badgeCount! > 0 ? (badgeCount! > 99 ? "99+" : "\(badgeCount!)") : nil)
+    // Disable hit testing on the button when not interactive
+    .allowsHitTesting(isEnabled && isInteractive)
   }
   
   private func glassEffectForStyle(_ style: String, interactive: Bool) -> Glass {
