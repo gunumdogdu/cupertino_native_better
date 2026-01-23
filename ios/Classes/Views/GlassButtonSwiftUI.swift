@@ -70,9 +70,10 @@ struct GlassButtonSwiftUI: View {
     // Only apply system disabled styling if no custom disabledIconColor is provided
     // When disabledIconColor is set, we handle the visual state ourselves
     .disabled(!isEnabled)
-    .allowsHitTesting(isEnabled && isInteractive) // Prevent taps when disabled or non-interactive
     .buttonStyle(NoHighlightButtonStyle())
     .badge(badgeCount != nil && badgeCount! > 0 ? (badgeCount! > 99 ? "99+" : "\(badgeCount!)") : nil)
+    // Disable hit testing on the button when not interactive
+    .allowsHitTesting(isEnabled && isInteractive)
   }
   
   private func glassEffectForStyle(_ style: String, interactive: Bool) -> Glass {

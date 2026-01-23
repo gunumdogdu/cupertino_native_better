@@ -9,6 +9,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   private var hostingController: UIHostingController<AnyView>?
   private var badgeView: UIView?
   private var badgeLabel: UILabel?
+  private var touchBlockingOverlay: UIView?
   private var isEnabled: Bool = true
   private var isInteractive: Bool = true
   private var currentButtonStyle: String = "automatic"
@@ -291,6 +292,9 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       addBadge(count: count)
     }
 
+    // Add touch blocking overlay if not interactive
+    updateTouchBlockingOverlay()
+
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
@@ -520,6 +524,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           self.removeBadge()
           result(nil)
         }
+      case "setInteraction":
+        if let args = call.arguments as? [String: Any], let inter = args["interaction"] as? NSNumber {
+          self.isInteractive = inter.boolValue
+          self.updateTouchBlockingOverlay()
+          result(nil)
+        } else { result(FlutterError(code: "bad_args", message: "Missing interaction", details: nil)) }
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -864,5 +874,99 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     badgeView?.removeFromSuperview()
     badgeView = nil
     badgeLabel = nil
+  }
+
+  // MARK: - Touch Blocking Overlay
+
+  private func updateTouchBlockingOverlay() {
+    if isInteractive {
+      // Remove overlay when interactive
+      removeTouchBlockingOverlay()
+    } else {
+      // Add overlay when non-interactive
+      addTouchBlockingOverlay()
+    }
+  }
+
+  private func addTouchBlockingOverlay() {
+    // Remove existing overlay first
+    removeTouchBlockingOverlay()
+
+    // Create an invisible view that intercepts all touches
+    let overlay = TouchBlockingView()
+    overlay.backgroundColor = .clear
+    overlay.translatesAutoresizingMaskIntoConstraints = false
+
+    container.addSubview(overlay)
+    touchBlockingOverlay = overlay
+
+    // Make sure overlay covers the entire container
+    NSLayoutConstraint.activate([
+      overlay.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+      overlay.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      overlay.topAnchor.constraint(equalTo: container.topAnchor),
+      overlay.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+    ])
+
+    // Bring overlay to front (above everything including badge)
+    container.bringSubviewToFront(overlay)
+  }
+
+  private func removeTouchBlockingOverlay() {
+    touchBlockingOverlay?.removeFromSuperview()
+    touchBlockingOverlay = nil
+  }
+}
+
+/// A UIView subclass that intercepts and consumes all touch events
+private class TouchBlockingView: UIView {
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    // Ensure user interaction is enabled so we receive touch events
+    isUserInteractionEnabled = true
+    // Make this view exclusive - it will block touches from passing through
+    isExclusiveTouch = true
+  }
+
+  required init?(coder: NSCoder) {
+    super.init(coder: coder)
+    isUserInteractionEnabled = true
+    isExclusiveTouch = true
+  }
+
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    // Return self to intercept all touches in this view's bounds
+    // This prevents the touch from reaching any views beneath us
+    if self.point(inside: point, with: event) {
+      return self
+    }
+    return nil
+  }
+
+  override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+    // Accept all points within our bounds
+    return bounds.contains(point)
+  }
+
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    // Consume the touch - do nothing, don't call super
+  }
+
+  override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+    // Consume the touch - do nothing, don't call super
+  }
+
+  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+    // Consume the touch - do nothing, don't call super
+  }
+
+  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+    // Consume the touch - do nothing, don't call super
+  }
+
+  // Also handle any gesture recognizer events that might slip through
+  override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+    // Block all gesture recognizers
+    return false
   }
 }

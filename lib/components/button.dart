@@ -236,6 +236,7 @@ class _CNButtonState extends State<CNButton> {
   Uint8List? _lastImageAssetData;
   IconData? _lastCustomIcon;
   int? _lastBadgeCount;
+  bool? _lastInteraction;
   Offset? _downPosition;
   bool _pressed = false;
 
@@ -602,6 +603,7 @@ class _CNButtonState extends State<CNButton> {
     _lastImageAssetData = widget.imageAsset?.imageData;
     _lastCustomIcon = widget.customIcon;
     _lastBadgeCount = widget.badgeCount;
+    _lastInteraction = widget.config.interaction;
     // Always request intrinsic size to get both width and height
     // Use a small delay to ensure native view has finished layout
     Future.delayed(const Duration(milliseconds: 10), () {
@@ -894,6 +896,15 @@ class _CNButtonState extends State<CNButton> {
     if (_lastBadgeCount != widget.badgeCount) {
       await ch.invokeMethod('setBadgeCount', {'badgeCount': widget.badgeCount});
       _lastBadgeCount = widget.badgeCount;
+    }
+
+    // Sync interaction state
+    if (_lastInteraction != widget.config.interaction) {
+      await ch.invokeMethod(
+        'setInteraction',
+        {'interaction': widget.config.interaction},
+      );
+      _lastInteraction = widget.config.interaction;
     }
   }
 
