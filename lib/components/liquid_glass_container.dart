@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -123,6 +125,11 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
       return null;
     });
     _lastIsDark = _isDark;
+    unawaited(_updateConfig());
+    Future<void>.delayed(const Duration(milliseconds: 16), () async {
+      if (!mounted || _channel == null) return;
+      await _updateConfig();
+    });
   }
 
   Future<void> _updateConfig() async {

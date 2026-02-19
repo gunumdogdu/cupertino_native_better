@@ -4,13 +4,13 @@ import SwiftUI
 
 @available(iOS 26.0, *)
 class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
-  private let container: UIView
+  private let container: CNLiquidGlassHostView
   private var hostingController: UIHostingController<LiquidGlassContainerSwiftUI>
   private let channel: FlutterMethodChannel
   
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeLiquidGlassContainer_\(viewId)", binaryMessenger: messenger)
-    self.container = UIView(frame: frame)
+    self.container = CNLiquidGlassHostView(frame: frame)
     self.container.backgroundColor = .clear
     
     // Parse arguments
@@ -61,6 +61,11 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
     
     super.init()
+
+    container.onDidMoveToWindow = { [weak self] window in
+      guard window != nil else { return }
+      self?.refreshGlass()
+    }
     
     // Sync Flutter's brightness mode with Swift at initialization
     if #available(iOS 13.0, *) {
@@ -76,6 +81,10 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
       hostingController.view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
     ])
+
+    DispatchQueue.main.async { [weak self] in
+      self?.refreshGlass()
+    }
     
     // Set up method channel handler
     channel.setMethodCallHandler { [weak self] (call, result) in
@@ -133,6 +142,15 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     
     hostingController.rootView = newGlassView
     hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
+    refreshGlass()
+  }
+
+  private func refreshGlass() {
+    hostingController.rootView = hostingController.rootView
+    container.setNeedsLayout()
+    hostingController.view.setNeedsLayout()
+    container.layoutIfNeeded()
+    hostingController.view.layoutIfNeeded()
   }
   
   func view() -> UIView {
@@ -148,26 +166,14 @@ struct LiquidGlassContainerSwiftUI: View {
   let tint: UIColor?
   let interactive: Bool
 
-  /// Observe transition state to disable glass effect during navigation
-  @ObservedObject private var transitionObserver = CNTransitionObserver.shared
-
   var body: some View {
     GeometryReader { geometry in
       shapeForConfig()
         .fill(Color.clear)
         .contentShape(shapeForConfig())
         .allowsHitTesting(false)  // Always false - let Flutter handle gestures
-        .applyConditionalGlassEffectForContainer(
-          isTransitioning: transitionObserver.isTransitioning,
-          glass: glassEffectForConfig(),
-          shape: shapeForConfig()
-        )
+        .glassEffect(glassEffectForConfig(), in: shapeForConfig())
         .frame(width: geometry.size.width, height: geometry.size.height)
-        .animation(.easeInOut(duration: 0.25), value: effect)
-        .animation(.easeInOut(duration: 0.25), value: shape)
-        .animation(.easeInOut(duration: 0.25), value: cornerRadius)
-        .animation(.easeInOut(duration: 0.25), value: tint)
-        .animation(.easeInOut(duration: 0.25), value: interactive)
     }
   }
   
@@ -201,24 +207,6 @@ struct LiquidGlassContainerSwiftUI: View {
   }
 }
 
-// Helper to apply glass effect conditionally based on transition state for containers
-@available(iOS 26.0, *)
-extension View {
-  @ViewBuilder
-  func applyConditionalGlassEffectForContainer<S: Shape>(isTransitioning: Bool, glass: Glass, shape: S) -> some View {
-    if isTransitioning {
-      // During transitions, use a simple background instead of glass to prevent sampling artifacts
-      self.background(
-        shape
-          .fill(Color(UIColor.systemBackground).opacity(0.8))
-      )
-    } else {
-      // Normal state - apply full glass effect
-      self.glassEffect(glass, in: shape)
-    }
-  }
-}
-
 // Fallback for iOS < 26
 class FallbackLiquidGlassContainerView: NSObject, FlutterPlatformView {
   private let container: UIView
@@ -234,3 +222,11 @@ class FallbackLiquidGlassContainerView: NSObject, FlutterPlatformView {
   }
 }
 
+private final class CNLiquidGlassHostView: UIView {
+  var onDidMoveToWindow: ((UIWindow?) -> Void)?
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    onDidMoveToWindow?(window)
+  }
+}
