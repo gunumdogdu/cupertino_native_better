@@ -293,13 +293,13 @@ class _CNTabBarState extends State<CNTabBar> {
       return _buildFlutterFallback(context);
     }
 
-    // Render custom IconData to bytes
+    // Render custom IconData to bytes.
+    // Issue #5: Show Flutter fallback while loading so user sees a working tab bar instead of empty ~2s.
     return FutureBuilder<List<List<Uint8List?>>>(
       future: _renderCustomIcons(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          // Show placeholder while rendering
-          return SizedBox(height: widget.height ?? 50, width: double.infinity);
+          return _buildFlutterFallback(context);
         }
 
         final iconBytes = snapshot.data!;
@@ -314,11 +314,8 @@ class _CNTabBarState extends State<CNTabBar> {
           ),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return SizedBox(height: widget.height);
+              return _buildFlutterFallback(context);
             }
-            // Keep native tab bar visible at all times
-            // Search UI should be handled in app content area, not as tab bar overlay
-            // This matches adaptive_platform_ui behavior
             return snapshot.data!;
           },
         );
@@ -588,20 +585,30 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastRightCount = widget.rightCount;
     _lastSplitSpacing = widget.splitSpacing;
 
-    // Force refresh for label rendering on iOS < 16
-    // Wait for next frame to ensure view is fully initialized
+    // Force refresh for label rendering (Issue #6: sporadic missing labels with 5 items).
+    // First refresh after 50ms; second after 200ms for slow-to-initialize native view.
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       Future.delayed(const Duration(milliseconds: 50), () async {
         if (mounted && _channel != null) {
           try {
             await _channel?.invokeMethod('refresh');
-            // Ensure correct selection after refresh (refresh can reset selection state)
             await _channel?.invokeMethod('setSelectedIndex', {
               'index': widget.currentIndex,
             });
           } catch (e) {
             // Ignore MissingPluginException during hot reload or view recreation
-            // This is expected when the platform view is being recreated
+          }
+        }
+      });
+      Future.delayed(const Duration(milliseconds: 200), () async {
+        if (mounted && _channel != null) {
+          try {
+            await _channel?.invokeMethod('refresh');
+            await _channel?.invokeMethod('setSelectedIndex', {
+              'index': widget.currentIndex,
+            });
+          } catch (e) {
+            // Ignore when platform view is being recreated
           }
         }
       });

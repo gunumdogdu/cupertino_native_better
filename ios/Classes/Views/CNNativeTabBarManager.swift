@@ -311,18 +311,20 @@ class CNNativeTabBarManager: NSObject {
         tabBar.tabBar.backgroundColor = .clear
     }
 
-    private func notifyTabSelected(_ index: Int) {
+    /// Notify Flutter of tab change and embed the Flutter view into the *newly selected* view controller.
+    /// Passing the selected VC explicitly avoids timing issues where tabBar.selectedViewController
+    /// might not yet reflect the new selection (fixes Issue #7: double-tap to switch tab).
+    private func notifyTabSelected(_ index: Int, selectedViewController: UIViewController) {
         methodChannel?.invokeMethod("onTabSelected", arguments: ["index": index])
 
-        guard let flutterView = flutterViewController?.view,
-              let tabBar = tabBarController else { return }
+        guard let flutterView = flutterViewController?.view else { return }
 
-        // Get the selected view controller - handle navigation controller wrapping for search tab
+        // Resolve FlutterTabViewController from the VC that was just selected (not from tabBar.selectedViewController)
         var targetVC: FlutterTabViewController?
-        if let navController = tabBar.selectedViewController as? UINavigationController,
+        if let navController = selectedViewController as? UINavigationController,
            let rootVC = navController.topViewController as? FlutterTabViewController {
             targetVC = rootVC
-        } else if let flutterTabVC = tabBar.selectedViewController as? FlutterTabViewController {
+        } else if let flutterTabVC = selectedViewController as? FlutterTabViewController {
             targetVC = flutterTabVC
         }
 
@@ -369,12 +371,15 @@ class CNNativeTabBarManager: NSObject {
 
         case "setSelectedIndex":
             guard let args = call.arguments as? [String: Any],
-                  let index = args["index"] as? Int else {
+                  let index = args["index"] as? Int,
+                  let tabBar = tabBarController,
+                  let vcs = tabBar.viewControllers,
+                  index >= 0, index < vcs.count else {
                 result(FlutterError(code: "invalid_args", message: "Invalid index", details: nil))
                 return
             }
-            tabBarController?.selectedIndex = index
-            notifyTabSelected(index)
+            tabBar.selectedIndex = index
+            notifyTabSelected(index, selectedViewController: vcs[index])
             result(nil)
 
         case "activateSearch":
@@ -452,7 +457,7 @@ class CNNativeTabBarManager: NSObject {
 extension CNNativeTabBarManager: UITabBarControllerDelegate {
     func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
         let index = tabBarController.viewControllers?.firstIndex(of: viewController) ?? 0
-        notifyTabSelected(index)
+        notifyTabSelected(index, selectedViewController: viewController)
     }
 }
 

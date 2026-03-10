@@ -24,9 +24,17 @@ struct GlassButtonGroupSwiftUI: View {
   @ObservedObject var viewModel: GlassButtonGroupViewModel
   @Namespace private var namespace
 
+  /// Barres horizontales avec plusieurs boutons : spacingForGlass plus élevé
+  /// pour que le blend démarre plus tôt et réduise le rétrécissement entre icônes.
+  private var effectiveSpacingForGlass: CGFloat {
+    if viewModel.axis == .horizontal, viewModel.buttons.count >= 2 {
+      return max(viewModel.spacingForGlass, 80)
+    }
+    return viewModel.spacingForGlass
+  }
+
   var body: some View {
-    // Badges are now rendered using UIKit views, not SwiftUI
-    GlassEffectContainer(spacing: viewModel.spacingForGlass) {
+    GlassEffectContainer(spacing: effectiveSpacingForGlass) {
       if viewModel.axis == .horizontal {
         HStack(alignment: .center, spacing: viewModel.spacing) {
           ForEach(Array(viewModel.buttons.enumerated()), id: \.offset) { index, button in
@@ -47,7 +55,7 @@ struct GlassButtonGroupSwiftUI: View {
               glassEffectInteractive: button.glassEffectInteractive,
               namespace: namespace,
               config: button.config,
-              badgeCount: nil // Badges rendered via UIKit
+              badgeCount: nil
             )
             .fixedSize(horizontal: true, vertical: false)
           }
@@ -73,7 +81,7 @@ struct GlassButtonGroupSwiftUI: View {
               glassEffectInteractive: button.glassEffectInteractive,
               namespace: namespace,
               config: button.config,
-              badgeCount: nil // Badges rendered via UIKit
+              badgeCount: nil
             )
             .fixedSize(horizontal: true, vertical: false)
           }
