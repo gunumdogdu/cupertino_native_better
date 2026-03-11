@@ -146,7 +146,7 @@ Future<bool> _assetExists(String assetPath) async {
 Future<Uint8List?> iconDataToImageBytes(
   IconData iconData, {
   double size = 25.0,
-  Color color = CupertinoColors.black,
+  Color? color,
 }) async {
   try {
     final RenderRepaintBoundary repaintBoundary = RenderRepaintBoundary();
@@ -175,7 +175,7 @@ Future<Uint8List?> iconDataToImageBytes(
             child: Icon(
               iconData,
               size: size,
-              color: color, // Will be tinted by native platform
+              color: color ?? CupertinoColors.black, // Will be tinted by native platform
             ),
           ),
         ).attachToRenderTree(buildOwner);

@@ -78,6 +78,7 @@ class CNPopupMenuButton extends StatefulWidget {
   }) : buttonIcon = null,
        buttonCustomIcon = null,
        buttonImageAsset = null,
+       customButtonIconColor = null,
        width = null,
        round = false;
 
@@ -86,6 +87,7 @@ class CNPopupMenuButton extends StatefulWidget {
     super.key,
     this.buttonIcon,
     this.buttonCustomIcon,
+    this.customButtonIconColor,
     this.buttonImageAsset,
     required this.items,
     required this.onSelected,
@@ -115,6 +117,15 @@ class CNPopupMenuButton extends StatefulWidget {
   /// Optional custom icon from CupertinoIcons, Icons, or any IconData for the button.
   /// If provided, this takes precedence over [buttonIcon] but not [buttonImageAsset].
   final IconData? buttonCustomIcon;
+
+  /// Optional color for the custom button icon.
+  /// 
+  /// This color will be applied when rendering [buttonCustomIcon].
+  /// If null, the icon will use its default color behavior.
+  /// 
+  /// This property only affects [buttonCustomIcon] and has no effect when
+  /// using [buttonImageAsset] or [buttonIcon].
+  final Color? customButtonIconColor;
 
   /// Optional image asset (SVG, PNG, etc.) for the button icon.
   /// If provided, this takes precedence over [buttonIcon] and [buttonCustomIcon].
@@ -283,6 +294,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
       buttonIconBytes = await iconDataToImageBytes(
         widget.buttonCustomIcon!,
         size: widget.buttonIcon?.size ?? 20.0,
+        color: widget.customButtonIconColor,
       );
     }
 
@@ -319,7 +331,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
     final capturedIsDark = _isDark;
     final capturedStyle = encodeStyle(context, tint: _effectiveTint);
     final capturedButtonIconColor = resolveColorToArgb(
-      widget.buttonImageAsset?.color ?? widget.buttonIcon?.color,
+      widget.buttonImageAsset?.color ?? widget.customButtonIconColor ??
+      widget.buttonIcon?.color,
       context,
     );
     final capturedButtonPaletteColors = widget.buttonIcon?.paletteColors
@@ -697,7 +710,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
     final tint = resolveColorToArgb(_effectiveTint, context);
     final preIconName = widget.buttonIcon?.name;
     final preIconSize = widget.buttonIcon?.size;
-    final preIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
+    final preIconColor = resolveColorToArgb(
+      widget.customButtonIconColor ?? widget.buttonIcon?.color,
+      context,
+    );
     if (_lastTint != tint && tint != null) {
       await ch.invokeMethod('setStyle', {'tint': tint});
       _lastTint = tint;
