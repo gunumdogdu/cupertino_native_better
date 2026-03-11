@@ -146,7 +146,7 @@ Future<bool> _assetExists(String assetPath) async {
 Future<Uint8List?> iconDataToImageBytes(
   IconData iconData, {
   double size = 25.0,
-  Color? color ,
+  Color? color,
 }) async {
   try {
     final RenderRepaintBoundary repaintBoundary = RenderRepaintBoundary();

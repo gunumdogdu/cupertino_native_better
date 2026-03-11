@@ -331,7 +331,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
     final capturedIsDark = _isDark;
     final capturedStyle = encodeStyle(context, tint: _effectiveTint);
     final capturedButtonIconColor = resolveColorToArgb(
-      widget.buttonImageAsset?.color ?? widget.buttonIcon?.color,
+      widget.buttonImageAsset?.color ?? widget.customButtonIconColor ??
+      widget.buttonIcon?.color,
       context,
     );
     final capturedButtonPaletteColors = widget.buttonIcon?.paletteColors
@@ -709,7 +710,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
     final tint = resolveColorToArgb(_effectiveTint, context);
     final preIconName = widget.buttonIcon?.name;
     final preIconSize = widget.buttonIcon?.size;
-    final preIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
+    final preIconColor = resolveColorToArgb(
+      widget.customButtonIconColor ?? widget.buttonIcon?.color,
+      context,
+    );
     if (_lastTint != tint && tint != null) {
       await ch.invokeMethod('setStyle', {'tint': tint});
       _lastTint = tint;
