@@ -33,57 +33,64 @@ struct GlassButtonGroupSwiftUI: View {
     return viewModel.spacingForGlass
   }
 
+  @ViewBuilder
+  private func buttonView(for button: GlassButtonData) -> some View {
+    let baseButton = GlassButtonSwiftUI(
+      title: button.title,
+      iconName: button.iconName,
+      iconImage: button.iconImage,
+      iconSize: button.iconSize,
+      iconColor: button.iconColor,
+      tint: button.tint,
+      isRound: button.isRound,
+      style: button.style,
+      isEnabled: button.isEnabled,
+      isInteractive: button.isInteractive,
+      onPressed: button.isPopup ? {} : button.onPressed,
+      glassEffectUnionId: button.glassEffectUnionId,
+      glassEffectId: button.glassEffectId,
+      glassEffectInteractive: button.glassEffectInteractive,
+      namespace: namespace,
+      config: button.config,
+      badgeCount: nil
+    )
+    if button.isPopup, let labels = button.menuLabels, !labels.isEmpty, let onSelected = button.onMenuSelected {
+      Menu {
+        ForEach(Array(labels.enumerated()), id: \.offset) { idx, label in
+          Button {
+            onSelected(idx)
+          } label: {
+            if idx < (button.menuSfSymbols?.count ?? 0), let sym = button.menuSfSymbols?[idx], !sym.isEmpty {
+              Label(label, systemImage: sym)
+            } else {
+              Text(label)
+            }
+          }
+        }
+      } label: {
+        baseButton
+      }
+      .menuStyle(.borderlessButton)
+    } else {
+      baseButton
+    }
+  }
+
   var body: some View {
     GlassEffectContainer(spacing: effectiveSpacingForGlass) {
       if viewModel.axis == .horizontal {
         HStack(alignment: .center, spacing: viewModel.spacing) {
           ForEach(Array(viewModel.buttons.enumerated()), id: \.offset) { index, button in
-            GlassButtonSwiftUI(
-              title: button.title,
-              iconName: button.iconName,
-              iconImage: button.iconImage,
-              iconSize: button.iconSize,
-              iconColor: button.iconColor,
-              tint: button.tint,
-              isRound: button.isRound,
-              style: button.style,
-              isEnabled: button.isEnabled,
-              isInteractive: button.isInteractive,
-              onPressed: button.onPressed,
-              glassEffectUnionId: button.glassEffectUnionId,
-              glassEffectId: button.glassEffectId,
-              glassEffectInteractive: button.glassEffectInteractive,
-              namespace: namespace,
-              config: button.config,
-              badgeCount: nil
-            )
-            .fixedSize(horizontal: true, vertical: false)
+            buttonView(for: button)
+              .fixedSize(horizontal: true, vertical: false)
           }
         }
         .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
       } else {
         VStack(alignment: .center, spacing: viewModel.spacing) {
           ForEach(Array(viewModel.buttons.enumerated()), id: \.offset) { index, button in
-            GlassButtonSwiftUI(
-              title: button.title,
-              iconName: button.iconName,
-              iconImage: button.iconImage,
-              iconSize: button.iconSize,
-              iconColor: button.iconColor,
-              tint: button.tint,
-              isRound: button.isRound,
-              style: button.style,
-              isEnabled: button.isEnabled,
-              isInteractive: button.isInteractive,
-              onPressed: button.onPressed,
-              glassEffectUnionId: button.glassEffectUnionId,
-              glassEffectId: button.glassEffectId,
-              glassEffectInteractive: button.glassEffectInteractive,
-              namespace: namespace,
-              config: button.config,
-              badgeCount: nil
-            )
-            .fixedSize(horizontal: true, vertical: false)
+            buttonView(for: button)
+              .fixedSize(horizontal: true, vertical: false)
           }
         }
         .frame(minHeight: 0, maxHeight: .infinity, alignment: .center)
@@ -197,6 +204,14 @@ struct GlassButtonData: Identifiable {
   let glassEffectInteractive: Bool
   let config: GlassButtonConfig
   let badgeCount: Int?
+  let menuLabels: [String]?
+  let menuSfSymbols: [String]?
+  let onMenuSelected: ((Int) -> Void)?
+  
+  var isPopup: Bool {
+    guard let labels = menuLabels, !labels.isEmpty else { return false }
+    return onMenuSelected != nil
+  }
 }
 
 @available(iOS 26.0, *)
@@ -316,8 +331,21 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
           
           // Create callback for this button
           let buttonIndex = index
-          let buttonCallback: () -> Void = {
-            channel.invokeMethod("buttonPressed", arguments: ["index": buttonIndex], result: nil)
+          let menuLabels = buttonDict["menuLabels"] as? [String]
+          let menuSfSymbols = buttonDict["menuSfSymbols"] as? [String]
+          let isPopup = (menuLabels != nil && !(menuLabels?.isEmpty ?? true))
+          
+          let buttonCallback: () -> Void
+          var onMenuSelected: ((Int) -> Void)? = nil
+          if isPopup, let labels = menuLabels {
+            onMenuSelected = { selectedIndex in
+              channel.invokeMethod("buttonPressed", arguments: ["index": buttonIndex, "selectedIndex": selectedIndex], result: nil)
+            }
+            buttonCallback = {}
+          } else {
+            buttonCallback = {
+              channel.invokeMethod("buttonPressed", arguments: ["index": buttonIndex], result: nil)
+            }
           }
           buttonCallbacks[buttonIndex] = buttonCallback
           
@@ -364,7 +392,10 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
             glassEffectId: glassEffectId,
             glassEffectInteractive: glassEffectInteractive,
             config: config,
-            badgeCount: badgeCount
+            badgeCount: badgeCount,
+            menuLabels: menuLabels,
+            menuSfSymbols: menuSfSymbols,
+            onMenuSelected: onMenuSelected
           )
           buttons.append(buttonData)
         }
@@ -565,9 +596,23 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       spacing: spacing ?? 8.0
     )
     
-    let buttonCallback = buttonCallbacks[index] ?? { [weak self] in
-      self?.channel.invokeMethod("buttonPressed", arguments: ["index": index], result: nil)
+    let menuLabels = buttonDict["menuLabels"] as? [String]
+    let menuSfSymbols = buttonDict["menuSfSymbols"] as? [String]
+    let isPopup = (menuLabels != nil && !(menuLabels?.isEmpty ?? true))
+    
+    let buttonCallback: () -> Void
+    var onMenuSelected: ((Int) -> Void)? = nil
+    if isPopup {
+      onMenuSelected = { [weak self] selectedIndex in
+        self?.channel.invokeMethod("buttonPressed", arguments: ["index": index, "selectedIndex": selectedIndex], result: nil)
+      }
+      buttonCallback = {}
+    } else {
+      buttonCallback = buttonCallbacks[index] ?? { [weak self] in
+        self?.channel.invokeMethod("buttonPressed", arguments: ["index": index], result: nil)
+      }
     }
+    buttonCallbacks[index] = buttonCallback
     
     let buttonData = GlassButtonData(
       title: title,
@@ -585,7 +630,10 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       glassEffectId: glassEffectId,
       glassEffectInteractive: glassEffectInteractive,
       config: config,
-      badgeCount: badgeCount
+      badgeCount: badgeCount,
+      menuLabels: menuLabels,
+      menuSfSymbols: menuSfSymbols,
+      onMenuSelected: onMenuSelected
     )
 
     viewModel.updateButton(at: index, with: buttonData)
@@ -660,8 +708,21 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       }
       
       let buttonIndex = index
-      let buttonCallback: () -> Void = {
-        self.channel.invokeMethod("buttonPressed", arguments: ["index": buttonIndex], result: nil)
+      let menuLabels = buttonDict["menuLabels"] as? [String]
+      let menuSfSymbols = buttonDict["menuSfSymbols"] as? [String]
+      let isPopup = (menuLabels != nil && !(menuLabels?.isEmpty ?? true))
+      
+      let buttonCallback: () -> Void
+      var onMenuSelected: ((Int) -> Void)? = nil
+      if isPopup {
+        onMenuSelected = { selectedIndex in
+          self.channel.invokeMethod("buttonPressed", arguments: ["index": buttonIndex, "selectedIndex": selectedIndex], result: nil)
+        }
+        buttonCallback = {}
+      } else {
+        buttonCallback = {
+          self.channel.invokeMethod("buttonPressed", arguments: ["index": buttonIndex], result: nil)
+        }
       }
       buttonCallbacks[buttonIndex] = buttonCallback
       
@@ -705,7 +766,10 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
         glassEffectId: glassEffectId,
         glassEffectInteractive: glassEffectInteractive,
         config: config,
-        badgeCount: badgeCount
+        badgeCount: badgeCount,
+        menuLabels: menuLabels,
+        menuSfSymbols: menuSfSymbols,
+        onMenuSelected: onMenuSelected
       )
       newButtons.append(buttonData)
     }

@@ -8,7 +8,9 @@ import '../utils/theme_helper.dart';
 import '../channel/params.dart';
 import '../style/button_data.dart';
 import '../style/image_placement.dart';
+import '../style/sf_symbol.dart';
 import 'button.dart';
+import 'popup_menu_button.dart';
 
 /// A group of buttons that can be rendered together for proper Liquid Glass blending effects.
 ///
@@ -237,13 +239,18 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
     _channel = channel;
     channel.setMethodCallHandler((call) async {
       if (call.method == 'buttonPressed') {
-        final index = call.arguments['index'] as int?;
-        if (index != null && index >= 0) {
-          if (_usingWidgets && index < widget._buttonWidgets!.length) {
-            widget._buttonWidgets![index].onPressed?.call();
-          } else if (!_usingWidgets && index < widget.buttons.length) {
-            widget.buttons[index].onPressed?.call();
+        final args = call.arguments as Map?;
+        final index = args?['index'] as int?;
+        final selectedIndex = args?['selectedIndex'] as int?;
+        if (index != null && index >= 0 && !_usingWidgets && index < widget.buttons.length) {
+          final btn = widget.buttons[index];
+          if (btn.isPopup && selectedIndex != null && selectedIndex >= 0) {
+            btn.onMenuSelected?.call(selectedIndex);
+          } else if (!btn.isPopup) {
+            btn.onPressed?.call();
           }
+        } else if (index != null && index >= 0 && _usingWidgets && index < widget._buttonWidgets!.length) {
+          widget._buttonWidgets![index].onPressed?.call();
         }
       }
     });
@@ -423,6 +430,26 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
 
   List<Widget> _buildDataChildren() {
     return widget.buttons.map((data) {
+      if (data.isPopup) {
+        final items = data.popupItems!
+            .map(
+              (e) => CNPopupMenuItem(
+                label: e.label,
+                icon: e.sfSymbol != null && e.sfSymbol!.isNotEmpty
+                    ? CNSymbol(e.sfSymbol!, size: 18)
+                    : null,
+              ),
+            )
+            .toList();
+        return CNPopupMenuButton.icon(
+          buttonIcon: data.icon,
+          buttonCustomIcon: data.customIcon,
+          items: items,
+          onSelected: data.onMenuSelected!,
+          tint: data.tint,
+          buttonStyle: data.config.style,
+        );
+      }
       if (data.isIcon) {
         return CNButton.icon(
           icon: data.icon,
@@ -556,6 +583,11 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       if (button.config.minHeight != null) 'minHeight': button.config.minHeight,
       if (button.config.imagePadding != null)
         'imagePadding': button.config.imagePadding,
+      if (button.isPopup) ...{
+        'menuLabels': button.popupItems!.map((e) => e.label).toList(),
+        'menuSfSymbols':
+            button.popupItems!.map((e) => e.sfSymbol ?? '').toList(),
+      },
     };
   }
 
@@ -658,6 +690,7 @@ class _ButtonSnapshot {
   final bool interaction;
   final int? tint;
   final int? badgeCount;
+  final String? menuLabelsKey;
 
   _ButtonSnapshot({
     this.label,
@@ -674,6 +707,7 @@ class _ButtonSnapshot {
     required this.interaction,
     this.tint,
     this.badgeCount,
+    this.menuLabelsKey,
   });
 
   factory _ButtonSnapshot.fromButtonWidget(CNButton button) {
@@ -692,6 +726,7 @@ class _ButtonSnapshot {
       interaction: button.config.interaction,
       tint: button.tint?.toARGB32(),
       badgeCount: button.badgeCount,
+      menuLabelsKey: null,
     );
   }
 
@@ -711,6 +746,7 @@ class _ButtonSnapshot {
       interaction: button.config.interaction,
       tint: button.tint?.toARGB32(),
       badgeCount: button.badgeCount,
+      menuLabelsKey: button.popupItems?.map((e) => e.label).join('|'),
     );
   }
 
@@ -728,6 +764,7 @@ class _ButtonSnapshot {
         enabled == other.enabled &&
         interaction == other.interaction &&
         tint == other.tint &&
-        badgeCount == other.badgeCount;
+        badgeCount == other.badgeCount &&
+        menuLabelsKey == other.menuLabelsKey;
   }
 }
