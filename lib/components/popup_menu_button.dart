@@ -77,6 +77,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.preserveTopToBottomOrder = false,
   }) : buttonIcon = null,
        buttonCustomIcon = null,
+       buttonCustomIconColor = null,
        buttonImageAsset = null,
        width = null,
        round = false;
@@ -86,6 +87,7 @@ class CNPopupMenuButton extends StatefulWidget {
     super.key,
     this.buttonIcon,
     this.buttonCustomIcon,
+    this.buttonCustomIconColor,
     this.buttonImageAsset,
     required this.items,
     required this.onSelected,
@@ -115,6 +117,13 @@ class CNPopupMenuButton extends StatefulWidget {
   /// Optional custom icon from CupertinoIcons, Icons, or any IconData for the button.
   /// If provided, this takes precedence over [buttonIcon] but not [buttonImageAsset].
   final IconData? buttonCustomIcon;
+
+  /// Optional color for the [buttonCustomIcon].
+  ///
+  /// When provided, the custom icon is rendered with this color.
+  /// Defaults to white when not specified (suitable for glass-style buttons).
+  /// Has no effect on [buttonIcon] (SF Symbol) or [buttonImageAsset].
+  final Color? buttonCustomIconColor;
 
   /// Optional image asset (SVG, PNG, etc.) for the button icon.
   /// If provided, this takes precedence over [buttonIcon] and [buttonCustomIcon].
@@ -228,11 +237,11 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
         hasMenuImageAssets) {
       // Create a key that changes when button or menu icons change
       final buttonIconKey =
-          '${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}';
+          '${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}_${widget.buttonCustomIconColor?.toARGB32() ?? 0}';
       final menuIconsKey = widget.items
           .map((e) {
             if (e is CNPopupMenuItem) {
-              return '${e.imageAsset?.assetPath}_${e.imageAsset?.imageData?.length ?? 0}_${e.customIcon?.hashCode ?? 0}';
+              return '${e.imageAsset?.assetPath}_${e.imageAsset?.imageData?.length ?? 0}_${e.customIcon?.hashCode ?? 0}_${e.iconColor?.toARGB32() ?? 0}';
             }
             return '';
           })
@@ -283,6 +292,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
       buttonIconBytes = await iconDataToImageBytes(
         widget.buttonCustomIcon!,
         size: widget.buttonIcon?.size ?? 20.0,
+        color: widget.buttonCustomIconColor ?? CupertinoColors.white,
       );
     }
 
@@ -298,6 +308,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
           final bytes = await iconDataToImageBytes(
             e.customIcon!,
             size: e.icon?.size ?? 20.0,
+            color: e.iconColor ?? CupertinoColors.label,
           );
           menuIconBytes.add(bytes);
         } else {
@@ -518,6 +529,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
       '${widget.height}_'
       '${widget.width}_'
       '${widget.tint?.toARGB32()}_'
+      '${widget.buttonCustomIconColor?.toARGB32()}_'
       '$_isDark',
     );
 
