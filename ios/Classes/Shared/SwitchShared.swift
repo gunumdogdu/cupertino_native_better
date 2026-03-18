@@ -4,6 +4,14 @@ struct CupertinoSwitchView: View {
   @ObservedObject var model: SwitchModel
 
   var body: some View {
+    configuredToggle
+      // Prevent SwiftUI's automatic keyboard-avoidance from pushing the
+      // switch upward when the on-screen keyboard appears (Issue #4).
+      .ignoresSafeArea(.keyboard)
+  }
+
+  @ViewBuilder
+  private var configuredToggle: some View {
     let base = Toggle("", isOn: $model.value)
       .labelsHidden()
       .disabled(!model.enabled)

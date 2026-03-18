@@ -32,6 +32,11 @@ class CupertinoSwitchPlatformView: NSObject, FlutterPlatformView {
     if #available(iOS 13.0, *) {
       self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
     }
+    // Prevent the hosting controller from resizing itself in response to the
+    // keyboard, which would push the switch upward (Issue #4).
+    if #available(iOS 16.0, *) {
+      self.hostingController.sizingOptions = .intrinsicContentSize
+    }
     super.init()
 
     if let tint = initialTint {
