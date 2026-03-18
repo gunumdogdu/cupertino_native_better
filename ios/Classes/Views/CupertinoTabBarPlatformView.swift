@@ -29,6 +29,8 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
   private var rightInsetVal: CGFloat = 0
   private var splitSpacingVal: CGFloat = 12 // Apple's recommended spacing for visual separation
   private var currentIconSizes: [CGFloat] = [] // Track icon sizes for dynamic height calculation
+  private var labelFontFamily: String? = nil
+  private var labelFontSize: CGFloat = 0 // 0 means system default (~10pt)
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeTabBar_\(viewId)", binaryMessenger: messenger)
@@ -95,6 +97,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       if let sp = dict["splitSpacing"] as? NSNumber { splitSpacingVal = CGFloat(truncating: sp) }
       // content insets controlled by Flutter padding; keep zero here
     }
+    // Font is read after super.init() below to use self.
 
     // Preload SVG assets dynamically based on what's actually being used
     let allAssetPaths = Set(imageAssetPaths + activeImageAssetPaths).filter { !$0.isEmpty }
@@ -116,16 +119,9 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     let appearance: UITabBarAppearance? = {
-    if #available(iOS 13.0, *) {
-      let ap = UITabBarAppearance()
-      ap.configureWithTransparentBackground()
-      // Remove shadow to prevent shadow appearing over modals/bottom sheets
-      ap.shadowColor = .clear
-      ap.shadowImage = UIImage()
-      return ap
-    }
-    return nil
-  }()
+      if #available(iOS 13.0, *) { return self.makeAppearance() }
+      return nil
+    }()
     func buildItems(_ range: Range<Int>) -> [UITabBarItem] {
       var items: [UITabBarItem] = []
       for i in range {
@@ -363,6 +359,11 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     self.leftInsetVal = leftInset
     self.rightInsetVal = rightInset
     self.currentIconSizes = sizes.compactMap { $0 }.map { CGFloat(truncating: $0) }
+    // Read custom label font from creation params
+    if let dict = args as? [String: Any] {
+      if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
+      if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
+    }
 channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
@@ -535,13 +536,7 @@ channel.setMethodCallHandler { [weak self] call, result in
           let imageAssetFormats = self.currentImageAssetFormats
           let activeImageAssetFormats = self.currentActiveImageAssetFormats
           let appearance: UITabBarAppearance? = {
-            if #available(iOS 13.0, *) {
-              let ap = UITabBarAppearance()
-              ap.configureWithTransparentBackground()
-              ap.shadowColor = .clear
-              ap.shadowImage = UIImage()
-              return ap
-            }
+            if #available(iOS 13.0, *) { return self.makeAppearance() }
             return nil
           }()
           let iconSizes = self.currentIconSizes
@@ -828,6 +823,28 @@ channel.setMethodCallHandler { [weak self] call, result in
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing badges", details: nil)) }
+      case "setFont":
+        // Update label font and re-apply appearance to all tab bars
+        if let args = call.arguments as? [String: Any] {
+          if let ff = args["labelFontFamily"] as? String { self.labelFontFamily = ff.isEmpty ? nil : ff }
+          if let fs = args["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
+          if #available(iOS 13.0, *) {
+            let ap = self.makeAppearance()
+            if let bar = self.tabBar {
+              bar.standardAppearance = ap
+              if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap }
+            }
+            if let left = self.tabBarLeft {
+              left.standardAppearance = ap
+              if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap }
+            }
+            if let right = self.tabBarRight {
+              right.standardAppearance = ap
+              if #available(iOS 15.0, *) { right.scrollEdgeAppearance = ap }
+            }
+          }
+          result(nil)
+        } else { result(FlutterError(code: "bad_args", message: "Missing font args", details: nil)) }
       case "refresh":
         // Force refresh for label rendering on iOS < 16
         // UITabBar only fully layouts labels when items are selected
@@ -926,6 +943,34 @@ channel.setMethodCallHandler { [weak self] call, result in
   }
 
   func view() -> UIView { container }
+
+  // MARK: - Appearance helpers
+
+  /// Builds a UITabBarAppearance with transparent background and optional custom label font.
+  @available(iOS 13.0, *)
+  private func makeAppearance() -> UITabBarAppearance {
+    let ap = UITabBarAppearance()
+    ap.configureWithTransparentBackground()
+    ap.shadowColor = .clear
+    ap.shadowImage = UIImage()
+    applyLabelFont(to: ap)
+    return ap
+  }
+
+  /// Applies the current label font to a UITabBarAppearance.
+  @available(iOS 13.0, *)
+  private func applyLabelFont(to ap: UITabBarAppearance) {
+    guard let fontFamily = labelFontFamily, !fontFamily.isEmpty else { return }
+    let size = labelFontSize > 0 ? labelFontSize : 10.0
+    let font = UIFont(name: fontFamily, size: size) ?? UIFont.systemFont(ofSize: size)
+    let attrs: [NSAttributedString.Key: Any] = [.font: font]
+    ap.stackedLayoutAppearance.normal.titleTextAttributes = attrs
+    ap.stackedLayoutAppearance.selected.titleTextAttributes = attrs
+    ap.inlineLayoutAppearance.normal.titleTextAttributes = attrs
+    ap.inlineLayoutAppearance.selected.titleTextAttributes = attrs
+    ap.compactInlineLayoutAppearance.normal.titleTextAttributes = attrs
+    ap.compactInlineLayoutAppearance.selected.titleTextAttributes = attrs
+  }
 
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
     // Single bar case

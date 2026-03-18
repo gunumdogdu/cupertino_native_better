@@ -109,6 +109,8 @@ class CNTabBar extends StatefulWidget {
         12.0, // Apple's recommended spacing for visual separation
     this.searchItem,
     this.searchController,
+    this.labelFontFamily,
+    this.labelFontSize,
   }) : assert(items.length >= 2, 'Tab bar must have at least 2 items'),
        assert(
          items.length <= 5,
@@ -186,6 +188,29 @@ class CNTabBar extends StatefulWidget {
   /// - Listen to search state changes
   final CNTabBarSearchController? searchController;
 
+  /// Optional custom font family for tab bar item labels.
+  ///
+  /// The font must be registered in the app's `Info.plist` (iOS) or as a Flutter
+  /// font asset. When null, the system default tab bar label font is used.
+  ///
+  /// Example:
+  /// ```dart
+  /// CNTabBar(
+  ///   items: [...],
+  ///   currentIndex: _index,
+  ///   onTap: (i) => setState(() => _index = i),
+  ///   labelFontFamily: 'Roboto',
+  ///   labelFontSize: 11.0,
+  /// )
+  /// ```
+  final String? labelFontFamily;
+
+  /// Optional font size for tab bar item labels.
+  ///
+  /// Used together with [labelFontFamily]. When null, the system default size
+  /// is used (approximately 10pt on iOS).
+  final double? labelFontSize;
+
   @override
   State<CNTabBar> createState() => _CNTabBarState();
 }
@@ -206,6 +231,8 @@ class _CNTabBarState extends State<CNTabBar> {
   int? _lastRightCount;
   double? _lastSplitSpacing;
   double? _lastIconSize;
+  String? _lastLabelFontFamily;
+  double? _lastLabelFontSize;
 
   // Search state
   bool _isSearchActive = false;
@@ -460,6 +487,8 @@ class _CNTabBarState extends State<CNTabBar> {
       'sfSymbolColors': colors,
       'selectedIndex': widget.currentIndex,
       'isDark': capturedIsDark,
+      if (widget.labelFontFamily != null) 'labelFontFamily': widget.labelFontFamily,
+      if (widget.labelFontSize != null) 'labelFontSize': widget.labelFontSize,
       'split': _hasSearch
           ? true
           : widget.split, // Force split when search is enabled
@@ -584,6 +613,8 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastSplit = widget.split;
     _lastRightCount = widget.rightCount;
     _lastSplitSpacing = widget.splitSpacing;
+    _lastLabelFontFamily = widget.labelFontFamily;
+    _lastLabelFontSize = widget.labelFontSize;
 
     // Force refresh for label rendering (Issue #6: sporadic missing labels with 5 items).
     // First refresh after 50ms; second after 200ms for slow-to-initialize native view.
@@ -779,6 +810,18 @@ class _CNTabBarState extends State<CNTabBar> {
         _requestIntrinsicSize();
       }
 
+      // Font updates
+      if (_lastLabelFontFamily != widget.labelFontFamily ||
+          _lastLabelFontSize != widget.labelFontSize) {
+        await ch.invokeMethod('setFont', {
+          if (widget.labelFontFamily != null)
+            'labelFontFamily': widget.labelFontFamily,
+          if (widget.labelFontSize != null) 'labelFontSize': widget.labelFontSize,
+        });
+        _lastLabelFontFamily = widget.labelFontFamily;
+        _lastLabelFontSize = widget.labelFontSize;
+      }
+
       // Layout updates (split / insets)
       if (_lastSplit != widget.split ||
           _lastRightCount != widget.rightCount ||
@@ -854,24 +897,39 @@ class _CNTabBarState extends State<CNTabBar> {
 
     // If no search item, just return regular CupertinoTabBar
     if (!_hasSearch) {
-      return SizedBox(
-        height: widget.height,
-        child: CupertinoTabBar(
-          items: [
-            for (final item in widget.items)
-              BottomNavigationBarItem(
-                icon: _buildTabIcon(item, isActive: false),
-                activeIcon: _buildTabIcon(item, isActive: true),
-                label: item.label,
-              ),
-          ],
-          currentIndex: widget.currentIndex,
-          onTap: widget.onTap,
-          backgroundColor: widget.backgroundColor,
-          inactiveColor: CupertinoColors.inactiveGray,
-          activeColor: tintColor,
-        ),
+      Widget tabBar = CupertinoTabBar(
+        items: [
+          for (final item in widget.items)
+            BottomNavigationBarItem(
+              icon: _buildTabIcon(item, isActive: false),
+              activeIcon: _buildTabIcon(item, isActive: true),
+              label: item.label,
+            ),
+        ],
+        currentIndex: widget.currentIndex,
+        onTap: widget.onTap,
+        backgroundColor: widget.backgroundColor,
+        inactiveColor: CupertinoColors.inactiveGray,
+        activeColor: tintColor,
       );
+
+      // Apply custom font family via CupertinoTheme when specified.
+      // CupertinoTabBar derives its label style from the theme typography.
+      if (widget.labelFontFamily != null) {
+        tabBar = CupertinoTheme(
+          data: CupertinoTheme.of(context).copyWith(
+            textTheme: CupertinoTheme.of(context).textTheme.copyWith(
+              tabLabelTextStyle: TextStyle(
+                fontFamily: widget.labelFontFamily,
+                fontSize: widget.labelFontSize ?? 10.0,
+              ),
+            ),
+          ),
+          child: tabBar,
+        );
+      }
+
+      return SizedBox(height: widget.height, child: tabBar);
     }
 
     // With search: build a custom layout that mimics iOS 26 behavior
@@ -972,43 +1030,51 @@ class _CNTabBarState extends State<CNTabBar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (int i = 0; i < widget.items.length; i++)
-            GestureDetector(
-              onTap: () => widget.onTap(i),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: FittedBox(
-                        child: _buildTabIcon(
-                          widget.items[i],
-                          isActive: widget.currentIndex == i,
+            Flexible(
+              child: GestureDetector(
+                onTap: () => widget.onTap(i),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: FittedBox(
+                          child: _buildTabIcon(
+                            widget.items[i],
+                            isActive: widget.currentIndex == i,
+                          ),
                         ),
                       ),
-                    ),
-                    if (widget.items[i].label != null &&
-                        widget.items[i].label!.isNotEmpty) ...[
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.items[i].label!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: widget.currentIndex == i
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          color: widget.currentIndex == i
-                              ? tintColor
-                              : CupertinoColors.inactiveGray,
+                      if (widget.items[i].label != null &&
+                          widget.items[i].label!.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            widget.items[i].label!,
+                            style: TextStyle(
+                              fontFamily: widget.labelFontFamily,
+                              fontSize:
+                                  widget.labelFontSize ?? 12,
+                              fontWeight: widget.currentIndex == i
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              color: widget.currentIndex == i
+                                  ? tintColor
+                                  : CupertinoColors.inactiveGray,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
