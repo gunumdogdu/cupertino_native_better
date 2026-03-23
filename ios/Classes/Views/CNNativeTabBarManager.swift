@@ -10,7 +10,7 @@ import UIKit
 /// **never** reparented between child view controllers, fixing Issue #7 (double-tap).
 ///
 /// `UISearchController` remains attached to the navigation item when `isSearchTab` is true,
-/// preserving the native search integration expected by `CNTabBarNative` users.
+/// preserving the native search integration expected by `CNTabBarWithSearch` users.
 class CNNativeTabBarManager: NSObject {
 
     static let shared = CNNativeTabBarManager()
@@ -322,6 +322,10 @@ extension CNNativeTabBarManager: UISearchBarDelegate {
 
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
         methodChannel?.invokeMethod("onSearchCancelled", arguments: nil)
+        // Leave search tab so the tab bar is shown again (z-order fix).
+        if let firstNonSearch = tabConfigurations.firstIndex(where: { !$0.isSearchTab }) {
+            containerVC?.selectTab(at: firstNonSearch)
+        }
     }
 
     func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) {
@@ -497,10 +501,34 @@ private class NativeTabBarContainerVC: UIViewController, UITabBarDelegate {
             contentHost.navigationItem.hidesSearchBarWhenScrolling = false
             contentHost.definesPresentationContext = true
             navController.setNavigationBarHidden(false, animated: animated)
+            // Search bar sits in the nav stack; tab bar is `bringSubviewToFront` — hide tab bar
+            // while search is active so `UISearchController` is usable (PR #7 feedback).
+            setTabBarHidden(true, animated: animated)
         } else {
             contentHost.navigationItem.searchController = nil
             contentHost.title = config.title.isEmpty ? nil : config.title
             navController.setNavigationBarHidden(true, animated: animated)
+            setTabBarHidden(false, animated: animated)
+        }
+    }
+
+    /// Slides the native tab bar off-screen when the search tab is selected; restores it otherwise.
+    private func setTabBarHidden(_ hidden: Bool, animated: Bool) {
+        guard nativeTabBar.superview != nil else { return }
+        view.layoutIfNeeded()
+        let barHeight = max(nativeTabBar.bounds.height, 49)
+        let offset = barHeight + view.safeAreaInsets.bottom
+        let targetTransform = hidden
+            ? CGAffineTransform(translationX: 0, y: offset)
+            : .identity
+
+        let apply = {
+            self.nativeTabBar.transform = targetTransform
+        }
+        if animated {
+            UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseInOut, animations: apply)
+        } else {
+            apply()
         }
     }
 

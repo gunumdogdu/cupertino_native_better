@@ -23,6 +23,7 @@
 /// - [CNButton] - Native push button with Liquid Glass effects
 /// - [CNIcon] - Platform-rendered SF Symbols and custom icons
 /// - [CNTabBar] - Native tab bar with split mode support
+/// - [CNTabBarWithSearch] - Full-screen native container with `UISearchController` for search tabs (iOS 26+)
 /// - [CNSlider] - Native slider with controller support
 /// - [CNSwitch] - Native toggle switch
 /// - [CNPopupMenuButton] - Native popup menu
