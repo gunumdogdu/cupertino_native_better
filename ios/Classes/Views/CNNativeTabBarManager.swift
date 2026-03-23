@@ -108,9 +108,9 @@ class CNNativeTabBarManager: NSObject {
             return
         }
 
-        // 1) Attacher le container comme racine pour que la hiérarchie ait une taille valide.
-        // 2) Puis intégrer le FlutterViewController en enfant (addChild) — reparentage de la
-        //    seule UIView cassait souvent le rendu (surface vide).
+        // 1) Set the container as root so the hierarchy has a valid size.
+        // 2) Then embed FlutterViewController as a child (addChild) — reparenting only the
+        //    UIView often broke rendering (blank surface).
         UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: {
             window.rootViewController = vc
         }, completion: { _ in
@@ -370,7 +370,7 @@ private class NativeTabBarContainerVC: UIViewController, UITabBarDelegate {
         view.addSubview(navController.view)
         navController.didMove(toParent: self)
 
-        // Plein écran derrière la tab bar (effet type iOS : contenu visible sous la barre translucide).
+        // Full screen behind the tab bar (iOS-style: content visible under the translucent bar).
         NSLayoutConstraint.activate([
             navController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             navController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -564,7 +564,7 @@ private class NativeTabBarContainerVC: UIViewController, UITabBarDelegate {
 
 // MARK: - FlutterContentHostViewController
 
-/// Single VC that hosts the [FlutterViewController] as enfant pour un cycle de vie correct.
+/// Single VC that hosts the [FlutterViewController] as a child for correct view-controller lifecycle.
 private class FlutterContentHostViewController: UIViewController {
 
     private var embeddedFlutterVC: FlutterViewController?
