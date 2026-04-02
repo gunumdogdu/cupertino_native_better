@@ -942,6 +942,16 @@ channel.setMethodCallHandler { [weak self] call, result in
     }
   }
 
+  deinit {
+    channel.setMethodCallHandler(nil)
+    tabBar?.delegate = nil
+    tabBarLeft?.delegate = nil
+    tabBarRight?.delegate = nil
+    tabBar?.removeFromSuperview()
+    tabBarLeft?.removeFromSuperview()
+    tabBarRight?.removeFromSuperview()
+  }
+
   func view() -> UIView { container }
 
   // MARK: - Appearance helpers

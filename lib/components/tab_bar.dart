@@ -246,6 +246,14 @@ class _CNTabBarState extends State<CNTabBar> {
   // Whether search mode is enabled
   bool get _hasSearch => widget.searchItem != null;
 
+  // Lifecycle-managed native view preparation.
+  // Async work is kicked off once in initState and guarded by a monotonic
+  // generation token so that stale completions from superseded rebuilds
+  // never feed into the widget tree.
+  Map<String, dynamic>? _creationParams;
+  int _prepGeneration = 0;
+  bool _preparing = false;
+
   @override
   void initState() {
     super.initState();
@@ -253,6 +261,7 @@ class _CNTabBarState extends State<CNTabBar> {
     if (_hasSearch) {
       _searchFocusNode = FocusNode();
     }
+    _scheduleNativePreparation();
   }
 
   @override
@@ -272,10 +281,37 @@ class _CNTabBarState extends State<CNTabBar> {
 
   @override
   void dispose() {
+    _prepGeneration++; // invalidate any in-flight preparation
     widget.searchController?.removeListener(_onSearchControllerChanged);
     _searchFocusNode?.dispose();
     _channel?.setMethodCallHandler(null);
+    _channel = null;
     super.dispose();
+  }
+
+  /// Kick off async icon rendering + creation-param assembly exactly once.
+  /// Uses a generation token so that if the widget is disposed or a new
+  /// preparation supersedes this one, the stale result is silently dropped.
+  void _scheduleNativePreparation() {
+    final isIOSOrMacOS =
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+    if (!(isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass)) return;
+    if (_preparing) return;
+
+    _preparing = true;
+    final gen = ++_prepGeneration;
+
+    _prepareCreationParams().then((params) {
+      if (!mounted || gen != _prepGeneration) return;
+      setState(() {
+        _creationParams = params;
+        _preparing = false;
+      });
+    }).catchError((_) {
+      if (!mounted || gen != _prepGeneration) return;
+      _preparing = false;
+    });
   }
 
   void _onSearchControllerChanged() {
@@ -314,40 +350,18 @@ class _CNTabBarState extends State<CNTabBar> {
     final shouldUseNative =
         isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
 
-    // Fallback to Flutter widgets for non-iOS/macOS or iOS/macOS < 26
     if (!shouldUseNative) {
-      // For both non-iOS/macOS and iOS/macOS < 26, use Flutter-based implementation
       return _buildFlutterFallback(context);
     }
 
-    // Render custom IconData to bytes.
-    // Issue #5: Show Flutter fallback while loading so user sees a working tab bar instead of empty ~2s.
-    return FutureBuilder<List<List<Uint8List?>>>(
-      future: _renderCustomIcons(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return _buildFlutterFallback(context);
-        }
+    // Show fallback while async preparation is in flight.
+    // Once _creationParams is populated the platform view is built
+    // synchronously -- no FutureBuilder race.
+    if (_creationParams == null) {
+      return _buildFlutterFallback(context);
+    }
 
-        final iconBytes = snapshot.data!;
-        final customIconBytes = iconBytes[0];
-        final activeCustomIconBytes = iconBytes[1];
-
-        return FutureBuilder<Widget>(
-          future: _buildNativeTabBar(
-            context,
-            customIconBytes: customIconBytes,
-            activeCustomIconBytes: activeCustomIconBytes,
-          ),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return _buildFlutterFallback(context);
-            }
-            return snapshot.data!;
-          },
-        );
-      },
-    );
+    return _buildNativeTabBarPlatformView(_creationParams!);
   }
 
   Future<List<List<Uint8List?>>> _renderCustomIcons() async {
@@ -386,12 +400,21 @@ class _CNTabBarState extends State<CNTabBar> {
     return [customIconBytes, activeCustomIconBytes];
   }
 
-  Future<Widget> _buildNativeTabBar(
-    BuildContext context, {
-    required List<Uint8List?> customIconBytes,
-    required List<Uint8List?> activeCustomIconBytes,
-  }) async {
-    // Capture all context-derived values before any async operations
+  /// Prepares all creation params for the native platform view.
+  /// All async work (icon rendering, asset path resolution) happens here,
+  /// guarded by the generation token in the caller. The result is stored
+  /// in [_creationParams] so that [build] can construct the platform view
+  /// synchronously -- eliminating the nested-FutureBuilder race that caused
+  /// duplicate platform-view creation attempts.
+  Future<Map<String, dynamic>> _prepareCreationParams() async {
+    // Render custom icons (the only truly async step for most configs)
+    final iconBytes = await _renderCustomIcons();
+    final customIconBytes = iconBytes[0];
+    final activeCustomIconBytes = iconBytes[1];
+
+    if (!mounted) return const {};
+
+    // Capture all context-derived values
     final capturedDevicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final capturedIsDark = _isDark;
     final capturedStyle = encodeStyle(context, tint: _effectiveTint);
@@ -399,7 +422,6 @@ class _CNTabBarState extends State<CNTabBar> {
       widget.backgroundColor,
       context,
     );
-    // Capture search style params before async operations
     final capturedSearchStyle = _hasSearch
         ? _buildSearchStyleParams(context)
         : null;
@@ -411,7 +433,6 @@ class _CNTabBarState extends State<CNTabBar> {
         .toList();
     final badges = widget.items.map((e) => e.badge ?? '').toList();
 
-    // Extract imageAsset data and resolve asset paths based on device pixel ratio
     final imageAssetPaths = await Future.wait(
       widget.items.map(
         (e) async => e.imageAsset != null
@@ -427,7 +448,7 @@ class _CNTabBarState extends State<CNTabBar> {
       ),
     );
 
-    if (!mounted) return const SizedBox();
+    if (!mounted) return const {};
 
     final sizes = widget.items
         .map((e) => (widget.iconSize ?? e.icon?.size ?? e.imageAsset?.size))
@@ -445,7 +466,6 @@ class _CNTabBarState extends State<CNTabBar> {
     final activeImageAssetData = widget.items
         .map((e) => e.activeImageAsset?.imageData)
         .toList();
-    // Auto-detect format if not provided (use resolved paths)
     final imageAssetFormats = await Future.wait(
       widget.items.asMap().entries.map((entry) async {
         final e = entry.value;
@@ -467,9 +487,9 @@ class _CNTabBarState extends State<CNTabBar> {
       }),
     );
 
-    if (!mounted) return const SizedBox();
+    if (!mounted) return const {};
 
-    final creationParams = <String, dynamic>{
+    return <String, dynamic>{
       'labels': labels,
       'sfSymbols': symbols,
       'activeSfSymbols': activeSymbols,
@@ -482,7 +502,7 @@ class _CNTabBarState extends State<CNTabBar> {
       'activeImageAssetData': activeImageAssetData,
       'imageAssetFormats': imageAssetFormats,
       'activeImageAssetFormats': activeImageAssetFormats,
-      'iconScale': capturedDevicePixelRatio, // Pass the scale!
+      'iconScale': capturedDevicePixelRatio,
       'sfSymbolSizes': sizes,
       'sfSymbolColors': colors,
       'selectedIndex': widget.currentIndex,
@@ -490,9 +510,7 @@ class _CNTabBarState extends State<CNTabBar> {
       if (widget.labelFontFamily != null)
         'labelFontFamily': widget.labelFontFamily,
       if (widget.labelFontSize != null) 'labelFontSize': widget.labelFontSize,
-      'split': _hasSearch
-          ? true
-          : widget.split, // Force split when search is enabled
+      'split': _hasSearch ? true : widget.split,
       'rightCount': widget.rightCount,
       'splitSpacing': widget.splitSpacing,
       'style': capturedStyle
@@ -500,7 +518,6 @@ class _CNTabBarState extends State<CNTabBar> {
           if (capturedBackgroundColor != null)
             'backgroundColor': capturedBackgroundColor,
         }),
-      // Search configuration (iOS 26+)
       if (_hasSearch) ...{
         'hasSearch': true,
         'searchPlaceholder': widget.searchItem!.placeholder,
@@ -512,12 +529,9 @@ class _CNTabBarState extends State<CNTabBar> {
             'magnifyingglass',
         'automaticallyActivatesSearch':
             widget.searchItem!.automaticallyActivatesSearch,
-        // Style configuration (captured before async operations)
         if (capturedSearchStyle != null) 'searchStyle': capturedSearchStyle,
       },
     };
-
-    return _buildNativeTabBarPlatformView(creationParams);
   }
 
   Map<String, dynamic> _buildSearchStyleParams(BuildContext context) {
@@ -571,10 +585,10 @@ class _CNTabBarState extends State<CNTabBar> {
     };
   }
 
-  Future<Widget> _buildNativeTabBarPlatformView(
+  Widget _buildNativeTabBarPlatformView(
     Map<String, dynamic> creationParams,
-  ) async {
-    final viewType = 'CupertinoNativeTabBar';
+  ) {
+    const viewType = 'CupertinoNativeTabBar';
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
         ? UiKitView(
             viewType: viewType,

@@ -310,6 +310,12 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
         }
     }
 
+    deinit {
+        channel.setMethodCallHandler(nil)
+        tabBar?.delegate = nil
+        tabBar?.removeFromSuperview()
+    }
+
     func view() -> UIView {
         return container
     }
