@@ -6,6 +6,7 @@ import '../channel/params.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
+import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
 
 /// A platform-rendered SF Symbol icon, custom image asset, or IconData.
@@ -68,9 +69,19 @@ class _CNIconState extends State<CNIcon> {
   int? _lastColor;
   String? _lastMode;
   bool? _lastGradient;
-  // No intrinsic sizing storage; icons use explicit size.
 
   bool get _isDark => ThemeHelper.isDark(context);
+
+  @override
+  void initState() {
+    super.initState();
+    if (!PlatformViewGuard.isReady) {
+      PlatformViewGuard.ensureScheduled();
+      PlatformViewGuard.readyNotifier.addListener(
+        _onPlatformViewGuardReady,
+      );
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -86,19 +97,31 @@ class _CNIconState extends State<CNIcon> {
 
   @override
   void dispose() {
+    PlatformViewGuard.readyNotifier.removeListener(
+      _onPlatformViewGuardReady,
+    );
     _channel?.setMethodCallHandler(null);
     super.dispose();
   }
 
+  void _onPlatformViewGuardReady() {
+    if (!mounted) return;
+    PlatformViewGuard.readyNotifier.removeListener(
+      _onPlatformViewGuardReady,
+    );
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    // SF Symbols are available on iOS 13+ and macOS 11+
-    // Always use native rendering for icons on iOS/macOS
-    // (regardless of PlatformVersion initialization or iOS version)
     final shouldUseNative = PlatformVersion.supportsSFSymbols;
 
-    // Fallback to Flutter widgets for non-iOS/macOS only
     if (!shouldUseNative) {
+      return _buildFlutterIcon(context);
+    }
+
+    if (!PlatformViewGuard.isReady) {
+      PlatformViewGuard.ensureScheduled();
       return _buildFlutterIcon(context);
     }
 

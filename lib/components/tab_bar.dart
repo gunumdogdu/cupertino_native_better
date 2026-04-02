@@ -6,6 +6,7 @@ import '../channel/params.dart';
 import '../style/sf_symbol.dart';
 import '../style/tab_bar_search_item.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import 'icon.dart';
@@ -261,6 +262,12 @@ class _CNTabBarState extends State<CNTabBar> {
     if (_hasSearch) {
       _searchFocusNode = FocusNode();
     }
+    if (!PlatformViewGuard.isReady) {
+      PlatformViewGuard.ensureScheduled();
+      PlatformViewGuard.readyNotifier.addListener(
+        _onPlatformViewGuardReady,
+      );
+    }
     _scheduleNativePreparation();
   }
 
@@ -281,12 +288,25 @@ class _CNTabBarState extends State<CNTabBar> {
 
   @override
   void dispose() {
-    _prepGeneration++; // invalidate any in-flight preparation
+    _prepGeneration++;
+    PlatformViewGuard.readyNotifier.removeListener(
+      _onPlatformViewGuardReady,
+    );
     widget.searchController?.removeListener(_onSearchControllerChanged);
     _searchFocusNode?.dispose();
     _channel?.setMethodCallHandler(null);
     _channel = null;
     super.dispose();
+  }
+
+  void _onPlatformViewGuardReady() {
+    if (!mounted) return;
+    PlatformViewGuard.readyNotifier.removeListener(
+      _onPlatformViewGuardReady,
+    );
+    if (_creationParams != null) {
+      setState(() {});
+    }
   }
 
   /// Kick off async icon rendering + creation-param assembly exactly once.
@@ -343,7 +363,6 @@ class _CNTabBarState extends State<CNTabBar> {
 
   @override
   Widget build(BuildContext context) {
-    // Check if we should use native platform view
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
@@ -354,9 +373,14 @@ class _CNTabBarState extends State<CNTabBar> {
       return _buildFlutterFallback(context);
     }
 
-    // Show fallback while async preparation is in flight.
-    // Once _creationParams is populated the platform view is built
-    // synchronously -- no FutureBuilder race.
+    // Guard against creating platform views too early after hot
+    // restart / cold start.  The engine may not have fully purged
+    // previous-isolate view registrations yet.
+    if (!PlatformViewGuard.isReady) {
+      PlatformViewGuard.ensureScheduled();
+      return _buildFlutterFallback(context);
+    }
+
     if (_creationParams == null) {
       return _buildFlutterFallback(context);
     }

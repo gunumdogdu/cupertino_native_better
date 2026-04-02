@@ -81,6 +81,7 @@ export 'style/spotlight_mode.dart';
 export 'style/tab_bar_search_item.dart';
 
 // Utilities
+export 'utils/platform_view_guard.dart';
 export 'utils/version_detector.dart';
 export 'utils/theme_helper.dart';
 

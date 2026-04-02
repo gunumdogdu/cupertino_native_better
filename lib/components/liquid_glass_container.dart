@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../utils/theme_helper.dart';
+import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
 
 /// A container that applies Liquid Glass effects to its child widget.
@@ -40,6 +41,17 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
   bool get _isDark => ThemeHelper.isDark(context);
 
   @override
+  void initState() {
+    super.initState();
+    if (!PlatformViewGuard.isReady) {
+      PlatformViewGuard.ensureScheduled();
+      PlatformViewGuard.readyNotifier.addListener(
+        _onPlatformViewGuardReady,
+      );
+    }
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncBrightnessIfNeeded();
@@ -54,18 +66,40 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
   }
 
   @override
+  void dispose() {
+    PlatformViewGuard.readyNotifier.removeListener(
+      _onPlatformViewGuardReady,
+    );
+    _channel?.setMethodCallHandler(null);
+    _channel = null;
+    super.dispose();
+  }
+
+  void _onPlatformViewGuardReady() {
+    if (!mounted) return;
+    PlatformViewGuard.readyNotifier.removeListener(
+      _onPlatformViewGuardReady,
+    );
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
-    final shouldUseNative = isIOSOrMacOS && PlatformVersion.supportsLiquidGlass;
+    final shouldUseNative =
+        isIOSOrMacOS && PlatformVersion.supportsLiquidGlass;
 
     if (!shouldUseNative) {
-      // On unsupported platforms or versions, just return the child
       return widget.child;
     }
 
-    // For iOS 26+ and macOS 26+, use native LiquidGlassContainer
+    if (!PlatformViewGuard.isReady) {
+      PlatformViewGuard.ensureScheduled();
+      return widget.child;
+    }
+
     return _buildNativeContainer(context);
   }
 
