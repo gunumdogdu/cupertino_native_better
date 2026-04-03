@@ -45,9 +45,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
     super.initState();
     if (!PlatformViewGuard.isReady) {
       PlatformViewGuard.ensureScheduled();
-      PlatformViewGuard.readyNotifier.addListener(
-        _onPlatformViewGuardReady,
-      );
+      PlatformViewGuard.readyNotifier.addListener(_onPlatformViewGuardReady);
     }
   }
 
@@ -67,9 +65,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
 
   @override
   void dispose() {
-    PlatformViewGuard.readyNotifier.removeListener(
-      _onPlatformViewGuardReady,
-    );
+    PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     _channel?.setMethodCallHandler(null);
     _channel = null;
     super.dispose();
@@ -77,9 +73,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
 
   void _onPlatformViewGuardReady() {
     if (!mounted) return;
-    PlatformViewGuard.readyNotifier.removeListener(
-      _onPlatformViewGuardReady,
-    );
+    PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     setState(() {});
   }
 
@@ -88,8 +82,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
-    final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.supportsLiquidGlass;
+    final shouldUseNative = isIOSOrMacOS && PlatformVersion.supportsLiquidGlass;
 
     if (!shouldUseNative) {
       return widget.child;

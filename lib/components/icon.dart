@@ -77,9 +77,7 @@ class _CNIconState extends State<CNIcon> {
     super.initState();
     if (!PlatformViewGuard.isReady) {
       PlatformViewGuard.ensureScheduled();
-      PlatformViewGuard.readyNotifier.addListener(
-        _onPlatformViewGuardReady,
-      );
+      PlatformViewGuard.readyNotifier.addListener(_onPlatformViewGuardReady);
     }
   }
 
@@ -97,18 +95,14 @@ class _CNIconState extends State<CNIcon> {
 
   @override
   void dispose() {
-    PlatformViewGuard.readyNotifier.removeListener(
-      _onPlatformViewGuardReady,
-    );
+    PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     _channel?.setMethodCallHandler(null);
     super.dispose();
   }
 
   void _onPlatformViewGuardReady() {
     if (!mounted) return;
-    PlatformViewGuard.readyNotifier.removeListener(
-      _onPlatformViewGuardReady,
-    );
+    PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     setState(() {});
   }
 

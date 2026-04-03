@@ -1,3 +1,21 @@
+## 1.3.9
+
+### New Features
+
+- **Added**: `checked` property on `CNPopupMenuItem` for checkmark/selected state (Issue #28)
+  - Native iOS uses `UIAction.state = .on` for native checkmark display
+  - Supports single-selection, multi-selection, and mixed checked+disabled states
+  - Flutter fallback shows a checkmark icon before the label
+
+### Bug Fixes
+
+- **Fixed**: `PlatformException(recreating_view)` on iOS hot restart (PR #30 by @lucakramberger)
+  - New `PlatformViewGuard` utility delays platform view creation during startup
+  - `CNTabBar` refactored from nested FutureBuilders to state-managed async pipeline
+  - Native `deinit` cleanup added to tab bar platform views
+
+---
+
 ## 1.3.8
 
 ### Bug Fixes

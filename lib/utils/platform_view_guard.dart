@@ -31,8 +31,7 @@ class PlatformViewGuard {
   static bool get isReady => _ready;
 
   /// Notifier that fires once when readiness flips to `true`.
-  static final ValueNotifier<bool> readyNotifier =
-      ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> readyNotifier = ValueNotifier<bool>(false);
 
   /// Schedules the readiness flip if it hasn't been scheduled yet.
   ///
@@ -45,13 +44,10 @@ class PlatformViewGuard {
     if (_ready || _scheduled) return;
     _scheduled = true;
 
-    Future<void>.delayed(
-      const Duration(milliseconds: 500),
-      () {
-        if (_ready) return;
-        _ready = true;
-        readyNotifier.value = true;
-      },
-    );
+    Future<void>.delayed(const Duration(milliseconds: 500), () {
+      if (_ready) return;
+      _ready = true;
+      readyNotifier.value = true;
+    });
   }
 }

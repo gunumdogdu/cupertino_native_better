@@ -264,9 +264,7 @@ class _CNTabBarState extends State<CNTabBar> {
     }
     if (!PlatformViewGuard.isReady) {
       PlatformViewGuard.ensureScheduled();
-      PlatformViewGuard.readyNotifier.addListener(
-        _onPlatformViewGuardReady,
-      );
+      PlatformViewGuard.readyNotifier.addListener(_onPlatformViewGuardReady);
     }
     _scheduleNativePreparation();
   }
@@ -289,9 +287,7 @@ class _CNTabBarState extends State<CNTabBar> {
   @override
   void dispose() {
     _prepGeneration++;
-    PlatformViewGuard.readyNotifier.removeListener(
-      _onPlatformViewGuardReady,
-    );
+    PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     widget.searchController?.removeListener(_onSearchControllerChanged);
     _searchFocusNode?.dispose();
     _channel?.setMethodCallHandler(null);
@@ -301,9 +297,7 @@ class _CNTabBarState extends State<CNTabBar> {
 
   void _onPlatformViewGuardReady() {
     if (!mounted) return;
-    PlatformViewGuard.readyNotifier.removeListener(
-      _onPlatformViewGuardReady,
-    );
+    PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     if (_creationParams != null) {
       setState(() {});
     }
@@ -322,16 +316,18 @@ class _CNTabBarState extends State<CNTabBar> {
     _preparing = true;
     final gen = ++_prepGeneration;
 
-    _prepareCreationParams().then((params) {
-      if (!mounted || gen != _prepGeneration) return;
-      setState(() {
-        _creationParams = params;
-        _preparing = false;
-      });
-    }).catchError((_) {
-      if (!mounted || gen != _prepGeneration) return;
-      _preparing = false;
-    });
+    _prepareCreationParams()
+        .then((params) {
+          if (!mounted || gen != _prepGeneration) return;
+          setState(() {
+            _creationParams = params;
+            _preparing = false;
+          });
+        })
+        .catchError((_) {
+          if (!mounted || gen != _prepGeneration) return;
+          _preparing = false;
+        });
   }
 
   void _onSearchControllerChanged() {
@@ -609,9 +605,7 @@ class _CNTabBarState extends State<CNTabBar> {
     };
   }
 
-  Widget _buildNativeTabBarPlatformView(
-    Map<String, dynamic> creationParams,
-  ) {
+  Widget _buildNativeTabBarPlatformView(Map<String, dynamic> creationParams) {
     const viewType = 'CupertinoNativeTabBar';
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
         ? UiKitView(
