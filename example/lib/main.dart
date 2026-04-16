@@ -14,7 +14,16 @@ import 'demos/native_tab_bar_demo.dart';
 import 'demos/bottom_nav_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
 import 'demos/bottom_nav_custom_icons_test.dart';
+<<<<<<< Updated upstream
 import 'demos/issue31_textfield_disappear_test.dart';
+=======
+import 'demos/issue2_modal_shadow_test.dart';
+import 'demos/issue28_checked_state_test.dart';
+import 'demos/issue29_artifact_test.dart';
+import 'demos/issue29_transition_test.dart';
+import 'demos/issue31_textfield_disappear_test.dart';
+import 'demos/tabbar_split_search_clip_test.dart';
+>>>>>>> Stashed changes
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -257,6 +266,102 @@ class HomePage extends StatelessWidget {
           CupertinoListSection.insetGrouped(
             header: Text('Testing'),
             children: [
+              CupertinoListTile(
+                title: Text('#2: Modal bottom sheet shadow'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'rectangle.bottomthird.inset.filled',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue2ModalShadowTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#29: Transition Artifact'),
+                leading: CNIcon(
+                  symbol: CNSymbol('rectangle.on.rectangle', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue29TransitionTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#31: TextField disappear'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'textformat.abc',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue31TextFieldDisappearTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('CNTabBar split-search clip'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'magnifyingglass.circle',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const TabBarSplitSearchClipTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#29: Per-widget halo test'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'square.on.square.dashed',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue29ArtifactTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#28: Popup Checked State'),
+                leading: CNIcon(
+                  symbol: CNSymbol('checkmark.circle', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue28CheckedStateTestPage(),
+                    ),
+                  );
+                },
+              ),
               CupertinoListTile(
                 title: Text('Overlay Test'),
                 leading: CNIcon(

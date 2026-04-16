@@ -1,0 +1,6 @@
+framework module cupertino_native_better {
+  umbrella header "cupertino_native_better-umbrella.h"
+
+  export *
+  module * { export * }
+}

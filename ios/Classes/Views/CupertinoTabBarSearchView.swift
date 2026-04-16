@@ -56,6 +56,7 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
         }
 
         container.backgroundColor = .clear
+<<<<<<< Updated upstream
         // This view is iOS 26+ only and uses the Liquid Glass tab bar where
         // the search button renders as a floating glass orb that extends
         // slightly above the UITabBar's bounds. Clipping the container or
@@ -64,8 +65,21 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
         // disabled on this view via `bar.shadowImage = UIImage()` and
         // `bar.layer.shadowOpacity = 0` below, so leaving clipsToBounds
         // false is safe.
+=======
+        container.isOpaque = false
+        // This view is iOS 26+ only and uses the Liquid Glass tab bar where
+        // the search button renders as a floating glass orb that extends
+        // slightly above the UITabBar's bounds. Clipping the container or
+        // bar (the Issue #2 containment pattern) crops the orb's top edge.
+        // The shadow concerns Issue #2 addressed only apply to legacy
+        // UITabBar appearance — iOS 26 Liquid Glass already has the
+        // top-edge hairline disabled via `bar.shadowImage = UIImage()` and
+        // `bar.layer.shadowOpacity = 0` below, so leaving clipsToBounds
+        // false is safe here.
+>>>>>>> Stashed changes
         container.clipsToBounds = false
         container.layer.shadowOpacity = 0
+        container.layer.backgroundColor = UIColor.clear.cgColor
 
         setupUI()
         setupMethodChannel()
@@ -86,8 +100,13 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
         bar.backgroundColor = .clear
         // Don't clip — the Liquid Glass search orb extends above the bar's
         // bounds and needs the overflow to render its top edge correctly.
+<<<<<<< Updated upstream
         // The top hairline shadow is already suppressed by shadowImage above
         // and layer.shadowOpacity below.
+=======
+        // Top-edge shadow hairline is already suppressed by shadowImage
+        // above and layer.shadowOpacity below.
+>>>>>>> Stashed changes
         bar.clipsToBounds = false
         bar.layer.shadowOpacity = 0
 

@@ -12,7 +12,14 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeLiquidGlassContainer_\(viewId)", binaryMessenger: messenger)
     self.container = UIView(frame: frame)
     self.container.backgroundColor = .clear
-    
+    self.container.isOpaque = false
+    // Issue #29: clip + clear shadow sources so iOS 26 Liquid Glass effects
+    // do not render a halo outside the platform-view bounds during route
+    // transitions (same containment pattern as Issue #2).
+    self.container.clipsToBounds = true
+    self.container.layer.backgroundColor = UIColor.clear.cgColor
+    self.container.layer.shadowOpacity = 0
+
     // Parse arguments
     var effect: String = "regular"
     var shape: String = "capsule"
@@ -57,7 +64,12 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     )
     
     self.hostingController = UIHostingController(rootView: glassView)
+    // Transparent hosting view (Issue #29: prevent white placeholder during route transitions)
     self.hostingController.view.backgroundColor = .clear
+    self.hostingController.view.isOpaque = false
+    self.hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
+    self.hostingController.view.layer.shadowOpacity = 0
+    self.hostingController.view.clipsToBounds = true
     self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
     
     super.init()

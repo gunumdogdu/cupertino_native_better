@@ -230,9 +230,17 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     // Flutter manages the frame position and size
     self.container = UIView(frame: frame)
     self.container.backgroundColor = .clear
-
-    // Ensure container doesn't clip content (Flutter's ClipRect handles clipping)
-    self.container.clipsToBounds = false
+    self.container.isOpaque = false
+    // Issue #29: clip the container so the iOS 26 Liquid Glass material
+    // does not render a halo outside the platform-view bounds during route
+    // transitions. The UIKit badges (added in `updateBadgePositions`) sit
+    // at y=0 inside the container, so clipping does not crop their tops.
+    // Their X position math is a separate pre-existing layout issue (the
+    // calculation assumes buttons span container width, but the SwiftUI
+    // HStack is centered) — that is intentionally not fixed here.
+    self.container.clipsToBounds = true
+    self.container.layer.backgroundColor = UIColor.clear.cgColor
+    self.container.layer.shadowOpacity = 0
     // Remove any default layout margins that could cause offset
     if #available(iOS 11.0, *) {
       self.container.insetsLayoutMarginsFromSafeArea = false
@@ -423,6 +431,8 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     self.hostingController = UIHostingController(rootView: swiftUIView)
 
     self.hostingController.view.backgroundColor = .clear
+    self.hostingController.view.isOpaque = false
+    self.hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
     // Configure hosting controller to ignore safe areas and remove any padding
     if #available(iOS 11.0, *) {
       self.hostingController.view.insetsLayoutMarginsFromSafeArea = false
@@ -446,13 +456,21 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     // - 3px down from top (badge extends above buttons)
     // - 0px from left (no left overflow)
     // - 6px inset from right (badge extends 6px beyond last button)
-    // This ensures badges are positioned within container bounds for proper clipping
-    NSLayoutConstraint.activate([
-      hostingController.view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 0),
-      hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6),
-      hostingController.view.topAnchor.constraint(equalTo: container.topAnchor, constant: 3),
-      hostingController.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: 0),
-    ])
+    // This ensures badges are positioned within container bounds for proper clipping.
+    //
+    // Priority is .defaultHigh (750) instead of required (1000) so UIKit can
+    // silently break them during the brief moment when the parent container
+    // has `_UITemporaryLayoutWidth = 0` on initial mount. With required
+    // priority UIKit logs an "unsatisfiable constraints" warning every time.
+    let leading = hostingController.view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 0)
+    let trailing = hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6)
+    let top = hostingController.view.topAnchor.constraint(equalTo: container.topAnchor, constant: 3)
+    let bottom = hostingController.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: 0)
+    leading.priority = .defaultHigh
+    trailing.priority = .defaultHigh
+    top.priority = .defaultHigh
+    bottom.priority = .defaultHigh
+    NSLayoutConstraint.activate([leading, trailing, top, bottom])
 
     // Force immediate layout to ensure SwiftUI view calculates sizes correctly on first render
     hostingController.view.setNeedsLayout()
@@ -794,43 +812,100 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     let buttons = viewModel.buttons
     guard !buttons.isEmpty else { return }
 
-    // Calculate button positions based on axis and spacing
     let containerBounds = container.bounds
     let buttonCount = buttons.count
 
-    for (index, button) in buttons.enumerated() {
-      guard let badgeCount = button.badgeCount, badgeCount > 0 else { continue }
-
-      let badgeView = UIKitBadgeView(count: badgeCount)
-      badgeView.translatesAutoresizingMaskIntoConstraints = false
-      container.addSubview(badgeView)
-
-      // Position badge based on button index and axis
-      // Badge overlaps slightly with button for native iOS appearance
-      var badgeX: CGFloat = 0
-      var badgeY: CGFloat = 0
-
-      if axis == .horizontal {
-        // Horizontal layout: divide width by button count
-        // Account for 6px inset on the right (hosting controller is narrower than container)
-        let effectiveWidth = containerBounds.width - 6
-        let buttonWidth = effectiveWidth / CGFloat(buttonCount)
-        badgeX = (buttonWidth * CGFloat(index)) + buttonWidth - 12 // Closer to button edge
-        badgeY = 0 // Position at top - buttons are offset by 3px, so badge appears with -3px overlap
+    // Estimate each button's rendered width based on its content + the
+    // GlassButtonConfig's minHeight (capsule buttons stay >= minHeight wide).
+    // The previous implementation divided the container width evenly across
+    // buttons, which placed the last badge near the screen edge whenever the
+    // SwiftUI HStack was centered as a tight pill instead of stretched.
+    func estimatedWidth(for button: GlassButtonData) -> CGFloat {
+      let padding = button.config.padding
+      let horizontalPadding = padding.leading + padding.trailing
+      var contentWidth: CGFloat = 0
+      if let title = button.title, !title.isEmpty {
+        // Approximate using the system body font; SwiftUI may render slightly
+        // differently but this is close enough for badge positioning.
+        let font = UIFont.systemFont(ofSize: 17)
+        let textSize = (title as NSString).size(withAttributes: [.font: font])
+        contentWidth = textSize.width
+        if button.iconImage != nil || (button.iconName?.isEmpty == false) {
+          contentWidth += button.iconSize + button.config.spacing
+        }
       } else {
-        // Vertical layout: divide height by button count
-        let buttonHeight = containerBounds.height / CGFloat(buttonCount)
-        // Account for 6px inset on the right for vertical layout as well
-        badgeX = containerBounds.width - 12 - 6 // Adjust for hosting controller inset
-        badgeY = (buttonHeight * CGFloat(index)) + 3 // Account for hosting controller 3px offset
+        contentWidth = button.iconSize
       }
+      let intrinsic = contentWidth + horizontalPadding
+      return max(intrinsic, button.config.minHeight)
+    }
 
-      NSLayoutConstraint.activate([
-        badgeView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: badgeX),
-        badgeView.topAnchor.constraint(equalTo: container.topAnchor, constant: badgeY)
-      ])
+    if axis == .horizontal {
+      let widths = buttons.map(estimatedWidth)
+      let spacing = viewModel.spacing
+      let hstackWidth = widths.reduce(0, +) + spacing * CGFloat(buttonCount - 1)
+      // Hosting view is inset 6pt from container's trailing edge; HStack is
+      // centered inside that.
+      let hostingWidth = containerBounds.width - 6
+      let hstackStart = max(0, (hostingWidth - hstackWidth) / 2)
 
-      badgeViews.append(badgeView)
+      var cursor: CGFloat = hstackStart
+      for (index, button) in buttons.enumerated() {
+        let buttonWidth = widths[index]
+        let buttonRight = cursor + buttonWidth
+        defer { cursor += buttonWidth + spacing }
+
+        guard let badgeCount = button.badgeCount, badgeCount > 0 else { continue }
+
+        let badgeView = UIKitBadgeView(count: badgeCount)
+        badgeView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(badgeView)
+
+        // Badge sits at button's top-right corner with slight inward overlap
+        // so it visually attaches to the button corner.
+        let badgeX = buttonRight - 12
+        let badgeY: CGFloat = 0
+
+        NSLayoutConstraint.activate([
+          badgeView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: badgeX),
+          badgeView.topAnchor.constraint(equalTo: container.topAnchor, constant: badgeY)
+        ])
+
+        badgeViews.append(badgeView)
+        _ = index
+      }
+    } else {
+      // Vertical layout — same approach: estimate heights, center the VStack
+      // inside the hosting view, then place the badge at each button's
+      // top-right corner.
+      let heights = buttons.map { _ in CGFloat(44.0) } // minHeight default; vertical buttons rarely vary in height
+      let spacing = viewModel.spacing
+      let vstackHeight = heights.reduce(0, +) + spacing * CGFloat(buttonCount - 1)
+      let hostingHeight = containerBounds.height
+      let vstackStart = max(0, (hostingHeight - vstackHeight) / 2)
+      let badgeX = containerBounds.width - 12 - 6
+
+      var cursor: CGFloat = vstackStart
+      for (index, button) in buttons.enumerated() {
+        let buttonHeight = heights[index]
+        defer { cursor += buttonHeight + spacing }
+
+        guard let badgeCount = button.badgeCount, badgeCount > 0 else { continue }
+
+        let badgeView = UIKitBadgeView(count: badgeCount)
+        badgeView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(badgeView)
+
+        let badgeY = cursor
+
+        NSLayoutConstraint.activate([
+          badgeView.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: badgeX),
+          badgeView.topAnchor.constraint(equalTo: container.topAnchor, constant: badgeY)
+        ])
+
+        badgeViews.append(badgeView)
+        _ = index
+      }
     }
   }
 
