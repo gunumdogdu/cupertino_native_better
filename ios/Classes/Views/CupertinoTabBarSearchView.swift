@@ -56,7 +56,15 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
         }
 
         container.backgroundColor = .clear
-        container.clipsToBounds = true
+        // This view is iOS 26+ only and uses the Liquid Glass tab bar where
+        // the search button renders as a floating glass orb that extends
+        // slightly above the UITabBar's bounds. Clipping the container or
+        // the bar would crop the orb's top edge. The legacy top-edge shadow
+        // hairline that Issue #2 was originally clipping for is already
+        // disabled on this view via `bar.shadowImage = UIImage()` and
+        // `bar.layer.shadowOpacity = 0` below, so leaving clipsToBounds
+        // false is safe.
+        container.clipsToBounds = false
         container.layer.shadowOpacity = 0
 
         setupUI()
@@ -76,7 +84,11 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
         bar.backgroundImage = UIImage()
         bar.shadowImage = UIImage()
         bar.backgroundColor = .clear
-        bar.clipsToBounds = true
+        // Don't clip — the Liquid Glass search orb extends above the bar's
+        // bounds and needs the overflow to render its top edge correctly.
+        // The top hairline shadow is already suppressed by shadowImage above
+        // and layer.shadowOpacity below.
+        bar.clipsToBounds = false
         bar.layer.shadowOpacity = 0
 
         // Set tint colors
