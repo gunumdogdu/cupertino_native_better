@@ -97,6 +97,13 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
 
     self.isInteractive = interaction
     container.backgroundColor = .clear
+    container.isOpaque = false
+    // Issue #29: clip + clear all shadow sources so the platform view never
+    // renders anything outside its tight bounds during route transitions.
+    // Same pattern as Issue #2 (tab-bar shadow leak).
+    container.clipsToBounds = true
+    container.layer.backgroundColor = UIColor.clear.cgColor
+    container.layer.shadowOpacity = 0
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     // Create final image first (needed for both SwiftUI and UIKit paths)
@@ -226,6 +233,13 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let t = tint { uiButton.tintColor = t }
       else if #available(iOS 13.0, *) { uiButton.tintColor = .label }
 
+      // Issue #29: same shadow-containment as the container, so the button
+      // itself can't render a halo outside its frame during transitions.
+      uiButton.clipsToBounds = true
+      uiButton.layer.shadowOpacity = 0
+      uiButton.layer.backgroundColor = UIColor.clear.cgColor
+      uiButton.backgroundColor = .clear
+
       container.addSubview(uiButton)
       NSLayoutConstraint.activate([
         uiButton.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -233,7 +247,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         uiButton.topAnchor.constraint(equalTo: container.topAnchor),
         uiButton.bottomAnchor.constraint(equalTo: container.bottomAnchor),
       ])
-      
+
       applyButtonStyle(buttonStyle: buttonStyle, round: makeRound)
       currentButtonStyle = buttonStyle
       uiButton.isEnabled = enabled
@@ -640,7 +654,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     )
     
     let hostingController = UIHostingController(rootView: AnyView(swiftUIButton))
+    // Transparent hosting view so the pre-SwiftUI-render snapshot captured by
+    // iOS route transitions does not show a white placeholder (Issue #29).
     hostingController.view.backgroundColor = UIColor.clear
+    hostingController.view.isOpaque = false
+    hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
     self.hostingController = hostingController
     
     hostingController.view.translatesAutoresizingMaskIntoConstraints = false

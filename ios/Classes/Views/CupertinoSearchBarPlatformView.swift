@@ -87,11 +87,23 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         super.init()
 
         container.backgroundColor = .clear
+        container.isOpaque = false
+        // Issue #29: clip + clear shadow sources so iOS 26 Liquid Glass effects
+        // do not render a halo outside the platform-view bounds during route
+        // transitions (same containment pattern as Issue #2).
+        container.clipsToBounds = true
+        container.layer.backgroundColor = UIColor.clear.cgColor
+        container.layer.shadowOpacity = 0
         if #available(iOS 13.0, *) {
             container.overrideUserInterfaceStyle = isDark ? .dark : .light
         }
 
+        // Transparent hosting view (Issue #29: prevent white placeholder during route transitions)
         hostingController.view.backgroundColor = .clear
+        hostingController.view.isOpaque = false
+        hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
+        hostingController.view.layer.shadowOpacity = 0
+        hostingController.view.clipsToBounds = true
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(hostingController.view)
 

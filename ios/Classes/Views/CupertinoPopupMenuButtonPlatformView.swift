@@ -108,9 +108,20 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     super.init()
 
     container.backgroundColor = .clear
+    container.isOpaque = false
+    // Issue #29: clip + clear shadow sources so iOS 26 Liquid Glass effects
+    // do not render a halo outside the platform-view bounds during route
+    // transitions (same containment pattern as Issue #2).
+    container.clipsToBounds = true
+    container.layer.backgroundColor = UIColor.clear.cgColor
+    container.layer.shadowOpacity = 0
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     button.translatesAutoresizingMaskIntoConstraints = false
+    button.clipsToBounds = true
+    button.layer.shadowOpacity = 0
+    button.layer.backgroundColor = UIColor.clear.cgColor
+    button.backgroundColor = .clear
     // Choose a visible default tint if none provided
     if let t = tint { button.tintColor = t }
     else if #available(iOS 13.0, *) { button.tintColor = .label }

@@ -108,13 +108,10 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     super.init()
 
     container.backgroundColor = .clear
-    // On iOS 26+, the Liquid Glass tab bar needs to overflow slightly for the pill effect
-    // On older iOS, keep clipsToBounds to prevent visual artifacts
-    if #available(iOS 26.0, *) {
-      container.clipsToBounds = false
-    } else {
-      container.clipsToBounds = true // Prevent shadow leakage on older iOS
-    }
+    // Always clip container bounds to prevent the UITabBar's top-edge shadow
+    // from bleeding over modals / bottom sheets (Issue #2). On iOS 26+ the
+    // Liquid Glass appearance still renders correctly inside the clipped bounds.
+    container.clipsToBounds = true
     container.layer.shadowOpacity = 0 // Explicitly disable layer shadow
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
@@ -191,18 +188,17 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBarLeft = left; tabBarRight = right
       left.translatesAutoresizingMaskIntoConstraints = false
       right.translatesAutoresizingMaskIntoConstraints = false
-      // On iOS 26+, allow overflow for Liquid Glass pill effect
-      if #available(iOS 26.0, *) {
-        left.clipsToBounds = false; right.clipsToBounds = false
-      } else {
-        left.clipsToBounds = true; right.clipsToBounds = true // Prevent shadow leakage
-      }
+      // Clip both bars so the top-edge shadow does not leak over modals (Issue #2).
+      left.clipsToBounds = true; right.clipsToBounds = true
       left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
+      // Belt-and-suspenders: legacy shadowImage API also disables the top hairline,
+      // which iOS 26+ Liquid Glass can still render despite UITabBarAppearance.shadowImage.
+      left.shadowImage = UIImage(); right.shadowImage = UIImage()
       left.delegate = self; right.delegate = self
       if let bg = bg { left.barTintColor = bg; right.barTintColor = bg }
       if #available(iOS 10.0, *), let tint = tint { left.tintColor = tint; right.tintColor = tint }
       if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap; if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap; right.scrollEdgeAppearance = ap } } }
-      
+
       left.items = buildItems(0..<leftEnd)
       right.items = buildItems(leftEnd..<count)
       if selectedIndex < leftEnd, let items = left.items {
@@ -301,13 +297,12 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBar = bar
       bar.delegate = self
       bar.translatesAutoresizingMaskIntoConstraints = false
-      // On iOS 26+, allow overflow for Liquid Glass pill effect
-      if #available(iOS 26.0, *) {
-        bar.clipsToBounds = false
-      } else {
-        bar.clipsToBounds = true // Prevent shadow leakage on older iOS
-      }
+      // Clip the bar so the top-edge shadow does not leak over modals (Issue #2).
+      bar.clipsToBounds = true
       bar.layer.shadowOpacity = 0
+      // Belt-and-suspenders: legacy shadowImage API also disables the top hairline,
+      // which iOS 26+ Liquid Glass can still render despite UITabBarAppearance.shadowImage.
+      bar.shadowImage = UIImage()
       if let bg = bg { bar.barTintColor = bg }
       if #available(iOS 10.0, *), let tint = tint { bar.tintColor = tint }
       if let ap = appearance { if #available(iOS 13.0, *) { bar.standardAppearance = ap; if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap } } }
@@ -603,13 +598,10 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBarLeft = left; self.tabBarRight = right
             left.translatesAutoresizingMaskIntoConstraints = false
             right.translatesAutoresizingMaskIntoConstraints = false
-            // On iOS 26+, allow overflow for Liquid Glass pill effect
-            if #available(iOS 26.0, *) {
-              left.clipsToBounds = false; right.clipsToBounds = false
-            } else {
-              left.clipsToBounds = true; right.clipsToBounds = true
-            }
+            // Clip both bars so the top-edge shadow does not leak over modals (Issue #2).
+            left.clipsToBounds = true; right.clipsToBounds = true
             left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
+            left.shadowImage = UIImage(); right.shadowImage = UIImage()
             left.delegate = self; right.delegate = self
             if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap; if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap; right.scrollEdgeAppearance = ap } } }
             left.items = buildItems(0..<leftEnd)
@@ -698,13 +690,10 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBar = bar
             bar.delegate = self
             bar.translatesAutoresizingMaskIntoConstraints = false
-            // On iOS 26+, allow overflow for Liquid Glass pill effect
-            if #available(iOS 26.0, *) {
-              bar.clipsToBounds = false
-            } else {
-              bar.clipsToBounds = true
-            }
+            // Clip the bar so the top-edge shadow does not leak over modals (Issue #2).
+            bar.clipsToBounds = true
             bar.layer.shadowOpacity = 0
+            bar.shadowImage = UIImage()
             if let ap = appearance { if #available(iOS 13.0, *) { bar.standardAppearance = ap; if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap } } }
             bar.items = buildItems(0..<count)
             if let items = bar.items, selectedIndex >= 0, selectedIndex < items.count { bar.selectedItem = items[selectedIndex] }
