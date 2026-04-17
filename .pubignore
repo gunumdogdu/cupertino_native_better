@@ -45,3 +45,7 @@ coverage/
 
 # Xcode user state
 **/xcuserdata/
+
+# Internal planning / design docs — local only, never published
+docs/
+
