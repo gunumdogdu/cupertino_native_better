@@ -108,9 +108,21 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     super.init()
 
     container.backgroundColor = .clear
-    // Always clip container bounds to prevent the UITabBar's top-edge shadow
-    // from bleeding over modals / bottom sheets (Issue #2). On iOS 26+ the
-    // Liquid Glass appearance still renders correctly inside the clipped bounds.
+    // Always clip the container to block the iOS 26 Liquid Glass drop
+    // shadow from bleeding over modals (Issue #2). The Liquid Glass
+    // selection pill extends ~12-14pt above the bar's top edge — we make
+    // ROOM for it inside the container by positioning the bar 14pt below
+    // container.topAnchor (see constraints below) and reporting
+    // barHeight + 14pt in `getIntrinsicSize`. This way the pill (including
+    // its morph animation between tabs) renders inside the clipped
+    // container and the shadow is still blocked.
+    //
+    // NOTE on the iOS simulator: the simulator renders Liquid Glass with
+    // a software rasterizer and positions the pill slightly differently
+    // than real Metal hardware. You may see residual top-edge clipping
+    // on simulator that is NOT visible on a real iOS 26+ device. Always
+    // verify Liquid Glass behaviour on hardware before treating a
+    // visual artifact here as a bug.
     container.clipsToBounds = true
     container.layer.shadowOpacity = 0 // Explicitly disable layer shadow
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
@@ -188,8 +200,16 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBarLeft = left; tabBarRight = right
       left.translatesAutoresizingMaskIntoConstraints = false
       right.translatesAutoresizingMaskIntoConstraints = false
-      // Clip both bars so the top-edge shadow does not leak over modals (Issue #2).
-      left.clipsToBounds = true; right.clipsToBounds = true
+      // iOS 26+: leave bars unclipped so the Liquid Glass selection pill
+      // can render past their top edge into the container's 6pt headroom.
+      // Container is still clipped (above) so the bigger drop shadow
+      // can't escape the platform view bounds.
+      // iOS < 26: clip the bars to contain the legacy hairline shadow.
+      if #available(iOS 26.0, *) {
+        left.clipsToBounds = false; right.clipsToBounds = false
+      } else {
+        left.clipsToBounds = true; right.clipsToBounds = true
+      }
       left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
       // Belt-and-suspenders: legacy shadowImage API also disables the top hairline,
       // which iOS 26+ Liquid Glass can still render despite UITabBarAppearance.shadowImage.
@@ -228,24 +248,24 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
         let rightFraction = CGFloat(rightCount) / CGFloat(count)
         NSLayoutConstraint.activate([
           right.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -rightInset),
-          right.topAnchor.constraint(equalTo: container.topAnchor),
+          right.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
           right.bottomAnchor.constraint(equalTo: container.bottomAnchor),
           right.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: rightFraction),
           left.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leftInset),
           left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing),
-          left.topAnchor.constraint(equalTo: container.topAnchor),
+          left.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
           left.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
       } else {
         NSLayoutConstraint.activate([
           // Right bar fixed width, pinned to trailing
           right.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -rightInset),
-          right.topAnchor.constraint(equalTo: container.topAnchor),
+          right.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
           right.bottomAnchor.constraint(equalTo: container.bottomAnchor),
           right.widthAnchor.constraint(equalToConstant: adjustedRightWidth),
           // Left bar fixed width, pinned to leading
           left.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leftInset),
-          left.topAnchor.constraint(equalTo: container.topAnchor),
+          left.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
           left.bottomAnchor.constraint(equalTo: container.bottomAnchor),
           left.widthAnchor.constraint(equalToConstant: adjustedLeftWidth),
           // Spacing between
@@ -297,8 +317,15 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       tabBar = bar
       bar.delegate = self
       bar.translatesAutoresizingMaskIntoConstraints = false
-      // Clip the bar so the top-edge shadow does not leak over modals (Issue #2).
-      bar.clipsToBounds = true
+      // iOS 26+: leave the bar unclipped so the Liquid Glass selection pill
+      // can render into the container's 6pt headroom. Container clip blocks
+      // the bigger drop shadow.
+      // iOS < 26: clip to contain the legacy hairline shadow.
+      if #available(iOS 26.0, *) {
+        bar.clipsToBounds = false
+      } else {
+        bar.clipsToBounds = true
+      }
       bar.layer.shadowOpacity = 0
       // Belt-and-suspenders: legacy shadowImage API also disables the top hairline,
       // which iOS 26+ Liquid Glass can still render despite UITabBarAppearance.shadowImage.
@@ -312,7 +339,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       NSLayoutConstraint.activate([
         bar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
         bar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        bar.topAnchor.constraint(equalTo: container.topAnchor),
+        bar.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
         bar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
       ])
       // Force layout update for background and text rendering on iOS < 16
@@ -369,7 +396,14 @@ channel.setMethodCallHandler { [weak self] call, result in
           let defaultIconSize: CGFloat = 25.0
           let maxIconSize = self.currentIconSizes.max() ?? defaultIconSize
           let extraHeight = max(0, maxIconSize - defaultIconSize)
-          let dynamicHeight = size.height + extraHeight
+          // +14pt pill room: container is clipped (Issue #2 shadow fix), and
+          // the iOS 26 Liquid Glass selection pill — including its morphing
+          // animation between tabs — extends ~12-14pt above the bar's top
+          // edge. We position the bar 14pt below container.top via the
+          // layout constraints, and report height + 14 here so Flutter
+          // reserves space matching what the platform view actually needs.
+          let pillTopRoom: CGFloat = 14.0
+          let dynamicHeight = size.height + extraHeight + pillTopRoom
           result(["width": Double(size.width), "height": Double(dynamicHeight)])
         } else {
           result(["width": Double(self.container.bounds.width), "height": 50.0])
@@ -598,8 +632,13 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBarLeft = left; self.tabBarRight = right
             left.translatesAutoresizingMaskIntoConstraints = false
             right.translatesAutoresizingMaskIntoConstraints = false
-            // Clip both bars so the top-edge shadow does not leak over modals (Issue #2).
-            left.clipsToBounds = true; right.clipsToBounds = true
+            // iOS 26+: leave unclipped for pill overflow into 6pt headroom.
+            // iOS < 26: clip to contain the legacy hairline shadow.
+            if #available(iOS 26.0, *) {
+              left.clipsToBounds = false; right.clipsToBounds = false
+            } else {
+              left.clipsToBounds = true; right.clipsToBounds = true
+            }
             left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
             left.shadowImage = UIImage(); right.shadowImage = UIImage()
             left.delegate = self; right.delegate = self
@@ -624,22 +663,22 @@ channel.setMethodCallHandler { [weak self] call, result in
               let rightFraction = CGFloat(rightCount) / CGFloat(count)
               NSLayoutConstraint.activate([
                 right.trailingAnchor.constraint(equalTo: self.container.trailingAnchor, constant: -rightInset),
-                right.topAnchor.constraint(equalTo: self.container.topAnchor),
+                right.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
                 right.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
                 right.widthAnchor.constraint(equalTo: self.container.widthAnchor, multiplier: rightFraction),
                 left.leadingAnchor.constraint(equalTo: self.container.leadingAnchor, constant: leftInset),
                 left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing),
-                left.topAnchor.constraint(equalTo: self.container.topAnchor),
+                left.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
                 left.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
               ])
             } else {
               NSLayoutConstraint.activate([
                 right.trailingAnchor.constraint(equalTo: self.container.trailingAnchor, constant: -rightInset),
-                right.topAnchor.constraint(equalTo: self.container.topAnchor),
+                right.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
                 right.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
                 right.widthAnchor.constraint(equalToConstant: adjustedRightWidth),
                 left.leadingAnchor.constraint(equalTo: self.container.leadingAnchor, constant: leftInset),
-                left.topAnchor.constraint(equalTo: self.container.topAnchor),
+                left.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
                 left.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
                 left.widthAnchor.constraint(equalToConstant: adjustedLeftWidth),
                 left.trailingAnchor.constraint(lessThanOrEqualTo: right.leadingAnchor, constant: -spacing),
@@ -690,8 +729,13 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.tabBar = bar
             bar.delegate = self
             bar.translatesAutoresizingMaskIntoConstraints = false
-            // Clip the bar so the top-edge shadow does not leak over modals (Issue #2).
-            bar.clipsToBounds = true
+            // iOS 26+: leave unclipped for pill overflow into 6pt headroom.
+            // iOS < 26: clip to contain the legacy hairline shadow.
+            if #available(iOS 26.0, *) {
+              bar.clipsToBounds = false
+            } else {
+              bar.clipsToBounds = true
+            }
             bar.layer.shadowOpacity = 0
             bar.shadowImage = UIImage()
             if let ap = appearance { if #available(iOS 13.0, *) { bar.standardAppearance = ap; if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap } } }
@@ -701,7 +745,7 @@ channel.setMethodCallHandler { [weak self] call, result in
             NSLayoutConstraint.activate([
               bar.leadingAnchor.constraint(equalTo: self.container.leadingAnchor),
               bar.trailingAnchor.constraint(equalTo: self.container.trailingAnchor),
-              bar.topAnchor.constraint(equalTo: self.container.topAnchor),
+              bar.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
               bar.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
             ])
             // Force layout update for background and text rendering on iOS < 16

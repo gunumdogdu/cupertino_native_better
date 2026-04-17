@@ -38,3 +38,6 @@ example/.flutter-plugins-dependencies
 example/ios/Pods/
 example/ios/.symlinks/
 example/pubspec.lock
+
+# Internal planning / design docs (kept local, never committed)
+docs/superpowers/

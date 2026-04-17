@@ -1,3 +1,29 @@
+## 1.4.1
+
+### Bug Fixes
+
+- **Fixed**: `CNTabBar` iOS 26 Liquid Glass selection pill was being cropped at its top edge after the v1.4.0 Issue #2 fix.
+  - Root cause: v1.4.0 clipped the platform-view container to block the Liquid Glass drop shadow from bleeding over modal bottom sheets. The same clip also cut off the selection pill, which extends ~12–14pt above the bar's top during its morphing animation between tabs.
+  - Resolution: the container still clips (shadow containment preserved), but the UITabBar is now positioned 14pt below the container's top edge, and the reported intrinsic height is bar-height + 14pt. The Liquid Glass selection pill — including its morph animation when rapidly switching tabs — renders fully inside the clipped container. Bar's visible position is unchanged at the bottom of the allocated space.
+  - Applied to all 5 layout sites: single-bar init, split-bar init, and the equivalent setLayout rebuilds, for both iOS 26+ and iOS < 26 code paths.
+
+### Example app
+
+- **Added**: `Testing → #33: SVG in CNTabBar` — reproduction screen mirroring the SVG-icons-in-CNTabBar pattern reported in Issue #33, including the reporter's `NavBarItem` wrapper, `iconSize: 24`, and `tint` configuration. Local iOS 26 verification shows SVGs render correctly; the screen is published so the reporter (and future users hitting the same symptom) can confirm on their own setup.
+- **Added**: `Testing → Stack+Positioned tab bar` — demonstrates the `Stack` + `Positioned(bottom: 0)` layout pattern as an alternative to `Scaffold.bottomNavigationBar` for users who need custom z-order control.
+- **Enhanced**: `Testing → CNTabBar split-search clip` — bright teal background and a modal-bottom-sheet trigger button so both the search-orb top-edge clip and the Issue #2 shadow-bleed scenarios can be verified side-by-side on one screen.
+- **Bumped**: example app iOS deployment target from 14.0 to 15.0 (required by the plugin's `s.platform = :ios, '15.0'`).
+
+### Known issues
+
+- **iOS simulator (not real device)**: iOS 26 Liquid Glass rendering on the simulator is software-rasterized and has visible differences from real Metal hardware. You may see the Liquid Glass selection pill appear slightly clipped at the top, or a brief rectangular outline around buttons on press. These artifacts **do not appear on real iOS 26 devices**. Always verify Liquid Glass behavior on a real iPhone/iPad before treating a visual quirk as a package bug.
+
+### Pana
+
+- 160/160
+
+---
+
 ## 1.4.0
 
 ### Bug Fixes

@@ -19,6 +19,8 @@ import 'demos/issue28_checked_state_test.dart';
 import 'demos/issue29_artifact_test.dart';
 import 'demos/issue29_transition_test.dart';
 import 'demos/issue31_textfield_disappear_test.dart';
+import 'demos/issue33_svg_tabbar_test.dart';
+import 'demos/stack_positioned_tabbar_test.dart';
 import 'demos/tabbar_split_search_clip_test.dart';
 
 void main() {
@@ -289,6 +291,40 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     CupertinoPageRoute(
                       builder: (_) => const Issue29TransitionTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('Stack+Positioned tab bar (clean fix attempt)'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'rectangle.bottomthird.inset.filled',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const StackPositionedTabBarTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#33: SVG in CNTabBar'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'photo.fill',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue33SvgTabBarTest(),
                     ),
                   );
                 },

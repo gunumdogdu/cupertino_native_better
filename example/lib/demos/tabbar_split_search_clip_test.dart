@@ -24,10 +24,52 @@ class _TabBarSplitSearchClipTestState extends State<TabBarSplitSearchClipTest> {
   int _currentIndex = 0;
   String _searchText = '';
 
+  void _showCupertinoModal() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (ctx) => Container(
+        height: 320,
+        color: CupertinoColors.systemBackground.resolveFrom(ctx),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              const Text(
+                'Modal bottom sheet',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Watch the TOP edge of this sheet. With the split-search '
+                  'tab bar (clipsToBounds = false on iOS 26+), does a '
+                  'shadow line bleed across the top?',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const Spacer(),
+              CupertinoButton.filled(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
+      // Bright background so any clipping/halo on the dark CNTabBar at the
+      // bottom is obviously visible.
+      backgroundColor: CupertinoColors.systemTeal,
       navigationBar: CupertinoNavigationBar(
+        backgroundColor: CupertinoColors.systemTeal,
         middle: const Text('Split-search clip repro'),
         leading: CupertinoButton(
           padding: EdgeInsets.zero,
@@ -69,6 +111,13 @@ class _TabBarSplitSearchClipTestState extends State<TabBarSplitSearchClipTest> {
                           style: TextStyle(fontSize: 13),
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CupertinoButton.filled(
+                    onPressed: _showCupertinoModal,
+                    child: const Text(
+                      'Show modal bottom sheet (Issue #2 shadow check)',
                     ),
                   ),
                   const SizedBox(height: 16),
