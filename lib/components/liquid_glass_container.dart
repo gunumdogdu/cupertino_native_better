@@ -7,6 +7,7 @@ import '../style/glass_effect.dart';
 import '../utils/theme_helper.dart';
 import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
+import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// A container that applies Liquid Glass effects to its child widget.
 ///
@@ -38,6 +39,10 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
   MethodChannel? _channel;
   bool? _lastIsDark;
 
+  // Issue #29 halo containment via setTransitioning.
+  Animation<double>? _secondaryRouteAnim;
+  bool _modalAbove = false;
+
   bool get _isDark => ThemeHelper.isDark(context);
 
   @override
@@ -47,11 +52,14 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
       PlatformViewGuard.ensureScheduled();
       PlatformViewGuard.readyNotifier.addListener(_onPlatformViewGuardReady);
     }
+    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
+    _onAnyModalDepthChanged();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
   }
 
@@ -65,10 +73,43 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
 
   @override
   void dispose() {
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = null;
+    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     _channel?.setMethodCallHandler(null);
     _channel = null;
     super.dispose();
+  }
+
+  void _attachSecondaryRouteAnim() {
+    final route = ModalRoute.of(context);
+    final newAnim = route?.secondaryAnimation;
+    if (identical(newAnim, _secondaryRouteAnim)) return;
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = newAnim;
+    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _onSecondaryRouteAnimChanged();
+  }
+
+  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
+
+  void _onAnyModalDepthChanged() {
+    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
+    _pushContainmentIfNeeded();
+  }
+
+  void _pushContainmentIfNeeded() {
+    final anim = _secondaryRouteAnim;
+    final animating =
+        anim?.status == AnimationStatus.forward ||
+        anim?.status == AnimationStatus.reverse;
+    final active = animating || _modalAbove;
+    final ch = _channel;
+    if (ch == null) return;
+    try {
+      ch.invokeMethod('setTransitioning', {'active': active});
+    } catch (_) {}
   }
 
   void _onPlatformViewGuardReady() {
@@ -150,6 +191,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
       return null;
     });
     _lastIsDark = _isDark;
+    _pushContainmentIfNeeded();
   }
 
   Future<void> _updateConfig() async {

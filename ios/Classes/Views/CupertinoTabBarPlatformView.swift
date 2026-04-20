@@ -246,27 +246,45 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       // If total exceeds container, fall back to proportional widths
       if adjustedTotal > container.bounds.width {
         let rightFraction = CGFloat(rightCount) / CGFloat(count)
+        let rTop = right.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
+        let rBottom = right.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        let lTop = left.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
+        let lBottom = left.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        // Lower priority so UIKit can break these against `_UITemporaryLayoutHeight = 0`
+        // during the initial layout pass without logging an unsatisfiable-constraints warning.
+        rTop.priority = .defaultHigh
+        rBottom.priority = .defaultHigh
+        lTop.priority = .defaultHigh
+        lBottom.priority = .defaultHigh
         NSLayoutConstraint.activate([
           right.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -rightInset),
-          right.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
-          right.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+          rTop,
+          rBottom,
           right.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: rightFraction),
           left.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leftInset),
           left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing),
-          left.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
-          left.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+          lTop,
+          lBottom,
         ])
       } else {
+        let rTop = right.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
+        let rBottom = right.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        let lTop = left.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
+        let lBottom = left.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        rTop.priority = .defaultHigh
+        rBottom.priority = .defaultHigh
+        lTop.priority = .defaultHigh
+        lBottom.priority = .defaultHigh
         NSLayoutConstraint.activate([
           // Right bar fixed width, pinned to trailing
           right.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -rightInset),
-          right.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
-          right.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+          rTop,
+          rBottom,
           right.widthAnchor.constraint(equalToConstant: adjustedRightWidth),
           // Left bar fixed width, pinned to leading
           left.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leftInset),
-          left.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
-          left.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+          lTop,
+          lBottom,
           left.widthAnchor.constraint(equalToConstant: adjustedLeftWidth),
           // Spacing between
           left.trailingAnchor.constraint(lessThanOrEqualTo: right.leadingAnchor, constant: -spacing),
@@ -336,11 +354,17 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       bar.items = buildItems(0..<count)
       if selectedIndex >= 0, let items = bar.items, selectedIndex < items.count { bar.selectedItem = items[selectedIndex] }
       container.addSubview(bar)
+      let barTop = bar.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
+      let barBottom = bar.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+      // Lower priority so UIKit can break these against `_UITemporaryLayoutHeight = 0`
+      // during the initial layout pass without logging an unsatisfiable-constraints warning.
+      barTop.priority = .defaultHigh
+      barBottom.priority = .defaultHigh
       NSLayoutConstraint.activate([
         bar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
         bar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-        bar.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
-        bar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        barTop,
+        barBottom,
       ])
       // Force layout update for background and text rendering on iOS < 16
       // Re-assign items after layout to ensure labels render properly
@@ -661,25 +685,41 @@ channel.setMethodCallHandler { [weak self] call, result in
             
             if adjustedTotal > self.container.bounds.width {
               let rightFraction = CGFloat(rightCount) / CGFloat(count)
+              let rTop = right.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14)
+              let rBottom = right.bottomAnchor.constraint(equalTo: self.container.bottomAnchor)
+              let lTop = left.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14)
+              let lBottom = left.bottomAnchor.constraint(equalTo: self.container.bottomAnchor)
+              rTop.priority = .defaultHigh
+              rBottom.priority = .defaultHigh
+              lTop.priority = .defaultHigh
+              lBottom.priority = .defaultHigh
               NSLayoutConstraint.activate([
                 right.trailingAnchor.constraint(equalTo: self.container.trailingAnchor, constant: -rightInset),
-                right.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
-                right.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
+                rTop,
+                rBottom,
                 right.widthAnchor.constraint(equalTo: self.container.widthAnchor, multiplier: rightFraction),
                 left.leadingAnchor.constraint(equalTo: self.container.leadingAnchor, constant: leftInset),
                 left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing),
-                left.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
-                left.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
+                lTop,
+                lBottom,
               ])
             } else {
+              let rTop = right.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14)
+              let rBottom = right.bottomAnchor.constraint(equalTo: self.container.bottomAnchor)
+              let lTop = left.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14)
+              let lBottom = left.bottomAnchor.constraint(equalTo: self.container.bottomAnchor)
+              rTop.priority = .defaultHigh
+              rBottom.priority = .defaultHigh
+              lTop.priority = .defaultHigh
+              lBottom.priority = .defaultHigh
               NSLayoutConstraint.activate([
                 right.trailingAnchor.constraint(equalTo: self.container.trailingAnchor, constant: -rightInset),
-                right.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
-                right.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
+                rTop,
+                rBottom,
                 right.widthAnchor.constraint(equalToConstant: adjustedRightWidth),
                 left.leadingAnchor.constraint(equalTo: self.container.leadingAnchor, constant: leftInset),
-                left.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
-                left.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
+                lTop,
+                lBottom,
                 left.widthAnchor.constraint(equalToConstant: adjustedLeftWidth),
                 left.trailingAnchor.constraint(lessThanOrEqualTo: right.leadingAnchor, constant: -spacing),
               ])
@@ -742,11 +782,15 @@ channel.setMethodCallHandler { [weak self] call, result in
             bar.items = buildItems(0..<count)
             if let items = bar.items, selectedIndex >= 0, selectedIndex < items.count { bar.selectedItem = items[selectedIndex] }
             self.container.addSubview(bar)
+            let barTop = bar.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14)
+            let barBottom = bar.bottomAnchor.constraint(equalTo: self.container.bottomAnchor)
+            barTop.priority = .defaultHigh
+            barBottom.priority = .defaultHigh
             NSLayoutConstraint.activate([
               bar.leadingAnchor.constraint(equalTo: self.container.leadingAnchor),
               bar.trailingAnchor.constraint(equalTo: self.container.trailingAnchor),
-              bar.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14),
-              bar.bottomAnchor.constraint(equalTo: self.container.bottomAnchor),
+              barTop,
+              barBottom,
             ])
             // Force layout update for background and text rendering on iOS < 16
             // Re-assign items after layout to ensure labels render properly

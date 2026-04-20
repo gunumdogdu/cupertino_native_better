@@ -1,3 +1,48 @@
+## 1.4.3
+
+### Bug Fixes
+
+- **Fixed #34** — CNButton glass capsule not stretching with its parent frame; icon overflowing a small pill when wrapped in `SizedBox` / `Expanded`. Regression introduced in v1.4.0.
+  - Root cause: the v1.4.0 "feat: fixes" commit added always-on `container.clipsToBounds = true` + `uiButton.clipsToBounds = true` (plus layer shadow/background clearing) across every iOS 26 glass widget as part of the #29 halo containment. `UIButton.Configuration.glass()` renders its capsule via an internal background subview whose visual size includes a soft-edge glow extending slightly beyond the button's layer bounds — the always-on clipping was cropping that glow AND preventing the capsule from growing with a stretched frame.
+  - Fix: reverted all the always-on clipping across `CNButton`, `CNPopupMenuButton`, `CNFloatingIsland`, `CNGlassButtonGroup`, `LiquidGlassContainer`, `CNSearchBar`. Containers are unclipped at rest, so the glass capsule renders its full soft-edge glow and stretches properly with `SizedBox` / `Expanded` / `Container(width: ...)`.
+
+- **Fixed #29 (fully)** — the original halo-during-route-transition artifact is now resolved via a **dynamic** containment pattern instead of always-on clipping. This also catches the popup/sheet bleed cases that the v1.4.0 fix didn't cover (popup routes, persistent bottom sheets).
+  - New native method `setTransitioning(active:)` on `CNButton`, `CNPopupMenuButton`, `CNFloatingIsland`, `CNGlassButtonGroup`, `LiquidGlassContainer`, `CNSearchBar`, and the regular `CNTabBar` variant. When active, it applies the halo-containment clipping + shadow/background clearing; when inactive, it reverts.
+  - Dart side listens to two signals and calls `setTransitioning(true)` when either fires:
+    1. `ModalRoute.secondaryAnimation` — catches `CupertinoPageRoute` / `MaterialPageRoute` forward/reverse transitions.
+    2. A new `CNTabBarRouteObserver.anyModalDepth` counter that tracks any `PopupRoute` / Sheet / Popup / Dialog-named route (`showCupertinoSheet`, `showCupertinoModalPopup`, `showModalBottomSheet`, `DialogRoute`, etc.).
+  - For the split-search variant of `CNTabBar` (whose native container is intentionally unclipped so the floating search orb can render above the bar), the auto-hide trigger is broadened to `anyModalDepth` so popups over a search-enabled tab bar no longer leak shadow through the sheet's top edge.
+
+### New
+
+- **`CNTabBarRouteObserver.anyModalDepth`** (read-only `ValueListenable<int>`) — broader counter than the existing `modalDepth`. Tracks every modal-like route (all `PopupRoute`s plus any route whose runtime type contains `Sheet` / `Popup` / `Dialog`). Used internally by the glass widgets for halo-containment activation.
+
+- **`CNTabBarRouteObserver.markAnyModalActive()` / `markAnyModalInactive()`** — public manual API for non-route overlays that `NavigatorObserver` can't see, notably `Scaffold.showBottomSheet` (persistent bottom sheet anchored to `ScaffoldState`, not the Navigator):
+  ```dart
+  final controller = Scaffold.of(context).showBottomSheet(...);
+  CNTabBarRouteObserver.markAnyModalActive();
+  controller.closed.whenComplete(CNTabBarRouteObserver.markAnyModalInactive);
+  ```
+
+### Example app
+
+- **Added**: `Testing → CNButton modal halo test` — stretched CNButton variants + 4 sheet types (`showCupertinoSheet`, `showCupertinoModalPopup`, `showModalBottomSheet`, `showBottomSheet`) for verifying halo containment across every overlay variant.
+- **Added**: `Testing → Glass widgets modal halo test` — same 4-sheet matrix against `CNPopupMenuButton`, `CNGlassButtonGroup`, `LiquidGlassContainer`, `CNSearchBar`, `CNFloatingIsland`.
+- **Updated**: `Stack+Positioned tab bar` and `Split-search clip repro` screens now include all 4 sheet types for regression coverage.
+- **Added**: `DefaultMaterialLocalizations.delegate` to the root `CupertinoApp` so demos can mix `showModalBottomSheet` (Material) with Cupertino routes without adding `flutter_localizations`.
+
+### Behavioural details
+
+- At rest, glass widgets render the full iOS 26 Liquid Glass capsule (including the soft-edge glow that extends slightly beyond the view's layer bounds) and stretch to fill bounded parent frames. This matches native iOS behaviour.
+- During a route transition or while a modal/sheet/popup/dialog is above the widget's route, the native container is clipped and layer shadows are suppressed — the visible change is essentially invisible (the widget's visible frame is unchanged), but Flutter snapshots of the outgoing/incoming page no longer include a halo that extends past the platform-view bounds.
+- `CNTabBar` without `searchItem` still uses the narrow Sheet-only `modalDepth` heuristic for its auto-hide (avoids the recreate-and-restore flash on quick action-sheet popups). `CNTabBar` with `searchItem` uses the broader `anyModalDepth` because its container can't be clipped (the floating search orb needs to render above the bar's top edge).
+
+### Pana
+
+- 160/160
+
+---
+
 ## 1.4.2
 
 ### New

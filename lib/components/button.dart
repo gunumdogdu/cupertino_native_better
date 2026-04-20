@@ -20,6 +20,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
+import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// Configuration for CNButton with default values.
 class CNButtonConfig {
@@ -233,13 +234,34 @@ class _CNButtonState extends State<CNButton> {
   Offset? _downPosition;
   bool _pressed = false;
 
+  // Issue #29: while the enclosing route is animating in/out OR while
+  // any modal/sheet/popup/dialog is presented over it, toggle native-
+  // side halo containment (container + button clipsToBounds + shadow/
+  // background clearing) so the iOS 26 Liquid Glass capsule can't leak
+  // outside the platform view's bounds through the sheet's top edge or
+  // through the incoming/outgoing page snapshot. At rest (no transition,
+  // no modal) the containment is OFF so the capsule can render its full
+  // soft-edge glow and grow with a stretched parent frame.
+  Animation<double>? _secondaryRouteAnim;
+  bool _modalAbove = false;
+
   bool get _isDark => ThemeHelper.isDark(context);
 
   Color? get _effectiveTint =>
       widget.tint ?? ThemeHelper.getPrimaryColor(context);
 
   @override
+  void initState() {
+    super.initState();
+    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
+    _onAnyModalDepthChanged();
+  }
+
+  @override
   void dispose() {
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = null;
+    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _channel?.setMethodCallHandler(null);
     super.dispose();
   }
@@ -253,8 +275,53 @@ class _CNButtonState extends State<CNButton> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
     _syncPropsToNativeIfNeeded();
+  }
+
+  void _attachSecondaryRouteAnim() {
+    final route = ModalRoute.of(context);
+    final newAnim = route?.secondaryAnimation;
+    if (identical(newAnim, _secondaryRouteAnim)) return;
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = newAnim;
+    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _onSecondaryRouteAnimChanged();
+  }
+
+  void _onSecondaryRouteAnimChanged() {
+    final anim = _secondaryRouteAnim;
+    if (anim == null) return;
+    final isAnimating =
+        anim.status == AnimationStatus.forward ||
+        anim.status == AnimationStatus.reverse;
+    _pushContainmentIfNeeded(animating: isAnimating, modalAbove: _modalAbove);
+  }
+
+  void _onAnyModalDepthChanged() {
+    final above = CNTabBarRouteObserver.anyModalDepth.value > 0;
+    _pushContainmentIfNeeded(
+      animating:
+          _secondaryRouteAnim?.status == AnimationStatus.forward ||
+          _secondaryRouteAnim?.status == AnimationStatus.reverse,
+      modalAbove: above,
+    );
+  }
+
+  void _pushContainmentIfNeeded({
+    required bool animating,
+    required bool modalAbove,
+  }) {
+    final next = animating || modalAbove;
+    _modalAbove = modalAbove;
+    final ch = _channel;
+    if (ch == null) return;
+    try {
+      ch.invokeMethod('setTransitioning', {'active': next});
+    } catch (_) {
+      // MissingPluginException during hot reload / view recreation — ignore.
+    }
   }
 
   @override

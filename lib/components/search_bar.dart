@@ -8,6 +8,7 @@ import '../style/glass_effect.dart';
 import '../style/sf_symbol.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
+import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// Controller for imperatively managing [CNSearchBar] state.
 class CNSearchBarController {
@@ -192,6 +193,10 @@ class _CNSearchBarState extends State<CNSearchBar>
   bool _isExpanded = false;
   String _searchText = '';
 
+  // Issue #29 halo containment via setTransitioning.
+  Animation<double>? _secondaryRouteAnim;
+  bool _modalAbove = false;
+
   CNSearchBarController get _controller =>
       widget.controller ?? (_internalController ??= CNSearchBarController());
 
@@ -220,15 +225,57 @@ class _CNSearchBarState extends State<CNSearchBar>
     if (_isExpanded) {
       _animationController.value = 1.0;
     }
+
+    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
+    _onAnyModalDepthChanged();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _attachSecondaryRouteAnim();
   }
 
   @override
   void dispose() {
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = null;
+    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _animationController.dispose();
     _textController.dispose();
     _focusNode.dispose();
     _controller._detach();
     super.dispose();
+  }
+
+  void _attachSecondaryRouteAnim() {
+    final route = ModalRoute.of(context);
+    final newAnim = route?.secondaryAnimation;
+    if (identical(newAnim, _secondaryRouteAnim)) return;
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = newAnim;
+    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _onSecondaryRouteAnimChanged();
+  }
+
+  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
+
+  void _onAnyModalDepthChanged() {
+    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
+    _pushContainmentIfNeeded();
+  }
+
+  void _pushContainmentIfNeeded() {
+    final anim = _secondaryRouteAnim;
+    final animating =
+        anim?.status == AnimationStatus.forward ||
+        anim?.status == AnimationStatus.reverse;
+    final active = animating || _modalAbove;
+    final ch = _channel;
+    if (ch == null) return;
+    try {
+      ch.invokeMethod('setTransitioning', {'active': active});
+    } catch (_) {}
   }
 
   void _onTextChanged() {
@@ -251,6 +298,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     _channel = ch;
     _controller._attach(ch);
     ch.setMethodCallHandler(_onMethodCall);
+    _pushContainmentIfNeeded();
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {

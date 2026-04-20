@@ -10,6 +10,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
+import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// Base type for entries in a [CNPopupMenuButton] menu.
 abstract class CNPopupMenuEntry {
@@ -186,9 +187,21 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
   Offset? _downPosition;
   bool _pressed = false;
 
+  // Issue #29 halo containment: clip native view while enclosing route is
+  // animating OR while any modal/sheet/popup is above it.
+  Animation<double>? _secondaryRouteAnim;
+  bool _modalAbove = false;
+
   bool get _isDark => ThemeHelper.isDark(context);
   Color? get _effectiveTint =>
       widget.tint ?? ThemeHelper.getPrimaryColor(context);
+
+  @override
+  void initState() {
+    super.initState();
+    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
+    _onAnyModalDepthChanged();
+  }
 
   @override
   void didUpdateWidget(covariant CNPopupMenuButton oldWidget) {
@@ -199,13 +212,49 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
   }
 
   @override
   void dispose() {
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = null;
+    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _channel?.setMethodCallHandler(null);
     super.dispose();
+  }
+
+  void _attachSecondaryRouteAnim() {
+    final route = ModalRoute.of(context);
+    final newAnim = route?.secondaryAnimation;
+    if (identical(newAnim, _secondaryRouteAnim)) return;
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = newAnim;
+    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _onSecondaryRouteAnimChanged();
+  }
+
+  void _onSecondaryRouteAnimChanged() {
+    _pushContainmentIfNeeded();
+  }
+
+  void _onAnyModalDepthChanged() {
+    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
+    _pushContainmentIfNeeded();
+  }
+
+  void _pushContainmentIfNeeded() {
+    final anim = _secondaryRouteAnim;
+    final animating =
+        anim?.status == AnimationStatus.forward ||
+        anim?.status == AnimationStatus.reverse;
+    final active = animating || _modalAbove;
+    final ch = _channel;
+    if (ch == null) return;
+    try {
+      ch.invokeMethod('setTransitioning', {'active': active});
+    } catch (_) {}
   }
 
   @override

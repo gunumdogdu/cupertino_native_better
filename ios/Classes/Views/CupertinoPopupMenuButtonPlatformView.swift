@@ -108,20 +108,9 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     super.init()
 
     container.backgroundColor = .clear
-    container.isOpaque = false
-    // Issue #29: clip + clear shadow sources so iOS 26 Liquid Glass effects
-    // do not render a halo outside the platform-view bounds during route
-    // transitions (same containment pattern as Issue #2).
-    container.clipsToBounds = true
-    container.layer.backgroundColor = UIColor.clear.cgColor
-    container.layer.shadowOpacity = 0
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     button.translatesAutoresizingMaskIntoConstraints = false
-    button.clipsToBounds = true
-    button.layer.shadowOpacity = 0
-    button.layer.backgroundColor = UIColor.clear.cgColor
-    button.backgroundColor = .clear
     // Choose a visible default tint if none provided
     if let t = tint { button.tintColor = t }
     else if #available(iOS 13.0, *) { button.tintColor = .label }
@@ -202,6 +191,14 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
+      case "setTransitioning":
+        // Issue #29 follow-up: apply halo-containment clipping only while
+        // the enclosing route is animating OR while a modal/sheet/popup
+        // is presented on top. At rest the container is unclipped so the
+        // glass capsule renders its full soft-edge glow.
+        let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
+        self.applyTransitionContainment(active)
+        result(nil)
       case "getIntrinsicSize":
         let size = self.button.intrinsicContentSize
         result(["width": Double(size.width), "height": Double(size.height)])
@@ -286,6 +283,24 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  /// Toggle Issue #29 halo containment based on whether the enclosing
+  /// route is animating or a modal is presented on top.
+  private func applyTransitionContainment(_ active: Bool) {
+    if active {
+      container.isOpaque = false
+      container.clipsToBounds = true
+      container.layer.backgroundColor = UIColor.clear.cgColor
+      container.layer.shadowOpacity = 0
+      button.clipsToBounds = true
+      button.layer.shadowOpacity = 0
+      button.layer.backgroundColor = UIColor.clear.cgColor
+      button.backgroundColor = .clear
+    } else {
+      container.clipsToBounds = false
+      button.clipsToBounds = false
+    }
+  }
 
   private func rebuildMenu(defaultSizes: [Any]? = nil, defaultColors: [Any]? = nil) {
     // iOS 14+ native menu

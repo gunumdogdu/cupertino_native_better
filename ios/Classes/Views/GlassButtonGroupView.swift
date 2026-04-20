@@ -230,17 +230,9 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     // Flutter manages the frame position and size
     self.container = UIView(frame: frame)
     self.container.backgroundColor = .clear
-    self.container.isOpaque = false
-    // Issue #29: clip the container so the iOS 26 Liquid Glass material
-    // does not render a halo outside the platform-view bounds during route
-    // transitions. The UIKit badges (added in `updateBadgePositions`) sit
-    // at y=0 inside the container, so clipping does not crop their tops.
-    // Their X position math is a separate pre-existing layout issue (the
-    // calculation assumes buttons span container width, but the SwiftUI
-    // HStack is centered) — that is intentionally not fixed here.
-    self.container.clipsToBounds = true
-    self.container.layer.backgroundColor = UIColor.clear.cgColor
-    self.container.layer.shadowOpacity = 0
+
+    // Ensure container doesn't clip content (Flutter's ClipRect handles clipping)
+    self.container.clipsToBounds = false
     // Remove any default layout margins that could cause offset
     if #available(iOS 11.0, *) {
       self.container.insetsLayoutMarginsFromSafeArea = false
@@ -431,8 +423,6 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     self.hostingController = UIHostingController(rootView: swiftUIView)
 
     self.hostingController.view.backgroundColor = .clear
-    self.hostingController.view.isOpaque = false
-    self.hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
     // Configure hosting controller to ignore safe areas and remove any padding
     if #available(iOS 11.0, *) {
       self.hostingController.view.insetsLayoutMarginsFromSafeArea = false
@@ -517,9 +507,30 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
         } else {
           result(FlutterError(code: "bad_args", message: "Missing buttons", details: nil))
         }
+      case "setTransitioning":
+        let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
+        self.applyTransitionContainment(active)
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  /// Toggle Issue #29 halo containment on container + hosting view.
+  private func applyTransitionContainment(_ active: Bool) {
+    if active {
+      container.isOpaque = false
+      container.clipsToBounds = true
+      container.layer.backgroundColor = UIColor.clear.cgColor
+      container.layer.shadowOpacity = 0
+      hostingController.view.clipsToBounds = true
+      hostingController.view.isOpaque = false
+      hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
+      hostingController.view.layer.shadowOpacity = 0
+    } else {
+      container.clipsToBounds = false
+      hostingController.view.clipsToBounds = false
     }
   }
   

@@ -113,6 +113,7 @@ class CNTabBar extends StatefulWidget {
     this.labelFontFamily,
     this.labelFontSize,
     this.autoHideOnModal = true,
+    this.autoHideOnPageTransition = true,
   }) : assert(items.length >= 2, 'Tab bar must have at least 2 items'),
        assert(
          items.length <= 5,
@@ -237,6 +238,31 @@ class CNTabBar extends StatefulWidget {
   /// hit the z-order issue).
   final bool autoHideOnModal;
 
+  /// Whether the tab bar automatically hides itself while the enclosing
+  /// route is animating in or out (e.g. during a `CupertinoPageRoute`
+  /// push or pop).
+  ///
+  /// When a page containing a `UiKitView` is animated by Flutter, the
+  /// engine must composite the live native layer (UITabBar) on top of
+  /// Flutter's snapshot of the route. During the animation window, the
+  /// `PlatformViewLayer` overlay can occlude Flutter content elsewhere on
+  /// the page — most visibly, parts of header/text widgets become
+  /// invisible mid-transition (Issue #29 follow-up). This is a Flutter
+  /// hybrid-composition limitation and not something the Swift side can
+  /// fix.
+  ///
+  /// When this is `true` (default), `CNTabBar` listens to its enclosing
+  /// `ModalRoute.secondaryAnimation` and renders an empty `SizedBox` of
+  /// the same height while the route is animating (`forward` or
+  /// `reverse`). Once the animation settles (`completed`/`dismissed`),
+  /// the platform view is restored. With no live `UiKitView` on the page
+  /// during the slide, Flutter falls back to its normal compositing path
+  /// and the occlusion artifact disappears.
+  ///
+  /// Set to `false` if you want the bar to stay visible during route
+  /// transitions (rare; will reintroduce the Flutter overlay artifact).
+  final bool autoHideOnPageTransition;
+
   @override
   State<CNTabBar> createState() => _CNTabBarState();
 }
@@ -273,6 +299,14 @@ class _CNTabBarState extends State<CNTabBar> {
   // with Flutter-rendered modal content (notably Material TextFields).
   bool _modalUp = false;
 
+  // Issue #29 follow-up: auto-hide while the enclosing route is animating
+  // in/out. Flutter's PlatformViewLayer overlay occludes Flutter content
+  // elsewhere on the page during the transition window; swapping the
+  // platform view for a SizedBox during forward/reverse status makes the
+  // page Flutter-only for the slide, eliminating the artifact.
+  bool _pageTransitioning = false;
+  Animation<double>? _secondaryRouteAnim;
+
   bool get _isDark => ThemeHelper.isDark(context);
   Color? get _effectiveTint =>
       widget.tint ?? ThemeHelper.getPrimaryColor(context);
@@ -300,17 +334,53 @@ class _CNTabBarState extends State<CNTabBar> {
       PlatformViewGuard.readyNotifier.addListener(_onPlatformViewGuardReady);
     }
     if (widget.autoHideOnModal) {
-      CNTabBarRouteObserver.modalDepth.addListener(_onModalDepthChanged);
+      // Split-search variant (iOS 26+) uses an UNCLIPPED native container
+      // so the floating search orb can render above the bar's top edge.
+      // That lets the bar's drop shadow bleed through popup-type sheets
+      // (showCupertinoModalPopup, showModalBottomSheet, showBottomSheet)
+      // which the narrow Sheet-only `modalDepth` heuristic doesn't catch.
+      // For the search variant, listen to the broader `anyModalDepth`
+      // instead so we hide for any modal-like overlay. Regular tab bar
+      // keeps the narrow heuristic (avoids flash on small popups).
+      final depthListenable = _hasSearch
+          ? CNTabBarRouteObserver.anyModalDepth
+          : CNTabBarRouteObserver.modalDepth;
+      depthListenable.addListener(_onModalDepthChanged);
       _onModalDepthChanged();
     }
     _scheduleNativePreparation();
   }
 
   void _onModalDepthChanged() {
-    final shouldHide = CNTabBarRouteObserver.modalDepth.value > 0;
+    final depth = _hasSearch
+        ? CNTabBarRouteObserver.anyModalDepth.value
+        : CNTabBarRouteObserver.modalDepth.value;
+    final shouldHide = depth > 0;
     if (shouldHide != _modalUp && mounted) {
       setState(() => _modalUp = shouldHide);
     }
+  }
+
+  void _onSecondaryRouteAnimChanged() {
+    final anim = _secondaryRouteAnim;
+    if (anim == null) return;
+    final isAnimating =
+        anim.status == AnimationStatus.forward ||
+        anim.status == AnimationStatus.reverse;
+    if (isAnimating != _pageTransitioning && mounted) {
+      setState(() => _pageTransitioning = isAnimating);
+    }
+  }
+
+  void _attachSecondaryRouteAnim() {
+    if (!widget.autoHideOnPageTransition) return;
+    final route = ModalRoute.of(context);
+    final newAnim = route?.secondaryAnimation;
+    if (identical(newAnim, _secondaryRouteAnim)) return;
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = newAnim;
+    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _onSecondaryRouteAnimChanged();
   }
 
   @override
@@ -325,6 +395,17 @@ class _CNTabBarState extends State<CNTabBar> {
     if (_hasSearch && _searchFocusNode == null) {
       _searchFocusNode = FocusNode();
     }
+    if (oldWidget.autoHideOnPageTransition != widget.autoHideOnPageTransition) {
+      if (widget.autoHideOnPageTransition) {
+        _attachSecondaryRouteAnim();
+      } else {
+        _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+        _secondaryRouteAnim = null;
+        if (_pageTransitioning) {
+          _pageTransitioning = false;
+        }
+      }
+    }
     _syncPropsToNativeIfNeeded();
   }
 
@@ -333,7 +414,14 @@ class _CNTabBarState extends State<CNTabBar> {
     _prepGeneration++;
     PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     widget.searchController?.removeListener(_onSearchControllerChanged);
+    // Remove from both to be safe — removeListener is a no-op if we never
+    // added to one of them (the choice depends on `_hasSearch` at attach
+    // time; searchItem could in theory be added/removed between attach and
+    // dispose).
     CNTabBarRouteObserver.modalDepth.removeListener(_onModalDepthChanged);
+    CNTabBarRouteObserver.anyModalDepth.removeListener(_onModalDepthChanged);
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = null;
     _searchFocusNode?.dispose();
     _channel?.setMethodCallHandler(null);
     _channel = null;
@@ -429,7 +517,14 @@ class _CNTabBarState extends State<CNTabBar> {
     // Issue #31: when a modal/sheet is presented over our route, render
     // an empty placeholder of the same size instead of the platform view.
     // Restores when the modal is dismissed.
-    if (_modalUp && widget.autoHideOnModal) {
+    //
+    // Issue #29 follow-up: same swap while the route itself is animating
+    // in/out, so Flutter's PlatformViewLayer overlay doesn't occlude
+    // header/text widgets elsewhere on the page during the slide.
+    final hideForModal = _modalUp && widget.autoHideOnModal;
+    final hideForTransition =
+        _pageTransitioning && widget.autoHideOnPageTransition;
+    if (hideForModal || hideForTransition) {
       final h = widget.height ?? _intrinsicHeight ?? 50.0;
       return SizedBox(height: h);
     }
@@ -940,6 +1035,7 @@ class _CNTabBarState extends State<CNTabBar> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
     _syncPropsToNativeIfNeeded();
   }
@@ -1383,6 +1479,39 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   /// Read-only listenable of the current modal/sheet depth.
   static ValueListenable<int> get modalDepth => _modalDepth;
 
+  /// Broader notifier that also counts popups (action sheets, bottom
+  /// sheets, dialogs) — anything that sits above a route as a ModalRoute/
+  /// PopupRoute. Used by [CNButton] (and other iOS 26 glass widgets) to
+  /// enable halo-containment clipping while any kind of sheet/popup is
+  /// on top, not just full-screen "Sheet" routes.
+  static final ValueNotifier<int> _anyModalDepth = ValueNotifier<int>(0);
+
+  /// Read-only listenable of the current sheet/popup/dialog depth (any
+  /// modal-like route, not just full-screen sheets).
+  static ValueListenable<int> get anyModalDepth => _anyModalDepth;
+
+  /// Manually bump [anyModalDepth] up by one. Pair with
+  /// [markAnyModalInactive] once the modal is dismissed. Useful for
+  /// non-route-based overlays that `NavigatorObserver` cannot see —
+  /// notably `Scaffold.showBottomSheet` (persistent bottom sheets),
+  /// which are anchored to Scaffold state instead of the Navigator.
+  ///
+  /// Example:
+  /// ```dart
+  /// final controller = Scaffold.of(context).showBottomSheet(...);
+  /// CNTabBarRouteObserver.markAnyModalActive();
+  /// controller.closed.whenComplete(CNTabBarRouteObserver.markAnyModalInactive);
+  /// ```
+  static void markAnyModalActive() {
+    _anyModalDepth.value = _anyModalDepth.value + 1;
+  }
+
+  /// Pair with [markAnyModalActive]. Clamps at zero.
+  static void markAnyModalInactive() {
+    final next = _anyModalDepth.value - 1;
+    _anyModalDepth.value = next < 0 ? 0 : next;
+  }
+
   /// Heuristic for "is this route a full-screen-ish sheet that should
   /// trigger tab-bar auto-hide?". Intentionally narrow: only matches
   /// routes whose runtime type name contains `Sheet`. This catches the
@@ -1406,35 +1535,55 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     return route.runtimeType.toString().contains('Sheet');
   }
 
+  /// Broader predicate: matches any modal-like route that visually covers
+  /// (fully or partially) the underlying page. Used to drive the halo-
+  /// containment counter for non-tab-bar glass widgets.
+  bool _isAnyModal(Route<dynamic> route) {
+    if (route is PopupRoute) return true;
+    final name = route.runtimeType.toString();
+    return name.contains('Sheet') ||
+        name.contains('Popup') ||
+        name.contains('Dialog');
+  }
+
   void _bumpUp(Route<dynamic> route) {
-    _modalDepth.value = _modalDepth.value + 1;
+    if (_isModal(route)) {
+      _modalDepth.value = _modalDepth.value + 1;
+    }
+    if (_isAnyModal(route)) {
+      _anyModalDepth.value = _anyModalDepth.value + 1;
+    }
   }
 
   void _bumpDown(Route<dynamic> route) {
-    final next = _modalDepth.value - 1;
-    _modalDepth.value = next < 0 ? 0 : next;
+    if (_isModal(route)) {
+      final next = _modalDepth.value - 1;
+      _modalDepth.value = next < 0 ? 0 : next;
+    }
+    if (_isAnyModal(route)) {
+      final next = _anyModalDepth.value - 1;
+      _anyModalDepth.value = next < 0 ? 0 : next;
+    }
   }
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (_isModal(route)) _bumpUp(route);
+    _bumpUp(route);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (_isModal(route)) _bumpDown(route);
+    _bumpDown(route);
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (_isModal(route)) _bumpDown(route);
+    _bumpDown(route);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    final wasModal = oldRoute != null && _isModal(oldRoute);
-    final isNow = newRoute != null && _isModal(newRoute);
-    if (wasModal && !isNow) _bumpDown(oldRoute);
-    if (!wasModal && isNow) _bumpUp(newRoute);
+    if (oldRoute != null) _bumpDown(oldRoute);
+    if (newRoute != null) _bumpUp(newRoute);
   }
 }

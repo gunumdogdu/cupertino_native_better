@@ -97,13 +97,6 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
 
     self.isInteractive = interaction
     container.backgroundColor = .clear
-    container.isOpaque = false
-    // Issue #29: clip + clear all shadow sources so the platform view never
-    // renders anything outside its tight bounds during route transitions.
-    // Same pattern as Issue #2 (tab-bar shadow leak).
-    container.clipsToBounds = true
-    container.layer.backgroundColor = UIColor.clear.cgColor
-    container.layer.shadowOpacity = 0
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     // Create final image first (needed for both SwiftUI and UIKit paths)
@@ -233,13 +226,6 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let t = tint { uiButton.tintColor = t }
       else if #available(iOS 13.0, *) { uiButton.tintColor = .label }
 
-      // Issue #29: same shadow-containment as the container, so the button
-      // itself can't render a halo outside its frame during transitions.
-      uiButton.clipsToBounds = true
-      uiButton.layer.shadowOpacity = 0
-      uiButton.layer.backgroundColor = UIColor.clear.cgColor
-      uiButton.backgroundColor = .clear
-
       container.addSubview(uiButton)
       NSLayoutConstraint.activate([
         uiButton.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -247,7 +233,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         uiButton.topAnchor.constraint(equalTo: container.topAnchor),
         uiButton.bottomAnchor.constraint(equalTo: container.bottomAnchor),
       ])
-
+      
       applyButtonStyle(buttonStyle: buttonStyle, round: makeRound)
       currentButtonStyle = buttonStyle
       uiButton.isEnabled = enabled
@@ -309,6 +295,17 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
+      case "setTransitioning":
+        // Issue #29: apply halo-containment clipping ONLY while the
+        // enclosing route is animating. At rest the container is
+        // unclipped so `UIButton.Configuration.glass()` can render its
+        // full capsule (and stretch with a bounded parent frame); during
+        // forward/reverse route animation we clip + suppress shadows so
+        // the liquid-glass halo can't bleed outside the platform view's
+        // bounds on the outgoing/incoming page snapshot.
+        let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
+        self.applyTransitionContainment(active)
+        result(nil)
       case "getIntrinsicSize":
         if usesSwiftUI {
           // For SwiftUI buttons, return estimated size
@@ -549,6 +546,38 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
 
   func view() -> UIView { container }
 
+  /// Toggle Issue #29 halo containment based on whether the enclosing
+  /// Flutter route is currently animating. See the `setTransitioning`
+  /// method call handler for rationale.
+  private func applyTransitionContainment(_ active: Bool) {
+    if active {
+      container.isOpaque = false
+      container.clipsToBounds = true
+      container.layer.backgroundColor = UIColor.clear.cgColor
+      container.layer.shadowOpacity = 0
+      if let btn = self.button {
+        btn.clipsToBounds = true
+        btn.layer.shadowOpacity = 0
+        btn.layer.backgroundColor = UIColor.clear.cgColor
+        btn.backgroundColor = .clear
+      }
+      if let hv = self.hostingController?.view {
+        hv.clipsToBounds = true
+        hv.isOpaque = false
+        hv.layer.backgroundColor = UIColor.clear.cgColor
+        hv.layer.shadowOpacity = 0
+      }
+    } else {
+      container.clipsToBounds = false
+      if let btn = self.button {
+        btn.clipsToBounds = false
+      }
+      if let hv = self.hostingController?.view {
+        hv.clipsToBounds = false
+      }
+    }
+  }
+
   @available(iOS 26.0, *)
   private func setupSwiftUIButton(
     title: String?,
@@ -654,11 +683,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     )
     
     let hostingController = UIHostingController(rootView: AnyView(swiftUIButton))
-    // Transparent hosting view so the pre-SwiftUI-render snapshot captured by
-    // iOS route transitions does not show a white placeholder (Issue #29).
     hostingController.view.backgroundColor = UIColor.clear
-    hostingController.view.isOpaque = false
-    hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
     self.hostingController = hostingController
     
     hostingController.view.translatesAutoresizingMaskIntoConstraints = false

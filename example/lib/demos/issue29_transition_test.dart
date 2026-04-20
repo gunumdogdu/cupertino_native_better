@@ -2,14 +2,19 @@ import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-/// Issue #29 Test - Exact repro from the issue
+void main() {
+  runApp(
+    const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Issue29TransitionTestPage(),
+    ),
+  );
+}
+
 class Issue29TransitionTestPage extends StatefulWidget {
   final bool isSecondPage;
 
-  const Issue29TransitionTestPage({
-    this.isSecondPage = false,
-    super.key,
-  });
+  const Issue29TransitionTestPage({this.isSecondPage = false, super.key});
 
   static Route<void> route({bool isSecondPage = false}) {
     return _SlowCupertinoPageRoute(
@@ -23,11 +28,12 @@ class Issue29TransitionTestPage extends StatefulWidget {
 }
 
 class _Issue29TransitionTestPageState extends State<Issue29TransitionTestPage> {
+  int _tabIndex = 0;
+
   void _openNextPage() {
-    Navigator.of(context).push(
-      Issue29TransitionTestPage.route(
-          isSecondPage: !widget.isSecondPage),
-    );
+    Navigator.of(
+      context,
+    ).push(Issue29TransitionTestPage.route(isSecondPage: !widget.isSecondPage));
   }
 
   @override
@@ -41,8 +47,7 @@ class _Issue29TransitionTestPageState extends State<Issue29TransitionTestPage> {
         child: Column(
           children: [
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   if (widget.isSecondPage)
@@ -74,6 +79,21 @@ class _Issue29TransitionTestPageState extends State<Issue29TransitionTestPage> {
               ),
             ),
             const Spacer(),
+            if (!widget.isSecondPage)
+              CNTabBar(
+                items: const [
+                  CNTabBarItem(label: 'Home', icon: CNSymbol('house')),
+                  CNTabBarItem(
+                    label: 'Settings',
+                    icon: CNSymbol('gearshape.fill'),
+                  ),
+                  CNTabBarItem(label: 'Profile', icon: CNSymbol('person.fill')),
+                ],
+                height: 100,
+                currentIndex: _tabIndex,
+                onTap: (index) => setState(() => _tabIndex = index),
+                tint: Colors.blue,
+              ),
           ],
         ),
       ),

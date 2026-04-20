@@ -11,6 +11,7 @@ import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import 'button.dart';
 import 'popup_menu_button.dart';
+import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// A group of buttons that can be rendered together for proper Liquid Glass blending effects.
 ///
@@ -109,13 +110,68 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
   double? _lastSpacing;
   double? _lastSpacingForGlass;
 
+  // Issue #29 halo containment via setTransitioning.
+  Animation<double>? _secondaryRouteAnim;
+  bool _modalAbove = false;
+
   /// Whether we're using widget mode (backward compatibility).
   bool get _usingWidgets => widget._buttonWidgets != null;
+
+  @override
+  void initState() {
+    super.initState();
+    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
+    _onAnyModalDepthChanged();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _attachSecondaryRouteAnim();
+  }
 
   @override
   void didUpdateWidget(covariant CNGlassButtonGroup oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncButtonsToNativeIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = null;
+    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
+    super.dispose();
+  }
+
+  void _attachSecondaryRouteAnim() {
+    final route = ModalRoute.of(context);
+    final newAnim = route?.secondaryAnimation;
+    if (identical(newAnim, _secondaryRouteAnim)) return;
+    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim = newAnim;
+    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _onSecondaryRouteAnimChanged();
+  }
+
+  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
+
+  void _onAnyModalDepthChanged() {
+    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
+    _pushContainmentIfNeeded();
+  }
+
+  void _pushContainmentIfNeeded() {
+    final anim = _secondaryRouteAnim;
+    final animating =
+        anim?.status == AnimationStatus.forward ||
+        anim?.status == AnimationStatus.reverse;
+    final active = animating || _modalAbove;
+    final ch = _channel;
+    if (ch == null) return;
+    try {
+      ch.invokeMethod('setTransitioning', {'active': active});
+    } catch (_) {}
   }
 
   @override
@@ -237,6 +293,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
   void _onCreated(int id) {
     final channel = MethodChannel('CupertinoNativeGlassButtonGroup_$id');
     _channel = channel;
+    _pushContainmentIfNeeded();
     channel.setMethodCallHandler((call) async {
       if (call.method == 'buttonPressed') {
         final args = call.arguments as Map?;

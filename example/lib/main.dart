@@ -1,5 +1,6 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 import 'demos/slider.dart';
 import 'demos/switch.dart';
 import 'demos/segmented_control.dart';
@@ -16,6 +17,8 @@ import 'demos/bottom_nav_indexed_test.dart';
 import 'demos/bottom_nav_custom_icons_test.dart';
 import 'demos/issue2_modal_shadow_test.dart';
 import 'demos/issue28_checked_state_test.dart';
+import 'demos/cnbutton_modal_halo_test.dart';
+import 'demos/glass_widgets_modal_halo_test.dart';
 import 'demos/issue29_artifact_test.dart';
 import 'demos/issue29_transition_test.dart';
 import 'demos/issue31_no_search_test.dart';
@@ -62,6 +65,15 @@ class _MyAppState extends State<MyApp> {
       // and auto-hide its native UITabBar to avoid z-order conflicts with
       // Flutter-rendered modal content (e.g. Material TextFields).
       navigatorObservers: [CNTabBarRouteObserver()],
+      // Provide Material + Cupertino localizations at the root so demos can
+      // freely mix `showModalBottomSheet` (Material) with Cupertino routes
+      // without adding the `flutter_localizations` package. Default English
+      // strings are sufficient for the demo app.
+      localizationsDelegates: const [
+        DefaultMaterialLocalizations.delegate,
+        DefaultCupertinoLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+      ],
       theme: CupertinoThemeData(
         brightness: _isDarkMode ? Brightness.dark : Brightness.light,
         primaryColor: _accentColor,
@@ -235,7 +247,9 @@ class HomePage extends StatelessWidget {
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
-                    CupertinoPageRoute(builder: (_) => const NativeTabBarDemoPage()),
+                    CupertinoPageRoute(
+                      builder: (_) => const NativeTabBarDemoPage(),
+                    ),
                   );
                 },
               ),
@@ -291,13 +305,44 @@ class HomePage extends StatelessWidget {
               CupertinoListTile(
                 title: Text('#29: Transition Artifact'),
                 leading: CNIcon(
-                  symbol: CNSymbol('rectangle.on.rectangle', color: accentColor),
+                  symbol: CNSymbol(
+                    'rectangle.on.rectangle',
+                    color: accentColor,
+                  ),
                 ),
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute(
                       builder: (_) => const Issue29TransitionTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('CNButton modal halo test'),
+                leading: CNIcon(
+                  symbol: CNSymbol('square.on.square', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const CNButtonModalHaloTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('Glass widgets modal halo test'),
+                leading: CNIcon(
+                  symbol: CNSymbol('rectangle.stack.fill', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const GlassWidgetsModalHaloTest(),
                     ),
                   );
                 },
@@ -322,10 +367,7 @@ class HomePage extends StatelessWidget {
               CupertinoListTile(
                 title: Text('#33: SVG in CNTabBar'),
                 leading: CNIcon(
-                  symbol: CNSymbol(
-                    'photo.fill',
-                    color: accentColor,
-                  ),
+                  symbol: CNSymbol('photo.fill', color: accentColor),
                 ),
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
@@ -339,10 +381,7 @@ class HomePage extends StatelessWidget {
               CupertinoListTile(
                 title: Text('#31: TextField disappear'),
                 leading: CNIcon(
-                  symbol: CNSymbol(
-                    'textformat.abc',
-                    color: accentColor,
-                  ),
+                  symbol: CNSymbol('textformat.abc', color: accentColor),
                 ),
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
@@ -354,12 +393,11 @@ class HomePage extends StatelessWidget {
                 },
               ),
               CupertinoListTile(
-                title: Text('#31: TextField — NO search variant (hypothesis test)'),
+                title: Text(
+                  '#31: TextField — NO search variant (hypothesis test)',
+                ),
                 leading: CNIcon(
-                  symbol: CNSymbol(
-                    'textformat',
-                    color: accentColor,
-                  ),
+                  symbol: CNSymbol('textformat', color: accentColor),
                 ),
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
@@ -456,37 +494,37 @@ class HomePage extends StatelessWidget {
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
-                    CupertinoPageRoute(builder: (_) => const BottomNavTestPage()),
+                    CupertinoPageRoute(
+                      builder: (_) => const BottomNavTestPage(),
+                    ),
                   );
                 },
               ),
               CupertinoListTile(
                 title: Text('Bottom Nav Test (IndexedStack)'),
                 leading: CNIcon(
-                  symbol: CNSymbol(
-                    'square.stack.3d.up',
-                    color: accentColor,
-                  ),
+                  symbol: CNSymbol('square.stack.3d.up', color: accentColor),
                 ),
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
-                    CupertinoPageRoute(builder: (_) => const BottomNavIndexedTestPage()),
+                    CupertinoPageRoute(
+                      builder: (_) => const BottomNavIndexedTestPage(),
+                    ),
                   );
                 },
               ),
               CupertinoListTile(
                 title: Text('Bottom Nav Test (Custom Icons)'),
                 leading: CNIcon(
-                  symbol: CNSymbol(
-                    'photo.artframe',
-                    color: accentColor,
-                  ),
+                  symbol: CNSymbol('photo.artframe', color: accentColor),
                 ),
                 trailing: CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
-                    CupertinoPageRoute(builder: (_) => const BottomNavCustomIconsTestPage()),
+                    CupertinoPageRoute(
+                      builder: (_) => const BottomNavCustomIconsTestPage(),
+                    ),
                   );
                 },
               ),

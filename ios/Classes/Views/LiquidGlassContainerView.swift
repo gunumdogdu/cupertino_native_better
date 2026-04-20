@@ -12,14 +12,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeLiquidGlassContainer_\(viewId)", binaryMessenger: messenger)
     self.container = UIView(frame: frame)
     self.container.backgroundColor = .clear
-    self.container.isOpaque = false
-    // Issue #29: clip + clear shadow sources so iOS 26 Liquid Glass effects
-    // do not render a halo outside the platform-view bounds during route
-    // transitions (same containment pattern as Issue #2).
-    self.container.clipsToBounds = true
-    self.container.layer.backgroundColor = UIColor.clear.cgColor
-    self.container.layer.shadowOpacity = 0
-
+    
     // Parse arguments
     var effect: String = "regular"
     var shape: String = "capsule"
@@ -64,12 +57,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     )
     
     self.hostingController = UIHostingController(rootView: glassView)
-    // Transparent hosting view (Issue #29: prevent white placeholder during route transitions)
     self.hostingController.view.backgroundColor = .clear
-    self.hostingController.view.isOpaque = false
-    self.hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
-    self.hostingController.view.layer.shadowOpacity = 0
-    self.hostingController.view.clipsToBounds = true
     self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
     
     super.init()
@@ -94,9 +82,30 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       if call.method == "updateConfig" {
         self?.updateConfig(args: call.arguments)
         result(nil)
+      } else if call.method == "setTransitioning" {
+        let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
+        self?.applyTransitionContainment(active)
+        result(nil)
       } else {
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  /// Toggle Issue #29 halo containment on container + hosting view.
+  private func applyTransitionContainment(_ active: Bool) {
+    if active {
+      container.isOpaque = false
+      container.clipsToBounds = true
+      container.layer.backgroundColor = UIColor.clear.cgColor
+      container.layer.shadowOpacity = 0
+      hostingController.view.clipsToBounds = true
+      hostingController.view.isOpaque = false
+      hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
+      hostingController.view.layer.shadowOpacity = 0
+    } else {
+      container.clipsToBounds = false
+      hostingController.view.clipsToBounds = false
     }
   }
   
