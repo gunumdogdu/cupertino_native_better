@@ -7,7 +7,15 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
   private let container: UIView
   private var hostingController: UIHostingController<LiquidGlassContainerSwiftUI>
   private let channel: FlutterMethodChannel
-  
+
+  // Stored shape config so `applyTransitionContainment` can clip the
+  // container's layer to the same rounded shape the SwiftUI glass uses.
+  // Without this we clip to the rectangular layer bounds and the layer's
+  // drop shadow leaks past the rounded corners — visible behind a modal
+  // scrim as four square shadow nubs at the corners (Issue #36).
+  private var configuredShape: String = "capsule"
+  private var configuredCornerRadius: CGFloat? = nil
+
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeLiquidGlassContainer_\(viewId)", binaryMessenger: messenger)
     self.container = UIView(frame: frame)
@@ -55,12 +63,14 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       tint: tint,
       interactive: interactive
     )
-    
+
     self.hostingController = UIHostingController(rootView: glassView)
     self.hostingController.view.backgroundColor = .clear
     self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
-    
+
     super.init()
+    self.configuredShape = shape
+    self.configuredCornerRadius = cornerRadius
     
     // Sync Flutter's brightness mode with Swift at initialization
     if #available(iOS 13.0, *) {
@@ -92,20 +102,41 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     }
   }
 
-  /// Toggle Issue #29 halo containment on container + hosting view.
+  /// Toggle Issue #29 / #36 halo containment on container + hosting view.
+  /// Clips with the same rounded shape the SwiftUI glass uses so the
+  /// layer's drop shadow doesn't leak past the rounded corners and show
+  /// up as four square shadow nubs behind a modal scrim.
   private func applyTransitionContainment(_ active: Bool) {
     if active {
+      let radius = roundedCornerRadiusForCurrentShape()
       container.isOpaque = false
       container.clipsToBounds = true
+      container.layer.cornerRadius = radius
       container.layer.backgroundColor = UIColor.clear.cgColor
       container.layer.shadowOpacity = 0
       hostingController.view.clipsToBounds = true
+      hostingController.view.layer.cornerRadius = radius
       hostingController.view.isOpaque = false
       hostingController.view.layer.backgroundColor = UIColor.clear.cgColor
       hostingController.view.layer.shadowOpacity = 0
     } else {
       container.clipsToBounds = false
+      container.layer.cornerRadius = 0
       hostingController.view.clipsToBounds = false
+      hostingController.view.layer.cornerRadius = 0
+    }
+  }
+
+  private func roundedCornerRadiusForCurrentShape() -> CGFloat {
+    let bounds = container.bounds
+    switch configuredShape {
+    case "circle":
+      return min(bounds.width, bounds.height) / 2.0
+    case "rect":
+      return configuredCornerRadius ?? 0
+    default:
+      // Capsule — half of the shorter side gives the iOS pill shape.
+      return min(bounds.width, bounds.height) / 2.0
     }
   }
   
@@ -151,9 +182,12 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       tint: tint,
       interactive: interactive
     )
-    
+
     hostingController.rootView = newGlassView
     hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
+    // Keep stored config in sync for `applyTransitionContainment`.
+    self.configuredShape = shape
+    self.configuredCornerRadius = cornerRadius
   }
   
   func view() -> UIView {

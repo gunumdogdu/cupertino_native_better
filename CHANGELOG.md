@@ -1,3 +1,33 @@
+## 1.4.4
+
+### Bug Fixes
+
+- **Fixed #36** — `LiquidGlassContainer`'s rectangular layer drop shadow leaking past its rounded glass corners while a modal/sheet was presented above. Visible as four square shadow nubs at the card's corners through the modal's scrim, even though the visible glass was rounded.
+  - Root cause: `applyTransitionContainment(true)` (added in v1.4.3 for the dynamic halo containment) only set `clipsToBounds = true` on the container's CALayer, which clips to the **rectangular** layer bounds — leaving the four corners outside the rounded glass shape unclipped. The layer's drop shadow rendered into those corners and bled through the modal scrim.
+  - Fix: in `LiquidGlassContainerView.swift`, `applyTransitionContainment(true)` now also sets `container.layer.cornerRadius` (and the hosting view's) to match the configured glass shape:
+    - `rect` shape → uses the configured `cornerRadius`
+    - `capsule` / `circle` → `min(width, height) / 2`
+  - The clip is now rounded, matching the visible glass exactly. Reverted to 0 when containment goes inactive so it doesn't affect the at-rest visual.
+
+### Documentation
+
+- **README**: added a prominent "Required Setup: register `CNTabBarRouteObserver`" section directly under Quick Start, documenting:
+  - Why the observer is needed (hybrid composition, halo containment, z-order with sheets).
+  - Where to register it: `CupertinoApp` / `MaterialApp` / `GoRouter` snippets.
+  - What it fixes across all 7 glass widgets, with explicit references to Issues #29, #31, #36.
+  - Manual `markAnyModalActive` / `markAnyModalInactive` API for non-route overlays (`Scaffold.showBottomSheet`).
+  - Several users reported needing this observer to fix sheet bleed-through; with this section it should now be impossible to miss during initial setup.
+
+### Example app
+
+- **Added**: `Testing → #36: LiquidGlassContainer behind modal` — focused reproduction page for Issue #36. Card-shaped `LiquidGlassContainer` matching the issue reporter's `_AdaptiveGlassContainer` widget exactly (`cornerRadius: 15`, `rect`, `EdgeInsets.all(13)`, no tint), four sheet variants including the reporter's exact `showModalBottomSheet` invocation (rounded top, scaffold-bg, `Clip.antiAlias`, bounce animation, `useRootNavigator: true`), and a `CalendarDatePicker` inside each sheet matching the modal content from the issue's screenshots. White scaffold + black/white pill buttons mirror the reporter's app styling.
+
+### Pana
+
+- 160/160
+
+---
+
 ## 1.4.3
 
 ### Bug Fixes

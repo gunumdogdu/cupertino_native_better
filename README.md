@@ -12,8 +12,6 @@ Native iOS 26+ **Liquid Glass** widgets for Flutter with pixel-perfect fidelity.
 
 ## Quick Start
 
-No initialization required! Just import and use:
-
 ```dart
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 
@@ -23,6 +21,44 @@ void main() {
 ```
 
 > **Note:** `PlatformVersion` auto-initializes on first access. No need to call `initialize()` anymore!
+
+### Required Setup: register `CNTabBarRouteObserver`
+
+iOS 26 Liquid Glass widgets are native `UIView`s composited under Flutter via hybrid composition. Without coordination, their drop shadow / soft-edge halo can bleed through any sheet or popup pushed over the page, and `CNTabBar` can render above modal content (e.g. making a `TextField` inside a sheet invisible).
+
+`cupertino_native_better` ships a single `NavigatorObserver` that fixes this for the entire app. **Register it once** on your root navigator:
+
+```dart
+CupertinoApp(
+  navigatorObservers: [CNTabBarRouteObserver()],
+  // ...
+)
+// or
+MaterialApp(
+  navigatorObservers: [CNTabBarRouteObserver()],
+  // ...
+)
+// GoRouter:
+GoRouter(
+  observers: [CNTabBarRouteObserver()],
+  routes: [...],
+)
+```
+
+With this single line:
+
+- `CNTabBar` auto-hides while a full-screen sheet is on top (fixes Issue #31 z-order conflicts with Material `TextField`s).
+- Every glass widget (`CNButton`, `CNPopupMenuButton`, `CNFloatingIsland`, `CNGlassButtonGroup`, `LiquidGlassContainer`, `CNSearchBar`, split-search `CNTabBar`) clamps its halo while a modal/sheet/popup/dialog is presented above — no glass border bleeding through the modal scrim (Issues #29, #36).
+
+For non-route overlays that the observer can't see (notably `Scaffold.showBottomSheet` — anchored to `ScaffoldState`, not pushed onto the Navigator), pair the show/close with the manual API:
+
+```dart
+final controller = Scaffold.of(context).showBottomSheet(...);
+CNTabBarRouteObserver.markAnyModalActive();
+controller.closed.whenComplete(CNTabBarRouteObserver.markAnyModalInactive);
+```
+
+> Without the observer registered, widgets still render fine — but the dynamic z-order/halo containment never engages, and you may see glass bleeding through modals.
 
 ## Performance Best Practices
 

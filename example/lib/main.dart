@@ -23,6 +23,7 @@ import 'demos/issue29_artifact_test.dart';
 import 'demos/issue29_transition_test.dart';
 import 'demos/issue31_no_search_test.dart';
 import 'demos/issue31_textfield_disappear_test.dart';
+import 'demos/issue36_liquid_glass_modal_test.dart';
 import 'demos/issue33_svg_tabbar_test.dart';
 import 'demos/stack_positioned_tabbar_test.dart';
 import 'demos/tabbar_split_search_clip_test.dart';
@@ -343,6 +344,23 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     CupertinoPageRoute(
                       builder: (_) => const GlassWidgetsModalHaloTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#36: LiquidGlassContainer behind modal'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'rectangle.fill.on.rectangle.fill',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue36LiquidGlassModalTest(),
                     ),
                   );
                 },
