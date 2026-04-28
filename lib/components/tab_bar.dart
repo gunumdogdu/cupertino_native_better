@@ -1390,45 +1390,52 @@ class _CNTabBarState extends State<CNTabBar> {
   /// Builds an icon widget for the tab bar fallback.
   /// Priority: imageAsset > customIcon > icon (SF Symbol)
   Widget _buildTabIcon(CNTabBarItem item, {required bool isActive}) {
-    const defaultSize = 25.0;
+    const defaultSize = 22.0;
+    final fromWidget = widget.iconSize;
 
     // Check for image asset (highest priority)
     if (isActive && item.activeImageAsset != null) {
       return CNIcon(
         imageAsset: item.activeImageAsset,
-        size: item.activeImageAsset!.size,
+        size: fromWidget ?? item.activeImageAsset!.size,
       );
     }
     if (item.imageAsset != null) {
-      return CNIcon(imageAsset: item.imageAsset, size: item.imageAsset!.size);
+      return CNIcon(
+        imageAsset: item.imageAsset,
+        size: fromWidget ?? item.imageAsset!.size,
+      );
     }
 
     // Check for custom icon (medium priority)
     if (isActive && item.activeCustomIcon != null) {
-      return Icon(item.activeCustomIcon, size: defaultSize);
+      return Icon(item.activeCustomIcon, size: fromWidget ?? defaultSize);
     }
     if (item.customIcon != null) {
-      return Icon(item.customIcon, size: defaultSize);
+      return Icon(item.customIcon, size: fromWidget ?? defaultSize);
     }
 
     // Check for SF Symbol (lowest priority)
     if (isActive && item.activeIcon != null) {
       return CNIcon(
         symbol: item.activeIcon,
-        size: item.activeIcon!.size,
+        size: fromWidget ?? item.activeIcon!.size,
         color: item.activeIcon!.color,
       );
     }
     if (item.icon != null) {
       return CNIcon(
         symbol: item.icon,
-        size: item.icon!.size,
+        size: fromWidget ?? item.icon!.size,
         color: item.icon!.color,
       );
     }
 
     // Fallback to empty circle if nothing provided
-    return const Icon(CupertinoIcons.circle, size: defaultSize);
+    return Icon(
+      CupertinoIcons.circle,
+      size: fromWidget ?? defaultSize,
+    );
   }
 }
 

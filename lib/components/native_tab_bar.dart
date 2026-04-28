@@ -6,19 +6,21 @@ import '../utils/version_detector.dart';
 
 /// iOS 26+ Native Tab Bar with Search Support
 ///
-/// This enables the native iOS 26 tab bar with search functionality.
-/// When enabled, it replaces the Flutter app's root with a native UITabBarController,
-/// giving you the true iOS 26 liquid glass morphing search effect.
+/// When enabled, replaces the app root with a native container: a bottom `UITabBar`,
+/// a `UINavigationController` with a single content host that keeps the Flutter view
+/// fixed (no reparenting between tabs), and a native `UISearchController` on the
+/// navigation item when a tab is marked with [CNTab.isSearchTab].
 ///
-/// **Important**: This replaces your app's root view controller.
-/// The Flutter content will be displayed within the selected tab.
+/// **Important**: This replaces your app's root view controller. The Flutter view
+/// stays embedded once; only the navigation chrome (including search) toggles when
+/// you select the search tab.
 ///
 /// Example:
 /// ```dart
 /// @override
 /// void initState() {
 ///   super.initState();
-///   CNTabBarNative.enable(
+///   CNTabBarWithSearch.enable(
 ///     tabs: [
 ///       CNTab(title: 'Home', sfSymbol: CNSymbol('house.fill')),
 ///       CNTab(title: 'Search', sfSymbol: CNSymbol('magnifyingglass'), isSearchTab: true),
@@ -35,11 +37,11 @@ import '../utils/version_detector.dart';
 ///
 /// @override
 /// void dispose() {
-///   CNTabBarNative.disable();
+///   CNTabBarWithSearch.disable();
 ///   super.dispose();
 /// }
 /// ```
-class CNTabBarNative {
+class CNTabBarWithSearch {
   static const MethodChannel _channel = MethodChannel('cn_native_tab_bar');
 
   static bool _isEnabled = false;
@@ -51,9 +53,9 @@ class CNTabBarNative {
 
   /// Enable native tab bar mode
   ///
-  /// This will replace your app's root view controller with a native
-  /// UITabBarController. Your Flutter content will be displayed within
-  /// the selected tab.
+  /// Replaces your app's root with the native tab bar + navigation container
+  /// described in [CNTabBarWithSearch]. Flutter content is not moved between
+  /// view controllers when changing tabs.
   ///
   /// Only works on iOS 26+. On older versions, this is a no-op.
   static Future<void> enable({
@@ -217,7 +219,11 @@ class CNTabBarNative {
   }
 }
 
-/// Configuration for a native tab in [CNTabBarNative].
+/// Backward-compatible alias; prefer [CNTabBarWithSearch].
+@Deprecated('Use CNTabBarWithSearch instead')
+typedef CNTabBarNative = CNTabBarWithSearch;
+
+/// Configuration for a native tab in [CNTabBarWithSearch].
 ///
 /// Each tab can have a title, SF Symbol icon, and optionally be marked as a search tab.
 ///
@@ -249,7 +255,7 @@ class CNTab {
   /// Badge count to display on the tab
   final int? badgeCount;
 
-  /// Creates a tab configuration for [CNTabBarNative].
+  /// Creates a tab configuration for [CNTabBarWithSearch].
   const CNTab({
     required this.title,
     this.sfSymbol,
