@@ -923,15 +923,19 @@ channel.setMethodCallHandler { [weak self] call, result in
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing font args", details: nil)) }
       case "refresh":
-        // Force refresh for label rendering on iOS < 16
-        // UITabBar only fully layouts labels when items are selected
-        // So we need to temporarily select each item to force layout
+        // Force refresh for label rendering on iOS < 16.
+        // UITabBar only fully layouts labels when items are selected,
+        // so we temporarily select each item to force layout. The
+        // entire cycle is wrapped in `UIView.setAnimationsEnabled(false)`
+        // so the iOS 26 Liquid Glass selection pill doesn't morph
+        // visibly through every tab on launch (Issue #35).
         if let bar = self.tabBar, let items = bar.items, !items.isEmpty {
           let originalSelected = bar.selectedItem
           // Temporarily remove delegate to prevent callbacks during refresh
           bar.delegate = nil
           DispatchQueue.main.async { [weak self, weak bar, weak originalSelected] in
             guard let self = self, let bar = bar, let items = bar.items, !items.isEmpty else { return }
+            UIView.setAnimationsEnabled(false)
             // Cycle through each item to force label layout
             var index = 0
             func selectNext() {
@@ -944,8 +948,9 @@ channel.setMethodCallHandler { [weak self] call, result in
                 }
                 bar.setNeedsLayout()
                 bar.layoutIfNeeded()
-                // Restore delegate
+                // Restore delegate + animations
                 bar.delegate = self
+                UIView.setAnimationsEnabled(true)
                 return
               }
               bar.selectedItem = items[index]
@@ -967,7 +972,7 @@ channel.setMethodCallHandler { [weak self] call, result in
           DispatchQueue.main.async { [weak self, weak left, weak right, weak leftOriginal, weak rightOriginal] in
             guard let self = self, let left = left, let right = right,
                   let leftItems = left.items, let rightItems = right.items else { return }
-            
+            UIView.setAnimationsEnabled(false)
             // Process left items
             var leftIndex = 0
             func selectNextLeft() {
@@ -1001,9 +1006,10 @@ channel.setMethodCallHandler { [weak self] call, result in
                     right.selectedItem = rightOriginal
                     right.setNeedsLayout()
                     right.layoutIfNeeded()
-                    // Restore delegates
+                    // Restore delegates + animations
                     left.delegate = self
                     right.delegate = self
+                    UIView.setAnimationsEnabled(true)
                   }
                 }
                 selectNextRight()

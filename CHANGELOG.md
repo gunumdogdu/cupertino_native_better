@@ -1,3 +1,58 @@
+## 1.4.5
+
+### Bug Fixes
+
+- **Fixed #35 / #41 (recreate animation on launch + navigation)** — `CNTabBar` no longer plays a visible "morph through every tab" animation on app launch or after navigating away and back.
+  - **Launch glitch (#35)**: Swift `refresh` cycles `bar.selectedItem` through every tab to force UITabBar's label layout (workaround for an old "5 items, sporadic missing labels" bug — Issue #6). On iOS 26 with Liquid Glass, that cycling was visible as the selection pill morphing through every tab. The cycle is now wrapped in `UIView.setAnimationsEnabled(false) … true` — labels still render correctly, but the pill no longer animates between items. Tab bar appears instantly with the configured `currentIndex`.
+  - **Recreate-on-return (#41 part 1)**: `autoHideOnPageTransition` previously swapped the platform view to a `SizedBox` during route slides, destroying the native `UITabBar`. On return, a fresh view was created and `_onCreated` re-ran `setSelectedIndex` + `refresh` → visible animate-to-index. Fix: when `autoHideOnPageTransition` is on, `CNTabBar.build` now always returns an `IndexedStack` (children: `[SizedBox, UiKitView]`); only the painted index toggles between 0 and 1 across the transition. The `UiKitView`'s element stays mounted in both states, so the native `UITabBar` is preserved across navigation. Bar just appears with the correct index, no animation.
+
+- **Fixed #41 (PlatformViewGuard 500 ms fallback flash on first build)** — non-iOS26 fallback widgets briefly visible during cold start.
+  - Cause: `PlatformViewGuard.ensureScheduled` always delayed platform-view creation by 500 ms to give Flutter's `FlutterPlatformViewsController` time to purge stale registrations from a previous Dart isolate after a hot restart. That race only exists in debug; release builds (cold-start, no isolate recycling) were paying the same flash-of-fallback cost for nothing.
+  - Fix: `PlatformViewGuard` is now ready immediately in `kReleaseMode`. Native iOS 26 widgets render from the first frame in production; debug-mode hot-restart safety is preserved unchanged.
+
+- **Fixed #36 follow-up** — `LiquidGlassContainer`'s rectangular layer drop shadow leaking past its rounded glass corners while a modal/sheet was presented above (was already targeted in v1.4.4 but only clipped the rectangular layer bounds; rounded clip wasn't applied across all shape configurations correctly). The corner-radius clip in `applyTransitionContainment` now consistently matches `rect` (configured cornerRadius), `capsule` (`min(width, height)/2`), and `circle` (`min(width, height)/2`) — no more square shadow nubs.
+
+### New
+
+- **Fixed #40 (CNButton label customization)** — `CNButtonConfig` now accepts:
+  - `labelFontFamily` — custom font family (must be registered in `Info.plist` or as a Flutter font asset).
+  - `labelFontSize` — point size override.
+  - `labelColor` — explicit foreground color (overrides the `tint`-derived default for non-filled styles, and the system default for filled / borderedProminent / prominentGlass).
+  - `labelFontWeight` — Flutter `FontWeight` override.
+
+  Implementation: Swift side applies them via `UIButton.Configuration.titleTextAttributesTransformer`, so the overrides take effect on the native label without losing the iOS 26 Liquid Glass / prominent / tinted button background. Both creation-time (creationParams) and runtime (`setLabelStyle` channel call from `_syncPropsToNativeIfNeeded`) updates are supported. Flutter `FontWeight.value` (0-8) is mapped to `UIFont.Weight`.
+
+  Example:
+  ```dart
+  CNButton(
+    label: '1',
+    tint: CupertinoColors.systemOrange,
+    onPressed: () {},
+    config: const CNButtonConfig(
+      style: CNButtonStyle.prominentGlass,
+      width: 80, minHeight: 80,
+      labelFontSize: 36,
+      labelFontWeight: FontWeight.w600,
+      labelColor: CupertinoColors.white,
+    ),
+  )
+  ```
+
+### Behavioural details
+
+- `CNTabBar.autoHideOnPageTransition` keeps its default `true`. With the IndexedStack-based hide it's now zero-cost: state is preserved across navigation while still preventing the original page-wide PlatformViewLayer occlusion artifact during route slides.
+- Multi-label `CNButton` (e.g. dial-pad style: large number + small letters underneath) is intentionally **not** added to `CNButton`'s API. The same effect composes cleanly via `LiquidGlassContainer` wrapping a `Column` of two Flutter `Text`s — full `TextStyle` freedom on both labels with the native iOS 26 Liquid Glass background. See the closing comment on Issue #40 for a snippet.
+
+### Example app
+
+- **Added**: `Testing → #40: CNButton label style` — interactive screen for verifying the new label-style params (font-size slider, color swatches, font-family segmented control, style picker).
+
+### Pana
+
+- 160/160
+
+---
+
 ## 1.4.4
 
 ### Bug Fixes

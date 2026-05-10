@@ -15,6 +15,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   private var currentButtonStyle: String = "automatic"
   private var usesSwiftUI: Bool = false
   private var makeRound: Bool = false
+  // Issue #40: optional label-style overrides applied via attributedTitle.
+  private var labelFontFamily: String? = nil
+  private var labelFontSize: CGFloat? = nil
+  private var labelColor: UIColor? = nil
+  private var labelFontWeight: Int? = nil  // Flutter FontWeight.value (0..8)
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeButton_\(viewId)", binaryMessenger: messenger)
@@ -91,6 +96,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let geInteractive = dict["glassEffectInteractive"] as? NSNumber { glassEffectInteractive = geInteractive.boolValue }
       if let bc = dict["badgeCount"] as? NSNumber { badgeCount = bc.intValue }
       if let inter = dict["interaction"] as? NSNumber { interaction = inter.boolValue }
+      // Issue #40: label style overrides
+      if let f = dict["labelFontFamily"] as? String, !f.isEmpty { self.labelFontFamily = f }
+      if let s = dict["labelFontSize"] as? NSNumber, s.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: s) }
+      if let c = dict["labelColor"] as? NSNumber { self.labelColor = Self.colorFromARGB(c.intValue) }
+      if let w = dict["labelFontWeight"] as? NSNumber { self.labelFontWeight = w.intValue }
     }
 
     super.init()
@@ -358,6 +368,43 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           self.setButtonContent(title: t, image: nil, iconOnly: false, imagePlacement: nil, imagePadding: nil, horizontalPadding: nil)
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing title", details: nil)) }
+      case "setLabelStyle":
+        // Issue #40 runtime label-style sync. Flutter sends the new
+        // values plus explicit "clear*" markers so we can reset
+        // overrides that were removed.
+        if let args = call.arguments as? [String: Any] {
+          if (args["clearFontFamily"] as? NSNumber)?.boolValue == true {
+            self.labelFontFamily = nil
+          }
+          if let f = args["labelFontFamily"] as? String, !f.isEmpty {
+            self.labelFontFamily = f
+          }
+          if (args["clearFontSize"] as? NSNumber)?.boolValue == true {
+            self.labelFontSize = nil
+          }
+          if let s = args["labelFontSize"] as? NSNumber, s.doubleValue > 0 {
+            self.labelFontSize = CGFloat(truncating: s)
+          }
+          if (args["clearLabelColor"] as? NSNumber)?.boolValue == true {
+            self.labelColor = nil
+          }
+          if let c = args["labelColor"] as? NSNumber {
+            self.labelColor = Self.colorFromARGB(c.intValue)
+          }
+          if (args["clearFontWeight"] as? NSNumber)?.boolValue == true {
+            self.labelFontWeight = nil
+          }
+          if let w = args["labelFontWeight"] as? NSNumber {
+            self.labelFontWeight = w.intValue
+          }
+          // Re-apply via the existing config path.
+          if #available(iOS 15.0, *), let button = self.button, !usesSwiftUI,
+             var cfg = button.configuration {
+            cfg.titleTextAttributesTransformer = self.makeTitleTextAttributesTransformer()
+            button.configuration = cfg
+          }
+          result(nil)
+        } else { result(FlutterError(code: "bad_args", message: "Missing label style args", details: nil)) }
       case "setButtonIcon":
         if let args = call.arguments as? [String: Any] {
           var image: UIImage? = nil
@@ -545,6 +592,59 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  /// Issue #40: build a title-text-attributes transformer that applies
+  /// the configured `labelFontFamily` / `labelFontSize` /
+  /// `labelFontWeight` / `labelColor` to whatever attributes UIKit
+  /// would otherwise use for the button's title.
+  ///
+  /// Uses `AttributeContainer`'s direct `.font` / `.foregroundColor`
+  /// properties (the modern UIKit SDK signature for this transformer).
+  @available(iOS 15.0, *)
+  private func makeTitleTextAttributesTransformer() -> UIConfigurationTextAttributesTransformer {
+    let family = self.labelFontFamily
+    let size = self.labelFontSize
+    let weight = self.labelFontWeight
+    let color = self.labelColor
+    return UIConfigurationTextAttributesTransformer { incoming in
+      var outgoing = incoming
+      let baseFont = incoming.font ?? UIFont.preferredFont(forTextStyle: .body)
+      let pointSize = size ?? baseFont.pointSize
+      let uiWeight = Self.uiFontWeight(fromFlutterValue: weight)
+      let resolvedFont: UIFont
+      if let f = family {
+        let descriptor = UIFontDescriptor(name: f, size: pointSize)
+        resolvedFont = UIFont(descriptor: descriptor, size: pointSize)
+      } else if let w = uiWeight {
+        resolvedFont = UIFont.systemFont(ofSize: pointSize, weight: w)
+      } else {
+        resolvedFont = baseFont.withSize(pointSize)
+      }
+      outgoing.font = resolvedFont
+      if let color = color {
+        outgoing.foregroundColor = color
+      }
+      return outgoing
+    }
+  }
+
+  /// Maps Flutter's `FontWeight.value` (0-8) to UIKit's `UIFont.Weight`.
+  /// Returns nil when the input is nil.
+  private static func uiFontWeight(fromFlutterValue value: Int?) -> UIFont.Weight? {
+    guard let v = value else { return nil }
+    switch v {
+    case 0: return .ultraLight  // w100
+    case 1: return .thin        // w200
+    case 2: return .light       // w300
+    case 3: return .regular     // w400
+    case 4: return .medium      // w500
+    case 5: return .semibold    // w600
+    case 6: return .bold        // w700
+    case 7: return .heavy       // w800
+    case 8: return .black       // w900
+    default: return nil
+    }
+  }
 
   /// Toggle Issue #29 halo containment based on whether the enclosing
   /// Flutter route is currently animating. See the `setTransitioning`
@@ -804,7 +904,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let image = image {
         cfg.image = image
       }
-      
+
+      // Issue #40: apply optional label-style overrides via the
+      // titleTextAttributesTransformer so font-size / family / color /
+      // weight take effect on the native label.
+      cfg.titleTextAttributesTransformer = makeTitleTextAttributesTransformer()
+
       // Apply imagePlacement
       if let placement = imagePlacement {
         switch placement {

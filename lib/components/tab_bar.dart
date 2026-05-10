@@ -238,29 +238,31 @@ class CNTabBar extends StatefulWidget {
   /// hit the z-order issue).
   final bool autoHideOnModal;
 
-  /// Whether the tab bar automatically hides itself while the enclosing
-  /// route is animating in or out (e.g. during a `CupertinoPageRoute`
-  /// push or pop).
+  /// Whether the tab bar's platform view is hidden from Flutter's scene
+  /// while the enclosing route is animating in or out (e.g. during a
+  /// `CupertinoPageRoute` push or pop). Default: `true`.
   ///
   /// When a page containing a `UiKitView` is animated by Flutter, the
-  /// engine must composite the live native layer (UITabBar) on top of
-  /// Flutter's snapshot of the route. During the animation window, the
-  /// `PlatformViewLayer` overlay can occlude Flutter content elsewhere on
-  /// the page — most visibly, parts of header/text widgets become
-  /// invisible mid-transition (Issue #29 follow-up). This is a Flutter
-  /// hybrid-composition limitation and not something the Swift side can
-  /// fix.
+  /// `PlatformViewLayer` overlay can occlude Flutter content elsewhere
+  /// on the page — most visibly, parts of header/text widgets become
+  /// briefly invisible mid-transition (Issue #29 follow-up). This is a
+  /// Flutter hybrid-composition limitation and not something the Swift
+  /// side can fix.
   ///
-  /// When this is `true` (default), `CNTabBar` listens to its enclosing
-  /// `ModalRoute.secondaryAnimation` and renders an empty `SizedBox` of
-  /// the same height while the route is animating (`forward` or
-  /// `reverse`). Once the animation settles (`completed`/`dismissed`),
-  /// the platform view is restored. With no live `UiKitView` on the page
-  /// during the slide, Flutter falls back to its normal compositing path
-  /// and the occlusion artifact disappears.
+  /// When this is `true`, `CNTabBar` listens to its enclosing
+  /// `ModalRoute.secondaryAnimation` and wraps the platform view in an
+  /// `IndexedStack` while the route is animating (`forward` / `reverse`)
+  /// — the platform view stays MOUNTED (so the native `UITabBar` is not
+  /// destroyed, preserving its state for the return) but isn't painted,
+  /// so its `PlatformViewLayer` doesn't enter the scene and trigger the
+  /// occlusion artifact. When the animation settles the IndexedStack
+  /// switches to paint the platform view again — instant, no recreate
+  /// animation (Issue #35 fix).
   ///
-  /// Set to `false` if you want the bar to stay visible during route
-  /// transitions (rare; will reintroduce the Flutter overlay artifact).
+  /// Set to `false` to skip the IndexedStack wrap entirely. The platform
+  /// view will be painted continuously through transitions; this can
+  /// re-introduce the page-wide occlusion artifact for content above
+  /// the tab bar.
   final bool autoHideOnPageTransition;
 
   @override
@@ -514,22 +516,50 @@ class _CNTabBarState extends State<CNTabBar> {
       return _buildFlutterFallback(context);
     }
 
-    // Issue #31: when a modal/sheet is presented over our route, render
-    // an empty placeholder of the same size instead of the platform view.
-    // Restores when the modal is dismissed.
+    // Issue #31: when a modal/sheet is presented over our route, hide
+    // the native tab bar so its UIView z-order can't conflict with
+    // Flutter-rendered modal content. Modal hide must DESTROY the
+    // platform view (return SizedBox) — otherwise the iOS UITabBar
+    // layer keeps rendering above the modal content (TextField
+    // disappears, bar bleeds during sheet drags).
     //
-    // Issue #29 follow-up: same swap while the route itself is animating
-    // in/out, so Flutter's PlatformViewLayer overlay doesn't occlude
-    // header/text widgets elsewhere on the page during the slide.
+    // Issue #29 follow-up + Issue #35 follow-up: when only the route
+    // itself is animating (no modal), use an `IndexedStack` so the
+    // platform view stays MOUNTED but isn't painted. The PlatformView
+    // layer isn't added to the scene that frame, so Flutter's hybrid-
+    // composition overlay doesn't kick in (no occlusion of Flutter
+    // content elsewhere on the page) — AND the native UITabBar isn't
+    // destroyed, so when the transition completes the bar is just
+    // there with the correct selected index, no recreate animation.
     final hideForModal = _modalUp && widget.autoHideOnModal;
-    final hideForTransition =
-        _pageTransitioning && widget.autoHideOnPageTransition;
-    if (hideForModal || hideForTransition) {
-      final h = widget.height ?? _intrinsicHeight ?? 50.0;
+    final h = widget.height ?? _intrinsicHeight ?? 50.0;
+
+    // Modal hide must DESTROY the platform view — see comment above.
+    if (hideForModal) {
       return SizedBox(height: h);
     }
 
-    return _buildNativeTabBarPlatformView(_creationParams!);
+    final platformView = _buildNativeTabBarPlatformView(_creationParams!);
+
+    // Page-transition hide: ALWAYS wrap in IndexedStack when the feature
+    // is on, so the widget tree shape is identical regardless of
+    // `_pageTransitioning`. Only the painted index changes. This keeps
+    // the platform-view child's Element mounted across the toggle —
+    // critical: if we returned `platformView` directly when the
+    // transition ends, the tree shape would change and the UiKitView
+    // would be destroyed and re-created (visible "animate to index" on
+    // return — Issue #35).
+    if (widget.autoHideOnPageTransition) {
+      return IndexedStack(
+        index: _pageTransitioning ? 0 : 1,
+        sizing: StackFit.passthrough,
+        children: [
+          SizedBox(height: h),
+          platformView,
+        ],
+      );
+    }
+    return platformView;
   }
 
   Future<List<List<Uint8List?>>> _renderCustomIcons() async {
@@ -797,16 +827,23 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastLabelFontFamily = widget.labelFontFamily;
     _lastLabelFontSize = widget.labelFontSize;
 
-    // Force refresh for label rendering (Issue #6: sporadic missing labels with 5 items).
-    // First refresh after 50ms; second after 200ms for slow-to-initialize native view.
+    // Force refresh for label rendering (Issue #6: sporadic missing
+    // labels with 5 items). The Swift-side `refresh` cycles
+    // `bar.selectedItem` through every tab to force UITabBar layout,
+    // then restores the original. We need this on iOS 26 too — the
+    // missing-label bug isn't limited to iOS < 16.
     //
-    // Order matters: setSelectedIndex must run BEFORE refresh on each pass.
-    // The native `refresh` method captures `bar.selectedItem` at start, then
-    // cycles through items asynchronously and restores the captured value.
-    // If we ran setSelectedIndex AFTER refresh, refresh's restore would
-    // override our intended index, leaving the bar stuck at whatever was
-    // there at refresh-start time (typically the stale creationParams
-    // selectedIndex = 0 — see auto-hide-on-modal recreation flow).
+    // To avoid the visible "tabs activate in sequence on launch" glitch
+    // (Issue #35), the Swift refresh wraps the cycle in
+    // `UIView.setAnimationsEnabled(false)` so the Liquid Glass selection
+    // pill doesn't morph between tabs while we cycle.
+    //
+    // Order matters: setSelectedIndex must run BEFORE refresh on each
+    // pass. Refresh captures `bar.selectedItem` at start and restores
+    // it after cycling — if we ran setSelectedIndex AFTER refresh, that
+    // restore would override our intended index, leaving the bar stuck
+    // at the stale creationParams selectedIndex = 0 (see auto-hide-on-
+    // modal recreation flow).
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       Future.delayed(const Duration(milliseconds: 50), () async {
         if (mounted && _channel != null) {
