@@ -774,6 +774,14 @@ void main() {
     Finder iconWith(IconData data) =>
         find.byWidgetPredicate((w) => w is Icon && w.icon == data);
 
+    Widget hostTabBar(CNTabBar tabBar) {
+      return CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: SafeArea(child: tabBar),
+        ),
+      );
+    }
+
     // Drains `PlatformViewGuard`'s 500ms debug-mode debounce so the test
     // doesn't fail with a "pending Timer after dispose" error when run in
     // isolation. The guard is scheduled in `_CNTabBarState.initState`.
@@ -785,24 +793,27 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CNTabBar(
-              iconSize: 32.0,
-              items: const [
-                CNTabBarItem(label: 'Home', customIcon: Icons.home),
-                CNTabBarItem(label: 'Settings', customIcon: Icons.settings),
-              ],
-              currentIndex: 0,
-              onTap: (_) {},
-            ),
+        hostTabBar(
+          CNTabBar(
+            iconSize: 32.0,
+            items: const [
+              CNTabBarItem(label: 'Home', customIcon: CupertinoIcons.house),
+              CNTabBarItem(
+                label: 'Settings',
+                customIcon: CupertinoIcons.settings,
+              ),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
           ),
         ),
       );
       await tester.pump();
 
-      final homeIcon = tester.widget<Icon>(iconWith(Icons.home));
-      final settingsIcon = tester.widget<Icon>(iconWith(Icons.settings));
+      final homeIcon = tester.widget<Icon>(iconWith(CupertinoIcons.house));
+      final settingsIcon = tester.widget<Icon>(
+        iconWith(CupertinoIcons.settings),
+      );
       expect(homeIcon.size, 32.0);
       expect(settingsIcon.size, 32.0);
 
@@ -813,28 +824,31 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CNTabBar(
-              iconSize: 28.0,
-              items: const [
-                CNTabBarItem(
-                  label: 'Home',
-                  customIcon: Icons.home_outlined,
-                  activeCustomIcon: Icons.home,
-                ),
-                CNTabBarItem(label: 'Settings', customIcon: Icons.settings),
-              ],
-              currentIndex: 0,
-              onTap: (_) {},
-            ),
+        hostTabBar(
+          CNTabBar(
+            iconSize: 28.0,
+            items: const [
+              CNTabBarItem(
+                label: 'Home',
+                customIcon: CupertinoIcons.house,
+                activeCustomIcon: CupertinoIcons.house_fill,
+              ),
+              CNTabBarItem(
+                label: 'Settings',
+                customIcon: CupertinoIcons.settings,
+              ),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
           ),
         ),
       );
       await tester.pump();
 
-      // Selected tab uses the active icon
-      final activeHome = tester.widget<Icon>(iconWith(Icons.home));
+      // Selected tab renders the active icon
+      final activeHome = tester.widget<Icon>(
+        iconWith(CupertinoIcons.house_fill),
+      );
       expect(activeHome.size, 28.0);
 
       await drainPlatformViewGuard(tester);
@@ -844,22 +858,23 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CNTabBar(
-              items: const [
-                CNTabBarItem(label: 'Home', customIcon: Icons.home),
-                CNTabBarItem(label: 'Settings', customIcon: Icons.settings),
-              ],
-              currentIndex: 0,
-              onTap: (_) {},
-            ),
+        hostTabBar(
+          CNTabBar(
+            items: const [
+              CNTabBarItem(label: 'Home', customIcon: CupertinoIcons.house),
+              CNTabBarItem(
+                label: 'Settings',
+                customIcon: CupertinoIcons.settings,
+              ),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
           ),
         ),
       );
       await tester.pump();
 
-      final homeIcon = tester.widget<Icon>(iconWith(Icons.home));
+      final homeIcon = tester.widget<Icon>(iconWith(CupertinoIcons.house));
       expect(homeIcon.size, 25.0);
 
       await drainPlatformViewGuard(tester);
