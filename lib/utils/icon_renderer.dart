@@ -1,7 +1,6 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 /// Detects image format from asset path or image data.
@@ -139,62 +138,128 @@ Future<bool> _assetExists(String assetPath) async {
   }
 }
 
-/// Renders an IconData to PNG bytes for use in native platform views.
+/// Renders an [IconData] to PNG bytes for use in native platform views.
 ///
-/// The [size] parameter controls the logical pixel size of the icon.
-/// This function renders the icon at the native size and proper pixel density.
+/// The [size] parameter is the logical font size of the glyph. The returned
+/// bitmap is sized to the glyph's actual painted bounds, not to a fixed
+/// `size × size` box — square icon fonts (Material, Cupertino) round-trip at
+/// `size × size`, while fonts whose glyphs overflow their em-box (e.g.
+/// FontAwesome) get a bitmap large enough to contain the full glyph without
+/// clipping.
+///
+/// The function works in two passes:
+///   1. Lay out and paint the glyph onto a canvas with generous transparent
+///      padding on every side, large enough to contain any overflow from
+///      typical icon fonts.
+///   2. Scan the alpha channel to find the non-transparent bounding box and
+///      crop the bitmap down to that. This avoids per-font tuning and any
+///      caller-visible "overflow margin" knob.
 Future<Uint8List?> iconDataToImageBytes(
   IconData iconData, {
   double size = 25.0,
   Color color = CupertinoColors.black,
 }) async {
   try {
-    final RenderRepaintBoundary repaintBoundary = RenderRepaintBoundary();
-    final PipelineOwner pipelineOwner = PipelineOwner();
-    final BuildOwner buildOwner = BuildOwner(focusManager: FocusManager());
+    final double pixelRatio =
+        ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
 
-    final RenderView renderView = RenderView(
-      view: ui.PlatformDispatcher.instance.views.first,
-      child: RenderPositionedBox(
-        alignment: Alignment.center,
-        child: repaintBoundary,
+    final TextPainter painter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(iconData.codePoint),
+        style: TextStyle(
+          inherit: false,
+          color: color,
+          fontSize: size,
+          fontFamily: iconData.fontFamily,
+          package: iconData.fontPackage,
+        ),
       ),
-      configuration: ViewConfiguration.fromView(
-        ui.PlatformDispatcher.instance.views.first,
-      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    // 100% of `size` of transparent headroom on every side. TextPainter
+    // reports line-box metrics, not glyph-bounds metrics, so we can't ask
+    // the engine ahead of time how far a given glyph will overflow. This
+    // is a safe upper bound for every icon font we've encountered; the
+    // overflow gets cropped away in the second pass below.
+    final double padding = size;
+    final double logicalWidth = painter.width + padding * 2;
+    final double logicalHeight = painter.height + padding * 2;
+    final int paddedPixelWidth = (logicalWidth * pixelRatio).ceil();
+    final int paddedPixelHeight = (logicalHeight * pixelRatio).ceil();
+
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(recorder)..scale(pixelRatio);
+    painter.paint(canvas, Offset(padding, padding));
+    final ui.Image paddedImage = await recorder.endRecording().toImage(
+      paddedPixelWidth,
+      paddedPixelHeight,
     );
 
-    pipelineOwner.rootNode = renderView;
-    renderView.prepareInitialFrame();
-
-    final RenderObjectToWidgetElement<RenderBox> rootElement =
-        RenderObjectToWidgetAdapter<RenderBox>(
-          container: repaintBoundary,
-          child: Directionality(
-            textDirection: TextDirection.ltr,
-            child: Icon(
-              iconData,
-              size: size,
-              color: color, // Will be tinted by native platform
-            ),
-          ),
-        ).attachToRenderTree(buildOwner);
-
-    buildOwner.buildScope(rootElement);
-    buildOwner.finalizeTree();
-
-    pipelineOwner.flushLayout();
-    pipelineOwner.flushCompositingBits();
-    pipelineOwner.flushPaint();
-
-    final ui.Image image = await repaintBoundary.toImage(
-      pixelRatio: ui.PlatformDispatcher.instance.views.first.devicePixelRatio,
+    final ByteData? rgbaData = await paddedImage.toByteData(
+      format: ui.ImageByteFormat.rawStraightRgba,
     );
-    final ByteData? byteData = await image.toByteData(
+    if (rgbaData == null) {
+      paddedImage.dispose();
+      return null;
+    }
+    final Uint8List rgba = rgbaData.buffer.asUint8List();
+
+    int minX = paddedPixelWidth;
+    int minY = paddedPixelHeight;
+    int maxX = -1;
+    int maxY = -1;
+    for (int y = 0; y < paddedPixelHeight; y++) {
+      final int rowOffset = y * paddedPixelWidth * 4;
+      for (int x = 0; x < paddedPixelWidth; x++) {
+        if (rgba[rowOffset + x * 4 + 3] != 0) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (maxX < 0) {
+      // Nothing was painted (e.g. unknown glyph for the requested font).
+      paddedImage.dispose();
+      return null;
+    }
+
+    final int croppedPixelWidth = maxX - minX + 1;
+    final int croppedPixelHeight = maxY - minY + 1;
+
+    final ui.PictureRecorder cropRecorder = ui.PictureRecorder();
+    final Canvas cropCanvas = Canvas(cropRecorder);
+    cropCanvas.drawImageRect(
+      paddedImage,
+      Rect.fromLTWH(
+        minX.toDouble(),
+        minY.toDouble(),
+        croppedPixelWidth.toDouble(),
+        croppedPixelHeight.toDouble(),
+      ),
+      Rect.fromLTWH(
+        0,
+        0,
+        croppedPixelWidth.toDouble(),
+        croppedPixelHeight.toDouble(),
+      ),
+      Paint(),
+    );
+    final ui.Image croppedImage = await cropRecorder.endRecording().toImage(
+      croppedPixelWidth,
+      croppedPixelHeight,
+    );
+    paddedImage.dispose();
+
+    final ByteData? pngData = await croppedImage.toByteData(
       format: ui.ImageByteFormat.png,
     );
+    croppedImage.dispose();
 
-    return byteData?.buffer.asUint8List();
+    return pngData?.buffer.asUint8List();
   } catch (e) {
     debugPrint('Error rendering icon to image: $e');
     return null;
