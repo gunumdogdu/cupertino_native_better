@@ -572,7 +572,14 @@ class _CNTabBarState extends State<CNTabBar> {
         // For imageAsset, we don't need to render to bytes - native code will handle it
         customIconBytes.add(null);
       } else if (item.customIcon != null) {
-        final bytes = await iconDataToImageBytes(item.customIcon!, size: 25.0);
+        // Render at the requested icon size so that bar-level `iconSize`
+        // (and per-item `icon.size` fallback) actually scales custom icons.
+        // Native side embeds these bytes as-is, so the rasterized PNG must
+        // be produced at the target logical size.
+        final bytes = await iconDataToImageBytes(
+          item.customIcon!,
+          size: widget.iconSize ?? item.icon?.size ?? 25.0,
+        );
         customIconBytes.add(bytes);
       } else {
         customIconBytes.add(null);
@@ -585,7 +592,11 @@ class _CNTabBarState extends State<CNTabBar> {
       } else if (item.activeCustomIcon != null) {
         final bytes = await iconDataToImageBytes(
           item.activeCustomIcon!,
-          size: 25.0,
+          size:
+              widget.iconSize ??
+              item.activeIcon?.size ??
+              item.icon?.size ??
+              25.0,
         );
         activeCustomIconBytes.add(bytes);
       } else if (item.customIcon != null) {
@@ -1426,6 +1437,10 @@ class _CNTabBarState extends State<CNTabBar> {
 
   /// Builds an icon widget for the tab bar fallback.
   /// Priority: imageAsset > customIcon > icon (SF Symbol)
+  ///
+  /// Mirrors the native sizing precedence used in [_prepareCreationParams]:
+  /// bar-level [CNTabBar.iconSize] wins, then per-item icon/imageAsset size,
+  /// finally the standard 25pt tab-bar icon size.
   Widget _buildTabIcon(CNTabBarItem item, {required bool isActive}) {
     const defaultSize = 25.0;
 
@@ -1433,39 +1448,48 @@ class _CNTabBarState extends State<CNTabBar> {
     if (isActive && item.activeImageAsset != null) {
       return CNIcon(
         imageAsset: item.activeImageAsset,
-        size: item.activeImageAsset!.size,
+        size: widget.iconSize ?? item.activeImageAsset!.size,
       );
     }
     if (item.imageAsset != null) {
-      return CNIcon(imageAsset: item.imageAsset, size: item.imageAsset!.size);
+      return CNIcon(
+        imageAsset: item.imageAsset,
+        size: widget.iconSize ?? item.imageAsset!.size,
+      );
     }
 
     // Check for custom icon (medium priority)
     if (isActive && item.activeCustomIcon != null) {
-      return Icon(item.activeCustomIcon, size: defaultSize);
+      return Icon(
+        item.activeCustomIcon,
+        size: widget.iconSize ?? item.activeIcon?.size ?? defaultSize,
+      );
     }
     if (item.customIcon != null) {
-      return Icon(item.customIcon, size: defaultSize);
+      return Icon(
+        item.customIcon,
+        size: widget.iconSize ?? item.icon?.size ?? defaultSize,
+      );
     }
 
     // Check for SF Symbol (lowest priority)
     if (isActive && item.activeIcon != null) {
       return CNIcon(
         symbol: item.activeIcon,
-        size: item.activeIcon!.size,
+        size: widget.iconSize ?? item.activeIcon!.size,
         color: item.activeIcon!.color,
       );
     }
     if (item.icon != null) {
       return CNIcon(
         symbol: item.icon,
-        size: item.icon!.size,
+        size: widget.iconSize ?? item.icon!.size,
         color: item.icon!.color,
       );
     }
 
     // Fallback to empty circle if nothing provided
-    return const Icon(CupertinoIcons.circle, size: defaultSize);
+    return Icon(CupertinoIcons.circle, size: widget.iconSize ?? defaultSize);
   }
 }
 

@@ -762,4 +762,122 @@ void main() {
       expect(item.activeCustomIcon, Icons.home_filled);
     });
   });
+
+  group('CNTabBar iconSize', () {
+    // These tests exercise the Flutter fallback path (which is what runs
+    // in `flutter test` since UiKitView/AppKitView aren't available off-
+    // device). The fallback mirrors the native sizing precedence used in
+    // `_prepareCreationParams`, so it's the right place to assert that
+    // bar-level `iconSize` is honored across icon kinds — including the
+    // previously-broken `customIcon` path (Issue: customIcon ignored
+    // bar-level iconSize, was hardcoded to 25.0).
+    Finder iconWith(IconData data) =>
+        find.byWidgetPredicate((w) => w is Icon && w.icon == data);
+
+    Widget hostTabBar(CNTabBar tabBar) {
+      return CupertinoApp(
+        home: CupertinoPageScaffold(
+          child: SafeArea(child: tabBar),
+        ),
+      );
+    }
+
+    // Drains `PlatformViewGuard`'s 500ms debug-mode debounce so the test
+    // doesn't fail with a "pending Timer after dispose" error when run in
+    // isolation. The guard is scheduled in `_CNTabBarState.initState`.
+    Future<void> drainPlatformViewGuard(WidgetTester tester) async {
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+
+    testWidgets('bar-level iconSize sizes customIcon (unselected)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        hostTabBar(
+          CNTabBar(
+            iconSize: 32.0,
+            items: const [
+              CNTabBarItem(label: 'Home', customIcon: CupertinoIcons.house),
+              CNTabBarItem(
+                label: 'Settings',
+                customIcon: CupertinoIcons.settings,
+              ),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final homeIcon = tester.widget<Icon>(iconWith(CupertinoIcons.house));
+      final settingsIcon = tester.widget<Icon>(
+        iconWith(CupertinoIcons.settings),
+      );
+      expect(homeIcon.size, 32.0);
+      expect(settingsIcon.size, 32.0);
+
+      await drainPlatformViewGuard(tester);
+    });
+
+    testWidgets('bar-level iconSize sizes activeCustomIcon (selected)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        hostTabBar(
+          CNTabBar(
+            iconSize: 28.0,
+            items: const [
+              CNTabBarItem(
+                label: 'Home',
+                customIcon: CupertinoIcons.house,
+                activeCustomIcon: CupertinoIcons.house_fill,
+              ),
+              CNTabBarItem(
+                label: 'Settings',
+                customIcon: CupertinoIcons.settings,
+              ),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Selected tab renders the active icon
+      final activeHome = tester.widget<Icon>(
+        iconWith(CupertinoIcons.house_fill),
+      );
+      expect(activeHome.size, 28.0);
+
+      await drainPlatformViewGuard(tester);
+    });
+
+    testWidgets('customIcon falls back to 25pt when iconSize unset', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        hostTabBar(
+          CNTabBar(
+            items: const [
+              CNTabBarItem(label: 'Home', customIcon: CupertinoIcons.house),
+              CNTabBarItem(
+                label: 'Settings',
+                customIcon: CupertinoIcons.settings,
+              ),
+            ],
+            currentIndex: 0,
+            onTap: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final homeIcon = tester.widget<Icon>(iconWith(CupertinoIcons.house));
+      expect(homeIcon.size, 25.0);
+
+      await drainPlatformViewGuard(tester);
+    });
+  });
 }
