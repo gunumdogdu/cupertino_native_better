@@ -1,3 +1,27 @@
+## 1.4.6
+
+### New
+
+- **Swift Package Manager support** — fixes #44. The plugin now ships a `Package.swift` manifest for both iOS and macOS targets and is recognized by `pana` as "Swift PM-ready".
+
+  Flutter's SPM rollout is well underway: SPM support landed in Flutter **3.24** (Aug 2024) as opt-in, became the **default for new apps in Flutter 3.44**, and CocoaPods is being phased out — Firebase stops publishing to CocoaPods in **October 2026** and the CocoaPods registry becomes **read-only on December 2, 2026**. Plugins without SPM support already lose pana points and trigger build warnings on modern Flutter versions.
+
+  **Compatibility (no users locked out)**: the plugin's own pubspec constraints stay at `sdk: ^3.9.0` / `flutter: '>=3.3.0'`. The SPM `Package.swift` sits alongside the existing podspec and is only consulted by Flutter 3.24+. Older Flutter consumers continue to resolve the package via CocoaPods exactly as before — the podspec's `source_files` path was updated to point at the new SPM-shaped source directory (`ios/cupertino_native_better/Sources/cupertino_native_better/**`, mirrored on macOS) so both build paths produce the same result.
+
+  | Consumer Flutter | Build path |
+  |---|---|
+  | 3.3 – 3.23 (pre-SPM) | CocoaPods via podspec. Package.swift ignored. Unchanged from v1.4.5. |
+  | 3.24 – 3.43 (SPM opt-in) | CocoaPods by default; SPM if `flutter config --enable-swift-package-manager` is set. Both paths work. |
+  | 3.44+ (SPM default) | SPM via `Package.swift`. |
+
+  Thanks to @josec-ecw for the PR.
+
+### Pana
+
+- 160/160 (now includes "**Swift PM-ready**" recognition)
+
+---
+
 ## 1.4.5
 
 ### Bug Fixes
