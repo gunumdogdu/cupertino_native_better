@@ -140,20 +140,21 @@ Future<bool> _assetExists(String assetPath) async {
 
 /// Renders an [IconData] to PNG bytes for use in native platform views.
 ///
-/// The [size] parameter is the logical font size of the glyph. The returned
-/// bitmap is sized to the glyph's actual painted bounds, not to a fixed
-/// `size × size` box — square icon fonts (Material, Cupertino) round-trip at
-/// `size × size`, while fonts whose glyphs overflow their em-box (e.g.
-/// FontAwesome) get a bitmap large enough to contain the full glyph without
-/// clipping.
+/// The [size] parameter is the logical font size of the glyph. The output
+/// is always a square `size × size` logical-pixel bitmap with the glyph's
+/// visible bounds centered inside it. This keeps the embedded icon's
+/// effective dimensions consistent regardless of how much line-box
+/// leading the source font reports — so native containers like UITabBar
+/// lay out a predictable distance between icon and label.
 ///
-/// The function works in two passes:
-///   1. Lay out and paint the glyph onto a canvas with generous transparent
-///      padding on every side, large enough to contain any overflow from
-///      typical icon fonts.
-///   2. Scan the alpha channel to find the non-transparent bounding box and
-///      crop the bitmap down to that. This avoids per-font tuning and any
-///      caller-visible "overflow margin" knob.
+/// The function works in three passes:
+///   1. Paint the glyph onto a generously padded canvas (TextPainter
+///      reports line-box metrics, not glyph metrics — we can't ask the
+///      engine ahead of time how far the glyph overflows).
+///   2. Scan the alpha channel to find the actual non-transparent bounds.
+///   3. Re-blit the cropped glyph into a `size × size` canvas, centered
+///      and scaled down if its visible bounds happen to exceed `size`
+///      (FontAwesome-style overflowing glyphs).
 Future<Uint8List?> iconDataToImageBytes(
   IconData iconData, {
   double size = 25.0,
@@ -177,11 +178,6 @@ Future<Uint8List?> iconDataToImageBytes(
       textDirection: TextDirection.ltr,
     )..layout();
 
-    // 100% of `size` of transparent headroom on every side. TextPainter
-    // reports line-box metrics, not glyph-bounds metrics, so we can't ask
-    // the engine ahead of time how far a given glyph will overflow. This
-    // is a safe upper bound for every icon font we've encountered; the
-    // overflow gets cropped away in the second pass below.
     final double padding = size;
     final double logicalWidth = painter.width + padding * 2;
     final double logicalHeight = painter.height + padding * 2;
@@ -227,37 +223,50 @@ Future<Uint8List?> iconDataToImageBytes(
       return null;
     }
 
-    final int croppedPixelWidth = maxX - minX + 1;
-    final int croppedPixelHeight = maxY - minY + 1;
+    final double glyphPixelWidth = (maxX - minX + 1).toDouble();
+    final double glyphPixelHeight = (maxY - minY + 1).toDouble();
 
-    final ui.PictureRecorder cropRecorder = ui.PictureRecorder();
-    final Canvas cropCanvas = Canvas(cropRecorder);
-    cropCanvas.drawImageRect(
+    // Re-blit into a square `size × size` (logical pixels) canvas, with
+    // the visible glyph scaled to FILL the canvas (preserving aspect
+    // ratio). Standard icon fonts like CupertinoIcons / Material Icons
+    // render their glyphs inside the em-box with their own built-in
+    // padding — if we just placed the glyph 1:1, the visible ink would
+    // be smaller than the SF Symbol at the same pointSize and the rows
+    // would look mismatched. Scaling to fill the requested `size`
+    // matches SF Symbol's "pointSize is ink size" convention.
+    final int outputPixelSize = (size * pixelRatio).ceil();
+    final double maxGlyphDim = glyphPixelWidth > glyphPixelHeight
+        ? glyphPixelWidth
+        : glyphPixelHeight;
+    final double fitScale = outputPixelSize / maxGlyphDim;
+    final double drawnWidth = glyphPixelWidth * fitScale;
+    final double drawnHeight = glyphPixelHeight * fitScale;
+    final double dstX = (outputPixelSize - drawnWidth) / 2.0;
+    final double dstY = (outputPixelSize - drawnHeight) / 2.0;
+
+    final ui.PictureRecorder squareRecorder = ui.PictureRecorder();
+    final Canvas squareCanvas = Canvas(squareRecorder);
+    squareCanvas.drawImageRect(
       paddedImage,
       Rect.fromLTWH(
         minX.toDouble(),
         minY.toDouble(),
-        croppedPixelWidth.toDouble(),
-        croppedPixelHeight.toDouble(),
+        glyphPixelWidth,
+        glyphPixelHeight,
       ),
-      Rect.fromLTWH(
-        0,
-        0,
-        croppedPixelWidth.toDouble(),
-        croppedPixelHeight.toDouble(),
-      ),
+      Rect.fromLTWH(dstX, dstY, drawnWidth, drawnHeight),
       Paint(),
     );
-    final ui.Image croppedImage = await cropRecorder.endRecording().toImage(
-      croppedPixelWidth,
-      croppedPixelHeight,
+    final ui.Image squareImage = await squareRecorder.endRecording().toImage(
+      outputPixelSize,
+      outputPixelSize,
     );
     paddedImage.dispose();
 
-    final ByteData? pngData = await croppedImage.toByteData(
+    final ByteData? pngData = await squareImage.toByteData(
       format: ui.ImageByteFormat.png,
     );
-    croppedImage.dispose();
+    squareImage.dispose();
 
     return pngData?.buffer.asUint8List();
   } catch (e) {

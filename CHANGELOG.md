@@ -1,5 +1,12 @@
 ## 1.4.6
 
+### Bug Fixes
+
+- **Fixed #39 / merged PR #42** — `CNTabBar.iconSize` is now honored for `customIcon` items (any `IconData` like `CupertinoIcons.house` or `Icons.home`). Previously the custom-icon rasterizer was hardcoded to 25pt regardless of the bar-level `iconSize` or per-item `icon.size`. Bug originally surfaced via #39 (SVG `imageAsset` layout glitch on v1.4.3) and addressed by @Azzeccagarbugli's PR #42, with an extra refinement on top:
+  - `lib/components/tab_bar.dart`: `_prepareCreationParams` now passes `widget.iconSize ?? item.icon?.size ?? 25.0` to `iconDataToImageBytes`; same precedence on `activeCustomIcon`; `_buildTabIcon` (Flutter fallback) mirrors the precedence across all icon kinds.
+  - `lib/utils/icon_renderer.dart`: full rewrite of `iconDataToImageBytes`. Drops the heavy `RenderRepaintBoundary` + `BuildOwner` setup in favor of a `TextPainter` + canvas + alpha-channel crop approach. **Final step (refinement on top of the PR)**: re-blit the cropped glyph into a square `size × size` canvas with the glyph **scaled to fill**, so custom icons at a given pointSize match SF Symbol's visible ink at the same pointSize (matches SF Symbol's "pointSize is ink size" convention — previously, font em-box padding made customIcon visually smaller than equivalent SF Symbols at the same size).
+  - `test/widget_test.dart`: 6 new widget tests verifying the `iconSize > icon.size > 25pt` precedence across SF Symbol / customIcon / imageAsset in the Flutter fallback path.
+
 ### New
 
 - **Swift Package Manager support** — fixes #44. The plugin now ships a `Package.swift` manifest for both iOS and macOS targets and is recognized by `pana` as "Swift PM-ready".
@@ -15,6 +22,10 @@
   | 3.44+ (SPM default) | SPM via `Package.swift`. |
 
   Thanks to @josec-ecw for the PR.
+
+### Example app
+
+- **Added**: `Testing → PR #42: CNTabBar iconSize (customIcon)` — three side-by-side `CNTabBar`s (SF Symbol / customIcon / SVG imageAsset) with an `iconSize` slider so all three icon kinds can be verified to scale identically. Four Stratis UI Figma SVGs bundled (`camera-01`, `card-add`, `chromecast`, `home-03`) — same source as #39 reporter — for SVG verification.
 
 ### Pana
 
