@@ -72,6 +72,12 @@ class CNTabBarNative {
   /// Whether the tab bar is currently presented.
   static bool get isEnabled => _enabled;
 
+  /// Deprecated: use [isEnabled] (synchronous). Kept for backward compatibility.
+  @Deprecated(
+    'Use isEnabled instead. Will be removed in a future major release.',
+  )
+  static Future<bool> checkIsEnabled() async => _enabled;
+
   /// Present the native tab bar configured from [tabs].
   static Future<void> enable({
     required List<CNTab> tabs,
@@ -80,7 +86,7 @@ class CNTabBarNative {
     CNTabAccessory? bottomAccessory,
     Color? tintColor,
     Color? unselectedTintColor,
-    bool isDark = false,
+    bool? isDark,
     bool asRoot = false,
     bool nativeSearchFilter = true,
     void Function(int index)? onTabSelected,
@@ -88,6 +94,18 @@ class CNTabBarNative {
     void Function(String query)? onSearchChanged,
     VoidCallback? onAccessoryTap,
     VoidCallback? onDismissed,
+    @Deprecated(
+      'No longer fired — use onSearchChanged. Will be removed in a future major release.',
+    )
+    void Function(String query)? onSearchSubmitted,
+    @Deprecated(
+      'No longer fired — use onSearchChanged. Will be removed in a future major release.',
+    )
+    VoidCallback? onSearchCancelled,
+    @Deprecated(
+      'No longer fired — use onSearchChanged. Will be removed in a future major release.',
+    )
+    void Function(bool isActive)? onSearchActiveChanged,
   }) async {
     // iOS 26+ only — no-op elsewhere.
     if (defaultTargetPlatform != TargetPlatform.iOS ||
@@ -124,7 +142,7 @@ class CNTabBarNative {
       if (tintColor != null) 'tint': tintColor.toARGB32(),
       if (unselectedTintColor != null)
         'unselectedTint': unselectedTintColor.toARGB32(),
-      'isDark': isDark,
+      'isDark': isDark ?? false,
       'asRoot': asRoot,
       'nativeSearchFilter': nativeSearchFilter,
     });
@@ -194,9 +212,13 @@ class CNTabBarNative {
   }
 
   /// Change when the tab bar minimizes.
-  static Future<void> setMinimizeBehavior(CNTabMinimizeBehavior behavior) async {
+  static Future<void> setMinimizeBehavior(
+    CNTabMinimizeBehavior behavior,
+  ) async {
     if (!_enabled) return;
-    await _channel.invokeMethod('setMinimizeBehavior', {'behavior': behavior.name});
+    await _channel.invokeMethod('setMinimizeBehavior', {
+      'behavior': behavior.name,
+    });
   }
 
   /// Set the search field's text programmatically.
@@ -218,16 +240,16 @@ class CNTabBarNative {
   }
 
   static Map<String, dynamic> _itemMap(CNListItem i) => {
-        'title': i.title,
-        if (i.subtitle != null) 'subtitle': i.subtitle,
-        if (i.leadingSymbol != null) 'leadingSfSymbol': i.leadingSymbol!.name,
-        'showChevron': i.showChevron,
-      };
+    'title': i.title,
+    if (i.subtitle != null) 'subtitle': i.subtitle,
+    if (i.leadingSymbol != null) 'leadingSfSymbol': i.leadingSymbol!.name,
+    'showChevron': i.showChevron,
+  };
 
   static Map<String, dynamic> _accessoryMap(CNTabAccessory a) => {
-        'text': a.text,
-        if (a.sfSymbol != null) 'sfSymbol': a.sfSymbol!.name,
-      };
+    'text': a.text,
+    if (a.sfSymbol != null) 'sfSymbol': a.sfSymbol!.name,
+  };
 
   static Future<dynamic> _handle(MethodCall call) async {
     final args = call.arguments;

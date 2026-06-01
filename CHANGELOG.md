@@ -1,3 +1,32 @@
+## 1.5.0
+
+### New — CNTabBarNative gains minimize, native lists, accessory & root mode
+
+Building on the existing `CNTabBarNative` (the native iOS 26 Liquid Glass tab bar), this release adds:
+
+- **Minimize-on-scroll** (resolves #32) — `minimizeBehavior:` with `CNTabMinimizeBehavior.{automatic, never, onScrollDown, onScrollUp}`, changeable at runtime via `setMinimizeBehavior(...)`. Requires a tab backed by a `CNNativeList`, since iOS drives the minimize from a real native scroll view.
+- **Native list tabs** — `CNTab(nativeList: CNNativeList(items: [CNListItem(...)]))` renders a native scrollable list; `onListItemTap(tabIndex, itemIndex)` reports taps. New `CNNativeList` / `CNListItem` models (now exported from the package).
+- **Bottom accessory pill** — `bottomAccessory: CNTabAccessory(...)` floats above the bar and slides inline when it minimizes; `onAccessoryTap` reports taps; show/update/hide at runtime with `setBottomAccessory(...)` (pass `null` to hide).
+- **Presentation modes** — `asRoot:` selects modal presentation (default) or root presentation; in root mode a tab with no `nativeList` hosts your real Flutter UI.
+- **Search filtering option** — `nativeSearchFilter` (default `true`) filters the search tab's own list locally; set `false` to drive results yourself via `onSearchChanged` + `setItems`.
+- **Mutation API** — `setItems(...)` for dynamic/paginated data, plus `onDismissed` (fires when the bar is closed natively, e.g. via the ✕ button).
+
+The native manager was rewritten (`CNNativeTabBar.swift` replaces `CNNativeTabBarManager.swift`) on a stable SwiftUI `TabView` view tree.
+
+### Docs
+
+- Rewrote the README **"Native iOS 26 Tab Bar (CNTabBarNative)"** section: native-takeover mental model, a `CNTabBar` vs `CNTabBarNative` comparison table, presentation modes, and a per-method API reference. Added a preview GIF (minimize + accessory + search).
+- Documented that `CNTabBarNative` is a **native takeover, not a Flutter bottom-nav** — for Flutter screens per tab, use `CNTabBar` (clarifies #7).
+
+### Deprecated
+
+- `CNTabBarNative.enable` parameters `onSearchSubmitted`, `onSearchCancelled`, `onSearchActiveChanged` — the search tab now reports through `onSearchChanged`; these are no longer fired and will be removed in a future major release.
+- `CNTabBarNative.checkIsEnabled()` — use the synchronous `isEnabled` getter instead.
+
+### Notes
+
+- **#48 (color the unselected tab item):** investigated and intentionally **not** added to `CNTabBar`. iOS 26's Liquid Glass tab bar enforces the system color for unselected items and ignores customization — verified on-device with both the legacy `UITabBar.unselectedItemTintColor` and the modern `UITabBarAppearance` per-state `iconColor` / title `foregroundColor`. The selected `tint` is honored; the unselected state is system-owned, so a public knob would silently no-op on the package's target OS.
+
 ## 1.4.6
 
 ### Bug Fixes
