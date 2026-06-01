@@ -233,29 +233,187 @@ CNTabBar(
 
 ### Native iOS 26 Tab Bar (CNTabBarNative)
 
-For full iOS 26 liquid glass tab bar experience with native UITabBarController:
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/cntabbarnative_preview.gif" width="280" alt="CNTabBarNative: minimize-on-scroll, bottom accessory, and native iOS 26 search tab"/>
+</p>
+
+<p align="center"><em>Minimize-on-scroll, the bottom accessory pill, and the native iOS 26 search tab — all rendered natively.</em></p>
+
+> **`CNTabBarNative` is not a Flutter widget — it is a full native takeover.**
+> Calling `CNTabBarNative.enable(...)` presents a real iOS 26 Liquid Glass tab bar
+> (a SwiftUI `TabView` over a `UITabBarController`) **on top of / in place of** your
+> Flutter app. You don't put it in your widget tree and there is **no `currentIndex` /
+> `onTap` contract** — you drive it with static methods and react to callbacks.
+>
+> **iOS 26+ only.** On older iOS, other platforms, or the web, `enable()` is a silent
+> no-op (nothing appears). If you need a tab bar that works everywhere and lives inside
+> your Flutter tree, use [`CNTabBar`](#tab-bar-with-split-mode) instead.
+
+#### `CNTabBar` vs `CNTabBarNative` — pick the right one
+
+| | **`CNTabBar`** (widget) | **`CNTabBarNative`** (native takeover) |
+|---|---|---|
+| Where it lives | In your Flutter widget tree | Presented natively over/instead of your app |
+| Each tab's content | **Your Flutter screens** (you own navigation) | Native scrolling lists, a native search tab, and/or **one** root-mode Flutter surface |
+| Platforms | iOS (Liquid Glass on 26) + graceful Flutter fallback elsewhere | **iOS 26 only** (no-op otherwise) |
+| Minimize-on-scroll (shrink) | ✗ | ✅ (`minimizeBehavior`) |
+| Apple-Music-style search tab | Split-search variant (`searchItem`) | ✅ Dedicated `Tab(role: .search)` |
+| Bottom accessory pill | ✗ | ✅ (`bottomAccessory`) |
+| Best for | **A normal app** — Flutter screens per tab | Showcasing iOS 26 native chrome: minimize, native search, accessory |
+
+> ⚠️ **Do _not_** use `CNTabBarNative` as a drop-in for a Flutter bottom nav — e.g.
+> calling `enable()` in `initState` and driving an `IndexedStack` /
+> `Scaffold.bottomNavigationBar` from `onTabSelected` → `setState`. That creates **two
+> sources of truth** for the selected tab (the native bar _and_ your Flutter state),
+> which causes the "have to tap twice" behavior and screen rebuilds. For Flutter screens
+> per tab, use **`CNTabBar`**.
+
+#### Two presentation modes
+
+`CNTabBarNative` can present in one of two ways, controlled by `asRoot`:
+
+- **Modal (default, `asRoot: false`)** — presented full-screen over your app. Tabs that
+  have a `nativeList` show native lists; tabs **without** a list show a placeholder
+  (Flutter content requires root mode). Dismiss with `disable()` or the ✕ button.
+- **Root (`asRoot: true`)** — replaces the app's root view controller (primary
+  navigation). A tab **without** a `nativeList` then hosts your **real Flutter UI**
+  (the package re-parents your existing `FlutterViewController` into that tab). This is
+  how you mix native list/search tabs with **one** live Flutter "home" surface.
+
+#### Minimal example (modal, native lists + search + minimize)
 
 ```dart
-@override
-void initState() {
-  super.initState();
-  CNTabBarNative.enable(
-    tabs: [
-      CNTab(title: 'Home', sfSymbol: CNSymbol('house.fill')),
-      CNTab(title: 'Search', sfSymbol: CNSymbol('magnifyingglass'), isSearchTab: true),
-      CNTab(title: 'Profile', sfSymbol: CNSymbol('person.fill')),
-    ],
-    onTabSelected: (index) => setState(() => _selectedTab = index),
-    onSearchChanged: (query) => filterResults(query),
-  );
-}
+await CNTabBarNative.enable(
+  tabs: [
+    // A tab with a nativeList renders a native scrollable list — and is what
+    // lets the bar minimize on scroll (iOS needs a real native scroll view).
+    CNTab(
+      title: 'Feed',
+      sfSymbol: CNSymbol('list.bullet'),
+      nativeList: CNNativeList(items: [
+        for (var i = 1; i <= 50; i++)
+          CNListItem(
+            title: 'Post #$i',
+            subtitle: 'Row $i',
+            leadingSymbol: CNSymbol('photo'),
+            showChevron: true,
+          ),
+      ]),
+    ),
+    CNTab(
+      title: 'Profile',
+      sfSymbol: CNSymbol('person'),
+      badgeCount: 3,
+      nativeList: CNNativeList(items: profileItems),
+    ),
+    // Apple-Music-style search tab: its OWN screen with its OWN list + search field.
+    CNTab(
+      title: 'Search',
+      isSearchTab: true,
+      nativeList: CNNativeList(items: searchableItems),
+    ),
+  ],
+  minimizeBehavior: CNTabMinimizeBehavior.onScrollDown, // shrink on scroll down
+  bottomAccessory: CNTabAccessory(
+    text: 'Now Playing',
+    sfSymbol: CNSymbol('music.note'),
+  ),
+  tintColor: CupertinoColors.systemBlue,
+  isDark: false,
+  // Callbacks
+  onTabSelected: (i) => debugPrint('tab $i'),
+  onListItemTap: (tabIndex, itemIndex) => debugPrint('row $itemIndex in tab $tabIndex'),
+  onSearchChanged: (query) => debugPrint('search: $query'),
+  onAccessoryTap: () => debugPrint('accessory tapped'),
+  onDismissed: () => debugPrint('bar closed (✕ or disable())'),
+);
 
-@override
-void dispose() {
-  CNTabBarNative.disable();
-  super.dispose();
-}
+// Later, when leaving the experience:
+await CNTabBarNative.disable();
 ```
+
+#### Tabs — `CNTab`
+
+```dart
+CNTab(
+  title: 'Feed',                       // shown under the icon
+  sfSymbol: CNSymbol('list.bullet'),   // the tab icon (SF Symbol)
+  badgeCount: 3,                       // optional red badge
+  isSearchTab: false,                  // mark exactly one tab as the search tab
+  nativeList: CNNativeList(items: [...]), // optional native list content
+)
+```
+
+- A tab **with `nativeList`** → a native scrollable list (`CNListItem`s). Required for
+  minimize-on-scroll.
+- A tab **with `isSearchTab: true`** → the detached iOS 26 search button that morphs into
+  a search field (Apple Music style). It is its own destination with its own list.
+- A tab with **neither** → hosts your Flutter content in root mode, or a placeholder in
+  modal mode.
+
+#### Minimize-on-scroll
+
+```dart
+minimizeBehavior: CNTabMinimizeBehavior.onScrollDown,
+```
+
+| Value | Behavior |
+|---|---|
+| `automatic` | System default for the context |
+| `never` | Bar stays fully expanded |
+| `onScrollDown` | Minimize when scrolling **down**, expand on scroll up |
+| `onScrollUp` | Minimize when scrolling **up**, expand on scroll down |
+
+Requires at least one tab backed by a `CNNativeList` (iPhone) — a Flutter list cannot
+drive the native minimize. Change it at runtime with `setMinimizeBehavior(...)` (e.g. set
+`.never` to keep the bar expanded on a particular screen).
+
+#### Search tab
+
+The search tab is a **separate destination** (not an in-place filter of another tab).
+Two ways to populate results:
+
+- **`nativeSearchFilter: true`** (default) — iOS filters the search tab's own
+  `nativeList` for you, locally, as the user types.
+- **`nativeSearchFilter: false`** — you drive it: listen to `onSearchChanged(query)`, run
+  your own search (a backend, or across your own data), and push results into the search
+  tab with `setItems(tabIndex: searchTabIndex, items: results)`.
+
+Programmatic helpers: `setSearchText(text)`, `activateSearch()` (select the search tab),
+`deactivateSearch()` (clear the query).
+
+#### Bottom accessory pill
+
+A pill that floats above the bar and slides **inline** into it when the bar minimizes.
+
+```dart
+bottomAccessory: CNTabAccessory(text: 'Now Playing', sfSymbol: CNSymbol('music.note')),
+// ...
+onAccessoryTap: () { /* tapped */ },
+```
+
+Show / update / hide it after `enable()` with `setBottomAccessory(accessory)` — pass
+`null` to hide (e.g. hide it on a specific tab from inside `onTabSelected`).
+
+#### API reference
+
+| Method | What it does |
+|---|---|
+| `enable({tabs, selectedIndex, minimizeBehavior, bottomAccessory, tintColor, isDark, asRoot, nativeSearchFilter, ...callbacks})` | Present the native tab bar. No-op below iOS 26. |
+| `disable()` | Dismiss the bar and return to your app. |
+| `isEnabled` | `bool` — whether the bar is currently presented. |
+| `setItems({tabIndex, items})` | Replace a tab's native list (async data, pagination, live updates). |
+| `setSelectedIndex(index)` | Programmatically select a tab. |
+| `setBadgeCounts(List<int?>)` | Per-tab badges (`null`/`0` clears). |
+| `setBottomAccessory(accessory?)` | Show / update / hide the accessory (`null` hides). |
+| `setStyle({tintColor})` | Update the selected-tab tint. |
+| `setBrightness({isDark})` | Switch light/dark appearance. |
+| `setMinimizeBehavior(behavior)` | Change when the bar minimizes. |
+| `setSearchText(text)` / `activateSearch()` / `deactivateSearch()` | Drive the search tab. |
+
+**Callbacks** (all optional): `onTabSelected(int index)`, `onListItemTap(int tabIndex,
+int itemIndex)`, `onSearchChanged(String query)`, `onAccessoryTap()`, `onDismissed()`
+(fired when the bar is closed natively via ✕ — reset your own state here).
 
 ### Tab Bar with iOS 26 Search Tab
 

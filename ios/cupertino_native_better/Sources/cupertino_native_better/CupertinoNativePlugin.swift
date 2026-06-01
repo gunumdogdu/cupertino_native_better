@@ -12,7 +12,7 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
       _ = CNTransitionObserver.shared
     }
 
-    // Setup native tab bar manager (runtime check inside)
+    // Setup the native tab bar (iOS 26: search + minimize + accessory + native lists)
     CNNativeTabBarManager.shared.setup(messenger: registrar.messenger())
 
     // Register platform view factories

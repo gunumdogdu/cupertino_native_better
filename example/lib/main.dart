@@ -4,7 +4,6 @@ import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 import 'demos/slider.dart';
 import 'demos/switch.dart';
 import 'demos/segmented_control.dart';
-import 'demos/tab_bar.dart';
 import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/button.dart';
@@ -253,18 +252,6 @@ class HomePage extends StatelessWidget {
                     CupertinoPageRoute(
                       builder: (_) => const NativeTabBarDemoPage(),
                     ),
-                  );
-                },
-              ),
-              CupertinoListTile(
-                title: Text('Tab Bar'),
-                leading: CNIcon(
-                  symbol: CNSymbol('square.grid.2x2', color: accentColor),
-                ),
-                trailing: CupertinoListTileChevron(),
-                onTap: () {
-                  Navigator.of(context).push(
-                    CupertinoPageRoute(builder: (_) => const TabBarDemoPage()),
                   );
                 },
               ),

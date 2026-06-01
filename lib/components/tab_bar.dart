@@ -135,6 +135,8 @@ class CNTabBar extends StatefulWidget {
   final ValueChanged<int> onTap;
 
   /// Accent/tint color.
+  ///
+  /// Colors the selected item (icon + label).
   final Color? tint;
 
   /// Background color for the bar.
