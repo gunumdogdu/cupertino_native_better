@@ -10,7 +10,7 @@ UDID="${CAP_UDID:-4C83339D-23B8-4451-BB1A-D9998766296C}"
 BUNDLE="${CAP_BUNDLE:-com.dlab.cupertinoNativeExample}"
 WORK="/tmp/cn-capture"; mkdir -p "$WORK" "$OUT"
 
-STATIC_IDS=(cn-button)
+STATIC_IDS=(cn-button cn-button-icon cn-icon liquid-glass-container cn-glass-button-group cn-glass-card)
 ANIMATED_IDS=(cn-switch)
 
 boot() { xcrun simctl boot "$UDID" 2>/dev/null || true; open -a Simulator; sleep 4; }
