@@ -11,7 +11,7 @@ BUNDLE="${CAP_BUNDLE:-com.dlab.cupertinoNativeExample}"
 WORK="/tmp/cn-capture"; mkdir -p "$WORK" "$OUT"
 
 STATIC_IDS=(cn-button)
-ANIMATED_IDS=()
+ANIMATED_IDS=(cn-switch)
 
 boot() { xcrun simctl boot "$UDID" 2>/dev/null || true; open -a Simulator; sleep 4; }
 
@@ -38,6 +38,18 @@ capture_one() {
     crop_png "$WORK/$id.png" "$OUT/$id.png" "$L" "$T" "$W" "$H"
     echo "   wrote $OUT/$id.png"
   fi
+  if [ "$kind" = animated ]; then
+    local anim; anim="$(echo "$rectline" | sed -n 's/.*anim_ms=\([0-9]*\).*/\1/p')"
+    local secs; secs=$(awk "BEGIN{print ($anim/1000)+0.4}")
+    rm -f "$WORK/$id.mov"
+    ( xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$WORK/$id.mov" ) &
+    local recpid=$!
+    sleep "$secs"
+    kill -INT $recpid 2>/dev/null || true; wait $recpid 2>/dev/null || true
+    sleep 1
+    encode_gif "$WORK/$id.mov" "$OUT/$id.gif" "$L" "$T" "$W" "$H" 18
+    echo "   wrote $OUT/$id.gif"
+  fi
   kill $frpid 2>/dev/null || true
   pkill -f "flutter run" 2>/dev/null || true
   xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
@@ -46,4 +58,5 @@ capture_one() {
 
 boot
 for id in "${STATIC_IDS[@]}"; do capture_one "$id" static; done
+for id in "${ANIMATED_IDS[@]}"; do capture_one "$id" animated; done
 echo "done."
