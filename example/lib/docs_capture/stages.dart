@@ -454,42 +454,48 @@ class _FloatingIslandLoop extends StatefulWidget {
   State<_FloatingIslandLoop> createState() => _FloatingIslandLoopState();
 }
 
-class _FloatingIslandLoopState extends State<_FloatingIslandLoop> {
+class _FloatingIslandLoopState extends State<_FloatingIslandLoop>
+    with SingleTickerProviderStateMixin {
   // The CNFloatingIsland renders its native glass via a SwiftUI VStack pinned
   // to the TOP of (and centered within) its platform-view frame — it does NOT
   // lay itself out inside the measured CaptureStage RenderBox. So we bypass the
   // stage's auto-rect and announce a HARDCODED pixel rect (3x, iPhone 17 Pro,
-  // 1206x2622) covering a CENTERED region big enough for the EXPANDED state.
-  // The collapsed state (smaller) then sits centered within that same rect.
+  // 1206x2622) covering the EXPANDED island.
   //
-  // Stage container is _stageW x _stageH logical pts, horizontally centered on
-  // the 402pt-wide screen. The island is pinned to the top of that container,
-  // so we place the container's top where we want the island's top, and size
-  // the rect to the expanded island. Values measured empirically from a full
-  // screenshot (see tool note); tweak _rect* if the island moves.
+  // CHANGE: we no longer morph collapse<->expand (that left a big empty dark
+  // box below the collapsed pill, since the rect was sized for the expanded
+  // card). The island now stays EXPANDED the whole time (isExpanded:true and
+  // the controller is never driven). Internal motion comes from a row of
+  // "equalizer" bars beside the music note (a Flutter AnimationController),
+  // so the card is full and clearly alive with NO empty band.
   static const double _stageW = 300; // logical pts, centered on screen
-  static const int _expandedW = 264; // expanded island width in logical pts
+  static const int _expandedW = 260; // expanded island width in logical pts
+  static const int _expandedH = 88; // expanded island height in logical pts
+  // Inner content height = expandedH minus the package's EdgeInsets.all(16).
+  static const double _innerH = 56;
 
   // Hardcoded crop rect in device px (3x), MEASURED empirically from a full
   // screenshot (tool/capture_docs.sh writes <id>_full.png mid-capture). The
-  // native SwiftUI island does not center exactly where the Flutter SizedBox
-  // sits, so we bound the EXPANDED state directly: it renders at roughly
-  // L≈439 T≈917 W≈737 H≈341 px. We pad that a little and keep the collapsed
-  // state (smaller, centered on the same island center) inside the same rect.
-  static const int _rectL = 410;
-  static const int _rectT = 885;
-  static const int _rectW = 790;
-  static const int _rectH = 400;
-  static const int _animMs = 3400;
+  // island is a FIXED expanded size now (260x92 logical = 780x276 px), so the
+  // rect tightly bounds it. The card is centered horizontally and pinned to
+  // the top of its platform-view frame. Measured: L≈205 T≈891 on the
+  // 1206x2622 device. We pad a touch so all four corners + glass shadow are
+  // inside the frame with no empty band.
+  static const int _rectL = 188;
+  static const int _rectT = 895;
+  static const int _rectW = 804;
+  static const int _rectH = 300;
+  static const int _animMs = 2400;
 
-  final CNFloatingIslandController _c = CNFloatingIslandController();
-  Timer? _t;
-  bool _expanded = false;
-  final GlobalKey _stageKey = GlobalKey();
+  late final AnimationController _eq;
 
   @override
   void initState() {
     super.initState();
+    _eq = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _animMs),
+    )..repeat();
     SchedulerBinding.instance.addPostFrameCallback((_) {
       SchedulerBinding.instance.addPostFrameCallback((_) {
         debugPrint(
@@ -498,19 +504,11 @@ class _FloatingIslandLoopState extends State<_FloatingIslandLoop> {
         );
       });
     });
-    _t = Timer.periodic(const Duration(milliseconds: 1700), (_) {
-      _expanded = !_expanded;
-      if (_expanded) {
-        _c.expand();
-      } else {
-        _c.collapse();
-      }
-    });
   }
 
   @override
   void dispose() {
-    _t?.cancel();
+    _eq.dispose();
     super.dispose();
   }
 
@@ -525,22 +523,19 @@ class _FloatingIslandLoopState extends State<_FloatingIslandLoop> {
       child: Padding(
         padding: const EdgeInsets.only(top: 300),
         child: SizedBox(
-          key: _stageKey,
           width: _stageW,
-          height: 140,
+          height: 160,
           child: CNFloatingIsland(
-            controller: _c,
+            // Stay expanded the whole capture — no collapse morph, no empty
+            // box. The controller is intentionally NOT driven.
+            isExpanded: true,
             position: CNFloatingIslandPosition.top,
-            // The native island is top-leading anchored inside its frame, so a
-            // tiny collapsed pill would sit stranded in the corner of a crop
-            // sized for the expanded state. Keep the collapsed size close to
-            // the expanded size (taller + wider) so BOTH states comfortably
-            // fill the same centered rect — the morph still reads clearly.
-            collapsedWidth: 244,
+            collapsedWidth: _expandedW.toDouble(),
             collapsedHeight: 56,
             expandedWidth: _expandedW.toDouble(),
-            expandedHeight: 120,
+            expandedHeight: _expandedH.toDouble(),
             margin: EdgeInsets.zero,
+            // Required, but never shown (isExpanded:true and we never collapse).
             collapsed: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -552,25 +547,90 @@ class _FloatingIslandLoopState extends State<_FloatingIslandLoop> {
                         TextStyle(color: CupertinoColors.white, fontSize: 14)),
               ],
             ),
-            expanded: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(CupertinoIcons.music_note_2,
-                    color: CupertinoColors.white, size: 28),
-                SizedBox(height: 8),
-                Text('Daydream',
-                    style: TextStyle(
-                        color: CupertinoColors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-                SizedBox(height: 4),
-                Text('Wallows',
-                    style: TextStyle(
-                        color: CupertinoColors.systemGrey3, fontSize: 13)),
-              ],
+            // Fixed-height box matching the card's inner area, with the row
+            // centered inside it, so the content vertically fills the card and
+            // leaves NO empty band (rather than top-anchoring).
+            expanded: SizedBox(
+              height: _innerH,
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Icon(CupertinoIcons.music_note_2,
+                        color: CupertinoColors.white, size: 30),
+                    const SizedBox(width: 14),
+                    _Equalizer(controller: _eq),
+                    const SizedBox(width: 16),
+                    const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Daydream',
+                            style: TextStyle(
+                                color: CupertinoColors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600)),
+                        SizedBox(height: 4),
+                        Text('Wallows',
+                            style: TextStyle(
+                                color: CupertinoColors.systemGrey3,
+                                fontSize: 13)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A row of equalizer bars that bob up and down on a continuous loop, giving
+/// the (fixed-size) expanded floating island subtle internal motion without
+/// any collapse/expand morph.
+class _Equalizer extends StatelessWidget {
+  const _Equalizer({required this.controller});
+  final AnimationController controller;
+
+  static const List<double> _phases = [0.0, 0.33, 0.66, 0.15];
+  static const double _maxH = 28;
+  static const double _minH = 6;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            for (int i = 0; i < _phases.length; i++) ...[
+              if (i > 0) const SizedBox(width: 5),
+              _bar(_phases[i]),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _bar(double phase) {
+    // 0..1 triangle wave so bars rise and fall smoothly.
+    final t = (controller.value + phase) % 1.0;
+    final wave = t < 0.5 ? t * 2 : (1 - t) * 2;
+    final h = _minH + (_maxH - _minH) * wave;
+    return Container(
+      width: 4,
+      height: h,
+      decoration: BoxDecoration(
+        color: CupertinoColors.white,
+        borderRadius: BorderRadius.circular(2),
       ),
     );
   }
