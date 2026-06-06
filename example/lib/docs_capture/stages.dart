@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'capture_stage.dart';
 
@@ -180,6 +181,15 @@ final Map<String, StageSpec> kStages = {
     kind: 'animated',
     loopMs: 3400,
     build: () => const _FloatingIslandLoop(),
+  ),
+  // CNTabBarNative is a native iOS 26 take-over presented OVER the Flutter app,
+  // not a measurable Flutter widget. The stage enables the native bar, cycles
+  // the selected tab, and prints a HARDCODED rect covering the bottom native
+  // tab-bar region so the driver crops to it.
+  'cn-tab-bar-native': StageSpec(
+    kind: 'animated',
+    loopMs: 3000,
+    build: () => const _NativeTabBarLoop(),
   ),
   // The live CNToast.show overlay anchors to the top of the screen (outside
   // the centered stage rect), so it can't be cropped tightly. Fall back to a
@@ -369,6 +379,66 @@ class _TabBarLoopState extends State<_TabBarLoop> {
       onTap: (v) => setState(() => _i = v),
     ),
   );
+}
+
+class _NativeTabBarLoop extends StatefulWidget {
+  const _NativeTabBarLoop();
+  @override
+  State<_NativeTabBarLoop> createState() => _NativeTabBarLoopState();
+}
+
+class _NativeTabBarLoopState extends State<_NativeTabBarLoop> {
+  // Hardcoded pixel rect (3x) covering the bottom native tab-bar region on the
+  // iPhone 17 Pro (1206x2622). Measured empirically from a full screenshot.
+  static const int _rectL = 60;
+  static const int _rectT = 2330;
+  static const int _rectW = 1086;
+  static const int _rectH = 260;
+  static const int _animMs = 3000;
+
+  Timer? _t;
+  int _i = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      await CNTabBarNative.enable(
+        tabs: [
+          CNTab(title: 'Home', sfSymbol: CNSymbol('house.fill')),
+          CNTab(title: 'Search', sfSymbol: CNSymbol('magnifyingglass')),
+          CNTab(title: 'Favorites', sfSymbol: CNSymbol('heart.fill')),
+          CNTab(title: 'Profile', sfSymbol: CNSymbol('person.fill')),
+        ],
+        minimizeBehavior: CNTabMinimizeBehavior.never,
+        tintColor: CupertinoColors.systemBlue,
+        asRoot: true,
+      );
+      // Let the native bar settle, then announce a hardcoded crop rect.
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      debugPrint(
+        'CN_CAPTURE_READY id=cn-tab-bar-native '
+        'rect=$_rectL,$_rectT,$_rectW,$_rectH dpr=3.0 anim_ms=$_animMs',
+      );
+      _t = Timer.periodic(const Duration(milliseconds: 900), (_) {
+        _i = (_i + 1) % 4;
+        CNTabBarNative.setSelectedIndex(_i);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    CNTabBarNative.disable();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Covered by the native take-over; just a neutral backdrop.
+    return Container(color: const Color(0xFFF2F2F7));
+  }
 }
 
 class _FloatingIslandLoop extends StatefulWidget {

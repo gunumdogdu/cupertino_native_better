@@ -11,7 +11,7 @@ BUNDLE="${CAP_BUNDLE:-com.dlab.cupertinoNativeExample}"
 WORK="/tmp/cn-capture"; mkdir -p "$WORK" "$OUT"
 
 STATIC_IDS=(cn-button cn-button-icon cn-icon liquid-glass-container cn-glass-button-group cn-glass-card cn-popup-menu-button cn-search-bar cn-toast)
-ANIMATED_IDS=(cn-switch cn-slider cn-segmented-control cn-tab-bar cn-floating-island)
+ANIMATED_IDS=(cn-switch cn-slider cn-segmented-control cn-tab-bar cn-floating-island cn-tab-bar-native)
 
 boot() { xcrun simctl boot "$UDID" 2>/dev/null || true; open -a Simulator; sleep 4; }
 
@@ -59,6 +59,7 @@ capture_one() {
 if [ "${1:-}" != "" ]; then
   case "$1" in
     cn-button|cn-button-icon|cn-icon|liquid-glass-container|cn-glass-button-group|cn-glass-card|cn-popup-menu-button|cn-search-bar|cn-toast) K=static;;
+    cn-tab-bar-native) K=animated;;
     *) K=animated;;
   esac
   boot; capture_one "$1" "$K"; echo "done ($1)"; exit 0
