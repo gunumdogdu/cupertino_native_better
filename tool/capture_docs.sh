@@ -44,11 +44,22 @@ capture_one() {
     rm -f "$WORK/$id.mov"
     ( xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$WORK/$id.mov" ) &
     local recpid=$!
+    # Grab a full-screen screenshot mid-capture for rect QA/measurement.
+    sleep 1
+    xcrun simctl io "$UDID" screenshot "$WORK/${id}_full.png" 2>/dev/null || true
+    echo "   full screenshot: $WORK/${id}_full.png"
     sleep "$secs"
     kill -INT $recpid 2>/dev/null || true; wait $recpid 2>/dev/null || true
     sleep 1
     encode_gif "$WORK/$id.mov" "$OUT/$id.gif" "$L" "$T" "$W" "$H" 18
     echo "   wrote $OUT/$id.gif"
+    # QA: split a few cropped frames out of the encoded GIF so the result can
+    # be eyeballed without a separate ffmpeg invocation.
+    rm -f "$WORK/${id}_qa_"*.png
+    ffmpeg -y -loglevel error -i "$OUT/$id.gif" \
+      -vf "select='eq(n\,0)+eq(n\,12)+eq(n\,24)+eq(n\,36)+eq(n\,48)'" -vsync 0 \
+      "$WORK/${id}_qa_%02d.png" 2>/dev/null || true
+    echo "   QA frames: $WORK/${id}_qa_*.png"
   fi
   kill $frpid 2>/dev/null || true
   pkill -f "flutter run" 2>/dev/null || true

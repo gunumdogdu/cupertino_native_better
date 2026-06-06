@@ -367,7 +367,9 @@ class _TabBarLoopState extends State<_TabBarLoop> {
   @override
   Widget build(BuildContext context) => CaptureStage(
     id: 'cn-tab-bar',
-    size: const Size(340, 100),
+    // Taller stage so the native UITabBar has room to lay the label BELOW the
+    // icon without clipping (the old 340x100 squeezed both into one row).
+    size: const Size(360, 130),
     animMs: 3000,
     child: CNTabBar(
       items: const [
@@ -377,6 +379,11 @@ class _TabBarLoopState extends State<_TabBarLoop> {
       ],
       currentIndex: _i,
       onTap: (v) => setState(() => _i = v),
+      // Let the native iOS 26 tab bar use its INTRINSIC height: it stacks the
+      // icon above the label automatically at that height. Forcing a larger
+      // `height` makes the native bar vertically center icon+label into the
+      // same band, which is what caused them to overlap. The taller stage
+      // (360x130) just guarantees the intrinsic bar isn't clipped by the crop.
     ),
   );
 }
@@ -448,12 +455,49 @@ class _FloatingIslandLoop extends StatefulWidget {
 }
 
 class _FloatingIslandLoopState extends State<_FloatingIslandLoop> {
+  // The CNFloatingIsland renders its native glass via a SwiftUI VStack pinned
+  // to the TOP of (and centered within) its platform-view frame — it does NOT
+  // lay itself out inside the measured CaptureStage RenderBox. So we bypass the
+  // stage's auto-rect and announce a HARDCODED pixel rect (3x, iPhone 17 Pro,
+  // 1206x2622) covering a CENTERED region big enough for the EXPANDED state.
+  // The collapsed state (smaller) then sits centered within that same rect.
+  //
+  // Stage container is _stageW x _stageH logical pts, horizontally centered on
+  // the 402pt-wide screen. The island is pinned to the top of that container,
+  // so we place the container's top where we want the island's top, and size
+  // the rect to the expanded island. Values measured empirically from a full
+  // screenshot (see tool note); tweak _rect* if the island moves.
+  static const double _stageW = 300; // logical pts, centered on screen
+  static const int _expandedW = 264; // expanded island width in logical pts
+
+  // Hardcoded crop rect in device px (3x), MEASURED empirically from a full
+  // screenshot (tool/capture_docs.sh writes <id>_full.png mid-capture). The
+  // native SwiftUI island does not center exactly where the Flutter SizedBox
+  // sits, so we bound the EXPANDED state directly: it renders at roughly
+  // L≈439 T≈917 W≈737 H≈341 px. We pad that a little and keep the collapsed
+  // state (smaller, centered on the same island center) inside the same rect.
+  static const int _rectL = 410;
+  static const int _rectT = 885;
+  static const int _rectW = 790;
+  static const int _rectH = 400;
+  static const int _animMs = 3400;
+
   final CNFloatingIslandController _c = CNFloatingIslandController();
   Timer? _t;
   bool _expanded = false;
+  final GlobalKey _stageKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        debugPrint(
+          'CN_CAPTURE_READY id=cn-floating-island '
+          'rect=$_rectL,$_rectT,$_rectW,$_rectH dpr=3.0 anim_ms=$_animMs',
+        );
+      });
+    });
     _t = Timer.periodic(const Duration(milliseconds: 1700), (_) {
       _expanded = !_expanded;
       if (_expanded) {
@@ -471,44 +515,63 @@ class _FloatingIslandLoopState extends State<_FloatingIslandLoop> {
   }
 
   @override
-  Widget build(BuildContext context) => CaptureStage(
-    id: 'cn-floating-island',
-    size: const Size(300, 170),
-    animMs: 3400,
-    background: const Color(0xFF2A2440),
-    child: CNFloatingIsland(
-      controller: _c,
-      position: CNFloatingIslandPosition.top,
-      collapsedWidth: 180,
-      expandedWidth: 260,
-      expandedHeight: 120,
-      margin: const EdgeInsets.all(8),
-      collapsed: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(CupertinoIcons.music_note, color: CupertinoColors.white, size: 18),
-          SizedBox(width: 8),
-          Text('Now Playing',
-              style: TextStyle(color: CupertinoColors.white, fontSize: 14)),
-        ],
+  Widget build(BuildContext context) {
+    // Full-screen neutral backdrop with the island stage centered horizontally
+    // and offset from the top so the hardcoded rect lands on it. We do NOT use
+    // CaptureStage here (it would print an auto-rect we don't want).
+    return Container(
+      color: const Color(0xFF2A2440),
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 300),
+        child: SizedBox(
+          key: _stageKey,
+          width: _stageW,
+          height: 140,
+          child: CNFloatingIsland(
+            controller: _c,
+            position: CNFloatingIslandPosition.top,
+            // The native island is top-leading anchored inside its frame, so a
+            // tiny collapsed pill would sit stranded in the corner of a crop
+            // sized for the expanded state. Keep the collapsed size close to
+            // the expanded size (taller + wider) so BOTH states comfortably
+            // fill the same centered rect — the morph still reads clearly.
+            collapsedWidth: 244,
+            collapsedHeight: 56,
+            expandedWidth: _expandedW.toDouble(),
+            expandedHeight: 120,
+            margin: EdgeInsets.zero,
+            collapsed: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(CupertinoIcons.music_note,
+                    color: CupertinoColors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Now Playing',
+                    style:
+                        TextStyle(color: CupertinoColors.white, fontSize: 14)),
+              ],
+            ),
+            expanded: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(CupertinoIcons.music_note_2,
+                    color: CupertinoColors.white, size: 28),
+                SizedBox(height: 8),
+                Text('Daydream',
+                    style: TextStyle(
+                        color: CupertinoColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+                SizedBox(height: 4),
+                Text('Wallows',
+                    style: TextStyle(
+                        color: CupertinoColors.systemGrey3, fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
       ),
-      expanded: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(CupertinoIcons.music_note_2,
-              color: CupertinoColors.white, size: 28),
-          SizedBox(height: 8),
-          Text('Daydream',
-              style: TextStyle(
-                  color: CupertinoColors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600)),
-          SizedBox(height: 4),
-          Text('Wallows',
-              style: TextStyle(
-                  color: CupertinoColors.systemGrey3, fontSize: 13)),
-        ],
-      ),
-    ),
-  );
+    );
+  }
 }
