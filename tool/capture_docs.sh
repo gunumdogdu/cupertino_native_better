@@ -10,8 +10,8 @@ UDID="${CAP_UDID:-4C83339D-23B8-4451-BB1A-D9998766296C}"
 BUNDLE="${CAP_BUNDLE:-com.dlab.cupertinoNativeExample}"
 WORK="/tmp/cn-capture"; mkdir -p "$WORK" "$OUT"
 
-STATIC_IDS=(cn-button cn-button-icon cn-icon liquid-glass-container cn-glass-button-group cn-glass-card)
-ANIMATED_IDS=(cn-switch)
+STATIC_IDS=(cn-button cn-button-icon cn-icon liquid-glass-container cn-glass-button-group cn-glass-card cn-popup-menu-button cn-search-bar cn-toast)
+ANIMATED_IDS=(cn-switch cn-slider cn-segmented-control cn-tab-bar cn-floating-island)
 
 boot() { xcrun simctl boot "$UDID" 2>/dev/null || true; open -a Simulator; sleep 4; }
 
@@ -55,6 +55,14 @@ capture_one() {
   xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
   sleep 1
 }
+
+if [ "${1:-}" != "" ]; then
+  case "$1" in
+    cn-button|cn-button-icon|cn-icon|liquid-glass-container|cn-glass-button-group|cn-glass-card|cn-popup-menu-button|cn-search-bar|cn-toast) K=static;;
+    *) K=animated;;
+  esac
+  boot; capture_one "$1" "$K"; echo "done ($1)"; exit 0
+fi
 
 boot
 for id in "${STATIC_IDS[@]}"; do capture_one "$id" static; done
