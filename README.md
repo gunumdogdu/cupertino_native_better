@@ -3,6 +3,9 @@
 [![Pub Version](https://img.shields.io/pub/v/cupertino_native_better)](https://pub.dev/packages/cupertino_native_better)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS-lightgrey)](https://flutter.dev)
+[![Docs](https://img.shields.io/badge/docs-gunumdogdu.com%2Fdocs-0a7?logo=readthedocs&logoColor=white)](https://gunumdogdu.com/docs)
+
+📖 **Full documentation, component reference, and live previews → [gunumdogdu.com/docs](https://gunumdogdu.com/docs)**
 
 Native iOS 26+ **Liquid Glass** widgets for Flutter with pixel-perfect fidelity. This package renders authentic Apple UI components using native platform views, providing the genuine iOS/macOS look and feel that Flutter's built-in widgets cannot achieve.
 
