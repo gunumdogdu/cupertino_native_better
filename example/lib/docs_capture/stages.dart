@@ -395,48 +395,94 @@ class _NativeTabBarLoop extends StatefulWidget {
 }
 
 class _NativeTabBarLoopState extends State<_NativeTabBarLoop> {
-  // Hardcoded pixel rect (3x) covering the bottom native tab-bar region on the
-  // iPhone 17 Pro (1206x2622). Measured empirically from a full screenshot.
-  static const int _rectL = 60;
-  static const int _rectT = 2330;
-  static const int _rectW = 1086;
-  static const int _rectH = 260;
-  static const int _animMs = 3000;
+  // HEADLINE FEATURE: the native iOS 26 SEARCH of CNTabBarNative. We present a
+  // search tab (isSearchTab:true + a nativeList) with nativeSearchFilter:true,
+  // select it, then on a loop activate the search field and type a query so the
+  // native list visibly FILTERS live.
+  //
+  // On iOS 26 the tab-bar search FIELD renders as a pill at the BOTTOM of the
+  // screen (where the typed text + clear button appear) and the filtered rows
+  // render above it under a large "Search" title. So the crop must be TALL: it
+  // spans from just above the result rows down THROUGH the bottom search pill,
+  // capturing BOTH the search field and the live-filtering list.
+  //
+  // Hardcoded pixel rect (3x) on the iPhone 17 Pro (1206x2622), measured
+  // empirically from a full screenshot (tool writes <id>_full.png mid-capture).
+  // Width 1146 → encoder scales to 480 wide; height 2180 → 913 tall after the
+  // min(480,iw) scale. Result GIF is 480x913, ~160KB (< 700KB), fps 18.
+  static const int _rectL = 30;
+  static const int _rectT = 360;
+  static const int _rectW = 1146;
+  static const int _rectH = 2180;
+  static const int _animMs = 4000;
 
-  Timer? _t;
-  int _i = 0;
+  // The recognizable list contents. "Da" → Daydream, Daylight (clear filter).
+  static const List<CNListItem> _items = [
+    CNListItem(title: 'Daydream', subtitle: 'Wallows', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(title: 'Daylight', subtitle: 'David Kushner', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(title: 'Nightfall', subtitle: 'Halsey', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(title: 'Sunset', subtitle: 'The Midnight', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(title: 'Echoes', subtitle: 'Pink Floyd', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(title: 'Wallows', subtitle: 'Wallows', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(title: 'Drive', subtitle: 'Clairo', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(title: 'Ocean', subtitle: 'Lady Wray', leadingSymbol: CNSymbol('music.note')),
+  ];
+
+  bool _disposed = false;
 
   @override
   void initState() {
     super.initState();
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       await CNTabBarNative.enable(
-        tabs: [
-          CNTab(title: 'Home', sfSymbol: CNSymbol('house.fill')),
-          CNTab(title: 'Search', sfSymbol: CNSymbol('magnifyingglass')),
-          CNTab(title: 'Favorites', sfSymbol: CNSymbol('heart.fill')),
-          CNTab(title: 'Profile', sfSymbol: CNSymbol('person.fill')),
+        tabs: const [
+          CNTab(title: 'Library', sfSymbol: CNSymbol('music.note.list')),
+          CNTab(title: 'Radio', sfSymbol: CNSymbol('dot.radiowaves.left.and.right')),
+          // The search tab — isSearchTab:true + a nativeList that the native
+          // search field filters live when nativeSearchFilter is true.
+          CNTab(
+            title: 'Search',
+            isSearchTab: true,
+            nativeList: CNNativeList(items: _items),
+          ),
         ],
+        // Select the search tab so the search field is the focus.
+        selectedIndex: 2,
+        nativeSearchFilter: true,
         minimizeBehavior: CNTabMinimizeBehavior.never,
-        tintColor: CupertinoColors.systemBlue,
+        tintColor: CupertinoColors.systemPink,
         asRoot: true,
       );
-      // Let the native bar settle, then announce a hardcoded crop rect.
-      await Future<void>.delayed(const Duration(milliseconds: 800));
+      // Let the native bar settle, then announce the hardcoded crop rect.
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       debugPrint(
         'CN_CAPTURE_READY id=cn-tab-bar-native '
         'rect=$_rectL,$_rectT,$_rectW,$_rectH dpr=3.0 anim_ms=$_animMs',
       );
-      _t = Timer.periodic(const Duration(milliseconds: 900), (_) {
-        _i = (_i + 1) % 4;
-        CNTabBarNative.setSelectedIndex(_i);
-      });
+      _runLoop();
     });
+  }
+
+  // One ~4s pass: open the native search, type a query so the list filters
+  // down to the matches, then clear and close. Repeats for the capture window.
+  Future<void> _runLoop() async {
+    if (_disposed || !mounted) return;
+    await CNTabBarNative.activateSearch();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await CNTabBarNative.setSearchText('Da');
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    await CNTabBarNative.setSearchText('Day');
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    await CNTabBarNative.setSearchText('');
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await CNTabBarNative.deactivateSearch();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (!_disposed && mounted) _runLoop();
   }
 
   @override
   void dispose() {
-    _t?.cancel();
+    _disposed = true;
     CNTabBarNative.disable();
     super.dispose();
   }
