@@ -4,10 +4,10 @@ import 'package:flutter/widgets.dart';
 
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/theme_helper.dart';
 import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
-import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// A container that applies Liquid Glass effects to its child widget.
 ///
@@ -23,6 +23,7 @@ class LiquidGlassContainer extends StatefulWidget {
     super.key,
     required this.child,
     required this.config,
+    this.autoHideOnModal = true,
   });
 
   /// The child widget to apply the glass effect to.
@@ -31,17 +32,32 @@ class LiquidGlassContainer extends StatefulWidget {
   /// The glass effect configuration.
   final LiquidGlassConfig config;
 
+  /// When true (default), destroys the native container's PlatformView while
+  /// a modal sheet is presented above this widget's host route. Prevents the
+  /// iOS hybrid-composition z-order bleed (Issue #53) where host-page
+  /// PlatformView pixels leak through a sheet that also contains a
+  /// CN-widget. Requires `CNTabBarRouteObserver()` to be registered in the
+  /// app's `navigatorObservers`. No effect on iOS < 26 / non-iOS (fallback
+  /// path returns the child unchanged).
+  final bool autoHideOnModal;
+
   @override
   State<LiquidGlassContainer> createState() => _LiquidGlassContainerState();
 }
 
-class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
+class _LiquidGlassContainerState extends State<LiquidGlassContainer>
+    with ModalHideMixin<LiquidGlassContainer> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   MethodChannel? _channel;
   bool? _lastIsDark;
 
   // Issue #29 halo containment via setTransitioning.
   Animation<double>? _secondaryRouteAnim;
-  bool _modalAbove = false;
 
   bool get _isDark => ThemeHelper.isDark(context);
 
@@ -52,8 +68,6 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
       PlatformViewGuard.ensureScheduled();
       PlatformViewGuard.readyNotifier.addListener(_onPlatformViewGuardReady);
     }
-    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
-    _onAnyModalDepthChanged();
   }
 
   @override
@@ -75,7 +89,6 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
   void dispose() {
     _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
-    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     _channel?.setMethodCallHandler(null);
     _channel = null;
@@ -94,22 +107,15 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
 
   void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
 
-  void _onAnyModalDepthChanged() {
-    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
-    _pushContainmentIfNeeded();
-  }
-
   void _pushContainmentIfNeeded() {
     final anim = _secondaryRouteAnim;
     final animating =
         anim?.status == AnimationStatus.forward ||
         anim?.status == AnimationStatus.reverse;
-    final active = animating || _modalAbove;
+    final active = animating;
     final ch = _channel;
     if (ch == null) return;
-    try {
-      ch.invokeMethod('setTransitioning', {'active': active});
-    } catch (_) {}
+    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   void _onPlatformViewGuardReady() {
@@ -139,6 +145,22 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
 
   Widget _buildNativeContainer(BuildContext context) {
     const viewType = 'CupertinoNativeLiquidGlassContainer';
+
+    // Issue #53 fix: when a modal is presented above our host route, destroy
+    // the native container's PlatformView so it's removed from the shared
+    // iOS PlatformView container — otherwise its glass-effect background
+    // bleeds through the sheet's scrim. Size unknown (this container is
+    // sized by its child), so leave height/width null; the resulting
+    // SizedBox collapses to zero and the child still renders on top via
+    // the Stack below.
+    final hidden = maybeHiddenPlaceholder();
+    if (hidden != null) {
+      return Stack(
+        clipBehavior: Clip.none,
+        fit: StackFit.passthrough,
+        children: [hidden, widget.child],
+      );
+    }
 
     // Convert config to creation params
     final creationParams = <String, dynamic>{
@@ -170,17 +192,19 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer> {
     // The platform view fills the child's bounds exactly
     // StackFit.passthrough sizes the Stack to match the non-positioned child
     // This allows parent widgets to control alignment via Center, Align, etc.
-    return Stack(
-      clipBehavior: Clip.none,
-      fit: StackFit.passthrough,
-      children: [
-        // Glass effect background from native view - sized to match child
-        // Wrap in IgnorePointer so the platform view never intercepts touches
-        Positioned.fill(child: IgnorePointer(child: platformView)),
-        // Child content rendered on top - determines the size
-        // This will size the Stack, and Positioned.fill will match it
-        widget.child,
-      ],
+    return wrapWithModalInteractionGuard(
+      Stack(
+        clipBehavior: Clip.none,
+        fit: StackFit.passthrough,
+        children: [
+          // Glass effect background from native view - sized to match child
+          // Wrap in IgnorePointer so the platform view never intercepts touches
+          Positioned.fill(child: IgnorePointer(child: platformView)),
+          // Child content rendered on top - determines the size
+          // This will size the Stack, and Positioned.fill will match it
+          widget.child,
+        ],
+      ),
     );
   }
 

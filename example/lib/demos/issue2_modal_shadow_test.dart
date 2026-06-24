@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show showModalBottomSheet;
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 
 /// Issue #2 Reproduction: top shadow showing when flutter modal bottom sheet opens.
@@ -101,6 +102,83 @@ class _Issue2ModalShadowTestState extends State<Issue2ModalShadowTest> {
     );
   }
 
+  // ── #37-style sheets (added for cross-screen comparison) ─────────────────
+  //
+  // These mirror the sheet openers in `issue37_appbar_button_halo_test.dart`
+  // so you can verify whether the labels-disappear-after-close bug reproduces
+  // with the SAME sheets but a DIFFERENT layout (Column + CNTabBar here vs.
+  // Material Scaffold + bottomNavigationBar in #37). If the bug only shows in
+  // #37 with these sheets, the Scaffold setup is the culprit, not the sheet.
+
+  Widget _sheetBody(BuildContext ctx, String title, double? height) {
+    return SizedBox(
+      height: height,
+      child: Container(
+        color: CupertinoColors.systemBackground.resolveFrom(ctx),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Close this sheet and look at the CNTabBar below. If labels '
+                  'go blank until you tap each tab, the labels-disappear bug '
+                  'reproduces in THIS layout too.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const Spacer(),
+              CupertinoButton.filled(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCupertinoSheet37() {
+    Navigator.of(context, rootNavigator: true).push(
+      CupertinoSheetRoute<void>(
+        builder: (ctx) => _sheetBody(ctx, 'showCupertinoSheet (full)', null),
+      ),
+    );
+  }
+
+  void _showFullModalBottomSheet37() {
+    final h = MediaQuery.of(context).size.height;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: false,
+      builder: (ctx) => _sheetBody(ctx, 'showModalBottomSheet (100%)', h),
+    );
+  }
+
+  void _showTallModalBottomSheet37() {
+    final h = MediaQuery.of(context).size.height;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      builder: (ctx) => _sheetBody(ctx, 'showModalBottomSheet (90%)', h * 0.9),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
@@ -156,6 +234,36 @@ class _Issue2ModalShadowTestState extends State<Issue2ModalShadowTest> {
                   CupertinoButton.filled(
                     onPressed: _showFullScreenSheet,
                     child: const Text('Show CupertinoModalPopupRoute (sheet)'),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemBlue.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Cross-screen comparison — same sheets as #37. Open '
+                      'each, close, then check whether labels disappear. If '
+                      'they DON\'T here but DO in #37, the difference is the '
+                      'layout (Scaffold + bottomNavigationBar vs. Column).',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  CupertinoButton.filled(
+                    onPressed: _showCupertinoSheet37,
+                    child: const Text('showCupertinoSheet (full)'),
+                  ),
+                  const SizedBox(height: 12),
+                  CupertinoButton.filled(
+                    onPressed: _showFullModalBottomSheet37,
+                    child: const Text('showModalBottomSheet (100%)'),
+                  ),
+                  const SizedBox(height: 12),
+                  CupertinoButton.filled(
+                    onPressed: _showTallModalBottomSheet37,
+                    child: const Text('showModalBottomSheet (90%)'),
                   ),
                   const SizedBox(height: 24),
                   const Text(

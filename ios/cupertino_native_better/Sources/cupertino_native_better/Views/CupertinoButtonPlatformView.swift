@@ -305,6 +305,15 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
+      case "setInteractive":
+        if let args = call.arguments as? [String: Any],
+           let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+          NSLog("[CN Button] setInteractive=\(interactive)")
+          self._cnSetInteractiveRecursive(self.container, interactive)
+          self._cnSetInteractiveRecursive(self.hostingController?.view, interactive)
+          self._cnSetInteractiveRecursive(self.button, interactive)
+        }
+        result(nil)
       case "setTransitioning":
         // Issue #29: apply halo-containment clipping ONLY while the
         // enclosing route is animating. At rest the container is
@@ -592,6 +601,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+    guard let view = view else { return }
+    view.isUserInteractionEnabled = interactive
+    for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
+  }
 
   /// Issue #40: build a title-text-attributes transformer that applies
   /// the configured `labelFontFamily` / `labelFontSize` /

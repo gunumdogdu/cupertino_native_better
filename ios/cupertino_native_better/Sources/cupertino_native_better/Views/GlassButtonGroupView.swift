@@ -24,8 +24,8 @@ struct GlassButtonGroupSwiftUI: View {
   @ObservedObject var viewModel: GlassButtonGroupViewModel
   @Namespace private var namespace
 
-  /// Barres horizontales avec plusieurs boutons : spacingForGlass plus élevé
-  /// pour que le blend démarre plus tôt et réduise le rétrécissement entre icônes.
+  /// Horizontal multi-button bars : spacingForGlass plus élevé pour que le
+  /// blend démarre plus tôt et réduise le rétrécissement entre icônes.
   private var effectiveSpacingForGlass: CGFloat {
     if viewModel.axis == .horizontal, viewModel.buttons.count >= 2 {
       return max(viewModel.spacingForGlass, 80)
@@ -53,6 +53,16 @@ struct GlassButtonGroupSwiftUI: View {
       namespace: namespace,
       config: button.config,
       badgeCount: nil
+      // NOTE: `applyOwnGlass` left at its default `true` — each button
+      // applies its own `.glassEffect()` so the Button's gesture
+      // recognizer wraps the glass (taps work). The single-outer-glass
+      // approach (applyOwnGlass: false + group-level glass) produced
+      // the right pill visual but iOS 26's `.glassEffect` modifier
+      // intercepts touches at the UIKit layer below where SwiftUI's
+      // `.allowsHitTesting(false)` can reach, killing every tap.
+      // Reverted; the proper fix is a UIKit `UIVisualEffectView` with
+      // `UIGlassEffect` as a sibling subview behind the hosting view —
+      // tracked as a follow-up.
     )
     if button.isPopup, let labels = button.menuLabels, !labels.isEmpty, let onSelected = button.onMenuSelected {
       Menu {
@@ -511,10 +521,24 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
         let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
         self.applyTransitionContainment(active)
         result(nil)
+      case "setInteractive":
+        if let args = call.arguments as? [String: Any],
+           let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+          NSLog("[CN CNGroup] setInteractive=\(interactive)")
+          self._cnSetInteractiveRecursive(self.container, interactive)
+          self._cnSetInteractiveRecursive(self.hostingController.view, interactive)
+        }
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+
+  private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+    guard let view = view else { return }
+    view.isUserInteractionEnabled = interactive
+    for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
   }
 
   /// Toggle Issue #29 halo containment on container + hosting view.

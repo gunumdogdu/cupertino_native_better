@@ -1,7 +1,6 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart'
-    show Scaffold, ScaffoldState, showModalBottomSheet;
+import 'package:flutter/material.dart' show Scaffold, ScaffoldState;
 
 /// Modal halo test for CNButton (Issue #29 follow-up).
 ///
@@ -28,23 +27,23 @@ class _CNButtonModalHaloTestState extends State<CNButtonModalHaloTest> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   void _showCupertinoSheet() {
-    showCupertinoSheet<void>(
+    // CNBottomSheet.showCupertino injects the geometry probe → host-page
+    // CN-widgets above the sheet stay visible.
+    CNBottomSheet.showCupertino<void>(
       context: context,
-      builder: (ctx) => _SheetBody(
-        title: 'showCupertinoSheet',
+      pageBuilder: (ctx) => _SheetBody(
+        title: 'showCupertinoSheet (via CNBottomSheet)',
         onClose: () => Navigator.of(ctx).pop(),
       ),
     );
   }
 
   void _showCupertinoModalPopup() {
-    // Tall sheet so its top edge cuts across the CNButtons — lets us see
-    // whether the glass halo bleeds through the modal's top border.
     final screenH = MediaQuery.of(context).size.height;
-    showCupertinoModalPopup<void>(
+    CNBottomSheet.showModalPopup<void>(
       context: context,
       builder: (ctx) => _SheetBody(
-        title: 'showCupertinoModalPopup',
+        title: 'showCupertinoModalPopup (via CNBottomSheet)',
         height: screenH * 0.75,
         onClose: () => Navigator.of(ctx).pop(),
       ),
@@ -53,13 +52,11 @@ class _CNButtonModalHaloTestState extends State<CNButtonModalHaloTest> {
 
   void _showMaterialBottomSheet() {
     final screenH = MediaQuery.of(context).size.height;
-    showModalBottomSheet<void>(
+    CNBottomSheet.show<void>(
       context: context,
-      // Allow the sheet to be taller than the default half-screen ceiling
-      // so its top edge cuts across the CNButtons.
       isScrollControlled: true,
       builder: (ctx) => _SheetBody(
-        title: 'showModalBottomSheet',
+        title: 'showModalBottomSheet (via CNBottomSheet)',
         height: screenH * 0.75,
         onClose: () => Navigator.of(ctx).pop(),
       ),
@@ -71,16 +68,18 @@ class _CNButtonModalHaloTestState extends State<CNButtonModalHaloTest> {
     // modal, does not block underlying content, and is anchored to a
     // `ScaffoldState` rather than pushed onto the Navigator. Because the
     // NavigatorObserver never sees it, we manually mark the modal-depth
-    // counter active/inactive around it so CNButton's halo containment
-    // still engages.
+    // counter active/inactive around it. We ALSO wrap the body with
+    // CNSheetGeometryProbe so position-aware host-page hiding kicks in.
     final state = _scaffoldKey.currentState;
     if (state == null) return;
     final screenH = MediaQuery.of(context).size.height;
     final controller = state.showBottomSheet(
-      (ctx) => _SheetBody(
-        title: 'showBottomSheet (persistent)',
-        height: screenH * 0.75,
-        onClose: () => Navigator.of(ctx).pop(),
+      (ctx) => CNSheetGeometryProbe(
+        child: _SheetBody(
+          title: 'showBottomSheet (persistent, manual probe)',
+          height: screenH * 0.75,
+          onClose: () => Navigator.of(ctx).pop(),
+        ),
       ),
     );
     CNTabBarRouteObserver.markAnyModalActive();
@@ -177,7 +176,7 @@ class _CNButtonModalHaloTestState extends State<CNButtonModalHaloTest> {
   }
 }
 
-class _SheetBody extends StatelessWidget {
+class _SheetBody extends StatefulWidget {
   const _SheetBody({
     required this.title,
     required this.onClose,
@@ -189,12 +188,19 @@ class _SheetBody extends StatelessWidget {
   final double height;
 
   @override
+  State<_SheetBody> createState() => _SheetBodyState();
+}
+
+class _SheetBodyState extends State<_SheetBody> {
+  bool _switchValue = false;
+
+  @override
   Widget build(BuildContext context) {
     // Hard-size via a SizedBox so sheet routes that hand us unbounded
     // constraints (e.g. `showCupertinoModalPopup`) don't let the Spacer
     // stretch us beyond the intended height.
     return SizedBox(
-      height: height,
+      height: widget.height,
       child: Container(
         color: CupertinoColors.systemBackground.resolveFrom(context),
         child: SafeArea(
@@ -203,7 +209,7 @@ class _SheetBody extends StatelessWidget {
             children: [
               const SizedBox(height: 16),
               Text(
-                title,
+                widget.title,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -213,16 +219,30 @@ class _SheetBody extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
-                  'Watch the TOP edge of this sheet against the CNButtons '
-                  'underneath. If a translucent glass halo bleeds across '
-                  "the sheet's top border, we need to extend the button's "
-                  'setTransitioning toggle to modal-up state too.',
+                  'CNSwitch inside the sheet (mount-depth gate test — the '
+                  'switch should render normally and stay tappable even '
+                  'though it is a CN-widget inside a modal).',
                   textAlign: TextAlign.center,
                 ),
               ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'CNSwitch in sheet',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 12),
+                  CNSwitch(
+                    value: _switchValue,
+                    onChanged: (v) => setState(() => _switchValue = v),
+                  ),
+                ],
+              ),
               const Spacer(),
               CupertinoButton.filled(
-                onPressed: onClose,
+                onPressed: widget.onClose,
                 child: const Text('Close'),
               ),
               const SizedBox(height: 24),

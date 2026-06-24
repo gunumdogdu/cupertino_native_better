@@ -185,19 +185,36 @@ class _GlassWidgetsModalHaloTestState extends State<GlassWidgetsModalHaloTest> {
 
               const SizedBox(height: 12),
               const _SectionTitle('LiquidGlassContainer'),
-              const Center(
-                child: LiquidGlassContainer(
-                  config: LiquidGlassConfig(
-                    effect: CNGlassEffect.regular,
-                    shape: CNGlassEffectShape.capsule,
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    child: Text(
-                      'Liquid glass container',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const LiquidGlassContainer(
+                      config: LiquidGlassConfig(
+                        effect: CNGlassEffect.regular,
+                        shape: CNGlassEffectShape.capsule,
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        child: Text(
+                          'Liquid glass container',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    CNButton(
+                      label: 'Glass Button',
+                      onPressed: () {},
+                      config: const CNButtonConfig(
+                        style: CNButtonStyle.glass,
+                        shrinkWrap: true,
+                      ),
+                    ),
+                  ],
                 ),
               ),
 

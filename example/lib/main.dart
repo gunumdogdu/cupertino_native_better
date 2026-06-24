@@ -23,7 +23,10 @@ import 'demos/issue29_transition_test.dart';
 import 'demos/issue31_no_search_test.dart';
 import 'demos/issue31_textfield_disappear_test.dart';
 import 'demos/issue36_liquid_glass_modal_test.dart';
+import 'demos/issue37_appbar_button_halo_test.dart';
+import 'demos/issue53_cnbutton_under_sheet_test.dart';
 import 'demos/issue40_button_label_style_test.dart';
+import 'demos/issue55_popup_menu_destructive_test.dart';
 import 'demos/pr42_tabbar_iconsize_customicon_test.dart';
 import 'demos/issue33_svg_tabbar_test.dart';
 import 'demos/stack_positioned_tabbar_test.dart';
@@ -355,6 +358,34 @@ class HomePage extends StatelessWidget {
                 },
               ),
               CupertinoListTile(
+                title: Text('#37: AppBar CNButton halo bleed through sheet'),
+                leading: CNIcon(
+                  symbol: CNSymbol('bell.badge', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue37AppBarButtonHaloTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#53: CNButton under bottom sheet'),
+                leading: CNIcon(
+                  symbol: CNSymbol('square.and.pencil', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue53CNButtonUnderSheetTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
                 title: Text('#40: CNButton label style'),
                 leading: CNIcon(
                   symbol: CNSymbol('textformat.size', color: accentColor),
@@ -364,6 +395,21 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     CupertinoPageRoute(
                       builder: (_) => const Issue40ButtonLabelStyleTest(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#55: PopupMenu isDestructive'),
+                leading: CNIcon(
+                  symbol: CNSymbol('trash', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          const Issue55PopupMenuDestructiveTest(),
                     ),
                   );
                 },

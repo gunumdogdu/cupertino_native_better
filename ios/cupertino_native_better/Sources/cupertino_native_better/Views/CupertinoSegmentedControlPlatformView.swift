@@ -126,6 +126,14 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+      case "setInteractive":
+        if let args = call.arguments as? [String: Any],
+           let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+          NSLog("[CN Seg] setInteractive=\(interactive)")
+          self._cnSetInteractiveRecursive(self.container, interactive)
+          self._cnSetInteractiveRecursive(self.control, interactive)
+        }
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -133,6 +141,12 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+    guard let view = view else { return }
+    view.isUserInteractionEnabled = interactive
+    for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
+  }
 
   @objc private func onChanged(_ sender: UISegmentedControl) {
     channel.invokeMethod("valueChanged", arguments: ["index": sender.selectedSegmentIndex])

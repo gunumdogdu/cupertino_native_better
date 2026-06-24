@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import '../channel/params.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
+import '../utils/modal_hide_mixin.dart';
 
 /// Controller for a [CNSwitch] that allows imperative updates from Dart
 /// to the underlying native UISwitch/NSSwitch instance.
@@ -53,6 +54,7 @@ class CNSwitch extends StatefulWidget {
     this.controller,
     this.height = 44.0,
     this.color,
+    this.autoHideOnModal = true,
   });
 
   /// Whether the switch is on.
@@ -73,11 +75,26 @@ class CNSwitch extends StatefulWidget {
   /// Optional tint color to apply to the switch.
   final Color? color;
 
+  /// When true (default), destroys the native switch's PlatformView while a
+  /// modal sheet is presented above this widget's host route. Prevents the
+  /// iOS hybrid-composition z-order bleed (Issue #53) where the host-page
+  /// PlatformView's pixels leak through a sheet that also contains a
+  /// PlatformView (CN-widget). Requires `CNTabBarRouteObserver()` to be
+  /// registered in the app's `navigatorObservers`. No effect on non-iOS or
+  /// iOS < 26 (Flutter fallback path).
+  final bool autoHideOnModal;
+
   @override
   State<CNSwitch> createState() => _CNSwitchState();
 }
 
-class _CNSwitchState extends State<CNSwitch> {
+class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   MethodChannel? _channel;
 
   bool? _lastValue;
@@ -159,6 +176,14 @@ class _CNSwitchState extends State<CNSwitch> {
     }
 
     final double width = estimatedWidthFor(widget.height);
+
+    // Issue #53 fix: when a modal is presented above our host route, destroy
+    // the native UISwitch to remove its PlatformView from the shared iOS
+    // PlatformView container. Otherwise hybrid-composition z-order desyncs
+    // with the sheet's PlatformView during drag, causing visual bleed.
+    final hidden = maybeHiddenPlaceholder(height: widget.height, width: width);
+    if (hidden != null) return hidden;
+
     final creationParams = <String, dynamic>{
       'value': widget.value,
       'enabled': widget.enabled,
@@ -167,21 +192,23 @@ class _CNSwitchState extends State<CNSwitch> {
     };
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return ClipRect(
-        child: SizedBox(
-          height: widget.height,
-          width: width,
-          child: UiKitView(
-            viewType: viewType,
-            creationParamsCodec: const StandardMessageCodec(),
-            creationParams: creationParams,
-            onPlatformViewCreated: _onPlatformViewCreated,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<HorizontalDragGestureRecognizer>(
-                () => HorizontalDragGestureRecognizer(),
-              ),
-              Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-            },
+      return wrapWithModalInteractionGuard(
+        ClipRect(
+          child: SizedBox(
+            height: widget.height,
+            width: width,
+            child: UiKitView(
+              viewType: viewType,
+              creationParamsCodec: const StandardMessageCodec(),
+              creationParams: creationParams,
+              onPlatformViewCreated: _onPlatformViewCreated,
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<HorizontalDragGestureRecognizer>(
+                  () => HorizontalDragGestureRecognizer(),
+                ),
+                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+              },
+            ),
           ),
         ),
       );

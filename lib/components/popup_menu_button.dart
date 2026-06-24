@@ -7,10 +7,10 @@ import '../channel/params.dart';
 import '../style/button_style.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
-import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// Base type for entries in a [CNPopupMenuButton] menu.
 abstract class CNPopupMenuEntry {
@@ -29,6 +29,7 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
     this.iconColor,
     this.enabled = true,
     this.checked = false,
+    this.isDestructive = false,
   });
 
   /// Display label for the item.
@@ -55,6 +56,15 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
 
   /// Whether the item shows a checkmark (selected/active state).
   final bool checked;
+
+  /// Marks the item as destructive (e.g. "Delete", "Logout", "Remove").
+  ///
+  /// On iOS 14+ this applies `UIMenuElement.Attributes.destructive` so the
+  /// LABEL renders in the system red destructive color (not just the icon).
+  /// On iOS < 26 fallback (CupertinoActionSheet) the entry uses
+  /// `isDestructiveAction: true`. On iOS 13 legacy UIAlertController fallback
+  /// the action uses `.destructive` style.
+  final bool isDestructive;
 }
 
 /// A visual divider between popup menu items.
@@ -80,6 +90,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.shrinkWrap = false,
     this.buttonStyle = CNButtonStyle.plain,
     this.preserveTopToBottomOrder = false,
+    this.autoHideOnModal = true,
   }) : buttonIcon = null,
        buttonCustomIcon = null,
        buttonCustomIconColor = null,
@@ -100,6 +111,7 @@ class CNPopupMenuButton extends StatefulWidget {
     double size = 44.0, // button diameter (width = height)
     this.buttonStyle = CNButtonStyle.glass,
     this.preserveTopToBottomOrder = false,
+    this.autoHideOnModal = true,
   }) : buttonLabel = null,
        round = true,
        width = size,
@@ -164,6 +176,14 @@ class CNPopupMenuButton extends StatefulWidget {
   /// bottom. Set to true to always display items 1,2,3,4 from top to bottom.
   final bool preserveTopToBottomOrder;
 
+  /// When true (default), destroys the native popup menu's PlatformView while a
+  /// modal sheet is presented above this widget's host route. Fixes the
+  /// iOS hybrid-composition z-order bleed (Issue #53) where a host-page
+  /// CN-widget's pixels leak through a sheet that also contains a CN-widget.
+  /// Requires `CNTabBarRouteObserver()` to be registered in the app's
+  /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
+  final bool autoHideOnModal;
+
   /// Whether this instance is configured as an icon button variant.
   bool get isIconButton =>
       buttonIcon != null ||
@@ -174,7 +194,14 @@ class CNPopupMenuButton extends StatefulWidget {
   State<CNPopupMenuButton> createState() => _CNPopupMenuButtonState();
 }
 
-class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
+class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
+    with ModalHideMixin<CNPopupMenuButton> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   MethodChannel? _channel;
   bool? _lastIsDark;
   int? _lastTint;
@@ -188,20 +215,14 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
   bool _pressed = false;
 
   // Issue #29 halo containment: clip native view while enclosing route is
-  // animating OR while any modal/sheet/popup is above it.
+  // animating. Modal-up containment is now handled by ModalHideMixin
+  // (maybeHiddenPlaceholder + native setInteractive); the legacy modal trigger
+  // was removed to avoid double-firing visual blink.
   Animation<double>? _secondaryRouteAnim;
-  bool _modalAbove = false;
 
   bool get _isDark => ThemeHelper.isDark(context);
   Color? get _effectiveTint =>
       widget.tint ?? ThemeHelper.getPrimaryColor(context);
-
-  @override
-  void initState() {
-    super.initState();
-    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
-    _onAnyModalDepthChanged();
-  }
 
   @override
   void didUpdateWidget(covariant CNPopupMenuButton oldWidget) {
@@ -220,7 +241,6 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
   void dispose() {
     _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
-    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _channel?.setMethodCallHandler(null);
     super.dispose();
   }
@@ -239,22 +259,52 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
     _pushContainmentIfNeeded();
   }
 
-  void _onAnyModalDepthChanged() {
-    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
-    _pushContainmentIfNeeded();
-  }
-
   void _pushContainmentIfNeeded() {
     final anim = _secondaryRouteAnim;
     final animating =
         anim?.status == AnimationStatus.forward ||
         anim?.status == AnimationStatus.reverse;
-    final active = animating || _modalAbove;
+    final active = animating;
     final ch = _channel;
     if (ch == null) return;
-    try {
-      ch.invokeMethod('setTransitioning', {'active': active});
-    } catch (_) {}
+    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
+  }
+
+  /// Returns a hide-placeholder wrapped in a LayoutBuilder that reproduces
+  /// the live build's width formula, or null when the widget should render
+  /// normally. Mirrors the width logic in [_buildNativePopupMenu]'s
+  /// LayoutBuilder so the slot has identical dimensions whether or not the
+  /// native platform view is currently mounted (prevents surrounding text
+  /// from creeping into the slot during the hide/show transition).
+  Widget? _maybeHiddenWithLiveDimensions() {
+    // Probe with widget-level dimensions: if not hidden, return null so the
+    // caller proceeds with the normal build.
+    final probe = maybeHiddenPlaceholder(
+      height: widget.height,
+      width: widget.width,
+    );
+    if (probe == null) return null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hasBoundedWidth = constraints.hasBoundedWidth;
+        final preferIntrinsic = widget.shrinkWrap || !hasBoundedWidth;
+        double? width;
+        if (widget.isIconButton) {
+          // Fixed circle size for icon buttons (matches live build).
+          width = widget.width ?? widget.height;
+        } else if (preferIntrinsic) {
+          // Match the live build's intrinsic-width fallback (80.0).
+          width = _intrinsicWidth ?? 80.0;
+        } else if (hasBoundedWidth && constraints.maxWidth.isFinite) {
+          // Live build passes null width so SizedBox fills the parent's
+          // bounded width. Mirror that explicitly so the placeholder reserves
+          // the same footprint instead of collapsing to 0.
+          width = constraints.maxWidth;
+        }
+        return maybeHiddenPlaceholder(height: widget.height, width: width) ??
+            SizedBox(height: widget.height, width: width);
+      },
+    );
   }
 
   @override
@@ -271,6 +321,16 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
       // For both non-iOS/macOS and iOS/macOS < 26, use CupertinoActionSheet
       return _buildCupertinoFallback(context);
     }
+
+    // Issue #53 fix: when a modal is presented above our host route, destroy
+    // the native popup menu's PlatformView so it's removed from the shared
+    // iOS PlatformView container.
+    //
+    // Compute the placeholder width using the SAME formula the live build
+    // uses inside its LayoutBuilder so the surrounding layout does not
+    // reflow during hide/show (text creeping into the gap, etc.).
+    final hiddenWrapper = _maybeHiddenWithLiveDimensions();
+    if (hiddenWrapper != null) return hiddenWrapper;
 
     // Priority: imageAsset > customIcon > icon
 
@@ -454,6 +514,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
     final isDivider = <bool>[];
     final enabled = <bool>[];
     final checked = <bool>[];
+    final isDestructive = <bool>[];
     final sizes = <double?>[];
     final colors = <int?>[];
     final modes = <String?>[];
@@ -474,6 +535,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
         isDivider.add(true);
         enabled.add(false);
         checked.add(false);
+        isDestructive.add(false);
         sizes.add(null);
         colors.add(null);
         modes.add(null);
@@ -510,6 +572,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
         isDivider.add(false);
         enabled.add(e.enabled);
         checked.add(e.checked);
+        isDestructive.add(e.isDestructive);
         sizes.add(e.imageAsset?.size ?? e.icon?.size);
         colors.add(capturedMenuItemColors[i]);
         modes.add(e.imageAsset?.mode?.name ?? e.icon?.mode?.name);
@@ -553,6 +616,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
       'isDivider': isDivider,
       'enabled': enabled,
       'checked': checked,
+      'isDestructive': isDestructive,
       'sfSymbolSizes': sizes,
       'sfSymbolColors': colors,
       'sfSymbolRenderingModes': modes,
@@ -614,49 +678,51 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
             },
           );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final hasBoundedWidth = constraints.hasBoundedWidth;
-        // If shrinkWrap or width is unbounded (e.g. inside a Row), prefer intrinsic width.
-        final preferIntrinsic = widget.shrinkWrap || !hasBoundedWidth;
-        double? width;
-        if (widget.isIconButton) {
-          // Fixed circle size for icon buttons
-          width = widget.width ?? widget.height;
-        } else if (preferIntrinsic) {
-          width = _intrinsicWidth ?? 80.0;
-        }
-        return Listener(
-          onPointerDown: (e) {
-            _downPosition = e.position;
-            _setPressed(true);
-          },
-          onPointerMove: (e) {
-            final start = _downPosition;
-            if (start != null && _pressed) {
-              final moved = (e.position - start).distance;
-              if (moved > kTouchSlop) {
-                _setPressed(false);
+    return wrapWithModalInteractionGuard(
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final hasBoundedWidth = constraints.hasBoundedWidth;
+          // If shrinkWrap or width is unbounded (e.g. inside a Row), prefer intrinsic width.
+          final preferIntrinsic = widget.shrinkWrap || !hasBoundedWidth;
+          double? width;
+          if (widget.isIconButton) {
+            // Fixed circle size for icon buttons
+            width = widget.width ?? widget.height;
+          } else if (preferIntrinsic) {
+            width = _intrinsicWidth ?? 80.0;
+          }
+          return Listener(
+            onPointerDown: (e) {
+              _downPosition = e.position;
+              _setPressed(true);
+            },
+            onPointerMove: (e) {
+              final start = _downPosition;
+              if (start != null && _pressed) {
+                final moved = (e.position - start).distance;
+                if (moved > kTouchSlop) {
+                  _setPressed(false);
+                }
               }
-            }
-          },
-          onPointerUp: (_) {
-            _setPressed(false);
-            _downPosition = null;
-          },
-          onPointerCancel: (_) {
-            _setPressed(false);
-            _downPosition = null;
-          },
-          child: ClipRect(
-            child: SizedBox(
-              height: widget.height,
-              width: width,
-              child: platformView,
+            },
+            onPointerUp: (_) {
+              _setPressed(false);
+              _downPosition = null;
+            },
+            onPointerCancel: (_) {
+              _setPressed(false);
+              _downPosition = null;
+            },
+            child: ClipRect(
+              child: SizedBox(
+                height: widget.height,
+                width: width,
+                child: platformView,
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -706,6 +772,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
     final updIsDivider = <bool>[];
     final updEnabled = <bool>[];
     final updChecked = <bool>[];
+    final updIsDestructive = <bool>[];
     final updSizes = <double?>[];
     final updColors = <int?>[];
     final updModes = <String?>[];
@@ -721,6 +788,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
         updIsDivider.add(true);
         updEnabled.add(false);
         updChecked.add(false);
+        updIsDestructive.add(false);
         updSizes.add(null);
         updColors.add(null);
         updModes.add(null);
@@ -735,6 +803,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
         updIsDivider.add(false);
         updEnabled.add(e.enabled);
         updChecked.add(e.checked);
+        updIsDestructive.add(e.isDestructive);
         updSizes.add(e.imageAsset?.size ?? e.icon?.size);
         updColors.add(
           resolveColorToArgb(e.imageAsset?.color ?? e.icon?.color, context),
@@ -864,6 +933,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
       'isDivider': updIsDivider,
       'enabled': updEnabled,
       'checked': updChecked,
+      'isDestructive': updIsDestructive,
       'sfSymbolSizes': updSizes,
       'sfSymbolColors': updColors,
       'sfSymbolRenderingModes': updModes,
@@ -925,6 +995,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton> {
                     if (widget.items[i] is CNPopupMenuItem)
                       CupertinoActionSheetAction(
                         onPressed: () => Navigator.of(ctx).pop(i),
+                        isDestructiveAction:
+                            (widget.items[i] as CNPopupMenuItem).isDestructive,
                         child: Text((widget.items[i] as CNPopupMenuItem).label),
                       )
                     else

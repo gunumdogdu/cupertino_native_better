@@ -11,14 +11,12 @@ let package = Package(
         .library(name: "cupertino-native-better", targets: ["cupertino_native_better"])
     ],
     dependencies: [
-        .package(name: "FlutterFramework", path: "../FlutterFramework"),
         .package(url: "https://github.com/SVGKit/SVGKit.git", from: "3.0.0")
     ],
     targets: [
         .target(
             name: "cupertino_native_better",
             dependencies: [
-                .product(name: "FlutterFramework", package: "FlutterFramework"),
                 .product(name: "SVGKit", package: "SVGKit")
             ],
             path: "Sources/cupertino_native_better",

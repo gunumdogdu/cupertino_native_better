@@ -1,3 +1,77 @@
+## 1.5.1
+
+### Fixed — #53 PlatformView z-order bleed under bottom sheets
+
+iOS hybrid composition was reusing the same `PlatformViewContainer` for both a host-page CN-widget and a CN-widget inside a presented sheet, causing the host-page widget's pixels to leak through the sheet's scrim (and vice-versa).
+
+**Fix:** new `ModalHideMixin` (in `lib/utils/modal_hide_mixin.dart`) applied to **all 9** CN widgets that use a PlatformView — `CNButton`, `CNGlassButtonGroup`, `CNSwitch`, `CNSegmentedControl`, `CNPopupMenuButton`, `CNSearchBar`, `CNLiquidGlassContainer`, `CNFloatingIsland`, `CNSlider`. Each widget now destroys its PlatformView (with a same-size placeholder reserving the layout slot) while a sheet covers it, and recreates it when the sheet dismisses.
+
+Each affected widget gained an `autoHideOnModal: bool = true` constructor parameter so users can opt out per-instance.
+
+### New — `CNBottomSheet` + `CNSheetGeometryProbe`
+
+For the modal-hide to be **position-aware** (only widgets actually behind the sheet hide, not the entire host route), the sheet has to publish its rect each frame. Two new public APIs cover this:
+
+- **`CNBottomSheet`** (in `lib/components/bottom_sheet.dart`) — drop-in wrappers that inject the probe automatically:
+
+  ```dart
+  CNBottomSheet.show(context: context, builder: (ctx) => MySheet());
+  CNBottomSheet.showCupertino(context: context, builder: (ctx) => MySheet());
+  CNBottomSheet.showModalPopup(context: context, builder: (ctx) => MySheet());
+  ```
+
+- **`CNSheetGeometryProbe`** — wrap your own sheet builder manually if you need to keep using the framework APIs directly:
+
+  ```dart
+  showModalBottomSheet(
+    context: context,
+    builder: (ctx) => CNSheetGeometryProbe(child: MySheet()),
+  );
+  ```
+
+Without one of these the package falls back to a conservative "hide every CN-widget on this route while any modal is up" behavior — safe, but coarser than needed (an app-bar CN-button could disappear behind a 30%-height sheet).
+
+`CNTabBarRouteObserver` also gained `topModalRect: ValueNotifier<Rect?>` and `publishTopModalRect(Rect?)`, used by the probe.
+
+### Fixed — #55 `CNPopupMenuItem.isDestructive`
+
+`CNPopupMenuItem` gained `isDestructive: bool = false`. When true:
+
+- iOS 14+ adds `UIMenuElement.Attributes.destructive` → the **label** renders in the system destructive red (previously only the icon could be red via `iconColor`).
+- iOS 13 legacy fallback uses `UIAlertAction.Style.destructive`.
+- iOS < 26 / non-iOS Cupertino fallback uses `CupertinoActionSheetAction(isDestructiveAction: true)`.
+
+Thanks @ashellz for the report.
+
+### Fixed — CNGlassButtonGroup remount blink
+
+`CNGlassButtonGroup`'s `FutureBuilder` returned `SizedBox.shrink()` for one frame between the modal-hide placeholder removal and the platform view actually mounting — text below jumped up then back down on every sheet dismiss. The pending branch now mirrors the placeholder's axis-aware dimensions so the layout slot is held across the swap.
+
+### Fixed — PR #57 macOS `CNSwitch` rendered as a checkbox
+
+The macOS `Toggle` defaulted to a checkbox under recent SDKs. Applied `.toggleStyle(.switch)` to force the switch appearance. iOS unaffected. Thanks @jonathanfristedt.
+
+### Fixed — `MissingPluginException` storm during transitions
+
+`ch.invokeMethod('setTransitioning', …)` calls now use `.catchError((_) {})` to swallow async rejections, and fallback platform-view classes (iOS < 26) register no-op `MethodChannel` handlers so Dart-side calls from `ModalHideMixin` and route-transition containment don't throw.
+
+### Docs
+
+- `pubspec.yaml` `documentation:` now points to https://gunumdogdu.com/docs.
+- README documents `CNBottomSheet` / `CNSheetGeometryProbe` usage and the navigatorObserver requirement for modal-hide to work.
+
+### Example app
+
+- New: `Testing → #53: CNButton under bottom sheet` — four sheet-opener variants over a host page full of CN widgets.
+- New: `Testing → #55: PopupMenu isDestructive` — text, icon, and mixed menus with destructive items.
+- New: `Testing → Glass widgets modal halo test` — all 9 CN widgets behind sheets.
+- New: `Testing → CNButton modal halo test` — modal route push/pop animations.
+- New: `Testing → #37: CNAppBar button halo test`.
+
+### Known limitations
+
+- `CNGlassButtonGroup` glass merging at default spacing still shows a "dumbbell" between buttons. The single-uniform-pill rewrite hit a SwiftUI hit-testing limitation (`.glassEffect()` intercepts touches at a layer below `.allowsHitTesting(false)`); a UIKit `UIVisualEffectView` rewrite is queued for the next release.
+
 ## 1.5.0
 
 ### New — CNTabBarNative gains minimize, native lists, accessory & root mode

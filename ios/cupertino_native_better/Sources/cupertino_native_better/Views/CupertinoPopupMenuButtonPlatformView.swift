@@ -18,6 +18,10 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var dividers: [Bool] = []
   private var enabled: [Bool] = []
   private var checked: [Bool] = []
+  // Issue #55: per-item destructive flag. When true, the menu action is
+  // built with `UIMenuElement.Attributes.destructive` so iOS renders the
+  // label (not just the icon) in the system red destructive color.
+  private var isDestructive: [Bool] = []
   private var itemSizes: [Any] = []
   private var itemColors: [Any] = []
   private var itemModes: [String?] = []
@@ -93,6 +97,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       dividers = (dict["isDivider"] as? [NSNumber]) ?? []
       enabled = (dict["enabled"] as? [NSNumber]) ?? []
       if let c = dict["checked"] as? [NSNumber] { self.checked = c.map { $0.boolValue } }
+      if let d = dict["isDestructive"] as? [NSNumber] { self.isDestructive = d.map { $0.boolValue } }
       sizes = (dict["sfSymbolSizes"] as? [Any]) ?? []
       colors = (dict["sfSymbolColors"] as? [Any]) ?? []
       if let modes = dict["sfSymbolRenderingModes"] as? [String?] { self.itemModes = modes }
@@ -209,6 +214,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
           self.dividers = ((args["isDivider"] as? [NSNumber]) ?? []).map { $0.boolValue }
           self.enabled = ((args["enabled"] as? [NSNumber]) ?? []).map { $0.boolValue }
           self.checked = ((args["checked"] as? [NSNumber]) ?? []).map { $0.boolValue }
+          self.isDestructive = ((args["isDestructive"] as? [NSNumber]) ?? []).map { $0.boolValue }
           let sizes = (args["sfSymbolSizes"] as? [NSNumber]) ?? []
           let colors = (args["sfSymbolColors"] as? [NSNumber]) ?? []
           self.itemSizes = sizes
@@ -276,6 +282,14 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
           self.button.isHighlighted = p.boolValue
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing pressed", details: nil)) }
+      case "setInteractive":
+        if let args = call.arguments as? [String: Any],
+           let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+          NSLog("[CN CNPopup] setInteractive=\(interactive)")
+          self._cnSetInteractiveRecursive(self.container, interactive)
+          self._cnSetInteractiveRecursive(self.button, interactive)
+        }
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -283,6 +297,12 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+    guard let view = view else { return }
+    view.isUserInteractionEnabled = interactive
+    for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
+  }
 
   /// Toggle Issue #29 halo containment based on whether the enclosing
   /// route is animating or a modal is presented on top.
@@ -483,7 +503,13 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         }
         let isEnabled = i < enabled.count ? enabled[i] : true
         let isChecked = i < checked.count ? checked[i] : false
-        let action = UIAction(title: title, image: image, attributes: isEnabled ? [] : [.disabled]) { [weak self] _ in
+        let destructive = i < self.isDestructive.count ? self.isDestructive[i] : false
+        // Compose menu attributes: .destructive paints the label red
+        // (system destructive color); .disabled greys it out.
+        var attrs: UIMenuElement.Attributes = []
+        if !isEnabled { attrs.insert(.disabled) }
+        if destructive { attrs.insert(.destructive) }
+        let action = UIAction(title: title, image: image, attributes: attrs) { [weak self] _ in
           self?.channel.invokeMethod("itemSelected", arguments: ["index": i])
         }
         action.state = isChecked ? .on : .off
@@ -509,7 +535,8 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         continue
       }
       let title = i < labels.count ? labels[i] : ""
-      let action = UIAlertAction(title: title, style: .default) { [weak self] _ in
+      let destructive = i < self.isDestructive.count ? self.isDestructive[i] : false
+      let action = UIAlertAction(title: title, style: destructive ? .destructive : .default) { [weak self] _ in
         self?.channel.invokeMethod("itemSelected", arguments: ["index": i])
       }
       if i < enabled.count { action.isEnabled = enabled[i] }

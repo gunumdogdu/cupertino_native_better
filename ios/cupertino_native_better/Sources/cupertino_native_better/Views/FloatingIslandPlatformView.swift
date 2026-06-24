@@ -124,6 +124,15 @@ class FloatingIslandPlatformView: NSObject, FlutterPlatformView {
                 self.applyTransitionContainment(active)
                 result(nil)
 
+            case "setInteractive":
+                if let args = call.arguments as? [String: Any],
+                   let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+                    NSLog("[CN FloatIsland] setInteractive=\(interactive)")
+                    self._cnSetInteractiveRecursive(self.container, interactive)
+                    self._cnSetInteractiveRecursive(self.hostingController.view, interactive)
+                }
+                result(nil)
+
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -159,6 +168,12 @@ class FloatingIslandPlatformView: NSObject, FlutterPlatformView {
 
     func view() -> UIView {
         return container
+    }
+
+    private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+        guard let view = view else { return }
+        view.isUserInteractionEnabled = interactive
+        for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
     }
 }
 
