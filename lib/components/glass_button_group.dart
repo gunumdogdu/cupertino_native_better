@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import '../utils/version_detector.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/theme_helper.dart';
 import '../channel/params.dart';
 import '../style/button_data.dart';
@@ -11,7 +12,6 @@ import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import 'button.dart';
 import 'popup_menu_button.dart';
-import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// A group of buttons that can be rendered together for proper Liquid Glass blending effects.
 ///
@@ -63,6 +63,7 @@ class CNGlassButtonGroup extends StatefulWidget {
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
     this.spacingForGlass = 40.0,
+    this.autoHideOnModal = true,
   }) : _buttonWidgets = null;
 
   /// Creates a group from existing CNButton widgets.
@@ -77,6 +78,7 @@ class CNGlassButtonGroup extends StatefulWidget {
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
     this.spacingForGlass = 40.0,
+    this.autoHideOnModal = true,
   }) : buttons = const [],
        _buttonWidgets = buttonWidgets;
 
@@ -95,6 +97,15 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// Spacing value for Liquid Glass blending (affects how glass effects merge).
   final double spacingForGlass;
 
+  /// When true (default), destroys the native group's PlatformView while a
+  /// modal sheet is presented above this widget's host route. Fixes the
+  /// iOS hybrid-composition z-order bleed (Issue #53) where host-page
+  /// PlatformView pixels can leak through a sheet that also contains
+  /// CN-widgets. Requires `CNTabBarRouteObserver()` to be registered in
+  /// the app's `navigatorObservers`. No effect on iOS < 26 / non-iOS
+  /// (Flutter fallback).
+  final bool autoHideOnModal;
+
   /// Returns the effective button count (from data or widgets).
   int get _effectiveButtonCount =>
       _buttonWidgets != null ? _buttonWidgets.length : buttons.length;
@@ -103,7 +114,14 @@ class CNGlassButtonGroup extends StatefulWidget {
   State<CNGlassButtonGroup> createState() => _CNGlassButtonGroupState();
 }
 
-class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
+class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
+    with ModalHideMixin<CNGlassButtonGroup> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   MethodChannel? _channel;
   List<_ButtonSnapshot>? _lastButtonSnapshots;
   Axis? _lastAxis;
@@ -111,18 +129,14 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
   double? _lastSpacingForGlass;
 
   // Issue #29 halo containment via setTransitioning.
+  // Driven only by route-transition animations; the modal-up trigger has been
+  // removed in favor of ModalHideMixin (maybeHiddenPlaceholder + native
+  // setInteractive), which handles modal sheets without the visible
+  // clip/shadow blink the legacy trigger caused.
   Animation<double>? _secondaryRouteAnim;
-  bool _modalAbove = false;
 
   /// Whether we're using widget mode (backward compatibility).
   bool get _usingWidgets => widget._buttonWidgets != null;
-
-  @override
-  void initState() {
-    super.initState();
-    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
-    _onAnyModalDepthChanged();
-  }
 
   @override
   void didChangeDependencies() {
@@ -140,7 +154,6 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
   void dispose() {
     _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
-    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     super.dispose();
   }
 
@@ -156,22 +169,15 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
 
   void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
 
-  void _onAnyModalDepthChanged() {
-    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
-    _pushContainmentIfNeeded();
-  }
-
   void _pushContainmentIfNeeded() {
     final anim = _secondaryRouteAnim;
     final animating =
         anim?.status == AnimationStatus.forward ||
         anim?.status == AnimationStatus.reverse;
-    final active = animating || _modalAbove;
+    final active = animating;
     final ch = _channel;
     if (ch == null) return;
-    try {
-      ch.invokeMethod('setTransitioning', {'active': active});
-    } catch (_) {}
+    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   @override
@@ -186,7 +192,54 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
       return _buildFlutterFallback(context);
     }
 
-    return _buildNativeGroup(context);
+    // Issue #53 fix: while a modal is presented above our host route,
+    // destroy the native group's PlatformView so it's removed from the
+    // shared iOS PlatformView container (otherwise hybrid-composition
+    // z-order desyncs with the sheet's own PlatformViews and pixels bleed
+    // through the scrim).
+    //
+    // The hide path MUST size itself using the same width formula the live
+    // build uses — otherwise a bounded-width parent (e.g. Container with
+    // explicit width) makes the live widget take `constraints.maxWidth+6`
+    // while the placeholder takes the unbounded `estimatedWidth`, the slot
+    // visibly shrinks/grows, and surrounding text creeps into the gap.
+    // Wrap both paths in a single LayoutBuilder so the placeholder reuses
+    // the live build's constraint-aware sizing.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (widget.axis == Axis.horizontal) {
+          final totalHeight = _getEffectiveMinHeight() + 3.0;
+          final width = constraints.hasBoundedWidth
+              ? constraints.maxWidth + 6.0
+              : (widget._effectiveButtonCount * 44.0 +
+                    ((widget._effectiveButtonCount - 1) * widget.spacing) +
+                    6.0);
+          final hidden = maybeHiddenPlaceholder(
+            height: totalHeight,
+            width: width,
+          );
+          if (hidden != null) return hidden;
+        } else {
+          // Match the live vertical build: estimatedHeight is clamped to
+          // (44.0, 400.0) inside a LimitedBox. Mirror the clamp here so the
+          // placeholder reserves the exact same vertical footprint.
+          final rawHeight =
+              (widget._effectiveButtonCount * _getEffectiveMinHeight()) +
+              ((widget._effectiveButtonCount - 1) * widget.spacing) +
+              3.0;
+          final totalHeight = rawHeight.clamp(44.0, 400.0);
+          final width = constraints.hasBoundedWidth
+              ? constraints.maxWidth
+              : double.infinity;
+          final hidden = maybeHiddenPlaceholder(
+            height: totalHeight,
+            width: width,
+          );
+          if (hidden != null) return hidden;
+        }
+        return wrapWithModalInteractionGuard(_buildNativeGroup(context));
+      },
+    );
   }
 
   Widget _buildNativeGroup(BuildContext context) {
@@ -206,7 +259,38 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup> {
             ),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const SizedBox.shrink();
+          // CRITICAL: reserve the same layout slot the destroy-state
+          // placeholder uses. Returning SizedBox.shrink() here collapsed
+          // the slot for one frame on every remount (e.g. when a modal
+          // sheet finished dismissing) — the text below jumped up then
+          // back down, visible as an ugly one-frame blink. Mirror the
+          // axis-aware sizing math from the wrapping LayoutBuilder so
+          // the pending frame holds the exact same footprint as both
+          // the hidden placeholder and the resolved live build.
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              if (widget.axis == Axis.horizontal) {
+                final totalHeight = _getEffectiveMinHeight() + 3.0;
+                final width = constraints.hasBoundedWidth
+                    ? constraints.maxWidth + 6.0
+                    : (widget._effectiveButtonCount * 44.0 +
+                          ((widget._effectiveButtonCount - 1) *
+                              widget.spacing) +
+                          6.0);
+                return SizedBox(height: totalHeight, width: width);
+              } else {
+                final rawHeight =
+                    (widget._effectiveButtonCount * _getEffectiveMinHeight()) +
+                    ((widget._effectiveButtonCount - 1) * widget.spacing) +
+                    3.0;
+                final totalHeight = rawHeight.clamp(44.0, 400.0);
+                final width = constraints.hasBoundedWidth
+                    ? constraints.maxWidth
+                    : double.infinity;
+                return SizedBox(height: totalHeight, width: width);
+              }
+            },
+          );
         }
 
         final creationParams = <String, dynamic>{

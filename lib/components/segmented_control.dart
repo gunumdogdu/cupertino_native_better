@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../style/sf_symbol.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 
@@ -28,6 +29,7 @@ class CNSegmentedControl extends StatefulWidget {
     this.iconPaletteColors,
     this.iconGradientEnabled,
     this.iconRenderingMode,
+    this.autoHideOnModal = true,
   });
 
   /// Segment labels to display, in order.
@@ -69,11 +71,25 @@ class CNSegmentedControl extends StatefulWidget {
   /// Global icon rendering mode.
   final CNSymbolRenderingMode? iconRenderingMode;
 
+  /// When true (default), destroys the native segmented control's PlatformView
+  /// while a modal sheet is presented above this widget's host route. Fixes
+  /// the iOS hybrid-composition z-order bleed (Issue #53). Requires
+  /// `CNTabBarRouteObserver()` to be registered in the app's
+  /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
+  final bool autoHideOnModal;
+
   @override
   State<CNSegmentedControl> createState() => _CNSegmentedControlState();
 }
 
-class _CNSegmentedControlState extends State<CNSegmentedControl> {
+class _CNSegmentedControlState extends State<CNSegmentedControl>
+    with ModalHideMixin<CNSegmentedControl> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   MethodChannel? _channel;
 
   int? _lastSelected;
@@ -128,6 +144,19 @@ class _CNSegmentedControlState extends State<CNSegmentedControl> {
         ),
       );
     }
+
+    // Placeholder width MUST mirror the live build's footprint:
+    //   - shrinkWrap path renders inside a Center{SizedBox(width: _intrinsicWidth)},
+    //     which (until first measurement) stretches to full width then collapses
+    //     to the measured intrinsic. Use the cached intrinsic if available so
+    //     surrounding layout doesn't reflow when the placeholder swaps in.
+    //   - non-shrinkWrap path renders inside a SizedBox(height: ...) that takes
+    //     all available width (double.infinity).
+    final hidden = maybeHiddenPlaceholder(
+      height: widget.height,
+      width: widget.shrinkWrap ? _intrinsicWidth : double.infinity,
+    );
+    if (hidden != null) return hidden;
 
     const viewType = 'CupertinoNativeSegmentedControl';
     final creationParams = <String, dynamic>{
@@ -194,19 +223,23 @@ class _CNSegmentedControlState extends State<CNSegmentedControl> {
 
     if (widget.shrinkWrap) {
       final width = _intrinsicWidth;
-      return Center(
-        child: ClipRect(
-          child: SizedBox(
-            height: widget.height,
-            width: width, // if null, stretches initially until measured
-            child: platformView,
+      return wrapWithModalInteractionGuard(
+        Center(
+          child: ClipRect(
+            child: SizedBox(
+              height: widget.height,
+              width: width, // if null, stretches initially until measured
+              child: platformView,
+            ),
           ),
         ),
       );
     }
 
-    return ClipRect(
-      child: SizedBox(height: widget.height, child: platformView),
+    return wrapWithModalInteractionGuard(
+      ClipRect(
+        child: SizedBox(height: widget.height, child: platformView),
+      ),
     );
   }
 

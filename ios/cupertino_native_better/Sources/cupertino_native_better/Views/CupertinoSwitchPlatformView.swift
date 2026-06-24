@@ -67,6 +67,16 @@ class CupertinoSwitchPlatformView: NSObject, FlutterPlatformView {
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
+      case "setInteractive":
+        // Issue #53 follow-up: see button view's setInteractive for the
+        // rationale. Flutter's AbsorbPointer can't block native UIView
+        // touches; only isUserInteractionEnabled does.
+        if let args = call.arguments as? [String: Any],
+           let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+          NSLog("[CN CNSwitch] setInteractive=\(interactive)")
+          self._cnSetInteractiveRecursive(self.hostingController.view, interactive)
+        }
+        result(nil)
       case "setBrightness":
         if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
           if #available(iOS 13.0, *) {
@@ -123,5 +133,11 @@ class CupertinoSwitchPlatformView: NSObject, FlutterPlatformView {
   // Use shared utility functions
   private static func colorFromARGB(_ argb: Int) -> UIColor {
     return ImageUtils.colorFromARGB(argb)
+  }
+
+  private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+    guard let view = view else { return }
+    view.isUserInteractionEnabled = interactive
+    for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
   }
 }

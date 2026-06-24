@@ -17,10 +17,10 @@ import '../style/button_style.dart';
 import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
-import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// Configuration for CNButton with default values.
 class CNButtonConfig {
@@ -169,6 +169,7 @@ class CNButton extends StatefulWidget {
     this.customIcon,
     this.imageAsset,
     this.config = const CNButtonConfig(),
+    this.autoHideOnModal = true,
   }) : badgeCount = null,
        super();
 
@@ -191,6 +192,7 @@ class CNButton extends StatefulWidget {
     this.tint,
     this.badgeCount,
     this.config = const CNButtonConfig(style: CNButtonStyle.glass),
+    this.autoHideOnModal = true,
   }) : label = null,
        assert(
          icon != null || customIcon != null || imageAsset != null,
@@ -232,6 +234,14 @@ class CNButton extends StatefulWidget {
   /// Button configuration.
   final CNButtonConfig config;
 
+  /// When true (default), destroys the native button's PlatformView while a
+  /// modal sheet is presented above this widget's host route. Fixes the
+  /// iOS hybrid-composition z-order bleed (Issue #53) where a host-page
+  /// CNButton's pixels leak through a sheet that also contains a CN-widget.
+  /// Requires `CNTabBarRouteObserver()` to be registered in the app's
+  /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
+  final bool autoHideOnModal;
+
   /// Whether this instance is configured as the icon variant.
   bool get isIcon => icon != null || customIcon != null || imageAsset != null;
 
@@ -242,7 +252,13 @@ class CNButton extends StatefulWidget {
   State<CNButton> createState() => _CNButtonState();
 }
 
-class _CNButtonState extends State<CNButton> {
+class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   MethodChannel? _channel;
   bool? _lastIsDark;
   int? _lastTint;
@@ -277,7 +293,12 @@ class _CNButtonState extends State<CNButton> {
   // no modal) the containment is OFF so the capsule can render its full
   // soft-edge glow and grow with a stretched parent frame.
   Animation<double>? _secondaryRouteAnim;
-  bool _modalAbove = false;
+  // NOTE: modal-up containment is no longer driven from this widget. The
+  // ModalHideMixin handles modal up/down via maybeHiddenPlaceholder and
+  // the native `setInteractive` call. The legacy `_modalAbove` trigger was
+  // removed because it double-fired with the mixin and caused a visible
+  // blink/resize. Route-transition containment (Issue #29) is still driven
+  // by the secondaryAnimation listener below.
 
   bool get _isDark => ThemeHelper.isDark(context);
 
@@ -285,17 +306,9 @@ class _CNButtonState extends State<CNButton> {
       widget.tint ?? ThemeHelper.getPrimaryColor(context);
 
   @override
-  void initState() {
-    super.initState();
-    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
-    _onAnyModalDepthChanged();
-  }
-
-  @override
   void dispose() {
     _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
-    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _channel?.setMethodCallHandler(null);
     super.dispose();
   }
@@ -330,32 +343,18 @@ class _CNButtonState extends State<CNButton> {
     final isAnimating =
         anim.status == AnimationStatus.forward ||
         anim.status == AnimationStatus.reverse;
-    _pushContainmentIfNeeded(animating: isAnimating, modalAbove: _modalAbove);
+    _pushContainmentIfNeeded(animating: isAnimating);
   }
 
-  void _onAnyModalDepthChanged() {
-    final above = CNTabBarRouteObserver.anyModalDepth.value > 0;
-    _pushContainmentIfNeeded(
-      animating:
-          _secondaryRouteAnim?.status == AnimationStatus.forward ||
-          _secondaryRouteAnim?.status == AnimationStatus.reverse,
-      modalAbove: above,
-    );
-  }
-
-  void _pushContainmentIfNeeded({
-    required bool animating,
-    required bool modalAbove,
-  }) {
-    final next = animating || modalAbove;
-    _modalAbove = modalAbove;
+  void _pushContainmentIfNeeded({required bool animating}) {
+    final next = animating;
     final ch = _channel;
     if (ch == null) return;
-    try {
-      ch.invokeMethod('setTransitioning', {'active': next});
-    } catch (_) {
-      // MissingPluginException during hot reload / view recreation — ignore.
-    }
+    // Fire-and-forget: this is called from a sync listener so we can't await.
+    // A sync try/catch CANNOT catch async errors from the returned Future
+    // (e.g. MissingPluginException during hot reload / view recreation),
+    // so use .catchError to swallow them safely.
+    ch.invokeMethod('setTransitioning', {'active': next}).catchError((_) {});
   }
 
   @override
@@ -561,120 +560,154 @@ class _CNButtonState extends State<CNButton> {
         'labelFontWeight': widget.config.labelFontWeight!.value,
     };
 
-    final platformView = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              // Forward taps to native; let Flutter keep drags for scrolling.
-              Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-            },
-          )
-        : AppKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-            },
-          );
+    // Issue #53 fix: when a modal is presented above our host route, destroy
+    // the native button's PlatformView so it's removed from the shared iOS
+    // PlatformView container. Otherwise hybrid-composition z-order desyncs
+    // with the sheet's own PlatformViews during drag → visual bleed.
+    // The existing `setTransitioning` clipping (Issue #29) is unrelated and
+    // remains in place for route-transition halo containment.
+    //
+    // The placeholder dimensions MUST match the live build's
+    // `SizedBox(height, width, child: platformView)` formula exactly,
+    // otherwise surrounding layout reflows during hide/show. The live
+    // formula depends on LayoutBuilder constraints, so the
+    // maybeHiddenPlaceholder check has to live INSIDE the LayoutBuilder.
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final hasBoundedWidth = constraints.hasBoundedWidth;
-        final preferIntrinsic = widget.config.shrinkWrap || !hasBoundedWidth;
-        double? width;
-        // For icon-only buttons, use fixed width/height
-        // For buttons with label (with or without icon), use intrinsic width
-        final isIconButton = widget.isIcon && widget.label == null;
+    return wrapWithModalInteractionGuard(
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final hasBoundedWidth = constraints.hasBoundedWidth;
+          final preferIntrinsic = widget.config.shrinkWrap || !hasBoundedWidth;
+          double? width;
+          // For icon-only buttons, use fixed width/height
+          // For buttons with label (with or without icon), use intrinsic width
+          final isIconButton = widget.isIcon && widget.label == null;
 
-        // Calculate circular dimensions for icon buttons when padding/width/minHeight not provided
-        // Apple HIG specifies minimum touch target of 44×44 points
-        const double kMinimumTouchTarget = 44.0;
-        double? calculatedSize;
-        if (isIconButton &&
-            widget.config.padding == null &&
-            widget.config.width == null &&
-            widget.config.minHeight == null) {
-          // Get icon size
-          double iconSize = 20.0;
-          if (imageAsset != null) {
-            iconSize = imageAsset.size;
-          } else if (widget.icon != null) {
-            iconSize = widget.icon!.size;
-          } else if (widget.customIcon != null) {
-            iconSize = widget.config.customIconSize ?? 20.0;
-          }
-          // Calculate circular size: icon size + padding on all sides
-          // Use a padding of iconSize * 0.5 on each side for a nice circular appearance
-          // Ensure minimum size of 44 points per Apple HIG
-          calculatedSize = (iconSize + (iconSize * 0.5) * 2).clamp(
-            kMinimumTouchTarget,
-            double.infinity,
-          );
-        }
-
-        final defaultHeight = widget.config.minHeight ?? calculatedSize ?? 44.0;
-        if (isIconButton) {
-          width = widget.config.width ?? calculatedSize ?? defaultHeight;
-        } else if (preferIntrinsic) {
-          width = _intrinsicWidth ?? 80.0;
-        }
-        // Use intrinsic height when image is top/bottom to prevent cropping
-        final needsDynamicHeight =
-            widget.imageAsset != null ||
-            widget.customIcon != null ||
-            widget.icon != null;
-        final isVerticalPlacement =
-            widget.config.imagePlacement == CNImagePlacement.top ||
-            widget.config.imagePlacement == CNImagePlacement.bottom;
-        final height =
-            (needsDynamicHeight &&
-                isVerticalPlacement &&
-                _intrinsicHeight != null)
-            ? _intrinsicHeight!
-            : defaultHeight;
-        final buttonWidget = Listener(
-          onPointerDown: (e) {
-            if (!widget.config.interaction) return;
-            _downPosition = e.position;
-            _setPressed(true);
-          },
-          onPointerMove: (e) {
-            if (!widget.config.interaction) return;
-            final start = _downPosition;
-            if (start != null && _pressed) {
-              final moved = (e.position - start).distance;
-              if (moved > kTouchSlop) {
-                _setPressed(false);
-              }
+          // Calculate circular dimensions for icon buttons when padding/width/minHeight not provided
+          // Apple HIG specifies minimum touch target of 44×44 points
+          const double kMinimumTouchTarget = 44.0;
+          double? calculatedSize;
+          if (isIconButton &&
+              widget.config.padding == null &&
+              widget.config.width == null &&
+              widget.config.minHeight == null) {
+            // Get icon size
+            double iconSize = 20.0;
+            if (imageAsset != null) {
+              iconSize = imageAsset.size;
+            } else if (widget.icon != null) {
+              iconSize = widget.icon!.size;
+            } else if (widget.customIcon != null) {
+              iconSize = widget.config.customIconSize ?? 20.0;
             }
-          },
-          onPointerUp: (_) {
-            if (!widget.config.interaction) return;
-            _setPressed(false);
-            _downPosition = null;
-          },
-          onPointerCancel: (_) {
-            if (!widget.config.interaction) return;
-            _setPressed(false);
-            _downPosition = null;
-          },
-          child: ClipRect(
-            child: SizedBox(height: height, width: width, child: platformView),
-          ),
-        );
+            // Calculate circular size: icon size + padding on all sides
+            // Use a padding of iconSize * 0.5 on each side for a nice circular appearance
+            // Ensure minimum size of 44 points per Apple HIG
+            calculatedSize = (iconSize + (iconSize * 0.5) * 2).clamp(
+              kMinimumTouchTarget,
+              double.infinity,
+            );
+          }
 
-        // Wrap in IgnorePointer when interaction is disabled to absorb all touches
-        if (!widget.config.interaction) {
-          return IgnorePointer(ignoring: true, child: buttonWidget);
-        }
+          final defaultHeight =
+              widget.config.minHeight ?? calculatedSize ?? 44.0;
+          if (isIconButton) {
+            width = widget.config.width ?? calculatedSize ?? defaultHeight;
+          } else if (preferIntrinsic) {
+            width = _intrinsicWidth ?? 80.0;
+          }
+          // Use intrinsic height when image is top/bottom to prevent cropping
+          final needsDynamicHeight =
+              widget.imageAsset != null ||
+              widget.customIcon != null ||
+              widget.icon != null;
+          final isVerticalPlacement =
+              widget.config.imagePlacement == CNImagePlacement.top ||
+              widget.config.imagePlacement == CNImagePlacement.bottom;
+          final height =
+              (needsDynamicHeight &&
+                  isVerticalPlacement &&
+                  _intrinsicHeight != null)
+              ? _intrinsicHeight!
+              : defaultHeight;
 
-        return buttonWidget;
-      },
+          // Modal-hide placeholder: dimensions MUST mirror the live
+          // SizedBox(height: height, width: width, child: platformView) below.
+          // If width is null the live build stretches to bounded constraints,
+          // so do the same here (use constraints.maxWidth when bounded).
+          final placeholderWidth =
+              width ??
+              (constraints.hasBoundedWidth ? constraints.maxWidth : null);
+          final hidden = maybeHiddenPlaceholder(
+            height: height,
+            width: placeholderWidth,
+          );
+          if (hidden != null) return hidden;
+
+          final platformView = defaultTargetPlatform == TargetPlatform.iOS
+              ? UiKitView(
+                  viewType: viewType,
+                  creationParams: creationParams,
+                  creationParamsCodec: const StandardMessageCodec(),
+                  onPlatformViewCreated: _onCreated,
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    // Forward taps to native; let Flutter keep drags for scrolling.
+                    Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                  },
+                )
+              : AppKitView(
+                  viewType: viewType,
+                  creationParams: creationParams,
+                  creationParamsCodec: const StandardMessageCodec(),
+                  onPlatformViewCreated: _onCreated,
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                  },
+                );
+
+          final buttonWidget = Listener(
+            onPointerDown: (e) {
+              if (!widget.config.interaction) return;
+              _downPosition = e.position;
+              _setPressed(true);
+            },
+            onPointerMove: (e) {
+              if (!widget.config.interaction) return;
+              final start = _downPosition;
+              if (start != null && _pressed) {
+                final moved = (e.position - start).distance;
+                if (moved > kTouchSlop) {
+                  _setPressed(false);
+                }
+              }
+            },
+            onPointerUp: (_) {
+              if (!widget.config.interaction) return;
+              _setPressed(false);
+              _downPosition = null;
+            },
+            onPointerCancel: (_) {
+              if (!widget.config.interaction) return;
+              _setPressed(false);
+              _downPosition = null;
+            },
+            child: ClipRect(
+              child: SizedBox(
+                height: height,
+                width: width,
+                child: platformView,
+              ),
+            ),
+          );
+
+          // Wrap in IgnorePointer when interaction is disabled to absorb all touches
+          if (!widget.config.interaction) {
+            return IgnorePointer(ignoring: true, child: buttonWidget);
+          }
+
+          return buttonWidget;
+        },
+      ),
     );
   }
 

@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
-import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// Position for the floating island.
 enum CNFloatingIslandPosition {
@@ -115,6 +115,7 @@ class CNFloatingIsland extends StatefulWidget {
     this.springResponse = 0.4,
     this.margin = const EdgeInsets.all(16),
     this.controller,
+    this.autoHideOnModal = true,
   });
 
   /// Content shown when collapsed (compact mode).
@@ -168,12 +169,26 @@ class CNFloatingIsland extends StatefulWidget {
   /// Controller for programmatic control.
   final CNFloatingIslandController? controller;
 
+  /// When true (default), destroys the native floating island's PlatformView
+  /// while a modal sheet is presented above this widget's host route. Fixes
+  /// the iOS hybrid-composition z-order bleed (Issue #53) where a host-page
+  /// CN-widget's pixels leak through a sheet that also contains a CN-widget.
+  /// Requires `CNTabBarRouteObserver()` to be registered in the app's
+  /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
+  final bool autoHideOnModal;
+
   @override
   State<CNFloatingIsland> createState() => _CNFloatingIslandState();
 }
 
 class _CNFloatingIslandState extends State<CNFloatingIsland>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, ModalHideMixin<CNFloatingIsland> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _controller._channel;
+
   late AnimationController _animationController;
   late Animation<double> _expandAnimation;
 
@@ -181,10 +196,11 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   bool _isExpanded = false;
 
   // Issue #29 halo containment state — toggled via setTransitioning on
-  // the native channel while the enclosing route is animating or a modal
-  // is above.
+  // the native channel while the enclosing route is animating.
+  // Modal-up containment is now handled exclusively by ModalHideMixin
+  // (maybeHiddenPlaceholder + native setInteractive), so the legacy
+  // modal-depth trigger has been removed to avoid a double-fire blink.
   Animation<double>? _secondaryRouteAnim;
-  bool _modalAbove = false;
 
   CNFloatingIslandController get _controller =>
       widget.controller ??
@@ -208,9 +224,6 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
     if (_isExpanded) {
       _animationController.value = 1.0;
     }
-
-    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
-    _onAnyModalDepthChanged();
   }
 
   @override
@@ -231,22 +244,15 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
 
   void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
 
-  void _onAnyModalDepthChanged() {
-    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
-    _pushContainmentIfNeeded();
-  }
-
   void _pushContainmentIfNeeded() {
     final anim = _secondaryRouteAnim;
     final animating =
         anim?.status == AnimationStatus.forward ||
         anim?.status == AnimationStatus.reverse;
-    final active = animating || _modalAbove;
+    final active = animating;
     final ch = _controller._channel;
     if (ch == null) return;
-    try {
-      ch.invokeMethod('setTransitioning', {'active': active});
-    } catch (_) {}
+    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   void _setupAnimations() {
@@ -274,7 +280,6 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   void dispose() {
     _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
-    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _animationController.dispose();
     _controller._detach();
     super.dispose();
@@ -343,6 +348,21 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   }
 
   Widget _buildNativeFloatingIsland(BuildContext context) {
+    // Mirror the live build's outer envelope (Padding(margin) + Align)
+    // exactly so the surrounding layout doesn't shift when the native
+    // view is hidden for a modal. The live build's Padding + Align
+    // expand to fill the parent's incoming constraints, so the
+    // placeholder uses the same wrapper with a same-sized inner
+    // SizedBox at the pill's position.
+    if (isHiddenForModal) {
+      return _buildPositionedContainer(
+        child: SizedBox(
+          height: widget.collapsedHeight,
+          width: widget.collapsedWidth,
+        ),
+      );
+    }
+
     const viewType = 'CNFloatingIsland';
     final creationParams = <String, dynamic>{
       'isExpanded': _isExpanded,
@@ -372,12 +392,14 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
             onPlatformViewCreated: _onPlatformViewCreated,
           );
 
-    return _buildPositionedContainer(
-      child: Stack(
-        children: [
-          Positioned.fill(child: IgnorePointer(child: platformView)),
-          _buildContent(),
-        ],
+    return wrapWithModalInteractionGuard(
+      _buildPositionedContainer(
+        child: Stack(
+          children: [
+            Positioned.fill(child: IgnorePointer(child: platformView)),
+            _buildContent(),
+          ],
+        ),
       ),
     );
   }

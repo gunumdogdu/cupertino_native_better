@@ -140,6 +140,14 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
                 let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
                 self.applyTransitionContainment(active)
                 result(nil)
+            case "setInteractive":
+                if let args = call.arguments as? [String: Any],
+                   let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+                    NSLog("[CN SearchBar] setInteractive=\(interactive)")
+                    self._cnSetInteractiveRecursive(self.container, interactive)
+                    self._cnSetInteractiveRecursive(self.hostingController.view, interactive)
+                }
+                result(nil)
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -148,6 +156,12 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
 
     func view() -> UIView {
         return container
+    }
+
+    private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+        guard let view = view else { return }
+        view.isUserInteractionEnabled = interactive
+        for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
     }
 
     /// Toggle Issue #29 halo containment (container + hosting view).

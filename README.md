@@ -60,6 +60,37 @@ controller.closed.whenComplete(CNTabBarRouteObserver.markAnyModalInactive);
 
 > Without the observer registered, widgets still render fine — but the dynamic z-order/halo containment never engages, and you may see glass bleeding through modals.
 
+### Recommended Setup: present bottom sheets via `CNBottomSheet`
+
+Adding to the observer above, **v1.5.1** adds a second piece of the modal-coordination story to fix the PlatformView z-order bleed between CN-widgets on the host page and CN-widgets *inside* a presented sheet (Issue #53).
+
+When a bottom sheet covers a CN-widget, the package now destroys the host-page widget's PlatformView (with a same-size placeholder reserving the layout slot) while the sheet is up, then recreates it on dismiss. For this to be **position-aware** — only the widgets actually behind the sheet hide, not the entire route — the sheet has to publish its on-screen rect each frame.
+
+**Option A — drop-in wrappers (recommended):**
+
+```dart
+CNBottomSheet.show(context: context, builder: (ctx) => MySheet());
+CNBottomSheet.showCupertino(context: context, builder: (ctx) => MySheet());
+CNBottomSheet.showModalPopup(context: context, builder: (ctx) => MySheet());
+```
+
+`CNBottomSheet` mirrors Flutter's standard sheet APIs and injects a `CNSheetGeometryProbe` automatically.
+
+**Option B — wrap your own sheet manually:**
+
+```dart
+showModalBottomSheet(
+  context: context,
+  builder: (ctx) => CNSheetGeometryProbe(child: MySheet()),
+);
+```
+
+Wrap the builder's root child in `CNSheetGeometryProbe` if you need to keep using the framework's `showModalBottomSheet` / `showCupertinoModalPopup` directly (e.g. for advanced configuration not yet exposed on `CNBottomSheet`).
+
+Without one of these, the package falls back to a conservative "hide every CN-widget on this route while any modal is up" behavior — safe, but coarser than needed (e.g. an app-bar CN-button could disappear behind a 30%-height sheet).
+
+Each affected widget also has an `autoHideOnModal: bool = true` constructor parameter so you can opt out per-instance if you ever need the old behavior.
+
 ## Performance Best Practices
 
 ### ⚠️ LiquidGlassContainer & Lists

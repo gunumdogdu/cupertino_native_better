@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../style/sf_symbol.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
 import 'tab_bar.dart' show CNTabBarRouteObserver;
@@ -118,6 +119,7 @@ class CNSearchBar extends StatefulWidget {
     this.controller,
     this.searchIcon,
     this.clearIcon,
+    this.autoHideOnModal = true,
   });
 
   /// Placeholder text shown when the search field is empty.
@@ -177,12 +179,27 @@ class CNSearchBar extends StatefulWidget {
   /// Custom clear icon (defaults to xmark.circle.fill SF Symbol).
   final CNSymbol? clearIcon;
 
+  /// When true (default), destroys the native search bar's PlatformView while
+  /// a modal sheet is presented above this widget's host route. Fixes the
+  /// iOS hybrid-composition z-order bleed (Issue #53) where a host-page
+  /// CNSearchBar's pixels leak through a sheet that also contains a
+  /// CN-widget. Requires `CNTabBarRouteObserver()` to be registered in the
+  /// app's `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter
+  /// fallback).
+  final bool autoHideOnModal;
+
   @override
   State<CNSearchBar> createState() => _CNSearchBarState();
 }
 
 class _CNSearchBarState extends State<CNSearchBar>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, ModalHideMixin<CNSearchBar> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   late AnimationController _animationController;
   late Animation<double> _expandAnimation;
   late TextEditingController _textController;
@@ -195,7 +212,6 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   // Issue #29 halo containment via setTransitioning.
   Animation<double>? _secondaryRouteAnim;
-  bool _modalAbove = false;
 
   CNSearchBarController get _controller =>
       widget.controller ?? (_internalController ??= CNSearchBarController());
@@ -260,22 +276,20 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
 
-  void _onAnyModalDepthChanged() {
-    _modalAbove = CNTabBarRouteObserver.anyModalDepth.value > 0;
-    _pushContainmentIfNeeded();
-  }
+  // Legacy modal-up trigger disabled: ModalHideMixin (maybeHiddenPlaceholder +
+  // native setInteractive) is the supported modern path for modal hiding.
+  // Stub retained so the existing add/removeListener subscription compiles.
+  void _onAnyModalDepthChanged() {}
 
   void _pushContainmentIfNeeded() {
     final anim = _secondaryRouteAnim;
     final animating =
         anim?.status == AnimationStatus.forward ||
         anim?.status == AnimationStatus.reverse;
-    final active = animating || _modalAbove;
+    final active = animating;
     final ch = _channel;
     if (ch == null) return;
-    try {
-      ch.invokeMethod('setTransitioning', {'active': active});
-    } catch (_) {}
+    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   void _onTextChanged() {
@@ -400,6 +414,19 @@ class _CNSearchBarState extends State<CNSearchBar>
   }
 
   Widget _buildNativeSearchBar(BuildContext context) {
+    // Match the live build's width formula exactly so the placeholder occupies
+    // the same footprint while the native view is hidden behind a modal.
+    final expandedWidth = MediaQuery.of(context).size.width;
+    final placeholderWidth = widget.expandable
+        ? widget.collapsedWidth +
+              (expandedWidth - widget.collapsedWidth) * _expandAnimation.value
+        : expandedWidth;
+    final hidden = maybeHiddenPlaceholder(
+      height: widget.expandedHeight,
+      width: placeholderWidth,
+    );
+    if (hidden != null) return hidden;
+
     const viewType = 'CNSearchBar';
     final creationParams = <String, dynamic>{
       'placeholder': widget.placeholder,
@@ -433,25 +460,27 @@ class _CNSearchBarState extends State<CNSearchBar>
             onPlatformViewCreated: _onPlatformViewCreated,
           );
 
-    return AnimatedBuilder(
-      animation: _expandAnimation,
-      builder: (context, child) {
-        final expandedWidth = MediaQuery.of(context).size.width;
-        final width = widget.expandable
-            ? widget.collapsedWidth +
-                  (expandedWidth - widget.collapsedWidth) *
-                      _expandAnimation.value
-            : expandedWidth;
+    return wrapWithModalInteractionGuard(
+      AnimatedBuilder(
+        animation: _expandAnimation,
+        builder: (context, child) {
+          final expandedWidth = MediaQuery.of(context).size.width;
+          final width = widget.expandable
+              ? widget.collapsedWidth +
+                    (expandedWidth - widget.collapsedWidth) *
+                        _expandAnimation.value
+              : expandedWidth;
 
-        return SizedBox(
-          width: width,
-          height: widget.expandedHeight,
-          child: child,
-        );
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(widget.expandedHeight / 2),
-        child: platformView,
+          return SizedBox(
+            width: width,
+            height: widget.expandedHeight,
+            child: child,
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(widget.expandedHeight / 2),
+          child: platformView,
+        ),
       ),
     );
   }

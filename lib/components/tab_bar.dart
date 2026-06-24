@@ -541,6 +541,18 @@ class _CNTabBarState extends State<CNTabBar> {
       return SizedBox(height: h);
     }
 
+    // _creationParams is built once in initState/_scheduleNativePreparation
+    // and cached forever. When the platform view is destroyed by the modal-
+    // hide path above and then recreated on modal close, the new UITabBar
+    // was being instantiated with the STALE selectedIndex from first mount
+    // (typically 0), causing a visible Liquid-Glass pill animation from
+    // 0 -> widget.currentIndex once the post-create `setSelectedIndex` ran.
+    // Refresh the index field synchronously so the new native bar paints at
+    // the correct tab from the first layout pass — no morph animation.
+    if (_creationParams!['selectedIndex'] != widget.currentIndex) {
+      _creationParams!['selectedIndex'] = widget.currentIndex;
+    }
+
     final platformView = _buildNativeTabBarPlatformView(_creationParams!);
 
     // Page-transition hide: ALWAYS wrap in IndexedStack when the feature
@@ -1575,6 +1587,28 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     _anyModalDepth.value = next < 0 ? 0 : next;
   }
 
+  /// Live global rect of the currently-presented top modal sheet, OR null
+  /// when no probe is publishing geometry. Used by `ModalHideMixin` for
+  /// position-aware hide (only widgets whose own rect intersects this rect
+  /// get destroyed, instead of every CN-widget on the host page).
+  ///
+  /// Published by the probe widget injected by `CNBottomSheet.show` (or
+  /// `CNBottomSheet.showCupertino`). Sheets opened via raw
+  /// `showModalBottomSheet`/`showCupertinoSheet` leave this null and the
+  /// mixin falls back to the safe "destroy everything" behavior — still
+  /// bleed-free, just not position-aware.
+  static final ValueNotifier<Rect?> _topModalRect = ValueNotifier<Rect?>(null);
+
+  /// Read-only listenable of the live top-modal sheet rect (see
+  /// [_topModalRect] for details).
+  static ValueListenable<Rect?> get topModalRect => _topModalRect;
+
+  /// Internal API for the probe widget inside `CNBottomSheet`. Pass `null`
+  /// to clear (probe dispose).
+  static void publishTopModalRect(Rect? rect) {
+    _topModalRect.value = rect;
+  }
+
   /// Heuristic for "is this route a full-screen-ish sheet that should
   /// trigger tab-bar auto-hide?". Intentionally narrow: only matches
   /// routes whose runtime type name contains `Sheet`. This catches the
@@ -1618,15 +1652,55 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     }
   }
 
-  void _bumpDown(Route<dynamic> route) {
+  void _bumpDown(Route<dynamic> route, {bool deferAnyModal = false}) {
     if (_isModal(route)) {
+      // Narrow counter stays synchronous: CNTabBar unmounts on this signal
+      // and its pixels disappear the same frame as `Navigator.pop()`, so it
+      // has no halo race to worry about.
       final next = _modalDepth.value - 1;
       _modalDepth.value = next < 0 ? 0 : next;
     }
     if (_isAnyModal(route)) {
+      // Broad counter drives CNButton's native iOS 26 halo-containment clip.
+      // Releasing the clip synchronously at t=0 of the route's exit animation
+      // lets the Liquid Glass halo leak outside the platform-view bounds for
+      // the 1+ frames before the sheet's pixels clear (Issue #37). Defer the
+      // decrement until the route's exit animation reports `dismissed` so the
+      // clip stays ON for the entire visual duration of the close.
+      if (deferAnyModal) {
+        _decrementAnyModalWhenDismissed(route);
+      } else {
+        final next = _anyModalDepth.value - 1;
+        _anyModalDepth.value = next < 0 ? 0 : next;
+      }
+    }
+  }
+
+  /// Decrement [_anyModalDepth] only when [route]'s animation has fully
+  /// dismissed. If no animation is attached, or it is already dismissed
+  /// (e.g. an instant / synthetic pop), decrement immediately.
+  void _decrementAnyModalWhenDismissed(Route<dynamic> route) {
+    void decrement() {
       final next = _anyModalDepth.value - 1;
       _anyModalDepth.value = next < 0 ? 0 : next;
     }
+
+    // `animation` is defined on TransitionRoute (which all modal/popup/page
+    // routes extend), not on the base Route. For any non-TransitionRoute
+    // (synthetic / instant pops) just decrement now.
+    final anim = route is TransitionRoute ? route.animation : null;
+    if (anim == null || anim.status == AnimationStatus.dismissed) {
+      decrement();
+      return;
+    }
+    late void Function(AnimationStatus) listener;
+    listener = (status) {
+      if (status == AnimationStatus.dismissed) {
+        anim.removeStatusListener(listener);
+        decrement();
+      }
+    };
+    anim.addStatusListener(listener);
   }
 
   @override
@@ -1636,16 +1710,20 @@ class CNTabBarRouteObserver extends NavigatorObserver {
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    _bumpDown(route);
+    // Defer ONLY the broad _anyModalDepth decrement; the narrow _modalDepth
+    // path remains synchronous inside _bumpDown.
+    _bumpDown(route, deferAnyModal: true);
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    // didRemove represents a non-animated removal; deferring would never fire.
     _bumpDown(route);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    // Replaced route's pixels are immediately gone; keep synchronous.
     if (oldRoute != null) _bumpDown(oldRoute);
     if (newRoute != null) _bumpUp(newRoute);
   }

@@ -118,6 +118,14 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
           self.step = step
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing step", details: nil)) }
+      case "setInteractive":
+        if let args = call.arguments as? [String: Any],
+           let interactive = (args["interactive"] as? NSNumber)?.boolValue {
+          NSLog("[CN Slider] setInteractive=\(interactive)")
+          self._cnSetInteractiveRecursive(self.container, interactive)
+          self._cnSetInteractiveRecursive(self.slider, interactive)
+        }
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -142,5 +150,11 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
   // Use shared utility functions
   private static func colorFromARGB(_ argb: Int) -> UIColor {
     return ImageUtils.colorFromARGB(argb)
+  }
+
+  private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
+    guard let view = view else { return }
+    view.isUserInteractionEnabled = interactive
+    for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
   }
 }

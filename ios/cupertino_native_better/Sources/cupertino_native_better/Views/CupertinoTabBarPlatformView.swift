@@ -367,16 +367,31 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
         barBottom,
       ])
       // Force layout update for background and text rendering on iOS < 16
-      // Re-assign items after layout to ensure labels render properly
+      // Re-assign items after layout to ensure labels render properly.
+      // Mirror the split-bar branch: capture selectedIndex BEFORE the async,
+      // restore it AFTER the items reassignment. UITabBar resets selectedItem
+      // to nil when `bar.items = ...` is reassigned — without this restore,
+      // the bar visually jumps to index 0 (or no selection) for the ~50ms
+      // until Dart's post-create setSelectedIndex lands, which the user
+      // perceives as an animation from 0 to the current index after a
+      // modal-close recreate.
+      let capturedSelectedIndex = selectedIndex
       DispatchQueue.main.async { [weak self, weak bar] in
         guard let self = self, let bar = bar else { return }
         self.container.setNeedsLayout()
         self.container.layoutIfNeeded()
         bar.setNeedsLayout()
         bar.layoutIfNeeded()
-        // Re-assign items to force label rendering
-        let items = bar.items
-        bar.items = items
+        // Re-assign items to force label rendering, then restore selection.
+        UIView.performWithoutAnimation {
+          let items = bar.items
+          bar.items = items
+          if capturedSelectedIndex >= 0,
+             let items = bar.items,
+             capturedSelectedIndex < items.count {
+            bar.selectedItem = items[capturedSelectedIndex]
+          }
+        }
         // Force another update cycle for text rendering
         DispatchQueue.main.async { [weak bar] in
           guard let bar = bar else { return }
@@ -817,25 +832,36 @@ channel.setMethodCallHandler { [weak self] call, result in
         } else { result(FlutterError(code: "bad_args", message: "Missing layout", details: nil)) }
       case "setSelectedIndex":
         if let args = call.arguments as? [String: Any], let idx = (args["index"] as? NSNumber)?.intValue {
+          // Defense-in-depth against the modal-recreate flow: suppress the
+          // iOS 26 Liquid Glass selection-pill morph animation. Without this,
+          // if Dart pushes setSelectedIndex over an existing channel (post-
+          // create settle at +50ms / +200ms, or any _syncPropsToNativeIfNeeded
+          // call) and the bar happened to be at a different index, the pill
+          // would animate across. Mirrors the pattern used in the `refresh`
+          // case below (line 938).
           // Single bar
           if let bar = self.tabBar, let items = bar.items, idx >= 0, idx < items.count {
-            bar.selectedItem = items[idx]
+            UIView.performWithoutAnimation { bar.selectedItem = items[idx] }
             result(nil)
             return
           }
           // Split bars
           if let left = self.tabBarLeft, let leftItems = left.items {
             if idx < leftItems.count, idx >= 0 {
-              left.selectedItem = leftItems[idx]
-              self.tabBarRight?.selectedItem = nil
+              UIView.performWithoutAnimation {
+                left.selectedItem = leftItems[idx]
+                self.tabBarRight?.selectedItem = nil
+              }
               result(nil)
               return
             }
             if let right = self.tabBarRight, let rightItems = right.items {
               let ridx = idx - leftItems.count
               if ridx >= 0, ridx < rightItems.count {
-                right.selectedItem = rightItems[ridx]
-                self.tabBarLeft?.selectedItem = nil
+                UIView.performWithoutAnimation {
+                  right.selectedItem = rightItems[ridx]
+                  self.tabBarLeft?.selectedItem = nil
+                }
                 result(nil)
                 return
               }

@@ -22,6 +22,11 @@ struct GlassButtonSwiftUI: View {
   var namespace: Namespace.ID
   let config: GlassButtonConfig
   let badgeCount: Int?
+  /// When false, the button skips applying its own `.glassEffect()`. Used
+  /// by `CNGlassButtonGroup` so a single shared glass effect can be applied
+  /// at the group level (uniform pill outline) while each button keeps its
+  /// own `Button(action:)` for per-button hit-testing.
+  var applyOwnGlass: Bool = true
 
   /// Computes the effective icon color
   private var effectiveIconColor: Color? {
@@ -52,8 +57,14 @@ struct GlassButtonSwiftUI: View {
       .padding(config.padding)
       .frame(minHeight: config.minHeight)
       .contentShape(shapeForStyle(isRound, borderRadius: config.borderRadius))
-      .glassEffect(glassEffectForStyle(style, interactive: glassEffectInteractive), in: shapeForStyle(isRound, borderRadius: config.borderRadius))
-      .applyGlassEffectModifiers(unionId: glassEffectUnionId, id: glassEffectId, namespace: namespace)
+      .applyConditionalGlassEffect(
+        apply: applyOwnGlass,
+        glass: glassEffectForStyle(style, interactive: glassEffectInteractive),
+        shape: shapeForStyle(isRound, borderRadius: config.borderRadius),
+        unionId: glassEffectUnionId,
+        glassEffectId: glassEffectId,
+        namespace: namespace
+      )
       .animation(.easeInOut(duration: 0.25), value: iconSize)
       .animation(.easeInOut(duration: 0.25), value: iconColor)
       .animation(.easeInOut(duration: 0.25), value: tint)
@@ -93,6 +104,30 @@ struct GlassButtonSwiftUI: View {
     }
     // For non-round buttons without radius, also use capsule (as per user requirement)
     return AnyShape(Capsule())
+  }
+}
+
+// Apply the per-button glassEffect + union/id modifiers ONLY when
+// `apply` is true. When false (group mode), the button skips its own glass
+// and relies on the group's outer .glassEffect to produce one uniform pill.
+@available(iOS 26.0, *)
+extension View {
+  @ViewBuilder
+  func applyConditionalGlassEffect(
+    apply: Bool,
+    glass: Glass,
+    shape: some Shape,
+    unionId: String?,
+    glassEffectId: String?,
+    namespace: Namespace.ID
+  ) -> some View {
+    if apply {
+      self
+        .glassEffect(glass, in: shape)
+        .applyGlassEffectModifiers(unionId: unionId, id: glassEffectId, namespace: namespace)
+    } else {
+      self
+    }
   }
 }
 

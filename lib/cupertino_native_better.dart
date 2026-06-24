@@ -60,6 +60,7 @@ export 'components/slider.dart';
 export 'components/switch.dart';
 export 'components/tab_bar.dart';
 export 'components/native_tab_bar.dart';
+export 'components/bottom_sheet.dart' show CNBottomSheet, CNSheetGeometryProbe;
 export 'components/popup_menu_button.dart';
 export 'components/popup_gesture.dart';
 export 'components/segmented_control.dart';

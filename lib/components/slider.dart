@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import '../channel/params.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
+import '../utils/modal_hide_mixin.dart';
 
 /// Controller for a [CNSlider] allowing imperative changes to the native
 /// NSSlider/UISlider instance.
@@ -65,6 +66,7 @@ class CNSlider extends StatefulWidget {
     this.trackColor,
     this.trackBackgroundColor,
     this.step,
+    this.autoHideOnModal = true,
   });
 
   /// Current slider value.
@@ -103,11 +105,26 @@ class CNSlider extends StatefulWidget {
   /// Optional step interval for discrete values.
   final double? step;
 
+  /// When true (default), destroys the native slider's PlatformView while a
+  /// modal sheet is presented above this widget's host route. Prevents the
+  /// iOS hybrid-composition z-order bleed (Issue #53) where the host-page
+  /// PlatformView's pixels leak through a sheet that also contains a
+  /// PlatformView (CN-widget). Requires `CNTabBarRouteObserver()` to be
+  /// registered in the app's `navigatorObservers`. No effect on non-iOS or
+  /// iOS < 26 (Flutter fallback path).
+  final bool autoHideOnModal;
+
   @override
   State<CNSlider> createState() => _CNSliderState();
 }
 
-class _CNSliderState extends State<CNSlider> {
+class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
   MethodChannel? _channel;
 
   double? _lastValue;
@@ -196,6 +213,17 @@ class _CNSliderState extends State<CNSlider> {
     }
 
     const viewType = 'CupertinoNativeSlider';
+
+    // Issue #53 fix: when a modal is presented above our host route, destroy
+    // the native UISlider to remove its PlatformView from the shared iOS
+    // PlatformView container. Otherwise hybrid-composition z-order desyncs
+    // with the sheet's PlatformView during drag, causing visual bleed.
+    final hidden = maybeHiddenPlaceholder(
+      height: widget.height,
+      width: double.infinity,
+    );
+    if (hidden != null) return hidden;
+
     final creationParams = <String, dynamic>{
       'min': widget.min,
       'max': widget.max,
@@ -213,23 +241,25 @@ class _CNSliderState extends State<CNSlider> {
     };
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return ClipRect(
-        child: SizedBox(
-          height: widget.height,
-          width: double.infinity,
-          child: UiKitView(
-            viewType: viewType,
-            creationParamsCodec: const StandardMessageCodec(),
-            creationParams: creationParams,
-            onPlatformViewCreated: _onPlatformViewCreated,
-            // Forward horizontal drags and taps to the native slider so it
-            // works correctly inside Flutter scroll views.
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<HorizontalDragGestureRecognizer>(
-                () => HorizontalDragGestureRecognizer(),
-              ),
-              Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-            },
+      return wrapWithModalInteractionGuard(
+        ClipRect(
+          child: SizedBox(
+            height: widget.height,
+            width: double.infinity,
+            child: UiKitView(
+              viewType: viewType,
+              creationParamsCodec: const StandardMessageCodec(),
+              creationParams: creationParams,
+              onPlatformViewCreated: _onPlatformViewCreated,
+              // Forward horizontal drags and taps to the native slider so it
+              // works correctly inside Flutter scroll views.
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<HorizontalDragGestureRecognizer>(
+                  () => HorizontalDragGestureRecognizer(),
+                ),
+                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+              },
+            ),
           ),
         ),
       );
