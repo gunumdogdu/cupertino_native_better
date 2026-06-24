@@ -8,6 +8,9 @@ struct CupertinoSwitchView: View {
   var body: some View {
     let base = Toggle("", isOn: $model.value)
       .labelsHidden()
+      // On macOS a default Toggle renders as a checkbox; force the switch
+      // style so CNSwitch is a real toggle (iOS already defaults to a switch).
+      .toggleStyle(.switch)
       .disabled(!model.enabled)
       .onChange(of: model.value) { newValue in
         model.onChange(newValue)
