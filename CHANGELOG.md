@@ -1,3 +1,46 @@
+## 1.5.2
+
+### Fixed — #61 `CNBottomSheet.showCupertino` compile error on Flutter < 3.44
+
+`CNBottomSheet.showCupertino` in v1.5.1 called Flutter's `showCupertinoSheet()` with a `scrollableBuilder:` named parameter. That parameter was only added to `showCupertinoSheet` in Flutter **3.44.0** (via [flutter/flutter#177337](https://github.com/flutter/flutter/pull/177337), 2026-01-23). Anyone consuming the package on stable **3.35 – 3.41.x** — including a substantial share of production Flutter users, FlutterFlow environments, and CI setups — hit a hard compile error:
+
+```
+No named parameter with the name 'scrollableBuilder'.
+```
+
+Fix: switched to `builder:` (the current API on 3.35 – 3.41; deprecated-but-still-accepted on 3.44+). The lambda didn't use its `ScrollController` anyway, so the swap is behaviour-preserving. Compatible from Flutter 3.35 through today's master.
+
+Thanks @ArkayGit for the clean, precisely-scoped bug report.
+
+### Fixed — #46 `CNToast` queue deadlock after route pop
+
+`CNToast` stored the caller's `BuildContext` on each queued `_ToastEntry` and re-resolved `Overlay.of(entry.context)` inside `_showNext()` — which fires from a `Timer` after each toast's duration. If the caller's widget was disposed while toasts were pending (typical: user shows a toast then taps back), the framework crashed with:
+
+```
+Looking up a deactivated widget's ancestor is unsafe.
+```
+
+Worse, after the throw, `_isShowing` was left `true` and the queue was **permanently stuck** — every subsequent `CNToast.show/success/error/warning/info` call would silently `_queue.add()` without displaying, until app restart. Only `CNToast.loading()` still worked (it bypasses the queue and inserts into the overlay directly).
+
+Fix (in `lib/components/toast.dart`):
+
+- `_ToastEntry` now stores an `OverlayState` (resolved eagerly at `CNToast.show()` time), not a `BuildContext`. `_showNext()` no longer touches the caller's context and cannot throw on a deactivated widget.
+- Added `entry.overlay.mounted` short-circuit and a `try/catch` around `overlay.insert(...)` — if the OverlayState disappears between enqueue and display (extremely rare), the entry is dropped and the queue keeps draining. `_isShowing` is guaranteed to reset.
+
+### Fixed — #46 `CNToast` renders with yellow double-underline under `MaterialApp` (reporter's screenshot)
+
+The same issue also carried a second, unrelated defect surfaced by @macedondev's screenshot: text rendered as **dim red monospace with a yellow double-underline**. That's `MaterialApp._errorTextStyle` (`flutter/lib/src/material/app.dart:45`), Flutter's built-in "your Text has no Material ancestor" debug fallback. `MaterialApp` installs it as the ambient `DefaultTextStyle` at the app root; `_ToastOverlay` renders its `Text` inside an `OverlayEntry` with no `Material` between them, so the fallback style wins. `CupertinoApp` doesn't install `_errorTextStyle`, which is why the maintainer couldn't reproduce the bug locally.
+
+Fix: wrap the toast content in `Material(type: MaterialType.transparency, ...)` inside `_ToastOverlay.build()`, positioned **between `IgnorePointer` and `Align`** so `Positioned` still sees the `Overlay`'s `Stack` as its direct parent (a `Material` between them would break `Positioned`'s parent-data contract and throw `Incorrect use of ParentDataWidget`). Transparent Material paints nothing, so `CupertinoApp` users see no visual change; MaterialApp users get proper text-style resolution and the yellow underlines are gone. Applies to both the queued (`_showNext()`) and direct-insert (`loading()`) toast paths.
+
+Thanks @macedondev for the report.
+
+### Example app
+
+- New: `Testing → #46: CNToast use_build_context_synchronously` — two labeled scenarios. **Bug A** (queue crash on dispose): spam-and-pop button that queues 5 toasts then pops the route ~250ms in, reproducing the "Looking up a deactivated widget's ancestor" crash pre-fix and demonstrating the queue-drains-cleanly behaviour post-fix. **Bug B** (yellow underlines): a route whose body is a nested `MaterialApp` so `CNToast` fires into an overlay with the ambient `_errorTextStyle` — reproduces the reporter's exact rendering. Plus a quick-trigger row for all six `CNToast.*` variants for regression coverage.
+
+---
+
 ## 1.5.1
 
 ### Fixed — #53 PlatformView z-order bleed under bottom sheets

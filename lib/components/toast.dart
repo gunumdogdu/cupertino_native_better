@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Material, MaterialType;
 
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
@@ -120,9 +121,15 @@ class CNToast {
     Color? textColor,
     bool useGlassEffect = true,
   }) {
+    // Resolve the OverlayState eagerly from the caller's live context.
+    // We store the OverlayState — not the BuildContext — on the queued
+    // entry so a later `_showNext()` firing from a Timer can never
+    // dereference a deactivated caller widget (Issue #46 bug A).
+    final overlay = Overlay.of(context);
+
     _queue.add(
       _ToastEntry(
-        context: context,
+        overlay: overlay,
         message: message,
         icon: icon,
         position: position,
@@ -278,7 +285,16 @@ class CNToast {
     _isShowing = true;
     final entry = _queue.removeAt(0);
 
-    final overlay = Overlay.of(entry.context);
+    // The captured OverlayState may have been disposed while this entry sat
+    // in the queue (caller's Navigator torn down). Skip cleanly and continue
+    // draining rather than throwing, which used to leave `_isShowing = true`
+    // and permanently deadlock the queue (Issue #46 bug A).
+    if (!entry.overlay.mounted) {
+      _showNext();
+      return;
+    }
+
+    final overlay = entry.overlay;
     final shouldUseGlass =
         PlatformVersion.supportsLiquidGlass && entry.useGlassEffect;
 
@@ -302,7 +318,14 @@ class CNToast {
       },
     );
 
-    overlay.insert(overlayEntry);
+    try {
+      overlay.insert(overlayEntry);
+    } catch (_) {
+      // Extremely rare: overlay went unusable between the .mounted check
+      // and the insert. Drop this entry and move on so the queue drains.
+      _showNext();
+      return;
+    }
 
     // Auto dismiss
     final durationMs = _getDurationMs(entry.duration);
@@ -328,7 +351,7 @@ class CNToast {
 
 class _ToastEntry {
   _ToastEntry({
-    required this.context,
+    required this.overlay,
     required this.message,
     this.icon,
     required this.position,
@@ -339,7 +362,7 @@ class _ToastEntry {
     required this.useGlassEffect,
   });
 
-  final BuildContext context;
+  final OverlayState overlay;
   final String message;
   final Widget? icon;
   final CNToastPosition position;
@@ -528,15 +551,26 @@ class _ToastOverlayState extends State<_ToastOverlay>
       top: top,
       bottom: bottom,
       child: IgnorePointer(
-        child: Align(
-          alignment: alignment,
-          child: ScaleTransition(
-            scale: _scaleAnimation,
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: content,
+        // Fix B (Issue #46): a transparent Material wrap installs a proper
+        // `DefaultTextStyle` in this subtree, so under `MaterialApp` the
+        // toast `Text` no longer inherits `_errorTextStyle` (dim red
+        // monospace with yellow double-underline — Flutter's "no Material
+        // ancestor" visual warning). Nested INSIDE `Positioned` so the
+        // Positioned still sees the Overlay's `Stack` as its direct parent
+        // (a Material between them would break `Positioned`'s parent data).
+        // Under `CupertinoApp`, transparent Material paints nothing.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Align(
+            alignment: alignment,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: content,
+                ),
               ),
             ),
           ),

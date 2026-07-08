@@ -101,8 +101,15 @@ class CNBottomSheet {
       context: context,
       useNestedNavigation: useNestedNavigation,
       enableDrag: enableDrag,
-      scrollableBuilder: (ctx, scrollController) =>
-          CNSheetGeometryProbe(child: pageBuilder(ctx)),
+      // Intentionally using `builder:` even though Flutter 3.44 deprecated
+      // it in favor of `scrollableBuilder`. `scrollableBuilder` doesn't
+      // exist on Flutter 3.35 – 3.41.x — using it there hard-breaks the
+      // package (Issue #61). `builder:` compiles on every Flutter that has
+      // `showCupertinoSheet` and remains fully functional on 3.44+ (a
+      // compile-time deprecation warning only). This is the maximally
+      // compatible API surface until we drop <3.44 support.
+      // ignore: deprecated_member_use
+      builder: (ctx) => CNSheetGeometryProbe(child: pageBuilder(ctx)),
     );
   }
 
