@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
@@ -816,12 +817,24 @@ class _CNTabBarState extends State<CNTabBar> {
             creationParams: creationParams,
             creationParamsCodec: const StandardMessageCodec(),
             onPlatformViewCreated: _onCreated,
+            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+            // Claim taps eagerly so the native tab bar still receives
+            // touches when an ancestor widget (e.g. a full-screen
+            // GestureDetector/PageView from a debug overlay package)
+            // would otherwise win the gesture arena by default. See
+            // the same pattern in button.dart/switch.dart/slider.dart.
+            Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+          },
           )
         : AppKitView(
             viewType: viewType,
             creationParams: creationParams,
             creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,
+            onPlatformViewCreated: _onCreated,          
+            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+            Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+          },
+
           );
 
     final h = widget.height ?? _intrinsicHeight ?? 50.0;
