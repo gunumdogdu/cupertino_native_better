@@ -67,6 +67,13 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     self.hostingController = UIHostingController(rootView: glassView)
     self.hostingController.view.backgroundColor = .clear
     self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
+    // Don't propagate the screen's safe area into the SwiftUI glass. When the
+    // container's frame reaches into the bottom safe area (e.g. a floating
+    // bottom panel), UIHostingController otherwise insets the SwiftUI content
+    // by the overlap, so the glass renders short of the frame's bottom edge.
+    // Same issue class as the safeAreaInsets override in
+    // CupertinoSwitchPlatformView.swift.
+    self.hostingController.safeAreaRegions = []
 
     super.init()
     self.configuredShape = shape
