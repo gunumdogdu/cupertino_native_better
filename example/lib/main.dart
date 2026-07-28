@@ -27,6 +27,7 @@ import 'demos/issue37_appbar_button_halo_test.dart';
 import 'demos/issue53_cnbutton_under_sheet_test.dart';
 import 'demos/issue40_button_label_style_test.dart';
 import 'demos/issue46_cntoast_context_test.dart';
+import 'demos/issue62_tabbar_gesture_arena_test.dart';
 import 'demos/issue55_popup_menu_destructive_test.dart';
 import 'demos/pr42_tabbar_iconsize_customicon_test.dart';
 import 'demos/issue33_svg_tabbar_test.dart';
@@ -410,6 +411,21 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     CupertinoPageRoute(
                       builder: (_) => const Issue46CNToastContextTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#62 / PR #63: CNTabBar tap gesture arena'),
+                leading: CNIcon(
+                  symbol: CNSymbol('hand.tap.fill', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          const Issue62TabBarGestureArenaTestPage(),
                     ),
                   );
                 },

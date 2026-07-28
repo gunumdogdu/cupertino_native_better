@@ -818,23 +818,31 @@ class _CNTabBarState extends State<CNTabBar> {
             creationParamsCodec: const StandardMessageCodec(),
             onPlatformViewCreated: _onCreated,
             gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-            // Claim taps eagerly so the native tab bar still receives
-            // touches when an ancestor widget (e.g. a full-screen
-            // GestureDetector/PageView from a debug overlay package)
-            // would otherwise win the gesture arena by default. See
-            // the same pattern in button.dart/switch.dart/slider.dart.
-            Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+            // Claim every pointer on this platform view unconditionally so
+            // the native tab bar receives taps even when an ancestor holds
+            // an active recognizer of any kind (LongPress, HorizontalDrag,
+            // Tap). A bare TapGestureRecognizer here would be a no-op —
+            // Flutter's TapGestureRecognizer.isPointerAllowed returns false
+            // when no callbacks are set, so it never enters the arena and
+            // an ancestor recognizer wins uncontested (Issue #62 repro:
+            // GestureDetector(onLongPress: () {}, child: CNTabBar(...))).
+            // EagerGestureRecognizer.addAllowedPointer immediately calls
+            // resolve(accepted), so the platform view wins the arena on
+            // pointer-down and touches forward to the native UITabBar.
+            // A tab bar is only tapped, so claiming all gestures over it
+            // (drags/long-presses too) is the intended trade-off.
+            Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
           },
           )
         : AppKitView(
             viewType: viewType,
             creationParams: creationParams,
             creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,          
+            onPlatformViewCreated: _onCreated,
             gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-            Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-          },
-
+              // See rationale on the iOS branch above.
+              Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
+            },
           );
 
     final h = widget.height ?? _intrinsicHeight ?? 50.0;
