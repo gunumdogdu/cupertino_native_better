@@ -28,9 +28,11 @@ struct GlassButtonSwiftUI: View {
   /// own `Button(action:)` for per-button hit-testing.
   var applyOwnGlass: Bool = true
 
-  /// Computes the effective icon color
+  /// Computes the effective icon color. An explicit per-icon color wins over
+  /// the control tint; when neither is provided the system/glass default
+  /// (automatic adaptive foreground) applies.
   private var effectiveIconColor: Color? {
-    return tint ?? iconColor
+    return iconColor ?? tint
   }
 
   var body: some View {
