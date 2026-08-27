@@ -164,13 +164,16 @@ Future<Uint8List?> iconDataToImageBytes(
     final double pixelRatio =
         ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
 
+    const double supersample = 2.0;
+    final double canvasScale = pixelRatio * supersample;
+
     final TextPainter painter = TextPainter(
       text: TextSpan(
         text: String.fromCharCode(iconData.codePoint),
         style: TextStyle(
           inherit: false,
           color: color,
-          fontSize: size,
+          fontSize: size * supersample,
           fontFamily: iconData.fontFamily,
           package: iconData.fontPackage,
         ),
@@ -178,14 +181,14 @@ Future<Uint8List?> iconDataToImageBytes(
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final double padding = size;
+    final double padding = size * supersample;
     final double logicalWidth = painter.width + padding * 2;
     final double logicalHeight = painter.height + padding * 2;
-    final int paddedPixelWidth = (logicalWidth * pixelRatio).ceil();
-    final int paddedPixelHeight = (logicalHeight * pixelRatio).ceil();
+    final int paddedPixelWidth = (logicalWidth * canvasScale).ceil();
+    final int paddedPixelHeight = (logicalHeight * canvasScale).ceil();
 
     final ui.PictureRecorder recorder = ui.PictureRecorder();
-    final Canvas canvas = Canvas(recorder)..scale(pixelRatio);
+    final Canvas canvas = Canvas(recorder)..scale(canvasScale);
     painter.paint(canvas, Offset(padding, padding));
     final ui.Image paddedImage = await recorder.endRecording().toImage(
       paddedPixelWidth,
@@ -255,7 +258,7 @@ Future<Uint8List?> iconDataToImageBytes(
         glyphPixelHeight,
       ),
       Rect.fromLTWH(dstX, dstY, drawnWidth, drawnHeight),
-      Paint(),
+      Paint()..filterQuality = FilterQuality.high,
     );
     final ui.Image squareImage = await squareRecorder.endRecording().toImage(
       outputPixelSize,
