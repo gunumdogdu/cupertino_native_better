@@ -32,6 +32,9 @@ const String _icon = String.fromEnvironment('ICON', defaultValue: 'chevron');
 const String _size = String.fromEnvironment('SIZE', defaultValue: '20');
 const String _accent = String.fromEnvironment('ACCENT', defaultValue: 'blue');
 
+/// Stamped into the nav bar so a before/after screenshot pair can't be mixed up.
+const String _label = String.fromEnvironment('LABEL', defaultValue: '');
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   if (_probe == 'pr67report') {
