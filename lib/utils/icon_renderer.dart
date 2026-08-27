@@ -138,6 +138,30 @@ Future<bool> _assetExists(String assetPath) async {
   }
 }
 
+/// Renders in flight or already finished, keyed by everything that affects
+/// the output bytes.
+///
+/// Futures are cached rather than results, so concurrent callers for the same
+/// icon share one rasterisation instead of racing. Returning the *identical*
+/// `Future` on every call also matters to the widgets: several of them build
+/// `FutureBuilder(future: iconDataToImageBytes(...))` inside `build()`, and
+/// `FutureBuilder` only re-subscribes when the future's identity changes — so
+/// a stable instance means no re-render and no placeholder flash on rebuild.
+final Map<String, Future<Uint8List?>> _iconBytesCache =
+    <String, Future<Uint8List?>>{};
+
+/// Upper bound on [_iconBytesCache]. An app has a fixed icon set, but `size`
+/// is caller-supplied and can be animated, so the map needs a ceiling. Eviction
+/// is oldest-first — Dart preserves insertion order.
+const int _kIconBytesCacheLimit = 256;
+
+/// Drops every memoised icon rasterisation.
+///
+/// Rarely needed: entries are keyed by size and device pixel ratio, so a
+/// display change or a resize does not return stale bytes. Exposed for tests
+/// and for apps that swap icon fonts at runtime.
+void clearIconImageCache() => _iconBytesCache.clear();
+
 /// Renders an [IconData] to PNG bytes for use in native platform views.
 ///
 /// The [size] parameter is the logical font size of the glyph. The output
@@ -147,7 +171,49 @@ Future<bool> _assetExists(String assetPath) async {
 /// leading the source font reports — so native containers like UITabBar
 /// lay out a predictable distance between icon and label.
 ///
-/// The function works in three passes:
+/// Results are memoised per (glyph, font, size, colour, device pixel ratio);
+/// see [clearIconImageCache].
+Future<Uint8List?> iconDataToImageBytes(
+  IconData iconData, {
+  double size = 25.0,
+  Color color = CupertinoColors.black,
+}) {
+  final double pixelRatio =
+      ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+  final String key =
+      '${iconData.codePoint}|${iconData.fontFamily}|${iconData.fontPackage}'
+      '|${size.toStringAsFixed(3)}|${pixelRatio.toStringAsFixed(3)}'
+      '|${color.toARGB32()}';
+
+  final Future<Uint8List?>? cached = _iconBytesCache[key];
+  if (cached != null) return cached;
+
+  if (_iconBytesCache.length >= _kIconBytesCacheLimit) {
+    _iconBytesCache.remove(_iconBytesCache.keys.first);
+  }
+
+  final Future<Uint8List?> pending = _renderIconToImageBytes(
+    iconData,
+    size: size,
+    color: color,
+    pixelRatio: pixelRatio,
+  );
+  _iconBytesCache[key] = pending;
+  // A null result means the glyph could not be rasterised. Don't hold onto
+  // that — the next caller should be free to try again.
+  pending
+      .then((Uint8List? bytes) {
+        if (bytes == null) _iconBytesCache.remove(key);
+      })
+      .catchError((Object _) {
+        _iconBytesCache.remove(key);
+      });
+  return pending;
+}
+
+/// Does the actual rasterisation for [iconDataToImageBytes].
+///
+/// Three passes:
 ///   1. Paint the glyph onto a generously padded canvas (TextPainter
 ///      reports line-box metrics, not glyph metrics — we can't ask the
 ///      engine ahead of time how far the glyph overflows).
@@ -155,15 +221,13 @@ Future<bool> _assetExists(String assetPath) async {
 ///   3. Re-blit the cropped glyph into a `size × size` canvas, centered
 ///      and scaled down if its visible bounds happen to exceed `size`
 ///      (FontAwesome-style overflowing glyphs).
-Future<Uint8List?> iconDataToImageBytes(
+Future<Uint8List?> _renderIconToImageBytes(
   IconData iconData, {
-  double size = 25.0,
-  Color color = CupertinoColors.black,
+  required double size,
+  required Color color,
+  required double pixelRatio,
 }) async {
   try {
-    final double pixelRatio =
-        ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
-
     // Rasterise the glyph at twice the device pixel ratio. Pass 3 scales the
     // cropped ink to FILL a `size * pixelRatio` output, which for a typical
     // icon font is a slight upscale — and at 1x there is no sub-pixel detail
