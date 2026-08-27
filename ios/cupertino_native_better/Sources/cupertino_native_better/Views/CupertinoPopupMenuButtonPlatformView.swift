@@ -402,8 +402,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
             )
           } else {
             let size = CGSize(width: iconSize ?? 18, height: iconSize ?? 18)
-            image = ImageUtils.loadFlutterAsset(assetPath, size: size, format: format, scale: self.iconScale)?
-              .withRenderingMode(.alwaysTemplate)
+            // Single-colour artwork templates losslessly and picks up the
+            // menu's own colouring; multi-colour artwork keeps its pixels.
+            image = ImageUtils.templatedIfMonochrome(
+              ImageUtils.loadFlutterAsset(assetPath, size: size, format: format, scale: self.iconScale)
+            )
           }
         } else if i < self.imageAssetData.count, let data = self.imageAssetData[i] {
           let format = i < self.imageAssetFormats.count ? self.imageAssetFormats[i] : nil
@@ -431,8 +434,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
             )
           } else {
             let size: CGSize? = iconSize != nil ? CGSize(width: iconSize!, height: iconSize!) : nil
-            image = ImageUtils.createImageFromData(data, format: format, size: size, scale: self.iconScale)?
-              .withRenderingMode(.alwaysTemplate)
+            // Single-colour artwork templates losslessly and picks up the
+            // menu's own colouring; multi-colour artwork keeps its pixels.
+            image = ImageUtils.templatedIfMonochrome(
+              ImageUtils.createImageFromData(data, format: format, size: size, scale: self.iconScale)
+            )
           }
         }
         

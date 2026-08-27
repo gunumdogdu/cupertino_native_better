@@ -29,6 +29,8 @@ import 'demos/issue40_button_label_style_test.dart';
 import 'demos/issue46_cntoast_context_test.dart';
 import 'demos/issue62_tabbar_gesture_arena_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
+import 'demos/pr66_glass_image_asset_tint_test.dart';
+import 'demos/pr67_icon_supersample_test.dart';
 import 'demos/issue55_popup_menu_destructive_test.dart';
 import 'demos/pr42_tabbar_iconsize_customicon_test.dart';
 import 'demos/issue33_svg_tabbar_test.dart';
@@ -446,6 +448,34 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     CupertinoPageRoute(
                       builder: (_) => const Pr64LiquidGlassSafeAreaTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #66: glass imageAsset tint'),
+                leading: CNIcon(
+                  symbol: CNSymbol('paintbrush.pointed', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr66GlassImageAssetTintTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #67: icon supersampling'),
+                leading: CNIcon(
+                  symbol: CNSymbol('squareshape.split.2x2', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr67IconSupersampleTestPage(),
                     ),
                   );
                 },

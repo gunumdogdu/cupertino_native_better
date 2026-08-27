@@ -1498,8 +1498,12 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
       case CNButtonStyle.prominentGlass:
         return _effectiveTint;
       case CNButtonStyle.glass:
-        // For iOS < 26, approximate glass with tinted appearance
-        return (_effectiveTint ?? Theme.of(context).primaryColor)
+        // For iOS < 26, approximate glass with tinted appearance.
+        // `_effectiveTint` is null for glass so the native side can pick its
+        // own foreground, but the pre-26 fallback still needs a colour — take
+        // it from the Cupertino theme, not Material's, so a custom
+        // `CupertinoThemeData.primaryColor` keeps working here.
+        return (_effectiveTint ?? ThemeHelper.getPrimaryColor(context))
             .withValues(alpha: 0.1);
       default:
         return null;

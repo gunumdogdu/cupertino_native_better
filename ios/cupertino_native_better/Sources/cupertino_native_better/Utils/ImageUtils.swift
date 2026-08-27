@@ -337,5 +337,94 @@ final class ImageUtils {
     
     return createImageFromData(data, format: detectedFormat, size: size, color: color, scale: scale)
   }
+
+  // MARK: - Template Suitability
+
+  /// Whether every opaque pixel in `image` shares one colour.
+  ///
+  /// Used to decide if an uncoloured `imageAsset` may be rendered as a
+  /// template. Template rendering keeps only the alpha channel, so it is
+  /// lossless for single-colour artwork (a black glyph, a grey stroked SVG)
+  /// and destructive for anything else — a four-colour logo would flatten to
+  /// a silhouette. Single-colour art is the case that needs adapting to
+  /// Liquid Glass; multi-colour art is deliberate and must be left alone.
+  ///
+  /// Only near-opaque pixels are compared, so antialiased edges — which vary
+  /// in alpha but not in colour — do not count as a second colour. The scan
+  /// is capped at a 32x32 sample grid and returns as soon as it finds a
+  /// second colour, so cost stays flat regardless of source resolution.
+  static func isEffectivelyMonochrome(_ image: UIImage) -> Bool {
+    guard let cgImage = image.cgImage else {
+      // No bitmap to inspect (e.g. a CIImage-backed UIImage). Leave the image
+      // alone rather than guessing at its colours. SVGs do reach here with a
+      // cgImage — SVGKit rasterises through a CGContext.
+      return false
+    }
+
+    let width = cgImage.width
+    let height = cgImage.height
+    guard width > 0, height > 0 else { return false }
+
+    // Render into a known layout — the source may be any colour space,
+    // bit depth, or alpha arrangement.
+    let sampleWidth = min(width, 32)
+    let sampleHeight = min(height, 32)
+    let bytesPerRow = sampleWidth * 4
+    var buffer = [UInt8](repeating: 0, count: bytesPerRow * sampleHeight)
+
+    guard let context = CGContext(
+      data: &buffer,
+      width: sampleWidth,
+      height: sampleHeight,
+      bitsPerComponent: 8,
+      bytesPerRow: bytesPerRow,
+      space: CGColorSpaceCreateDeviceRGB(),
+      // Straight (non-premultiplied) alpha keeps edge pixels at their true
+      // colour instead of fading them toward black.
+      bitmapInfo: CGImageAlphaInfo.last.rawValue
+    ) else {
+      return false
+    }
+
+    context.draw(cgImage, in: CGRect(x: 0, y: 0, width: sampleWidth, height: sampleHeight))
+
+    var found: (UInt8, UInt8, UInt8)? = nil
+    // Tolerance absorbs resampling noise without merging distinct hues.
+    let tolerance: Int = 12
+
+    for y in 0..<sampleHeight {
+      let row = y * bytesPerRow
+      for x in 0..<sampleWidth {
+        let i = row + x * 4
+        guard buffer[i + 3] >= 250 else { continue }
+        let pixel = (buffer[i], buffer[i + 1], buffer[i + 2])
+        guard let first = found else {
+          found = pixel
+          continue
+        }
+        if abs(Int(pixel.0) - Int(first.0)) > tolerance
+            || abs(Int(pixel.1) - Int(first.1)) > tolerance
+            || abs(Int(pixel.2) - Int(first.2)) > tolerance {
+          return false
+        }
+      }
+    }
+
+    // No opaque pixel at all (a fully translucent image) is not something we
+    // should reinterpret as a template.
+    return found != nil
+  }
+
+  /// Returns `image` as a template when that is lossless, otherwise unchanged.
+  ///
+  /// Callers use this for artwork supplied without an explicit colour, so the
+  /// control's tint — and on iOS 26 the glass material's automatic foreground
+  /// adaptation — can apply. See `isEffectivelyMonochrome(_:)` for why
+  /// multi-colour artwork is left as-is.
+  static func templatedIfMonochrome(_ image: UIImage?) -> UIImage? {
+    guard let image = image else { return nil }
+    guard isEffectivelyMonochrome(image) else { return image }
+    return image.withRenderingMode(.alwaysTemplate)
+  }
 }
 

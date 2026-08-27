@@ -139,10 +139,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           finalImage = ImageUtils.scaleImage(finalImage!, to: targetSize, scale: iconScale)
         }
       }
-      // No explicit color: render as a template so the control's tint — and
-      // Liquid Glass's automatic foreground adaptation — applies.
-      if finalImage != nil, iconColor == nil {
-        finalImage = finalImage!.withRenderingMode(.alwaysTemplate)
+      // No explicit color: render single-colour artwork as a template so the
+      // control's tint — and Liquid Glass's automatic foreground adaptation —
+      // applies. Multi-colour artwork is left alone; templating would flatten
+      // it to a silhouette.
+      if iconColor == nil {
+        finalImage = ImageUtils.templatedIfMonochrome(finalImage)
       }
     } else if let data = imageData {
       let format = imageFormat
@@ -161,10 +163,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         let size: CGSize? = iconSize != nil ? CGSize(width: iconSize!, height: iconSize!) : nil
         finalImage = ImageUtils.createImageFromData(data, format: format, size: size, scale: iconScale)
       }
-      // No explicit color: render as a template so the control's tint — and
-      // Liquid Glass's automatic foreground adaptation — applies.
-      if finalImage != nil, iconColor == nil {
-        finalImage = finalImage!.withRenderingMode(.alwaysTemplate)
+      // No explicit color: render single-colour artwork as a template so the
+      // control's tint — and Liquid Glass's automatic foreground adaptation —
+      // applies. Multi-colour artwork is left alone; templating would flatten
+      // it to a silhouette.
+      if iconColor == nil {
+        finalImage = ImageUtils.templatedIfMonochrome(finalImage)
       }
     }
     
@@ -429,9 +433,15 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           var image: UIImage? = nil
           let size = CGSize(width: args["buttonIconSize"] as? CGFloat ?? 20, height: args["buttonIconSize"] as? CGFloat ?? 20)
           
+          // Tracks whether `image` came from an imageAsset, so the template
+          // pass below can't reach SF Symbols — templating one would flatten
+          // a `multicolor`/`palette` symbol to a single colour.
+          var imageIsAsset = false
+
           // Priority: imageAsset > customIconBytes > SF Symbol
           // Handle imageAsset properties first
           if let assetPath = args["buttonAssetPath"] as? String, !assetPath.isEmpty {
+            imageIsAsset = true
             let format = args["buttonImageFormat"] as? String
             let iconColorARGB = (args["buttonIconColor"] as? NSNumber)?.intValue
             
@@ -453,9 +463,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
               image = ImageUtils.scaleImage(image!, to: size, scale: UIScreen.main.scale)
             }
           } else if let imageData = args["buttonImageData"] as? FlutterStandardTypedData {
+            imageIsAsset = true
             let format = args["buttonImageFormat"] as? String
             let iconColorARGB = (args["buttonIconColor"] as? NSNumber)?.intValue
-            
+
             // Use utility function to create and optionally tint image
             if let argb = iconColorARGB, #available(iOS 13.0, *) {
               image = ImageUtils.createAndTintImage(
@@ -474,12 +485,13 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
             image = UIImage(systemName: name)
           }
           
-          // No explicit color: render as a template so the control's tint — and
-          // Liquid Glass's automatic foreground adaptation — applies.
-          if let img = image, (args["buttonIconColor"] as? NSNumber) == nil {
-            image = img.withRenderingMode(.alwaysTemplate)
+          // No explicit color: render single-colour artwork as a template so
+          // the control's tint — and Liquid Glass's automatic foreground
+          // adaptation — applies. Multi-colour artwork is left alone.
+          if imageIsAsset, (args["buttonIconColor"] as? NSNumber) == nil {
+            image = ImageUtils.templatedIfMonochrome(image)
           }
-          
+
           // Apply size and styling if image was found
           if let img = image {
             if let s = args["buttonIconSize"] as? NSNumber {
