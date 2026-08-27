@@ -139,6 +139,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           finalImage = ImageUtils.scaleImage(finalImage!, to: targetSize, scale: iconScale)
         }
       }
+      // No explicit color: render as a template so the control's tint — and
+      // Liquid Glass's automatic foreground adaptation — applies.
+      if finalImage != nil, iconColor == nil {
+        finalImage = finalImage!.withRenderingMode(.alwaysTemplate)
+      }
     } else if let data = imageData {
       let format = imageFormat
       let iconColorARGB: Int? = iconColor != nil ? ImageUtils.colorToARGB(iconColor!) : nil
@@ -155,6 +160,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       } else {
         let size: CGSize? = iconSize != nil ? CGSize(width: iconSize!, height: iconSize!) : nil
         finalImage = ImageUtils.createImageFromData(data, format: format, size: size, scale: iconScale)
+      }
+      // No explicit color: render as a template so the control's tint — and
+      // Liquid Glass's automatic foreground adaptation — applies.
+      if finalImage != nil, iconColor == nil {
+        finalImage = finalImage!.withRenderingMode(.alwaysTemplate)
       }
     }
     
@@ -462,6 +472,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
             image = UIImage(data: customIconBytes.data, scale: UIScreen.main.scale)?.withRenderingMode(.alwaysTemplate)
           } else if let name = args["buttonIconName"] as? String {
             image = UIImage(systemName: name)
+          }
+          
+          // No explicit color: render as a template so the control's tint — and
+          // Liquid Glass's automatic foreground adaptation — applies.
+          if let img = image, (args["buttonIconColor"] as? NSNumber) == nil {
+            image = img.withRenderingMode(.alwaysTemplate)
           }
           
           // Apply size and styling if image was found

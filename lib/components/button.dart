@@ -302,8 +302,16 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
   bool get _isDark => ThemeHelper.isDark(context);
 
-  Color? get _effectiveTint =>
-      widget.tint ?? ThemeHelper.getPrimaryColor(context);
+  /// Regular glass resolves its content foreground from the material's
+  /// automatic appearance, so no accent fallback is applied. Other styles
+  /// keep the primary fallback.
+  Color? get _effectiveTint {
+    final tint = widget.tint;
+    if (tint != null || widget.config.style != CNButtonStyle.glass) {
+      return tint ?? ThemeHelper.getPrimaryColor(context);
+    }
+    return null;
+  }
 
   @override
   void dispose() {
@@ -1491,7 +1499,8 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
         return _effectiveTint;
       case CNButtonStyle.glass:
         // For iOS < 26, approximate glass with tinted appearance
-        return _effectiveTint?.withValues(alpha: 0.1);
+        return (_effectiveTint ?? Theme.of(context).primaryColor)
+            .withValues(alpha: 0.1);
       default:
         return null;
     }
