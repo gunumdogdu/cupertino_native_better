@@ -63,14 +63,22 @@ void main() {
 
   group('CNGlassEffect', () {
     test('has all expected values', () {
-      expect(CNGlassEffect.values.length, 2);
+      // Adding a value here is source-breaking for callers with an exhaustive
+      // switch, so the count is asserted deliberately — bump it only alongside
+      // a minor version bump. `clear` arrived in 1.6.0 (PR #69).
+      expect(CNGlassEffect.values.length, 3);
       expect(CNGlassEffect.values, contains(CNGlassEffect.regular));
       expect(CNGlassEffect.values, contains(CNGlassEffect.prominent));
+      expect(CNGlassEffect.values, contains(CNGlassEffect.clear));
     });
 
     test('enum names are correct', () {
+      // The names go over the channel verbatim as `'effect': effect.name`,
+      // and the native side compares against the string "clear" — so these
+      // are wire format, not cosmetics.
       expect(CNGlassEffect.regular.name, 'regular');
       expect(CNGlassEffect.prominent.name, 'prominent');
+      expect(CNGlassEffect.clear.name, 'clear');
     });
   });
 
