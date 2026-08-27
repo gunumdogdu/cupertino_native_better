@@ -164,6 +164,15 @@ Future<Uint8List?> iconDataToImageBytes(
     final double pixelRatio =
         ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
 
+    // Rasterise the glyph at twice the device pixel ratio. Pass 3 scales the
+    // cropped ink to FILL a `size * pixelRatio` output, which for a typical
+    // icon font is a slight upscale — and at 1x there is no sub-pixel detail
+    // to upscale from, so thin strokes come out with staircase edges.
+    //
+    // Only the canvas is scaled, not the font size. Scaling both (4x linear,
+    // 16x the pixels) measures better but is not distinguishable at real icon
+    // sizes, and the intermediate buffer is walked pixel-by-pixel below to
+    // find the ink bounds.
     const double supersample = 2.0;
     final double canvasScale = pixelRatio * supersample;
 
@@ -173,7 +182,7 @@ Future<Uint8List?> iconDataToImageBytes(
         style: TextStyle(
           inherit: false,
           color: color,
-          fontSize: size * supersample,
+          fontSize: size,
           fontFamily: iconData.fontFamily,
           package: iconData.fontPackage,
         ),
@@ -181,7 +190,7 @@ Future<Uint8List?> iconDataToImageBytes(
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final double padding = size * supersample;
+    final double padding = size;
     final double logicalWidth = painter.width + padding * 2;
     final double logicalHeight = painter.height + padding * 2;
     final int paddedPixelWidth = (logicalWidth * canvasScale).ceil();
