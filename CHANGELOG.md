@@ -1,4 +1,29 @@
-## 1.5.5
+## 1.6.0
+
+> Minor rather than patch because `CNGlassEffect` gains a value (`clear`). That is source-breaking for anyone with an exhaustive `switch` over the enum. 1.5.5 was tagged during development and never published; everything it contained is here.
+
+### Added — #69 `CNGlassEffect.clear`, and `LiquidGlassConfig.effect` is now honoured
+
+`LiquidGlassConfig.effect` was serialised over the channel as `'effect': config.effect.name`, parsed natively, stored, handed to the SwiftUI view and even used as an `.animation(_:value:)` key — and then `glassEffectForConfig()` ignored it and hardcoded `Glass.regular` on both iOS and macOS. `CNGlassEffect.regular` and `CNGlassEffect.prominent` therefore rendered identically, and SwiftUI's third variant, `Glass.clear`, was unreachable.
+
+`clear` matters for glass over imagery: `regular` frosts what is behind it, `clear` lets it through — the treatment Apple's own media controls use over video and artwork.
+
+**Fix:** `CNGlassEffect.clear` is added and both containers honour the value they were already being given.
+
+**`prominent` is unchanged and still falls back to `regular`** — SwiftUI's `Glass` has no prominent counterpart to map onto. The enum value is kept so existing code compiles and so the mapping can be filled in later; it is now documented as a fallback rather than left to be discovered by screenshot. Note also that `clear` barely blurs, so content layered on top of it needs its own contrast handling (a shadow or scrim) in a way `regular` does not.
+
+Reported and fixed by @johndavid92 (PR #69). Verified on an iPhone 16 Pro / iOS 26 simulator with panels of identical size and position over vertical stripes that never vary along y — so every panel sees a pixel-identical backdrop and any difference is the glass alone. RMSE between panel interiors:
+
+| comparison | RMSE |
+|---|---|
+| before — `regular` vs `prominent` | 0.0010 |
+| *noise floor (same panel shifted 1px)* | *0.0027* |
+| after — `regular` vs `prominent` | 0.0010 (unchanged) |
+| after — `regular` vs `clear` | 0.337 |
+
+Before the fix the two effects differed by less than a one-pixel shift of the same image: peak difference 1/255, zero differing pixels at 2% fuzz. macOS could not be built in the verification environment (pre-existing Swift Package Manager scaffolding issue, unrelated to the change), so the macOS `glassEffectForConfig` body was type-checked against the MacOSX26.0 SDK directly instead.
+
+`CNGlassButtonGroup` still hardcodes `Glass.regular` in `GlassButtonSwiftUI.swift` on both platforms — a separate surface that does not take `CNGlassEffect`, left for a follow-up.
 
 ### Fixed — #66 Uncoloured `imageAsset` icons don't adapt to Liquid Glass
 
@@ -46,6 +71,7 @@ Results are memoised per (glyph, font, size, colour, device pixel ratio). Future
 
 - New: `Testing → PR #66: glass imageAsset tint` — puts the same artwork through SF Symbol, `customIcon`, uncoloured `imageAsset` and explicitly coloured `imageAsset` on a glass button, over a selectable backdrop (black / white / photo / split) and either brightness. Includes a deliberately four-colour row as the regression check for template flattening, plus popup-menu and button-group rows.
 - New: `Testing → PR #67: icon supersampling` — renders the same glyph through the renderer with the supersample factor and `FilterQuality` exposed as separate knobs, blown up nearest-neighbour so real pixels are visible, with mean-alpha-error and intermediate-buffer cost per variant.
+- New: `Testing → PR #69: LiquidGlass config.effect` — one panel per `CNGlassEffect.values` over vertical stripes that never vary along y, so every panel sees a pixel-identical backdrop and two panels that render differently can only differ because of the glass. Backdrop switches to a photo for the over-imagery case.
 - New: `example/lib/pr_probe_entry.dart` — an alternate entrypoint that boots straight into one test page in one configuration via `--dart-define`, for capturing before/after screenshots without tapping through the demo list.
 
 ---
