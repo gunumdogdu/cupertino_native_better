@@ -18,6 +18,7 @@ import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
+import 'demos/pr69_glass_effect_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const String _backdrop = String.fromEnvironment(
@@ -74,6 +75,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'pr67native') {
       return Pr67NativeStripPage(label: _label);
+    }
+    if (_probe.startsWith('pr69')) {
+      return Pr69GlassEffectTestPage(
+        initialBackdrop: _backdrop == 'photo' ? 'photo' : 'stripes',
+        initialTinted: _accent == 'pink',
+      );
     }
     return Pr67IconSupersampleTestPage(
       initialIcon: _icon,

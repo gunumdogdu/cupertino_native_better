@@ -5,13 +5,28 @@ import '../components/liquid_glass_container.dart';
 /// Liquid Glass effect variants for iOS 26+.
 enum CNGlassEffect {
   /// Regular glass effect with standard blur and transparency.
+  ///
+  /// Frosts whatever sits behind it. This is the default and the right choice
+  /// for glass over arbitrary content, where legibility matters more than
+  /// showing the backdrop.
   regular,
 
   /// Prominent glass effect with enhanced visual prominence.
+  ///
+  /// **Currently renders identically to [regular].** SwiftUI's `Glass` type
+  /// has no prominent counterpart to map onto, so this value falls back. It
+  /// is kept so existing code keeps compiling and so the mapping can be
+  /// filled in if Apple adds one; don't reach for it expecting a visual
+  /// difference today.
   prominent,
 
-  /// Clear glass effect — far more transparent than [regular], for glass that sits over
-  /// imagery and should let it through rather than frosting it.
+  /// Clear glass effect — far more transparent than [regular], for glass that
+  /// sits over imagery and should let it through rather than frosting it.
+  ///
+  /// Maps to SwiftUI's `Glass.clear`. This is what Apple's own media controls
+  /// use over video and artwork. Because it barely blurs, content layered on
+  /// top of it needs its own contrast handling — a shadow or a scrim — in a
+  /// way that [regular] does not.
   clear,
 }
 
@@ -100,7 +115,8 @@ extension LiquidGlassExtension on Widget {
   /// that applies the glass effect. On older versions or other platforms,
   /// the widget is returned unchanged.
   ///
-  /// The [effect] determines the glass variant (regular or prominent).
+  /// The [effect] determines the glass variant — [CNGlassEffect.regular] to
+  /// frost the backdrop, [CNGlassEffect.clear] to let it through.
   /// The [shape] determines the shape of the glass effect (capsule, rect, or circle).
   /// The [cornerRadius] is only used when [shape] is [CNGlassEffectShape.rect].
   /// The [tint] applies a color tint to the glass effect.
