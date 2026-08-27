@@ -1,3 +1,55 @@
+## 1.5.5
+
+### Fixed — #66 Uncoloured `imageAsset` icons don't adapt to Liquid Glass
+
+An `imageAsset` supplied without an explicit `color` was handed to UIKit as a non-template `UIImage`, so it kept its baked pixels. On an iOS 26 glass button the material resolves its light/dark appearance from the **backdrop**, so a black-baked glyph over a dark backdrop went invisible — and a white-baked one did the same over a light backdrop. `customIcon` and SF Symbols already receive `.alwaysTemplate` and were unaffected, which is what made the inconsistency easy to miss until an app mixed the two.
+
+**Fix:** uncoloured image assets are rendered as templates in `CupertinoButtonPlatformView` and `CupertinoPopupMenuButtonPlatformView`, so the control's tint — and Liquid Glass's automatic foreground adaptation — applies. Explicit `imageAsset.color` values keep their existing baked-tint behaviour.
+
+Templating is gated on the artwork actually being single-colour. `.alwaysTemplate` keeps only the alpha channel: lossless for a black glyph or a grey stroked SVG, but it flattens anything multi-colour to a silhouette. `ImageUtils.isEffectivelyMonochrome(_:)` samples the image on a capped 32×32 grid, compares only near-opaque pixels (so antialiased edges don't read as a second colour) and returns on the first distinct colour — so **multi-colour assets are left exactly as they were**.
+
+Also in this change:
+
+- `GlassButtonSwiftUI.effectiveIconColor` was `tint ?? iconColor`, so a control-level tint overrode an explicit per-icon colour. Now `iconColor ?? tint`.
+- The `setButtonIcon` template pass is scoped to image assets. Applied to every icon source it would also template SF Symbols, so a `multicolor`/`palette` symbol without an explicit colour rendered correctly on creation and then flattened after any icon update.
+
+**Behaviour change:** the plain `glass` style no longer sends a forced theme-accent tint from Dart, so the native side can resolve its own foreground. On iOS 26 this is mostly invisible for **icons** — `UIButton.Configuration.glass()` already overrode the image foreground, so a glass SF Symbol rendered as the adaptive system colour rather than the accent even before this release. It *is* visible on glass button **labels**, which now use the system label colour instead of `CupertinoThemeData.primaryColor`. Set `CNButton.tint` explicitly to keep an accent-coloured glass label. `prominentGlass` keeps its accent fallback, and the pre-iOS-26 fallback still reads `primaryColor` from the Cupertino theme.
+
+Reported and fixed by @azharul-islam (PR #66). Reproduced and verified on an iPhone 16 Pro / iOS 26 simulator: over a black backdrop in light mode, a black-baked `imageAsset` was invisible on the glass before the fix and adapts to white after, while a deliberately four-colour asset keeps all four colours.
+
+### Fixed — #67 `customIcon` glyphs pixelated on thin strokes
+
+`iconDataToImageBytes` painted the glyph at 1× `fontSize`, then the "scale to fill" re-blit **upscaled** the cropped ink — icon fonts pad their glyphs inside the em box, so the ink is smaller than the requested `size`. At 1× there is no sub-pixel detail to upscale from, so thin strokes (chevrons, checkmarks, plus signs, outline glyphs) came out with visible staircase edges. Every `customIcon` path in the package routes through this function: `CNButton`, `CNPopupMenuButton`, `CNTabBar`, `CNIcon`, `CNGlassButtonGroup`.
+
+**Fix:** the glyph is rasterised onto a canvas scaled to 2× the device pixel ratio, and the re-blit downscales with `FilterQuality.high` instead of the `Paint()` default of `FilterQuality.none`. Output dimensions are unchanged.
+
+Measured on an iPhone 16 Pro / iOS 26 simulator against a ground-truth render — mean absolute alpha error, chevron at 20 pt, 3× screen:
+
+| | intermediate buffer | MAE |
+|---|---|---|
+| before | 27k px | 7.00 |
+| `FilterQuality` change alone | 27k px | 6.82 |
+| **2× canvas + `FilterQuality.high`** | **108k px** | **2.98** |
+| 4× linear (font *and* canvas) | 434k px | 1.78 |
+
+The `FilterQuality` change on its own is close to a no-op — the re-blit is only a ~1.1× upscale, so the filter barely matters and it measured *worse* on 5 of 12 glyph/size combinations. The intermediate resolution was the actual problem. The last row is what PR #67 originally proposed; it measures better but is not distinguishable at real icon sizes, and it costs 16× the pixels in a buffer that is walked pixel-by-pixel to find the ink bounds.
+
+Reported and fixed by @azharul-islam (PR #67), refined to 2× on merge.
+
+### Performance — `iconDataToImageBytes` is now memoised
+
+There was no cache on icon rasterisation, and `CNButton` and `CNIcon` build `FutureBuilder(future: iconDataToImageBytes(...))` inside `build()` — so every rebuild re-ran three canvas passes plus a pixel-by-pixel scan of the intermediate buffer.
+
+Results are memoised per (glyph, font, size, colour, device pixel ratio). Futures rather than results are cached, so concurrent callers share one rasterisation; and because `FutureBuilder` only re-subscribes when its future's identity changes, those widgets now keep their snapshot across rebuilds instead of dropping back to a blank placeholder. The map is capped at 256 entries with oldest-first eviction, since `size` is caller-supplied and can be animated. `clearIconImageCache()` is exported for tests and for apps that swap icon fonts at runtime.
+
+### Example app
+
+- New: `Testing → PR #66: glass imageAsset tint` — puts the same artwork through SF Symbol, `customIcon`, uncoloured `imageAsset` and explicitly coloured `imageAsset` on a glass button, over a selectable backdrop (black / white / photo / split) and either brightness. Includes a deliberately four-colour row as the regression check for template flattening, plus popup-menu and button-group rows.
+- New: `Testing → PR #67: icon supersampling` — renders the same glyph through the renderer with the supersample factor and `FilterQuality` exposed as separate knobs, blown up nearest-neighbour so real pixels are visible, with mean-alpha-error and intermediate-buffer cost per variant.
+- New: `example/lib/pr_probe_entry.dart` — an alternate entrypoint that boots straight into one test page in one configuration via `--dart-define`, for capturing before/after screenshots without tapping through the demo list.
+
+---
+
 ## 1.5.4
 
 ### Fixed — #64 `LiquidGlassContainer` glass renders short in the bottom safe area
