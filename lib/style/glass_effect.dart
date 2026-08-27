@@ -9,6 +9,10 @@ enum CNGlassEffect {
 
   /// Prominent glass effect with enhanced visual prominence.
   prominent,
+
+  /// Clear glass effect — far more transparent than [regular], for glass that sits over
+  /// imagery and should let it through rather than frosting it.
+  clear,
 }
 
 /// Shapes for Liquid Glass effects.

@@ -248,8 +248,8 @@ struct LiquidGlassContainerSwiftUI: View {
   }
   
   private func glassEffectForConfig() -> Glass {
-    // Always use .regular for now - prominent glass API may be available in future
-    var glass = Glass.regular
+    // `prominent` still has no SwiftUI counterpart, so it keeps falling back to regular.
+    var glass: Glass = effect == "clear" ? .clear : .regular
     
     if let tintColor = tint {
       glass = glass.tint(Color(tintColor))
