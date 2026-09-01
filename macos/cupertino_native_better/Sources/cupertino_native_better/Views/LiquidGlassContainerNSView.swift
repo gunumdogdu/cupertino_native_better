@@ -6,6 +6,7 @@ import SwiftUI
 class LiquidGlassContainerNSView: NSView {
   private var hostingController: NSHostingController<LiquidGlassContainerSwiftUI>
   private let channel: FlutterMethodChannel
+  private var lastSize: CGSize = .zero
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeLiquidGlassContainer_\(viewId)", binaryMessenger: messenger)
@@ -77,6 +78,26 @@ class LiquidGlassContainerNSView: NSView {
 
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    guard window != nil else { return }
+    refreshGlass()
+  }
+
+  override func layout() {
+    super.layout()
+    guard bounds.size != lastSize else { return }
+    lastSize = bounds.size
+    refreshGlass()
+  }
+
+  /// SwiftUI sizes the glass from a `GeometryReader`, which does not re-run when AppKit alone
+  /// attaches or resizes the view, so re-render it when either happens.
+  private func refreshGlass() {
+    hostingController.rootView = hostingController.rootView
+    hostingController.view.needsLayout = true
   }
 
   private func updateConfig(args: Any?) {
