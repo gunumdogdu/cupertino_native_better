@@ -11,6 +11,10 @@
 //   flutter run -t lib/pr_probe_entry.dart \
 //     --dart-define=PROBE=pr67 --dart-define=ICON=chevron --dart-define=SIZE=20
 //
+//   flutter run -t lib/pr_probe_entry.dart \
+//     --dart-define=PROBE=pr72 --dart-define=SCENARIO=collapse --dart-define=LABEL=before
+//   (SCENARIO: resize | collapse | zero | offscreen | detach; the page auto-toggles.)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'package:flutter/cupertino.dart';
@@ -19,6 +23,7 @@ import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
 import 'demos/pr69_glass_effect_test.dart';
+import 'demos/pr72_glass_resize_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const String _backdrop = String.fromEnvironment(
@@ -32,6 +37,10 @@ const String _brightness = String.fromEnvironment(
 const String _icon = String.fromEnvironment('ICON', defaultValue: 'chevron');
 const String _size = String.fromEnvironment('SIZE', defaultValue: '20');
 const String _accent = String.fromEnvironment('ACCENT', defaultValue: 'blue');
+const String _scenario = String.fromEnvironment(
+  'SCENARIO',
+  defaultValue: 'resize',
+);
 
 /// Stamped into the nav bar so a before/after screenshot pair can't be mixed up.
 const String _label = String.fromEnvironment('LABEL', defaultValue: '');
@@ -80,6 +89,13 @@ class _ProbeApp extends StatelessWidget {
       return Pr69GlassEffectTestPage(
         initialBackdrop: _backdrop == 'photo' ? 'photo' : 'stripes',
         initialTinted: _accent == 'pink',
+      );
+    }
+    if (_probe.startsWith('pr72')) {
+      return Pr72GlassResizeTestPage(
+        initialScenario: _scenario,
+        label: _label,
+        autoCycle: true,
       );
     }
     return Pr67IconSupersampleTestPage(
