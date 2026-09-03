@@ -2,9 +2,29 @@ import Flutter
 import UIKit
 import SwiftUI
 
+/// SwiftUI sizes the glass from a `GeometryReader`, which does not re-run when UIKit alone attaches or
+/// resizes the view, so the host reports both and the glass is re-rendered.
+private final class CNGlassHostView: UIView {
+  var onNeedsGlassRefresh: (() -> Void)?
+  private var lastSize: CGSize = .zero
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    guard window != nil else { return }
+    onNeedsGlassRefresh?()
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    guard bounds.size != lastSize else { return }
+    lastSize = bounds.size
+    onNeedsGlassRefresh?()
+  }
+}
+
 @available(iOS 26.0, *)
 class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
-  private let container: UIView
+  private let container: CNGlassHostView
   private var hostingController: UIHostingController<LiquidGlassContainerSwiftUI>
   private let channel: FlutterMethodChannel
 
@@ -18,7 +38,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeLiquidGlassContainer_\(viewId)", binaryMessenger: messenger)
-    self.container = UIView(frame: frame)
+    self.container = CNGlassHostView(frame: frame)
     self.container.backgroundColor = .clear
     
     // Parse arguments
@@ -93,7 +113,10 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
       hostingController.view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
     ])
-    
+
+    container.onNeedsGlassRefresh = { [weak self] in self?.refreshGlass() }
+    DispatchQueue.main.async { [weak self] in self?.refreshGlass() }
+
     // Set up method channel handler
     channel.setMethodCallHandler { [weak self] (call, result) in
       if call.method == "updateConfig" {
@@ -205,6 +228,11 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     self.configuredCornerRadius = cornerRadius
   }
   
+  private func refreshGlass() {
+    hostingController.rootView = hostingController.rootView
+    hostingController.view.setNeedsLayout()
+  }
+
   func view() -> UIView {
     return container
   }
