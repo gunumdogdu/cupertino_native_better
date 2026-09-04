@@ -1065,11 +1065,22 @@ channel.setMethodCallHandler { [weak self] call, result in
 
   // MARK: - Appearance helpers
 
-  /// Builds a UITabBarAppearance with transparent background and optional custom label font.
+  /// Builds a UITabBarAppearance for the bar, plus the optional custom label font.
+  ///
+  /// On iOS 26+ the bar takes the default background, which is what makes UIKit
+  /// give it the Liquid Glass material. A transparent background there is not
+  /// "glass with no tint" — it is *no material at all*: the bar becomes a hole,
+  /// and whatever is behind it shows through at full sharpness. Below iOS 26
+  /// the default background is an opaque chrome bar, which is not what this
+  /// widget is for, so those keep the transparent appearance.
   @available(iOS 13.0, *)
   private func makeAppearance() -> UITabBarAppearance {
     let ap = UITabBarAppearance()
-    ap.configureWithTransparentBackground()
+    if #available(iOS 26.0, *) {
+      ap.configureWithDefaultBackground()
+    } else {
+      ap.configureWithTransparentBackground()
+    }
     ap.shadowColor = .clear
     ap.shadowImage = UIImage()
     applyLabelFont(to: ap)
