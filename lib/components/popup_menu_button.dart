@@ -204,6 +204,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
   MethodChannel? _channel;
   bool? _lastIsDark;
+  Map<String, Object?>? _lastItems;
   int? _lastTint;
   String? _lastTitle;
   String? _lastIconName;
@@ -744,6 +745,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     _lastIconSize = widget.buttonIcon?.size;
     _lastIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
     _lastStyle = widget.buttonStyle;
+    _lastItems = _menuItems();
     if (!widget.isIconButton) {
       _requestIntrinsicSize();
     }
@@ -773,76 +775,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   Future<void> _syncPropsToNativeIfNeeded() async {
     final ch = _channel;
     if (ch == null) return;
-    // Prepare popup items upfront to avoid using BuildContext after awaits.
-    final updLabels = <String>[];
-    final updSymbols = <String>[];
-    final updIsDivider = <bool>[];
-    final updEnabled = <bool>[];
-    final updChecked = <bool>[];
-    final updIsDestructive = <bool>[];
-    final updSizes = <double?>[];
-    final updColors = <int?>[];
-    final updModes = <String?>[];
-    final updPalettes = <List<int?>?>[];
-    final updGradients = <bool?>[];
-    final updImageAssetPaths = <String>[];
-    final updImageAssetData = <Uint8List?>[];
-    final updImageAssetFormats = <String>[];
-    for (final e in widget.items) {
-      if (e is CNPopupMenuDivider) {
-        updLabels.add('');
-        updSymbols.add('');
-        updIsDivider.add(true);
-        updEnabled.add(false);
-        updChecked.add(false);
-        updIsDestructive.add(false);
-        updSizes.add(null);
-        updColors.add(null);
-        updModes.add(null);
-        updPalettes.add(null);
-        updGradients.add(null);
-        updImageAssetPaths.add('');
-        updImageAssetData.add(null);
-        updImageAssetFormats.add('');
-      } else if (e is CNPopupMenuItem) {
-        updLabels.add(e.label);
-        updSymbols.add(e.icon?.name ?? '');
-        updIsDivider.add(false);
-        updEnabled.add(e.enabled);
-        updChecked.add(e.checked);
-        updIsDestructive.add(e.isDestructive);
-        updSizes.add(e.imageAsset?.size ?? e.icon?.size);
-        updColors.add(
-          resolveColorToArgb(e.imageAsset?.color ?? e.icon?.color, context),
-        );
-        updModes.add(e.imageAsset?.mode?.name ?? e.icon?.mode?.name);
-        updPalettes.add(
-          e.icon?.paletteColors
-              ?.map((c) => resolveColorToArgb(c, context))
-              .toList(),
-        );
-        updGradients.add(e.imageAsset?.gradient ?? e.icon?.gradient);
-
-        // Handle imageAsset for menu items
-        if (e.imageAsset != null) {
-          updImageAssetPaths.add(e.imageAsset!.assetPath);
-          updImageAssetData.add(e.imageAsset!.imageData);
-          // Auto-detect format if not provided
-          updImageAssetFormats.add(
-            e.imageAsset!.imageFormat ??
-                detectImageFormat(
-                  e.imageAsset!.assetPath,
-                  e.imageAsset!.imageData,
-                ) ??
-                '',
-          );
-        } else {
-          updImageAssetPaths.add('');
-          updImageAssetData.add(null);
-          updImageAssetFormats.add('');
-        }
-      }
-    }
+    final items = _menuItems();
     // Capture context-dependent values before any awaits
     final tint = resolveColorToArgb(_effectiveTint, context);
     final preIconName = widget.buttonIcon?.name;
@@ -934,7 +867,91 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       }
     }
 
-    await ch.invokeMethod('setItems', {
+    if (!_menuValuesEqual(_lastItems, items)) {
+      _lastItems = items;
+      try {
+        await ch.invokeMethod('setItems', items);
+      } catch (_) {
+        if (identical(ch, _channel) && identical(_lastItems, items)) {
+          _lastItems = null;
+        }
+        rethrow;
+      }
+    }
+  }
+
+  Map<String, Object?> _menuItems() {
+    // Prepare popup items upfront to avoid using BuildContext after awaits.
+    final updLabels = <String>[];
+    final updSymbols = <String>[];
+    final updIsDivider = <bool>[];
+    final updEnabled = <bool>[];
+    final updChecked = <bool>[];
+    final updIsDestructive = <bool>[];
+    final updSizes = <double?>[];
+    final updColors = <int?>[];
+    final updModes = <String?>[];
+    final updPalettes = <List<int?>?>[];
+    final updGradients = <bool?>[];
+    final updImageAssetPaths = <String>[];
+    final updImageAssetData = <Uint8List?>[];
+    final updImageAssetFormats = <String>[];
+    for (final e in widget.items) {
+      if (e is CNPopupMenuDivider) {
+        updLabels.add('');
+        updSymbols.add('');
+        updIsDivider.add(true);
+        updEnabled.add(false);
+        updChecked.add(false);
+        updIsDestructive.add(false);
+        updSizes.add(null);
+        updColors.add(null);
+        updModes.add(null);
+        updPalettes.add(null);
+        updGradients.add(null);
+        updImageAssetPaths.add('');
+        updImageAssetData.add(null);
+        updImageAssetFormats.add('');
+      } else if (e is CNPopupMenuItem) {
+        updLabels.add(e.label);
+        updSymbols.add(e.icon?.name ?? '');
+        updIsDivider.add(false);
+        updEnabled.add(e.enabled);
+        updChecked.add(e.checked);
+        updIsDestructive.add(e.isDestructive);
+        updSizes.add(e.imageAsset?.size ?? e.icon?.size);
+        updColors.add(
+          resolveColorToArgb(e.imageAsset?.color ?? e.icon?.color, context),
+        );
+        updModes.add(e.imageAsset?.mode?.name ?? e.icon?.mode?.name);
+        updPalettes.add(
+          e.icon?.paletteColors
+              ?.map((c) => resolveColorToArgb(c, context))
+              .toList(),
+        );
+        updGradients.add(e.imageAsset?.gradient ?? e.icon?.gradient);
+
+        // Handle imageAsset for menu items
+        if (e.imageAsset != null) {
+          updImageAssetPaths.add(e.imageAsset!.assetPath);
+          updImageAssetData.add(e.imageAsset!.imageData);
+          // Auto-detect format if not provided
+          updImageAssetFormats.add(
+            e.imageAsset!.imageFormat ??
+                detectImageFormat(
+                  e.imageAsset!.assetPath,
+                  e.imageAsset!.imageData,
+                ) ??
+                '',
+          );
+        } else {
+          updImageAssetPaths.add('');
+          updImageAssetData.add(null);
+          updImageAssetFormats.add('');
+        }
+      }
+    }
+    return {
       'labels': updLabels,
       'sfSymbols': updSymbols,
       'isDivider': updIsDivider,
@@ -949,7 +966,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       'imageAssetPaths': updImageAssetPaths,
       'imageAssetData': updImageAssetData,
       'imageAssetFormats': updImageAssetFormats,
-    });
+    };
   }
 
   Future<void> _syncBrightnessIfNeeded() async {
@@ -1031,4 +1048,22 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       ),
     );
   }
+}
+
+bool _menuValuesEqual(Object? a, Object? b) {
+  if (identical(a, b)) return true;
+  if (a is List && b is List) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!_menuValuesEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (a is Map && b is Map) {
+    return a.length == b.length &&
+        a.keys.every(
+          (key) => b.containsKey(key) && _menuValuesEqual(a[key], b[key]),
+        );
+  }
+  return a == b;
 }

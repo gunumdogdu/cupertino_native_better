@@ -261,6 +261,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
   MethodChannel? _channel;
   bool? _lastIsDark;
+  bool? _lastEnabled;
   int? _lastTint;
   String? _lastTitle;
   String? _lastIconName;
@@ -728,6 +729,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     _intrinsicHeight = null;
     _lastTint = resolveColorToArgb(_effectiveTint, context);
     _lastIsDark = _isDark;
+    _lastEnabled = widget.enabled && widget.onPressed != null;
     _lastTitle = widget.label;
     _lastIconName = widget.icon?.name;
     _lastIconSize = widget.icon?.size;
@@ -812,10 +814,18 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
       });
       _lastStyle = widget.config.style;
     }
-    // Enabled state
-    await ch.invokeMethod('setEnabled', {
-      'enabled': (widget.enabled && widget.onPressed != null),
-    });
+    final enabled = widget.enabled && widget.onPressed != null;
+    if (_lastEnabled != enabled) {
+      _lastEnabled = enabled;
+      try {
+        await ch.invokeMethod('setEnabled', {'enabled': enabled});
+      } catch (_) {
+        if (identical(ch, _channel) && _lastEnabled == enabled) {
+          _lastEnabled = null;
+        }
+        rethrow;
+      }
+    }
     if (_lastTitle != widget.label && widget.label != null) {
       await ch.invokeMethod('setButtonTitle', {'title': widget.label});
       _lastTitle = widget.label;
