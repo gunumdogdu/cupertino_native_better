@@ -254,7 +254,7 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
     CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _animationController.dispose();
@@ -268,13 +268,14 @@ class _CNSearchBarState extends State<CNSearchBar>
     final route = ModalRoute.of(context);
     final newAnim = route?.secondaryAnimation;
     if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.addStatusListener(_onSecondaryRouteAnimChanged);
     _onSecondaryRouteAnimChanged();
   }
 
-  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
+  void _onSecondaryRouteAnimChanged([AnimationStatus? status]) =>
+      _pushContainmentIfNeeded();
 
   // Legacy modal-up trigger disabled: ModalHideMixin (maybeHiddenPlaceholder +
   // native setInteractive) is the supported modern path for modal hiding.

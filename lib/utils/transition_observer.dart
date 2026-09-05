@@ -45,7 +45,8 @@ class CNTransitionObserver extends NavigatorObserver {
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _beginTransition();
-    _scheduleEndTransition(previousRoute);
+    // The outgoing route owns the reverse animation.
+    _scheduleEndTransition(route);
   }
 
   @override

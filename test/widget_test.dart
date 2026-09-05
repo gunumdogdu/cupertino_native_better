@@ -31,7 +31,8 @@ void main() {
       );
 
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
+      // Settle the debug-only platform-view startup guard.
+      await tester.pump(const Duration(milliseconds: 500));
 
       // Flutter fallback should show the text field
       expect(find.byType(CupertinoTextField), findsOneWidget);

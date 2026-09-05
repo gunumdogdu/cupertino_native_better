@@ -1,3 +1,9 @@
+## Arrivo fork — transition performance
+
+- Notify native containment on animation status changes instead of every frame.
+- Keep glass transition handling active until the outgoing pop animation ends.
+- Add channel-traffic and pop-duration regression tests.
+
 ## 1.6.0
 
 > Minor rather than patch because `CNGlassEffect` gains a value (`clear`). That is source-breaking for anyone with an exhaustive `switch` over the enum. 1.5.5 was tagged during development and never published; everything it contained is here.

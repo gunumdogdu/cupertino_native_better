@@ -261,6 +261,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
   MethodChannel? _channel;
   bool? _lastIsDark;
+  bool? _lastEnabled;
   int? _lastTint;
   String? _lastTitle;
   String? _lastIconName;
@@ -315,7 +316,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
     _channel?.setMethodCallHandler(null);
     super.dispose();
@@ -339,13 +340,13 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     final route = ModalRoute.of(context);
     final newAnim = route?.secondaryAnimation;
     if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.addStatusListener(_onSecondaryRouteAnimChanged);
     _onSecondaryRouteAnimChanged();
   }
 
-  void _onSecondaryRouteAnimChanged() {
+  void _onSecondaryRouteAnimChanged([AnimationStatus? status]) {
     final anim = _secondaryRouteAnim;
     if (anim == null) return;
     final isAnimating =
@@ -728,6 +729,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     _intrinsicHeight = null;
     _lastTint = resolveColorToArgb(_effectiveTint, context);
     _lastIsDark = _isDark;
+    _lastEnabled = widget.enabled && widget.onPressed != null;
     _lastTitle = widget.label;
     _lastIconName = widget.icon?.name;
     _lastIconSize = widget.icon?.size;
@@ -747,8 +749,8 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
         ? resolveColorToArgb(widget.config.labelColor!, context)
         : null;
     _lastLabelFontWeight = widget.config.labelFontWeight?.value;
-    // Always request intrinsic size to get both width and height
-    // Use a small delay to ensure native view has finished layout
+    // Fixed horizontal icon buttons never consume intrinsic dimensions.
+    if (!_usesIntrinsicSize) return;
     Future.delayed(const Duration(milliseconds: 10), () {
       if (mounted && _channel != null) {
         _requestIntrinsicSize();
@@ -769,14 +771,22 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     return null;
   }
 
+  bool get _usesIntrinsicSize =>
+      !widget.isIcon ||
+      widget.label != null ||
+      widget.config.imagePlacement == CNImagePlacement.top ||
+      widget.config.imagePlacement == CNImagePlacement.bottom;
+
   Future<void> _requestIntrinsicSize() async {
     final ch = _channel;
-    if (ch == null) return;
+    if (ch == null || !_usesIntrinsicSize) return;
     try {
       final size = await ch.invokeMethod<Map>('getIntrinsicSize');
       final w = (size?['width'] as num?)?.toDouble();
       final h = (size?['height'] as num?)?.toDouble();
-      if (mounted) {
+      if (!mounted || !identical(ch, _channel)) return;
+      if ((w != null && w != _intrinsicWidth) ||
+          (h != null && h != _intrinsicHeight)) {
         setState(() {
           if (w != null) _intrinsicWidth = w;
           if (h != null) _intrinsicHeight = h;
@@ -812,10 +822,18 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
       });
       _lastStyle = widget.config.style;
     }
-    // Enabled state
-    await ch.invokeMethod('setEnabled', {
-      'enabled': (widget.enabled && widget.onPressed != null),
-    });
+    final enabled = widget.enabled && widget.onPressed != null;
+    if (_lastEnabled != enabled) {
+      _lastEnabled = enabled;
+      try {
+        await ch.invokeMethod('setEnabled', {'enabled': enabled});
+      } catch (_) {
+        if (identical(ch, _channel) && _lastEnabled == enabled) {
+          _lastEnabled = null;
+        }
+        rethrow;
+      }
+    }
     if (_lastTitle != widget.label && widget.label != null) {
       await ch.invokeMethod('setButtonTitle', {'title': widget.label});
       _lastTitle = widget.label;
