@@ -315,7 +315,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
     _channel?.setMethodCallHandler(null);
     super.dispose();
@@ -339,13 +339,13 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     final route = ModalRoute.of(context);
     final newAnim = route?.secondaryAnimation;
     if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.addStatusListener(_onSecondaryRouteAnimChanged);
     _onSecondaryRouteAnimChanged();
   }
 
-  void _onSecondaryRouteAnimChanged() {
+  void _onSecondaryRouteAnimChanged([AnimationStatus? status]) {
     final anim = _secondaryRouteAnim;
     if (anim == null) return;
     final isAnimating =

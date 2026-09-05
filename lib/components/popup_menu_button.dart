@@ -246,7 +246,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
     _channel?.setMethodCallHandler(null);
     super.dispose();
@@ -256,13 +256,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final route = ModalRoute.of(context);
     final newAnim = route?.secondaryAnimation;
     if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
+    _secondaryRouteAnim?.addStatusListener(_onSecondaryRouteAnimChanged);
     _onSecondaryRouteAnimChanged();
   }
 
-  void _onSecondaryRouteAnimChanged() {
+  void _onSecondaryRouteAnimChanged([AnimationStatus? status]) {
     _pushContainmentIfNeeded();
   }
 
