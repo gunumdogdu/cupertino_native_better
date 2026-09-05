@@ -55,6 +55,21 @@ void main() {
                     enabled: enabled,
                     onPressed: hasCallback ? () {} : null,
                   ),
+                  CNButton.icon(
+                    key: const ValueKey('fixedIcon'),
+                    icon: const CNSymbol('chevron.left'),
+                    config: const CNButtonConfig(width: 32, minHeight: 32),
+                    onPressed: () {},
+                  ),
+                  CNButton(
+                    key: const ValueKey('verticalIcon'),
+                    label: 'Above',
+                    icon: const CNSymbol('arrow.up'),
+                    config: const CNButtonConfig(
+                      imagePlacement: CNImagePlacement.top,
+                    ),
+                    onPressed: () {},
+                  ),
                   CNPopupMenuButton.icon(
                     buttonIcon: const CNSymbol('ellipsis'),
                     items: [
@@ -86,7 +101,12 @@ void main() {
       }
 
       await rebuild();
-      expect(calls.length, 2);
+      expect(calls.length, 4);
+      expect(sent('getIntrinsicSize').length, 2);
+      expect(
+        tester.getSize(find.byKey(const ValueKey('fixedIcon'))),
+        const Size(32, 32),
+      );
       clear();
       for (var i = 0; i < 10; i++) {
         await rebuild();
