@@ -172,6 +172,10 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
         'tint': resolveColorToArgb(widget.config.tint!, context),
       'interactive': widget.config.interactive,
       'isDark': ThemeHelper.isDark(context),
+      if (widget.config.parts != null)
+        'parts': widget.config.parts!
+            .map((CNGlassPart part) => part.toMap())
+            .toList(),
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
@@ -232,6 +236,10 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
           'tint': resolveColorToArgb(widget.config.tint!, context),
         'interactive': widget.config.interactive,
         'isDark': _isDark,
+        if (widget.config.parts != null)
+          'parts': widget.config.parts!
+              .map((CNGlassPart part) => part.toMap())
+              .toList(),
       });
     } catch (e) {
       // Ignore errors - view might not be ready yet

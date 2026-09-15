@@ -28,6 +28,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     var tint: UIColor? = nil
     var interactive: Bool = false
     var isDark: Bool = false
+    var parts: [CNGlassPart] = []
     
     if let dict = args as? [String: Any] {
       if let effectStr = dict["effect"] as? String {
@@ -53,6 +54,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       if let isDarkBool = dict["isDark"] as? Bool {
         isDark = isDarkBool
       }
+      parts = CNGlassPart.list(from: dict["parts"])
     }
     
     // Create SwiftUI view
@@ -61,7 +63,8 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       shape: shape,
       cornerRadius: cornerRadius,
       tint: tint,
-      interactive: interactive
+      interactive: interactive,
+      parts: parts
     )
 
     self.hostingController = UIHostingController(rootView: glassView)
@@ -195,7 +198,8 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       shape: shape,
       cornerRadius: cornerRadius,
       tint: tint,
-      interactive: interactive
+      interactive: interactive,
+      parts: CNGlassPart.list(from: dict["parts"])
     )
 
     hostingController.rootView = newGlassView
@@ -216,6 +220,52 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
   }
 }
 
+/// One rounded rectangle of a multi-part glass shape, in points relative to the container's top-left.
+struct CNGlassPart: Equatable {
+  let left: CGFloat
+  let top: CGFloat
+  let width: CGFloat
+  let height: CGFloat
+  let radius: CGFloat
+
+  var rect: CGRect { CGRect(x: left, y: top, width: width, height: height) }
+
+  /// Never rounder than a capsule of that part, so a full-radius square reads as a circle.
+  var clampedRadius: CGFloat { min(radius, min(width, height) / 2.0) }
+
+  static func list(from raw: Any?) -> [CNGlassPart] {
+    guard let entries = raw as? [[String: Any]] else { return [] }
+    return entries.compactMap { entry in
+      guard let left = entry["left"] as? CGFloat,
+            let top = entry["top"] as? CGFloat,
+            let width = entry["width"] as? CGFloat,
+            let height = entry["height"] as? CGFloat,
+            let radius = entry["radius"] as? CGFloat,
+            width > 0, height > 0
+      else { return nil }
+      return CNGlassPart(left: left, top: top, width: width, height: height, radius: radius)
+    }
+  }
+}
+
+/// The parts as one `Shape`. `glassEffect(_:in:)` rims whatever outline it is handed, so a path of
+/// disjoint parts is rimmed on each of them while staying a single effect — one backdrop sample, so
+/// the parts cannot drift apart in colour.
+struct CNGlassPartsShape: Shape, Equatable {
+  let parts: [CNGlassPart]
+
+  func path(in rect: CGRect) -> Path {
+    var path = Path()
+    for part in parts {
+      path.addRoundedRect(
+        in: part.rect,
+        cornerSize: CGSize(width: part.clampedRadius, height: part.clampedRadius)
+      )
+    }
+    return path
+  }
+}
+
 @available(iOS 26.0, *)
 struct LiquidGlassContainerSwiftUI: View {
   let effect: String
@@ -223,6 +273,7 @@ struct LiquidGlassContainerSwiftUI: View {
   let cornerRadius: CGFloat?
   let tint: UIColor?
   let interactive: Bool
+  let parts: [CNGlassPart]
 
   /// Observe transition state to disable glass effect during navigation
   @ObservedObject private var transitionObserver = CNTransitionObserver.shared
@@ -263,6 +314,9 @@ struct LiquidGlassContainerSwiftUI: View {
   }
   
   private func shapeForConfig() -> some Shape {
+    if !parts.isEmpty {
+      return AnyShape(CNGlassPartsShape(parts: parts))
+    }
     switch shape {
     case "rect":
       if let radius = cornerRadius {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/widgets.dart';
 import '../utils/version_detector.dart';
 import '../components/liquid_glass_container.dart';
@@ -42,6 +43,57 @@ enum CNGlassEffectShape {
   circle,
 }
 
+/// One rounded rectangle of a multi-part glass shape, in logical points relative to the container's
+/// own top-left. A square with `radius` at half its side is a circle.
+@immutable
+class CNGlassPart {
+  /// Creates one part of a multi-part glass shape.
+  const CNGlassPart({
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  /// Offset from the container's left edge.
+  final double left;
+
+  /// Offset from the container's top edge.
+  final double top;
+
+  /// Part width.
+  final double width;
+
+  /// Part height.
+  final double height;
+
+  /// Corner radius, clamped natively to half the shorter side.
+  final double radius;
+
+  /// Wire format for the platform channel.
+  Map<String, double> toMap() => <String, double>{
+    'left': left,
+    'top': top,
+    'width': width,
+    'height': height,
+    'radius': radius,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CNGlassPart &&
+          left == other.left &&
+          top == other.top &&
+          width == other.width &&
+          height == other.height &&
+          radius == other.radius;
+
+  @override
+  int get hashCode => Object.hash(left, top, width, height, radius);
+}
+
 /// Configuration for Liquid Glass effects.
 class LiquidGlassConfig {
   /// The glass effect variant to apply.
@@ -59,6 +111,12 @@ class LiquidGlassConfig {
   /// Whether the glass effect should be interactive (responds to touch/pointer).
   final bool interactive;
 
+  /// Renders one glass effect whose shape is these disjoint parts, overriding [shape]. One effect
+  /// means one backdrop sample, so the parts cannot drift apart in colour, and the rim follows every
+  /// part's own outline — unlike clipping a single-shape container, which rims only the shape it was
+  /// given. Null (the default) keeps the [shape] behaviour.
+  final List<CNGlassPart>? parts;
+
   /// Creates a configuration for Liquid Glass effects.
   const LiquidGlassConfig({
     this.effect = CNGlassEffect.regular,
@@ -66,6 +124,7 @@ class LiquidGlassConfig {
     this.cornerRadius,
     this.tint,
     this.interactive = false,
+    this.parts,
   });
 
   @override
@@ -77,7 +136,8 @@ class LiquidGlassConfig {
           shape == other.shape &&
           cornerRadius == other.cornerRadius &&
           tint == other.tint &&
-          interactive == other.interactive;
+          interactive == other.interactive &&
+          listEquals(parts, other.parts);
 
   @override
   int get hashCode =>
@@ -85,7 +145,8 @@ class LiquidGlassConfig {
       shape.hashCode ^
       (cornerRadius?.hashCode ?? 0) ^
       (tint?.hashCode ?? 0) ^
-      interactive.hashCode;
+      interactive.hashCode ^
+      Object.hashAll(parts ?? const <CNGlassPart>[]);
 }
 
 /// Extension on Widget to apply Liquid Glass effects.
