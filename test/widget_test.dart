@@ -884,4 +884,45 @@ void main() {
       await drainPlatformViewGuard(tester);
     });
   });
+
+  group('ThemeHelper', () {
+    Future<bool> isDarkUnder(WidgetTester tester, CupertinoThemeData theme) async {
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      late bool isDark;
+      await tester.pumpWidget(
+        CupertinoApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) {
+              isDark = ThemeHelper.isDark(context);
+              return const SizedBox();
+            },
+          ),
+        ),
+      );
+      return isDark;
+    }
+
+    // A CupertinoApp with no brightness follows the system. Reporting light
+    // here creates native glass views as .light in a dark app, and they fade
+    // to dark on screen once the glass samples the dark backdrop.
+    testWidgets('follows the platform when the theme sets no brightness', (
+      tester,
+    ) async {
+      expect(await isDarkUnder(tester, const CupertinoThemeData()), isTrue);
+    });
+
+    testWidgets('an explicit theme brightness wins over the platform', (
+      tester,
+    ) async {
+      expect(
+        await isDarkUnder(
+          tester,
+          const CupertinoThemeData(brightness: Brightness.light),
+        ),
+        isFalse,
+      );
+    });
+  });
 }
