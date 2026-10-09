@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -886,7 +888,10 @@ void main() {
   });
 
   group('ThemeHelper', () {
-    Future<bool> isDarkUnder(WidgetTester tester, CupertinoThemeData theme) async {
+    Future<bool> isDarkUnder(
+      WidgetTester tester,
+      CupertinoThemeData theme,
+    ) async {
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       late bool isDark;
@@ -924,5 +929,22 @@ void main() {
         isFalse,
       );
     });
+
+    // Native views force overrideUserInterfaceStyle from 'isDark', so a
+    // widget that reads brightness anywhere else renders the wrong mode.
+    // Theme.of(context).brightness, for one, is light under a CupertinoApp
+    // that follows the system.
+    final nativeWidgetFiles = Directory('lib/components')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.readAsStringSync().contains('UiKitView('));
+    for (final file in nativeWidgetFiles) {
+      test('${file.path} takes isDark from ThemeHelper', () {
+        final source = file.readAsStringSync();
+        expect(source, contains("'isDark':"));
+        expect(source, contains('ThemeHelper.isDark('));
+        expect(source, isNot(contains('.brightness ==')));
+      });
+    }
   });
 }
