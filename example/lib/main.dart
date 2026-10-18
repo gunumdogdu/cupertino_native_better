@@ -29,11 +29,26 @@ import 'demos/issue53_cnbutton_under_sheet_test.dart';
 import 'demos/issue40_button_label_style_test.dart';
 import 'demos/issue46_cntoast_context_test.dart';
 import 'demos/issue62_tabbar_gesture_arena_test.dart';
+import 'demos/issue70_tabbar_background_test.dart';
+import 'demos/issue43_glass_interactable_under_modal_test.dart';
+import 'demos/issue50_glass_button_group_dumbbell_test.dart';
+import 'demos/issue60_tabbar_labels_after_pop_test.dart';
+import 'demos/issue65_gesture_arena_components_test.dart';
+import 'demos/issue68_tabbar_rapid_taps_test.dart';
+import 'demos/issue76_popup_gesture_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
 import 'demos/pr69_glass_effect_test.dart';
 import 'demos/pr72_glass_resize_test.dart';
+import 'demos/pr74_tabbar_glass_background_test.dart';
+import 'demos/pr77_liquid_glass_parts_test.dart';
+import 'demos/pr78_action_sheet_test.dart';
+import 'demos/pr79_alert_test.dart';
+import 'demos/pr82_tabbar_font_first_build_test.dart';
+import 'demos/pr84_system_brightness_test.dart';
+import 'demos/pr85_tabbar_icon_precache_test.dart';
+import 'demos/pr87_tabbar_selection_after_sheet_test.dart';
 import 'demos/issue55_popup_menu_destructive_test.dart';
 import 'demos/pr42_tabbar_iconsize_customicon_test.dart';
 import 'demos/issue33_svg_tabbar_test.dart';
@@ -454,6 +469,111 @@ class HomePage extends StatelessWidget {
                 },
               ),
               CupertinoListTile(
+                title: Text('#70: CNTabBar backgroundColor'),
+                leading: CNIcon(
+                  symbol: CNSymbol('paintpalette', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue70TabBarBackgroundTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#43: Glass interactable under modals'),
+                leading: CNIcon(
+                  symbol: CNSymbol('hand.tap', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          const Issue43GlassInteractableUnderModalTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#50: GlassButtonGroup dumbbell'),
+                leading: CNIcon(
+                  symbol: CNSymbol('capsule', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          const Issue50GlassButtonGroupDumbbellTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#60: TabBar labels after pop'),
+                leading: CNIcon(
+                  symbol: CNSymbol('textformat.size', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          const Issue60TabBarLabelsAfterPopTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#65: Gesture arena, all components'),
+                leading: CNIcon(
+                  symbol: CNSymbol('hand.draw', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          const Issue65GestureArenaComponentsTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#68: TabBar rapid taps'),
+                leading: CNIcon(
+                  symbol: CNSymbol('hand.tap.fill', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue68TabBarRapidTapsTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#76: CNPopupGesture long press'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'contextualmenu.and.cursorarrow',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Issue76PopupGestureTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
                 title: Text('PR #64: LiquidGlass safe-area clip'),
                 leading: CNIcon(
                   symbol: CNSymbol(
@@ -528,6 +648,123 @@ class HomePage extends StatelessWidget {
                   Navigator.of(context).push(
                     CupertinoPageRoute(
                       builder: (_) => const Pr72GlassResizeTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #74: TabBar glass background'),
+                leading: CNIcon(
+                  symbol: CNSymbol('dock.rectangle', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr74TabBarGlassBackgroundTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #77: LiquidGlass parts'),
+                leading: CNIcon(
+                  symbol: CNSymbol('capsule.on.rectangle', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr77LiquidGlassPartsTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #78: native action sheet'),
+                leading: CNIcon(
+                  symbol: CNSymbol('list.bullet.rectangle', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr78ActionSheetTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #79: native alert'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'exclamationmark.bubble',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr79AlertTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #82: TabBar font on first build'),
+                leading: CNIcon(
+                  symbol: CNSymbol('textformat', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr82TabBarFontFirstBuildTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #84: system brightness'),
+                leading: CNIcon(
+                  symbol: CNSymbol(
+                    'circle.lefthalf.filled',
+                    color: accentColor,
+                  ),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr84SystemBrightnessTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('PR #90: TabBar icon precache'),
+                leading: CNIcon(symbol: CNSymbol('timer', color: accentColor)),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) => const Pr85TabBarIconPrecacheTestPage(),
+                    ),
+                  );
+                },
+              ),
+              CupertinoListTile(
+                title: Text('#86 / PR #91: TabBar selection after sheet'),
+                leading: CNIcon(
+                  symbol: CNSymbol('rectangle.stack', color: accentColor),
+                ),
+                trailing: CupertinoListTileChevron(),
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (_) =>
+                          const Pr87TabBarSelectionAfterSheetTestPage(),
                     ),
                   );
                 },
