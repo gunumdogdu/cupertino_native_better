@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../style/glass_effect.dart';
 import '../../style/spotlight_mode.dart';
 import '../../channel/params.dart';
+import '../../utils/theme_helper.dart';
 import '../../utils/version_detector.dart';
 import '../liquid_glass_container.dart';
 
@@ -253,7 +254,7 @@ class _CNGlassCardState extends State<CNGlassCard>
       'spotlightColor': resolveColorToArgb(spotlightColor, context),
       'spotlightIntensity': widget.spotlightIntensity,
       'spotlightRadius': widget.spotlightRadius,
-      'isDark': Theme.of(context).brightness == Brightness.dark,
+      'isDark': ThemeHelper.isDark(context),
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS

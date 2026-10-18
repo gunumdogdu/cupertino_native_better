@@ -9,26 +9,12 @@ import 'package:flutter/material.dart';
 class ThemeHelper {
   /// Gets the brightness (light/dark mode) from the theme.
   ///
-  /// Tries to get brightness from:
-  /// 1. CupertinoTheme (if CupertinoApp is present)
-  /// 2. Material Theme (if MaterialApp is present)
-  /// 3. System brightness (fallback)
-  static Brightness getBrightness(BuildContext context) {
-    try {
-      final cupertinoTheme = CupertinoTheme.of(context);
-      final brightness = cupertinoTheme.brightness;
-      return brightness ?? Brightness.light;
-    } catch (_) {
-      // CupertinoApp not in tree, try Material theme
-      try {
-        final materialTheme = Theme.of(context);
-        return materialTheme.brightness;
-      } catch (_) {
-        // No theme found, use system brightness
-        return MediaQuery.of(context).platformBrightness;
-      }
-    }
-  }
+  /// Uses the CupertinoTheme brightness when one is set. Under a MaterialApp
+  /// that is the Material theme's brightness. When the theme sets none (a
+  /// CupertinoApp following the system), falls back to the platform
+  /// brightness.
+  static Brightness getBrightness(BuildContext context) =>
+      CupertinoTheme.brightnessOf(context);
 
   /// Gets the primary/accent color from the theme.
   ///

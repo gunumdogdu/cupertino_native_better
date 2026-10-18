@@ -1,12 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../style/sf_symbol.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
 import 'tab_bar.dart' show CNTabBarRouteObserver;
@@ -443,7 +443,7 @@ class _CNSearchBarState extends State<CNSearchBar>
       'autofocus': widget.autofocus,
       'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
       'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
-      'isDark': Theme.of(context).brightness == Brightness.dark,
+      'isDark': ThemeHelper.isDark(context),
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
