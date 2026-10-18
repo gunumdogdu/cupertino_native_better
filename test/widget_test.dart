@@ -33,7 +33,10 @@ void main() {
       );
 
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
+      // Past `PlatformViewGuard`'s 500ms debug-mode debounce, which the
+      // expanded bar's glass container schedules; the first test in the
+      // process to mount one would otherwise end with that timer pending.
+      await tester.pump(const Duration(milliseconds: 600));
 
       // Flutter fallback should show the text field
       expect(find.byType(CupertinoTextField), findsOneWidget);
@@ -782,9 +785,7 @@ void main() {
 
     Widget hostTabBar(CNTabBar tabBar) {
       return CupertinoApp(
-        home: CupertinoPageScaffold(
-          child: SafeArea(child: tabBar),
-        ),
+        home: CupertinoPageScaffold(child: SafeArea(child: tabBar)),
       );
     }
 

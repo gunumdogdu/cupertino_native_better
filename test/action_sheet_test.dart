@@ -188,6 +188,58 @@ void main() {
         expect(calls, isEmpty);
       });
     });
+    testWidgets('refuses a sheet whose actions are all disabled and has no '
+        'cancel', (tester) async {
+      final calls = <MethodCall>[];
+      mockChannel((call) async {
+        calls.add(call);
+        return null;
+      });
+
+      await _withPlatform(TargetPlatform.iOS, () async {
+        final context = await _pumpContext(tester);
+
+        // Nothing in it accepts a tap, and below iOS 26 an unanchored sheet
+        // with no cancel row cannot be dismissed either.
+        expect(
+          () => CNActionSheet.show<String>(
+            context: context,
+            actions: const [
+              CNActionSheetAction(
+                label: 'Export',
+                value: 'pdf',
+                enabled: false,
+              ),
+            ],
+          ),
+          throwsAssertionError,
+        );
+        expect(calls, isEmpty);
+      });
+    });
+
+    testWidgets('presents disabled actions when a cancel row is there', (
+      tester,
+    ) async {
+      final calls = <MethodCall>[];
+      mockChannel((call) async {
+        calls.add(call);
+        return null;
+      });
+
+      await _withPlatform(TargetPlatform.iOS, () async {
+        final context = await _pumpContext(tester);
+        final selected = await CNActionSheet.show<String>(
+          context: context,
+          actions: const [
+            CNActionSheetAction(label: 'Export', value: 'pdf', enabled: false),
+          ],
+          cancelLabel: 'Cancel',
+        );
+        expect(selected, isNull);
+        expect(calls.single.method, 'show');
+      });
+    });
   });
 
   group('CNActionSheet.show on non-iOS', () {

@@ -127,9 +127,10 @@ class CNActionSheet {
   /// nothing, and a sheet with no cancel row can only be left by picking one of
   /// its actions. Pass a [cancelLabel] unless forcing a choice is the point.
   ///
-  /// A call with no actions *and* no [cancelLabel] would present a sheet with
-  /// nothing to press and never resolve, so it asserts in debug and resolves to
-  /// null without presenting anything in release.
+  /// A call with no [cancelLabel] and no enabled action would present a sheet
+  /// with nothing to press — below iOS 26 one that cannot be dismissed at all
+  /// — so it asserts in debug and resolves to null without presenting
+  /// anything in release.
   ///
   /// Apple's Human Interface Guidelines recommend at most four buttons
   /// including cancel. Longer lists work, but scroll.
@@ -142,16 +143,20 @@ class CNActionSheet {
     Rect? anchorRect,
   }) {
     assert(
-      actions.isNotEmpty || cancelLabel != null,
-      'CNActionSheet.show needs at least one action or a cancelLabel: a sheet '
-      'with neither has nothing to press and never resolves.',
+      cancelLabel != null || actions.any((a) => a.enabled),
+      'CNActionSheet.show needs a cancelLabel or at least one enabled action: '
+      'a sheet with neither has nothing to press and never resolves.',
     );
-    // `actions` is often built from a collection that can come out empty. With
-    // no cancel button either, the native sheet has no button and no dismissal
-    // path, so none of the three paths that complete the call can run and the
-    // caller's await hangs for the life of the process. Answer it here instead
-    // of presenting a modal there is no way out of.
-    if (actions.isEmpty && cancelLabel == null) return Future<T?>.value(null);
+    // `actions` is often built from a collection that can come out empty, and
+    // `enabled` is often computed per action from one flag that can be false
+    // for all of them. With no cancel button either, the native sheet has no
+    // button that answers a tap and, below iOS 26, no dismissal path, so none
+    // of the paths that complete the call can run and the caller's await hangs
+    // for the life of the process. Answer it here instead of presenting a
+    // modal there is no way out of.
+    if (cancelLabel == null && !actions.any((a) => a.enabled)) {
+      return Future<T?>.value(null);
+    }
 
     if (defaultTargetPlatform != TargetPlatform.iOS) {
       return _showFallback<T>(

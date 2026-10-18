@@ -133,9 +133,9 @@ final class CNActionSheetManager: NSObject {
     /// Omitting the source is supported: the system centres the sheet, and
     /// from iOS 26 gives it a cancel button of its own. Earlier iOS adds
     /// nothing, so a centred sheet there shows exactly the actions Dart passed.
-    /// The one case that needs a synthetic source is a regular-width layout
-    /// before iOS 26, where UIKit raises `NSInternalInconsistencyException`
-    /// without one.
+    /// The one case that needs a synthetic source is a popover presentation
+    /// with no anchor, where UIKit raises `NSInternalInconsistencyException`
+    /// without one: always on iPad, and in any regular-width window.
     private func applyAnchor(_ anchorRect: CGRect?,
                              to alert: UIAlertController,
                              in window: UIWindow?,
@@ -151,7 +151,7 @@ final class CNActionSheetManager: NSObject {
         if let rect = anchorRect, let sourceView {
             popover.sourceView = sourceView
             popover.sourceRect = rect
-        } else if presenter.traitCollection.horizontalSizeClass == .regular, let sourceView {
+        } else if needsSyntheticSource(in: window), let sourceView {
             popover.sourceView = sourceView
             popover.sourceRect = CGRect(x: sourceView.bounds.midX,
                                         y: sourceView.bounds.maxY,
@@ -159,9 +159,19 @@ final class CNActionSheetManager: NSObject {
                                         height: 0)
             popover.permittedArrowDirections = []
         }
-        // Compact width with no anchor: left untouched on purpose. iOS 26
-        // centres it with a cancel button; earlier iOS slides it up from the
-        // bottom.
+        // iPhone in a compact window with no anchor: left untouched on
+        // purpose. iOS 26 centres it with a cancel button; earlier iOS slides
+        // it up from the bottom.
+    }
+
+    /// Whether an unanchored sheet will be presented as a popover. Decided on
+    /// the device and the window, not the presenter: a presenter inside an
+    /// iPad form sheet reports compact width while the sheet still pops over
+    /// from the regular-width window, and UIKit would throw on the missing
+    /// source.
+    private func needsSyntheticSource(in window: UIWindow?) -> Bool {
+        if UIDevice.current.userInterfaceIdiom == .pad { return true }
+        return window?.traitCollection.horizontalSizeClass == .regular
     }
 
     /// Delivers `value` to the waiting Dart call exactly once, whichever sheet

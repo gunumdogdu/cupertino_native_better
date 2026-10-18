@@ -160,6 +160,7 @@ This approach works reliably in **both debug and release builds**.
 | `CNPopupMenuButton` | Native popup menu with dividers, icons, and image assets | - |
 | `CNPopupMenuButton.icon` | Circular icon-only popup menu variant | - |
 | `CNActionSheet` | Native `UIAlertController` action sheet with destructive styling | - |
+| `CNAlert` | Native `UIAlertController` alert with text fields and destructive styling | - |
 | `CNSegmentedControl` | Native segmented control with SF Symbols support | - |
 | `CNGlassButtonGroup` | Grouped buttons with unified glass blending (tint color support) | - |
 | `LiquidGlassContainer` | Apply Liquid Glass effects to any Flutter widget | - |
@@ -265,6 +266,20 @@ CNTabBar(
   rightCount: 1, // Number of tabs pinned to the right
 )
 ```
+
+#### Precaching `customIcon` items
+
+Items that use `customIcon` (an `IconData`) are rendered to images before the
+native bar can be created, so the first mount of a bar shows its Flutter
+fallback for a few frames. When a bar appears right after launch, warm the
+cache first with the same items and `iconSize` the bar will use:
+
+```dart
+await CNTabBar.precacheIcons(items, iconSize: 25);
+```
+
+A bar mounted afterwards skips the fallback. SF Symbol and `imageAsset` items
+need no precaching.
 
 ### Native iOS 26 Tab Bar (CNTabBarNative)
 
@@ -510,7 +525,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.3.1
+  cupertino_native_better: ^1.7.0
 ```
 
 ## Usage
@@ -756,6 +771,58 @@ KVC against an undeclared private property: it risks App Store rejection and
 breaks silently across iOS releases. Use [`CNPopupMenuButton`](#popup-menu-button)
 when you need icons — its `UIMenu` path has a public image API.
 
+### Alert
+
+An imperative API like `CNActionSheet.show`. On iOS it presents a real
+`UIAlertController` in `.alert` style — system typography, the destructive
+red, VoiceOver, Dynamic Type, and on iOS 26 the Liquid Glass appearance — on
+every supported iOS version. Other platforms fall back to
+`CupertinoAlertDialog`.
+
+```dart
+final result = await CNAlert.show<String>(
+  context: context,
+  title: 'Delete photo?',
+  message: 'This cannot be undone.',
+  actions: const [
+    CNAlertAction(label: 'Cancel', isCancel: true),
+    CNAlertAction(label: 'Delete', value: 'delete', isDestructive: true),
+  ],
+);
+
+if (result?.value == 'delete') _deletePhoto();
+```
+
+Text fields come back in `CNAlertResult.textFields`, in order:
+
+```dart
+final result = await CNAlert.show<String>(
+  context: context,
+  title: 'Rename',
+  textFields: const [
+    CNAlertTextField(placeholder: 'Name', initialText: 'Untitled'),
+  ],
+  actions: const [
+    CNAlertAction(label: 'Cancel', isCancel: true),
+    CNAlertAction(label: 'Save', value: 'save', isDefault: true),
+  ],
+);
+
+if (result?.value == 'save') rename(result!.textFields.first);
+```
+
+`show` resolves to a `CNAlertResult` for every button press, cancel included,
+and to `null` when no answer was produced — for example when, on iOS, a
+second `CNAlert.show` replaced this alert. Things to know:
+
+- An alert cannot be dismissed by tapping outside, so pass at least one
+  enabled action. A call with none asserts in debug and resolves to `null`
+  without presenting in release.
+- At most one action may be `isCancel` and at most one `isDefault`; UIKit
+  cannot render more.
+- `UIAlertController` has no public API for custom content or action icons,
+  so `CNAlert` offers neither.
+
 ### Segmented Control
 
 <p align="center">
@@ -864,7 +931,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.3.1
+   cupertino_native_better: ^1.7.0
    ```
 
 2. Update imports:

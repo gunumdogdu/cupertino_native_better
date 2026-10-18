@@ -1,3 +1,60 @@
+## 1.7.0
+
+> Minor rather than patch: three new public APIs (`CNActionSheet`, `CNAlert`, `CNTabBar.precacheIcons`), and native widgets under a `CupertinoApp` whose theme leaves `brightness` unset now follow the system brightness instead of coming up light.
+
+### Fixed — #80 Swift Package Manager builds fail on CocoaLumberjack 3.10.0
+
+SVGKit 3.0.0 lets CocoaLumberjack resolve to 3.10.0 (released 2026-09-21), which requires iOS 15, while SVGKit's own target still declares iOS 9 (built as 12.0). Xcode's target-integrity check then rejects every Swift Package Manager build of an app that depends on this package: `The package product 'CocoaLumberjack' requires minimum platform version 15.0 for the iOS platform, but this target supports 12.0`. CocoaPods builds were not affected.
+
+**Fix:** the iOS manifest caps CocoaLumberjack to `3.7.0..<3.10.0` and lists its product on the plugin target, which is what makes Swift Package Manager apply the cap. It can go once SVGKit ships a release with its own cap. An app that already resolved 3.10.0 may need Xcode's *File → Packages → Reset Package Caches* (or a deleted `Package.resolved`) to pick the cap up.
+
+Reported by @dogankarakus, fixed by @yagizdo (PR #83). Verified with a fresh Swift Package Manager app on Flutter 3.44.0: 1.6.0 resolves CocoaLumberjack 3.10.0 and fails to build; this release resolves 3.9.1 and builds.
+
+### Added — #78 `CNActionSheet`, a native action sheet
+
+`CNActionSheet.show` presents a real `UIAlertController` in `.actionSheet` style on every supported iOS version, so the sheet is the system control: destructive red, disabled actions, VoiceOver, Dynamic Type, and the Liquid Glass look on iOS 26. Pass `anchorRect` to anchor it to the control that opened it; from iOS 26 that is how action sheets present on iPhone as well as iPad. Other platforms fall back to `CupertinoActionSheet`. See the README's *Action Sheet* section.
+
+Because it is a UIKit presentation rather than a Flutter route, inline CN widgets on the page stay mounted while it is open. Under a Flutter `CupertinoActionSheet` route, `ModalHideMixin` tears them down and recreates them on dismiss.
+
+Hardened before release:
+
+- **iPad:** an unanchored sheet whose presenter reports compact width (an iPad form sheet, for example) got no popover source, and UIKit throws on that. Whether a synthetic source is needed is now decided by the device and the window, not the presenter.
+- A sheet with no `cancelLabel` and no *enabled* action is refused (asserts in debug, resolves to `null` without presenting in release). Below iOS 26 such a sheet cannot be dismissed. Previously only a sheet with no actions at all was refused.
+
+Contributed by @yagizdo (PR #78). Verified on an iPhone (iOS 26.5.2): system look, anchored presentation, inline widgets stay mounted, an outside tap resolves to `null`, and back-to-back, superseding and chained calls all resolve. The unanchored iPad path was checked on an iPad Pro simulator.
+
+### Added — #79 `CNAlert`, a native alert with text fields
+
+`CNAlert.show` presents a `UIAlertController` in `.alert` style: default, cancel and destructive actions, disabled actions, and text fields (secure entry included) whose contents come back in `CNAlertResult.textFields`. Other platforms fall back to `CupertinoAlertDialog`. On iOS a second `show` replaces the alert on screen and resolves the first call to `null`. Configurations UIKit cannot render (no enabled action, two cancel or two default actions) assert in debug. See the README's *Alert* section.
+
+Contributed by @yagizdo (PR #79). Verified on an iPhone (iOS 26.5.2): system look, typed text returned, inline widgets stay mounted, back-to-back and chained calls resolve.
+
+### Added — #73 `CNTabBar.precacheIcons`
+
+A bar whose items use `customIcon` renders those icons to images before its native view can be created, so its first mount showed the Flutter fallback bar for a few frames: a visible flash when the bar appears right after the native splash. `CNTabBar.precacheIcons(items, iconSize: …)` renders them into the existing icon cache ahead of time. Pass the same items and `iconSize` as the bar.
+
+Reported and contributed by @TjarkGomollaDev (PR #90). On an iPhone (iOS 26.5.2, release build), a first mount showed the fallback for 5 frames (113–281 ms); after `precacheIcons` it showed 1 frame (49–50 ms), the same as a mount with cached icons. That last frame stays in every case because the bar builds its creation parameters asynchronously.
+
+### Fixed — #76 `CNPopupGesture` menu invisible until a hot reload, wrong item index
+
+- The menu sat under `Opacity(animation.value)`, which `showGeneralDialog`'s page builder reads once (0.0) and never rebuilds, so the menu stayed invisible until a hot reload. The route's transition already fades it in, so the wrapper is gone.
+- Every item reported the same out-of-range index (one shared counter). Each item now reports its own index, dividers excluded.
+- SF Symbol icons were drawn as a placeholder circle. They now render through `CNIcon`.
+
+Reported by @dogankarakus. Fixed in PR #89 and verified on an iPhone (iOS 26.5.2).
+
+### Changed — #84 widgets follow the system brightness when the theme sets none
+
+`ThemeHelper` read `Theme.of(context).brightness`, which under a `CupertinoApp` comes from the Cupertino theme with a **light** fallback. An app whose `CupertinoThemeData` leaves `brightness` null, i.e. follows the system, therefore created its native widgets light on a dark device. It now uses `CupertinoTheme.brightnessOf(context)`, which falls back to the platform brightness. `CNSearchBar`, `CNFloatingIsland`, `CNGlassCard` and `CNToast` now take their brightness from `ThemeHelper` too.
+
+Apps that set `brightness` explicitly see no change. An app that left it null and relied on the light result now gets dark widgets on a dark device.
+
+Contributed by @yagizdo (PR #84). Verified on an iPhone (iOS 26.5.2) with the theme set to none, dark and light.
+
+### Known limitations
+
+- iOS 26.2 and later ignore custom tab bar title fonts, so `CNTabBar.labelFontFamily` and `labelFontSize` have no visible effect there (Apple Feedback FB21291879). Verified on iOS 26.5.2, both through `UITabBarAppearance` and per item.
+
 ## 1.6.0
 
 > Minor rather than patch because `CNGlassEffect` gains a value (`clear`). That is source-breaking for anyone with an exhaustive `switch` over the enum. 1.5.5 was tagged during development and never published; everything it contained is here.
