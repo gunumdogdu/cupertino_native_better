@@ -159,6 +159,7 @@ This approach works reliably in **both debug and release builds**.
 | `CNSwitch` | Native toggle switch with animated state changes | `CNSwitchController` |
 | `CNPopupMenuButton` | Native popup menu with dividers, icons, and image assets | - |
 | `CNPopupMenuButton.icon` | Circular icon-only popup menu variant | - |
+| `CNActionSheet` | Native `UIAlertController` action sheet with destructive styling | - |
 | `CNSegmentedControl` | Native segmented control with SF Symbols support | - |
 | `CNGlassButtonGroup` | Grouped buttons with unified glass blending (tint color support) | - |
 | `LiquidGlassContainer` | Apply Liquid Glass effects to any Flutter widget | - |
@@ -665,6 +666,95 @@ CNPopupMenuButton.icon(
   onSelected: (index) {},
 )
 ```
+
+### Action Sheet
+
+An imperative API, like `CNToast.show`. On iOS it presents a real
+`UIAlertController` in `.actionSheet` style, so the sheet is the system
+control — system destructive red, VoiceOver, Dynamic Type, and on iOS 26 the
+Liquid Glass appearance, which the system applies with no opt-in. Because the
+appearance comes from the OS, the native path is used on **every** supported
+iOS version instead of being gated on iOS 26. Other platforms fall back to
+`CupertinoActionSheet`.
+
+```dart
+final choice = await CNActionSheet.show<String>(
+  context: context,
+  title: 'Delete photo?',
+  message: 'This cannot be undone.',
+  actions: const [
+    CNActionSheetAction(
+      label: 'Delete',
+      value: 'delete',
+      isDestructive: true,
+    ),
+    CNActionSheetAction(label: 'Duplicate', value: 'duplicate'),
+    CNActionSheetAction(label: 'Export as PDF', value: 'pdf', enabled: false),
+  ],
+  cancelLabel: 'Cancel',
+);
+
+if (choice == 'delete') _deletePhoto();
+```
+
+`show` resolves to the selected action's `value`, or `null` when the sheet is
+cancelled or dismissed.
+
+#### Anchoring — read this before shipping
+
+Starting in iOS 26 an action sheet anchors to the view it came from **on iPhone
+as well as iPad**, appearing directly over that view instead of sliding up from
+the bottom ([WWDC25](https://developer.apple.com/forums/thread/803824)). Pass
+`anchorRect` — the global rect of the widget that triggered the sheet — to get
+that presentation and its transition:
+
+```dart
+final box = _buttonKey.currentContext!.findRenderObject()! as RenderBox;
+
+await CNActionSheet.show<String>(
+  context: context,
+  anchorRect: box.localToGlobal(Offset.zero) & box.size,
+  actions: const [
+    CNActionSheetAction(label: 'Share', value: 'share'),
+    CNActionSheetAction(label: 'Remove', value: 'remove', isDestructive: true),
+  ],
+);
+```
+
+Omitting `anchorRect` is still valid — the system centres the sheet. Two things
+to know about that path:
+
+- On iOS 26 a centred sheet groups the cancel button with the actions (side by
+  side when there is only one action), rather than the detached bottom row
+  older iOS used.
+- Below iOS 26 UIKit adds no cancel button of its own, so the sheet shows
+  exactly the actions you passed. Without a `cancelLabel` the only way out is to
+  pick one, so pass one unless forcing a choice is what you want.
+
+What `anchorRect` itself does depends on the presentation the OS picks:
+
+- On iPad, and on iPhone from iOS 26, the sheet is a popover: it drops the
+  cancel button and is dismissed by tapping outside, so passing `cancelLabel`
+  alongside `anchorRect` is harmless — it simply does not render.
+- On iPhone below iOS 26 `anchorRect` does not turn the sheet into a popover.
+  It still slides up from the bottom, still renders `cancelLabel` and still has
+  no outside-tap dismissal, so pass one.
+
+#### Content guidance
+
+Apple's [HIG](https://developer.apple.com/design/human-interface-guidelines/action-sheets)
+puts destructive choices at the top and caps the sheet at four buttons including
+cancel. `CNActionSheet` preserves the order you pass — reordering would silently
+break the index-to-`value` mapping — so put the destructive action first
+yourself.
+
+#### No per-action icons
+
+`UIAlertAction` exposes no public image property, so `CNActionSheetAction` has
+no icon field. The `setValue(_:forKey: "image")` workaround seen in the wild is
+KVC against an undeclared private property: it risks App Store rejection and
+breaks silently across iOS releases. Use [`CNPopupMenuButton`](#popup-menu-button)
+when you need icons — its `UIMenu` path has a public image API.
 
 ### Segmented Control
 
