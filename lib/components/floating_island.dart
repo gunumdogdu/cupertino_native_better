@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
 
@@ -375,7 +376,7 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
       'tint': resolveColorToArgb(widget.tint, context),
       'springDamping': widget.springDamping,
       'springResponse': widget.springResponse,
-      'isDark': Theme.of(context).brightness == Brightness.dark,
+      'isDark': ThemeHelper.isDark(context),
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS

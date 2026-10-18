@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Material, MaterialType;
 
+import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
 import '../style/glass_effect.dart';
@@ -449,9 +450,7 @@ class _ToastOverlayState extends State<_ToastOverlay>
   Color _getBackgroundColor(BuildContext context) {
     if (widget.backgroundColor != null) return widget.backgroundColor!;
 
-    final brightness =
-        CupertinoTheme.of(context).brightness ?? Brightness.light;
-    final isDark = brightness == Brightness.dark;
+    final isDark = ThemeHelper.isDark(context);
 
     switch (widget.style) {
       case CNToastStyle.normal:

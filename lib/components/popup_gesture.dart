@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'icon.dart';
 import 'popup_menu_button.dart';
 
 /// A widget that wraps a child and shows a popup menu on long press.
@@ -157,31 +158,28 @@ class _CNPopupMenuOverlay extends StatelessWidget {
             scale: Tween<double>(begin: 0.8, end: 1.0).animate(
               CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
             ),
-            child: Opacity(
-              opacity: animation.value,
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  width: menuWidth,
-                  decoration: BoxDecoration(
-                    color: CupertinoTheme.of(
-                      context,
-                    ).scaffoldBackgroundColor.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: _buildMenuItems(context),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: menuWidth,
+                decoration: BoxDecoration(
+                  color: CupertinoTheme.of(
+                    context,
+                  ).scaffoldBackgroundColor.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _buildMenuItems(context),
                   ),
                 ),
               ),
@@ -213,20 +211,25 @@ class _CNPopupMenuOverlay extends StatelessWidget {
       final isLast = i == items.length - 1;
 
       if (item is CNPopupMenuItem) {
+        // Captured per item: a closure over the shared counter would report
+        // the final count for every item.
+        final int selectedIndex = itemIndex;
         widgets.add(
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            onPressed: item.enabled ? () => onSelected(itemIndex) : null,
+            onPressed: item.enabled ? () => onSelected(selectedIndex) : null,
             child: Row(
               children: [
                 if (item.icon != null) ...[
-                  // TODO: Add SF Symbol rendering support
-                  Icon(
-                    CupertinoIcons.circle,
+                  CNIcon(
+                    symbol: item.icon,
                     size: item.icon!.size,
-                    color: item.enabled
-                        ? CupertinoTheme.of(context).primaryColor
-                        : CupertinoColors.inactiveGray,
+                    color:
+                        item.iconColor ??
+                        item.icon!.color ??
+                        (item.enabled
+                            ? CupertinoTheme.of(context).primaryColor
+                            : CupertinoColors.inactiveGray),
                   ),
                   const SizedBox(width: 12),
                 ],
