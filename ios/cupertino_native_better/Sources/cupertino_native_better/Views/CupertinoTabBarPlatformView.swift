@@ -31,6 +31,9 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
   private var currentIconSizes: [CGFloat] = [] // Track icon sizes for dynamic height calculation
   private var labelFontFamily: String? = nil
   private var labelFontSize: CGFloat = 0 // 0 means system default (~10pt)
+  // Last index set by Dart or a tap, restored when a refresh cycle ends.
+  private var desiredIndex: Int?
+  private var refreshInFlight = false
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeTabBar_\(viewId)", binaryMessenger: messenger)
@@ -841,6 +844,7 @@ channel.setMethodCallHandler { [weak self] call, result in
           // case below (line 938).
           // Single bar
           if let bar = self.tabBar, let items = bar.items, idx >= 0, idx < items.count {
+            self.desiredIndex = idx
             UIView.performWithoutAnimation { bar.selectedItem = items[idx] }
             result(nil)
             return
@@ -956,18 +960,26 @@ channel.setMethodCallHandler { [weak self] call, result in
         // so the iOS 26 Liquid Glass selection pill doesn't morph
         // visibly through every tab on launch (Issue #35).
         if let bar = self.tabBar, let items = bar.items, !items.isEmpty {
+          // A second cycle would restore an item from the middle of the first.
+          if self.refreshInFlight { result(nil); return }
+          self.refreshInFlight = true
           let originalSelected = bar.selectedItem
           // Temporarily remove delegate to prevent callbacks during refresh
           bar.delegate = nil
           DispatchQueue.main.async { [weak self, weak bar, weak originalSelected] in
-            guard let self = self, let bar = bar, let items = bar.items, !items.isEmpty else { return }
+            guard let self = self, let bar = bar, let items = bar.items, !items.isEmpty else {
+              self?.refreshInFlight = false
+              return
+            }
             UIView.setAnimationsEnabled(false)
             // Cycle through each item to force label layout
             var index = 0
             func selectNext() {
               guard index < items.count else {
-                // Restore original selection
-                if let original = originalSelected {
+                // Restore the latest requested selection
+                if let idx = self.desiredIndex, idx >= 0, idx < items.count {
+                  bar.selectedItem = items[idx]
+                } else if let original = originalSelected {
                   bar.selectedItem = original
                 } else {
                   bar.selectedItem = items.first
@@ -977,6 +989,7 @@ channel.setMethodCallHandler { [weak self] call, result in
                 // Restore delegate + animations
                 bar.delegate = self
                 UIView.setAnimationsEnabled(true)
+                self.refreshInFlight = false
                 return
               }
               bar.selectedItem = items[index]
@@ -1094,6 +1107,7 @@ channel.setMethodCallHandler { [weak self] call, result in
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
     // Single bar case
     if let single = self.tabBar, single === tabBar, let items = single.items, let idx = items.firstIndex(of: item) {
+      desiredIndex = idx
       channel.invokeMethod("valueChanged", arguments: ["index": idx])
       return
     }
