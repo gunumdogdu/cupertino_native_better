@@ -270,8 +270,8 @@ class CNTabBar extends StatefulWidget {
 
   /// Renders the custom icons of [items] ahead of the bar's first mount.
   ///
-  /// Pass the same [items] and [iconSize] as the bar, so it skips its
-  /// Flutter fallback on mount.
+  /// Pass the same [items] and [iconSize] as the bar, so its first build
+  /// reads the rendered icons from cache instead of rasterising them.
   static Future<void> precacheIcons(
     List<CNTabBarItem> items, {
     double? iconSize,
@@ -543,16 +543,22 @@ class _CNTabBarState extends State<CNTabBar> {
       return _buildFlutterFallback(context);
     }
 
+    final h = widget.height ?? _intrinsicHeight ?? 50.0;
+
     // Guard against creating platform views too early after hot
     // restart / cold start.  The engine may not have fully purged
     // previous-isolate view registrations yet.
+    //
+    // While waiting (guard pending, or async creation params not ready
+    // on the first frame) keep the slot empty: the CupertinoTabBar
+    // fallback would flash the pre-iOS 26 bar before Liquid Glass lands.
     if (!PlatformViewGuard.isReady) {
       PlatformViewGuard.ensureScheduled();
-      return _buildFlutterFallback(context);
+      return SizedBox(height: h);
     }
 
     if (_creationParams == null) {
-      return _buildFlutterFallback(context);
+      return SizedBox(height: h);
     }
 
     // Issue #31: when a modal/sheet is presented over our route, hide
@@ -571,7 +577,6 @@ class _CNTabBarState extends State<CNTabBar> {
     // destroyed, so when the transition completes the bar is just
     // there with the correct selected index, no recreate animation.
     final hideForModal = _modalUp && widget.autoHideOnModal;
-    final h = widget.height ?? _intrinsicHeight ?? 50.0;
 
     // Modal hide must DESTROY the platform view — see comment above.
     if (hideForModal) {
