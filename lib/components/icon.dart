@@ -253,8 +253,15 @@ class _CNIconState extends State<CNIcon> {
         widget.size ?? (imageAsset?.size ?? widget.symbol?.size ?? 24.0);
     final h = widget.height ?? fallbackSize;
     final w = fallbackSize;
+    // AbsorbPointer keeps the icon's hit area for ancestors but keeps the
+    // UIKit view out of the gesture arena, where it would otherwise win the
+    // sweep and cancel an enclosing button's tap.
     return ClipRect(
-      child: SizedBox(width: w, height: h, child: platformView),
+      child: SizedBox(
+        width: w,
+        height: h,
+        child: AbsorbPointer(child: platformView),
+      ),
     );
   }
 
