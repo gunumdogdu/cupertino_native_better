@@ -912,9 +912,9 @@ class _CNTabBarState extends State<CNTabBar> {
     // missing-label bug isn't limited to iOS < 16.
     //
     // To avoid the visible "tabs activate in sequence on launch" glitch
-    // (Issue #35), the Swift refresh wraps the cycle in
-    // `UIView.setAnimationsEnabled(false)` so the Liquid Glass selection
-    // pill doesn't morph between tabs while we cycle.
+    // (Issue #35), the Swift refresh runs the whole cycle in one main-queue
+    // block without animation, so no intermediate selection reaches the
+    // screen.
     //
     // Order matters: setSelectedIndex must run BEFORE refresh on each
     // pass. Refresh captures `bar.selectedItem` at start and restores
