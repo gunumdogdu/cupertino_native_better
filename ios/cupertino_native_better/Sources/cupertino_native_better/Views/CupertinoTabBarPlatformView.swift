@@ -127,6 +127,11 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     container.layer.shadowOpacity = 0 // Explicitly disable layer shadow
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
+    // Read the custom label font first: makeAppearance() below bakes it in.
+    if let dict = args as? [String: Any] {
+      if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
+      if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
+    }
     let appearance: UITabBarAppearance? = {
       if #available(iOS 13.0, *) { return self.makeAppearance() }
       return nil
@@ -178,7 +183,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
         }
 
         let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
-        let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
+        let item = self.makeItem(title: title, image: image, selectedImage: selectedImage)
         if i < badges.count && !badges[i].isEmpty {
           item.badgeValue = badges[i]
         }
@@ -420,11 +425,6 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     self.leftInsetVal = leftInset
     self.rightInsetVal = rightInset
     self.currentIconSizes = sizes.compactMap { $0 }.map { CGFloat(truncating: $0) }
-    // Read custom label font from creation params
-    if let dict = args as? [String: Any] {
-      if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
-      if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
-    }
 channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
@@ -543,7 +543,7 @@ channel.setMethodCallHandler { [weak self] call, result in
               }
 
               let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
-              let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
+              let item = self.makeItem(title: title, image: image, selectedImage: selectedImage)
               if i < badges.count && !badges[i].isEmpty {
                 item.badgeValue = badges[i]
               }
@@ -655,7 +655,7 @@ channel.setMethodCallHandler { [weak self] call, result in
               }
 
               let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
-              let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
+              let item = self.makeItem(title: title, image: image, selectedImage: selectedImage)
               if i < badges.count && !badges[i].isEmpty {
                 item.badgeValue = badges[i]
               }
@@ -929,8 +929,10 @@ channel.setMethodCallHandler { [weak self] call, result in
       case "setFont":
         // Update label font and re-apply appearance to all tab bars
         if let args = call.arguments as? [String: Any] {
-          if let ff = args["labelFontFamily"] as? String { self.labelFontFamily = ff.isEmpty ? nil : ff }
-          if let fs = args["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
+          let oldRaise = self.iconRaise
+          self.labelFontFamily = (args["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+          self.labelFontSize = (args["labelFontSize"] as? NSNumber).map { CGFloat(truncating: $0) } ?? 0
+          let raiseDelta = self.iconRaise - oldRaise
           if #available(iOS 13.0, *) {
             let ap = self.makeAppearance()
             if let bar = self.tabBar {
@@ -944,6 +946,21 @@ channel.setMethodCallHandler { [weak self] call, result in
             if let right = self.tabBarRight {
               right.standardAppearance = ap
               if #available(iOS 15.0, *) { right.scrollEdgeAppearance = ap }
+            }
+            // A new appearance does not reach item views that already exist,
+            // so re-set the items to make the bar lay them out again.
+            UIView.performWithoutAnimation {
+              for bar in [self.tabBar, self.tabBarLeft, self.tabBarRight].compactMap({ $0 }) {
+                let items = bar.items ?? []
+                let selected = bar.selectedItem
+                for item in items where item.title != nil {
+                  item.image = self.raised(item.image, by: raiseDelta)
+                  item.selectedImage = self.raised(item.selectedImage, by: raiseDelta)
+                }
+                bar.items = nil
+                bar.items = items
+                bar.selectedItem = selected
+              }
             }
           }
           result(nil)
@@ -1063,6 +1080,34 @@ channel.setMethodCallHandler { [weak self] call, result in
 
   func view() -> UIView { container }
 
+  /// How much a custom label is taller than the native 10pt one. The bar
+  /// keeps its height and grows the label up into the icon, so half of
+  /// this moves the icon up and half moves the label down.
+  private var labelExtraHeight: CGFloat {
+    guard labelFontFamily != nil || labelFontSize > 0 else { return 0 }
+    let size = labelFontSize > 0 ? labelFontSize : 10.0
+    let font = labelFontFamily.flatMap { UIFont(name: $0, size: size) } ?? UIFont.systemFont(ofSize: size, weight: .medium)
+    return max(0, font.lineHeight - UIFont.systemFont(ofSize: 10, weight: .medium).lineHeight)
+  }
+
+  /// The bar centres an icon's alignment rect, so growing it downwards by
+  /// this much lifts the visible icon by half of it: half of the extra height.
+  private var iconRaise: CGFloat { labelExtraHeight }
+
+  // iOS 26 ignores UITabBarItem.imageInsets but honours an image's alignment rect.
+  private func raised(_ image: UIImage?, by amount: CGFloat) -> UIImage? {
+    guard let image = image, amount != 0 else { return image }
+    var insets = image.alignmentRectInsets
+    insets.bottom -= amount
+    return image.withAlignmentRectInsets(insets)
+  }
+
+  // Only an item with a label needs room for it.
+  private func makeItem(title: String?, image: UIImage?, selectedImage: UIImage?) -> UITabBarItem {
+    let raise = title == nil ? 0 : iconRaise
+    return UITabBarItem(title: title, image: raised(image, by: raise), selectedImage: raised(selectedImage, by: raise))
+  }
+
   // MARK: - Appearance helpers
 
   /// Builds a UITabBarAppearance with transparent background and optional custom label font.
@@ -1079,16 +1124,27 @@ channel.setMethodCallHandler { [weak self] call, result in
   /// Applies the current label font to a UITabBarAppearance.
   @available(iOS 13.0, *)
   private func applyLabelFont(to ap: UITabBarAppearance) {
-    guard let fontFamily = labelFontFamily, !fontFamily.isEmpty else { return }
+    guard labelFontFamily != nil || labelFontSize > 0 else { return }
     let size = labelFontSize > 0 ? labelFontSize : 10.0
-    let font = UIFont(name: fontFamily, size: size) ?? UIFont.systemFont(ofSize: size)
-    let attrs: [NSAttributedString.Key: Any] = [.font: font]
-    ap.stackedLayoutAppearance.normal.titleTextAttributes = attrs
-    ap.stackedLayoutAppearance.selected.titleTextAttributes = attrs
-    ap.inlineLayoutAppearance.normal.titleTextAttributes = attrs
-    ap.inlineLayoutAppearance.selected.titleTextAttributes = attrs
-    ap.compactInlineLayoutAppearance.normal.titleTextAttributes = attrs
-    ap.compactInlineLayoutAppearance.selected.titleTextAttributes = attrs
+    let custom = labelFontFamily.flatMap { UIFont(name: $0, size: size) }
+    // The iOS 26 default label is SF Medium, and SF Semibold inside the selection pill.
+    let normal: [NSAttributedString.Key: Any] = [.font: custom ?? UIFont.systemFont(ofSize: size, weight: .medium)]
+    let selected: [NSAttributedString.Key: Any] = [.font: custom ?? UIFont.systemFont(ofSize: size, weight: .semibold)]
+    for layout in [ap.stackedLayoutAppearance, ap.inlineLayoutAppearance, ap.compactInlineLayoutAppearance] {
+      layout.normal.titleTextAttributes = normal
+      layout.selected.titleTextAttributes = selected
+    }
+    // Stacked (icon above label): the label moves down as far as the icon
+    // moves up. Inline (side by side, iPad): the label follows the icon up,
+    // which there also moves by half of iconRaise.
+    let stacked = UIOffset(horizontal: 0, vertical: labelExtraHeight / 2)
+    let inline = UIOffset(horizontal: 0, vertical: -iconRaise / 2)
+    ap.stackedLayoutAppearance.normal.titlePositionAdjustment = stacked
+    ap.stackedLayoutAppearance.selected.titlePositionAdjustment = stacked
+    for layout in [ap.inlineLayoutAppearance, ap.compactInlineLayoutAppearance] {
+      layout.normal.titlePositionAdjustment = inline
+      layout.selected.titlePositionAdjustment = inline
+    }
   }
 
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
