@@ -49,3 +49,7 @@ coverage/
 # Internal planning / design docs — local only, never published
 docs/
 
+# Repository-only media and dev tooling. The README loads its images from
+# GitHub (raw.githubusercontent.com), so they are not needed in the package.
+misc/
+tool/

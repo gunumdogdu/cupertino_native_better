@@ -1,3 +1,41 @@
+## 1.8.0
+
+> Minor: iPhone Duo support (#102) through four new public APIs — `CNTabScaffold`, `CNTabRail`, `CNFoldable` / `CNFoldableScope` — a new `sidebarOnWideScreens` option on `CNTabBarNative.enable`, and VoiceOver names for native controls (#88) through a new `semanticLabel` on `CNButton`, `CNPopupMenuButton`, `CNSwitch` and `CNSlider`. Nothing changes for apps that do not use them.
+
+### Added — #102 iPhone Duo: tabs that move to the side, and a foldable API
+
+iPhone Duo (iOS 27.1) has an outer display and a larger inner display, and can stand partially open in a book or tabletop pose. On the outer display, and on the inner display in landscape, iOS moves the status bar and the tab bar to a vertical bar on one edge — but only for system containers. See the README's *iPhone Duo (foldable)* section.
+
+- **`CNTabBarNative`** is a system container, so it gets the vertical bar with no code change once the app is built with Xcode 27.1. New `sidebarOnWideScreens: true` turns the tabs into a native sidebar on the open inner display (`.sidebarAdaptable`, with the sidebar as the default placement): beside the content in landscape, behind a sidebar button in portrait.
+- **`CNTabScaffold`** brings the same behaviour to `CNTabBar`, which as a standalone bar never turns vertical. It shows a `CNTabBar` at the bottom, swaps it for a `CNTabRail` in the vertical-bar column whenever iOS uses one (moving it clear of the camera region), and with `sidebarOnWideScreens` shows a sidebar on screens at least 600 pt wide. The body stays mounted across every change, so folding never resets the page.
+- **`CNTabRail`** is a vertical tab bar taking the same `CNTabBarItem`s: icons in a Liquid Glass capsule (`rail`), or icon-and-label rows in a glass panel (`sidebar`). Badges, custom icons, VoiceOver labels and the selected trait are supported; Cupertino-drawn fallback below iOS 26.
+- **`CNFoldable`** reports the hinge (`UIHingeInteraction`: closed / partially open / fully open, and the angle), the physical side of the vertical bar, and the reserved regions — the fold and the camera — in Flutter's logical coordinates. **`CNFoldableScope`** exposes it to `CNFoldable.of(context)` and adds the active fold and the camera to `MediaQuery.displayFeatures`, which Flutter does not populate on iOS itself, so Flutter's dialogs and popups keep clear of the fold.
+
+The iOS 27.1 APIs are compiled only with the iOS 27.1 SDK (`canImport(UIKit, _version: 9127.0.85)`). Built with an older Xcode the package still compiles, `CNFoldable` reports `CNFoldableState.unsupported`, and `CNTabScaffold` keeps a bottom bar.
+
+Requested by @mark8055 (#102). Verified on the iPhone Duo simulator (Xcode 27.1, iOS 27.1, Flutter 3.44.0) in every pose: closed (vertical rail, 0°), open in landscape (vertical rail, 180°) and portrait (bottom bar or sidebar), book pose (a layout split left and right at the fold) and tabletop pose (split above and below it), and a cold start while unfolded.
+
+### Added — #88 VoiceOver names for native controls, and an Accessibility section
+
+- **`semanticLabel`** on `CNButton` (and `CNButton.icon`), `CNPopupMenuButton` (and `.icon`), `CNSwitch` and `CNSlider`: what VoiceOver reads for the native control. Without it, an icon-only button is read by its SF Symbol's built-in name — the example app's theme toggle was announced as "do not disturb", the name of the `moon` symbol — and a switch or slider has no name at all, because a native control cannot merge with the Flutter text beside it. The label is applied natively (the button's, slider's and SwiftUI toggle's accessibility label) and on the Flutter fallbacks.
+- **`CNTabRail`** supports the Large Content Viewer, like the system tab bars: its icons keep a fixed size, and with a large text size a long press shows the item enlarged.
+- **README *Accessibility* section:** what VoiceOver gets from each native widget, Dynamic Type, the Large Content Viewer, and a Flutter engine limitation that affects VoiceOver touch exploration over scrolling lists (flutter/flutter#194389).
+
+Requested by @tgrushka (#88). Checked through the iOS accessibility tree on the iPhone Duo simulator (iOS 27.1): the names, roles and values of buttons, menus, the slider, switches, the segmented control and the rail, before and after `semanticLabel`.
+
+### Changed — package
+
+- `misc/` (the README's images and videos) and `tool/` (development scripts) are no longer published; the README already loads its media from GitHub. The archive is about 8 MB smaller.
+- The pub.dev screenshots open with the iPhone Duo animation.
+
+### Example app
+
+- New *iPhone Duo* page (Navigation): a live hinge gauge, a player that splits at the fold, an even-numbered grid that reflows, and an overlay of the reserved regions.
+- The home list now keeps clear of the iPhone Duo outer display's vertical status bar.
+- The debug banner is off, so the light/dark toggle in the top-right corner can be tapped on macOS (#88).
+- The icon-only buttons in the navigation bar have VoiceOver names.
+- The macOS deployment target is 12.0: Xcode 27.1 rejects anything lower.
+
 ## 1.7.0
 
 > Minor rather than patch: three new public APIs (`CNActionSheet`, `CNAlert`, `CNTabBar.precacheIcons`), and native widgets under a `CupertinoApp` whose theme leaves `brightness` unset now follow the system brightness instead of coming up light.

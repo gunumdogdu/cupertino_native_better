@@ -155,6 +155,9 @@ This approach works reliably in **both debug and release builds**.
 | `CNButton.icon` | Circular icon-only button variant | - |
 | `CNIcon` | Platform-rendered SF Symbols, custom IconData, or image assets | - |
 | `CNTabBar` | Native tab bar with split mode for scroll-aware layouts | - |
+| `CNTabRail` | Vertical tab bar (glass rail or sidebar) for the side of the screen | - |
+| `CNTabScaffold` | Tab layout that moves the tabs to the side on iPhone Duo, like the system | - |
+| `CNFoldable` | iPhone Duo hinge (status + angle), vertical-bar side, fold and camera regions | - |
 | `CNSlider` | Native slider with min/max range and step support | `CNSliderController` |
 | `CNSwitch` | Native toggle switch with animated state changes | `CNSwitchController` |
 | `CNPopupMenuButton` | Native popup menu with dividers, icons, and image assets | - |
@@ -519,13 +522,97 @@ Controls whether the keyboard opens automatically when the search tab expands:
 
 This mirrors `UISearchTab.automaticallyActivatesSearch` from UIKit.
 
+### iPhone Duo (foldable)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/iphone_duo_preview.gif" width="560" alt="iPhone Duo: the tab bar moves to a vertical rail when folded, and the layout splits at the fold when partially open"/>
+</p>
+
+iPhone Duo folds. Closed, it uses its outer display; open, its larger inner display; partially open, it stands in a *book* pose (fold top to bottom) or a *tabletop* pose (fold left to right). On the outer display, and on the inner display in landscape, iOS 27.1 moves the status bar and the tab bar to a **vertical bar** on one edge.
+
+**`CNTabBarNative`** gets the vertical bar automatically once your app is built with Xcode 27.1. Add `sidebarOnWideScreens: true` to turn the tabs into a native sidebar on the open inner display: beside the content in landscape, behind a sidebar button in portrait.
+
+```dart
+CNTabBarNative.enable(
+  tabs: [...],
+  sidebarOnWideScreens: true,
+);
+```
+
+**`CNTabScaffold`** does the same for `CNTabBar`, which as a standalone bar never turns vertical on its own. It shows a `CNTabBar` at the bottom, swaps it for a `CNTabRail` in the vertical-bar column whenever iOS uses one, and can show a sidebar on wide screens. The body stays mounted, so folding never resets your page:
+
+```dart
+CNFoldableScope( // once, above the app
+  child: CNTabScaffold(
+    items: const [
+      CNTabBarItem(label: 'Home', icon: CNSymbol('house')),
+      CNTabBarItem(label: 'Library', icon: CNSymbol('books.vertical')),
+    ],
+    currentIndex: index,
+    onTap: (i) => setState(() => index = i),
+    sidebarOnWideScreens: true,
+    body: pages[index],
+  ),
+)
+```
+
+**`CNFoldable`** reports the hinge, the vertical bar and the screen's reserved regions. `CNFoldableScope` also adds the fold and the camera to `MediaQuery.displayFeatures`, so Flutter's own dialogs and popups keep clear of the fold when the device is partially open:
+
+```dart
+final duo = CNFoldable.of(context);
+
+duo.hinge?.status;     // CNHingeStatus.closed / partiallyOpen / fullyOpen
+duo.hinge?.degrees;    // 0 (shut) … 180 (flat)
+duo.verticalBarSide;   // CNVerticalBarSide.none / left / right
+duo.activeFold?.frame; // where the fold is, in logical pixels
+```
+
+Use the hinge angle for effects and the status and regions for layout, as Apple recommends. The *iPhone Duo* page of the example app splits a player at the fold (artwork above it in the tabletop pose, a list beside it in the book pose) and reflows an even-numbered grid.
+
+> **Requirements:** iOS 27.1 and Xcode 27.1 (the iOS 27.1 SDK). Built with an older Xcode the package still compiles; `CNFoldable` then reports `CNFoldableState.unsupported` and `CNTabScaffold` keeps a bottom bar.
+>
+> **Your own layouts:** on the outer display the vertical status bar adds a safe-area inset on one side. `ListView` pads only along its scroll axis, so wrap content in `SafeArea(top: false, bottom: false, …)` (or use `CNTabScaffold`'s body) to keep it clear.
+>
+> **Simulator:** Xcode 27.1 replaces Simulator with Device Hub. The *Closed*, *Partially Open* and *Open* pose buttons sit below the device; hold Option and drag the slider for any angle.
+
+### Accessibility
+
+The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOver, Voice Control and Switch Control see the system's own controls rather than an imitation. Checked through the iOS accessibility tree (iPhone Duo simulator, iOS 27.1):
+
+| Widget | What VoiceOver gets |
+|--------|---------------------|
+| `CNButton`, `CNButton.icon` | A button, named by its title or `semanticLabel` |
+| `CNPopupMenuButton` | A button that opens the system menu |
+| `CNSlider` | An adjustable slider with its value; swipe up or down to change it |
+| `CNSwitch` | A switch with its on/off state |
+| `CNSegmentedControl` | A group of segments, each with its title |
+| `CNTabRail` | A button per tab, with its badge as the value and the selected state |
+| `CNTabBarNative`, `CNAlert`, `CNActionSheet` | System controllers, presented by iOS |
+
+**Name every icon-only control.** Without a name, an icon-only button is read by its SF Symbol's built-in name, which describes the picture rather than the action (`moon` is read as "do not disturb"), and a switch or slider has no name at all: a native control cannot merge with the Flutter text next to it. Pass `semanticLabel`:
+
+```dart
+CNButton.icon(
+  icon: const CNSymbol('moon'),
+  semanticLabel: 'Switch to dark mode',
+  onPressed: toggleTheme,
+)
+
+CNSwitch(value: wifi, semanticLabel: 'Wi-Fi', onChanged: setWifi)
+CNSlider(value: volume, semanticLabel: 'Volume', onChanged: setVolume)
+```
+
+**Dynamic Type.** Button titles follow the system text size. Tab bars, the tab rail and segmented controls keep a fixed size, as they do throughout iOS, and offer the **Large Content Viewer** instead: with a large text size, long-press an item to see it enlarged. `CNTabBar` and `CNTabBarNative` are system tab bars, and `CNTabRail` adopts the viewer as well.
+
+> **Known Flutter limitation ([flutter/flutter#194389](https://github.com/flutter/flutter/issues/194389)):** VoiceOver *touch exploration* — moving a finger over the screen to find an element — does not reach a native control that shares its area with a scrolling Flutter list, because Flutter's accessibility hit test returns the list first. That covers controls placed inside a `ListView`, and a `CNTabBar` or `CNTabScaffold` bar floating over scrolling content. `CNTabBarNative` is not affected: its tab bar is a real `UITabBarController` outside Flutter's view. Where touch exploration of the tab bar matters, prefer `CNTabBarNative`.
+
 ## Installation
 
 Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.7.0
+  cupertino_native_better: ^1.8.0
 ```
 
 ## Usage
@@ -931,7 +1018,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.7.0
+   cupertino_native_better: ^1.8.0
    ```
 
 2. Update imports:
