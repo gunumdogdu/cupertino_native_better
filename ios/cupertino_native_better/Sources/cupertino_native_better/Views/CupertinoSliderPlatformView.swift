@@ -24,6 +24,7 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
     var trackTint: UIColor? = nil
     var trackBgTint: UIColor? = nil
     var step: Double = 0
+    var semanticLabel: String? = nil
 
     if let dict = args as? [String: Any] {
       if let v = dict["value"] as? NSNumber { initialValue = v.doubleValue }
@@ -32,6 +33,7 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
       if let v = dict["enabled"] as? NSNumber { enabled = v.boolValue }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
       if let v = dict["step"] as? NSNumber { step = v.doubleValue }
+      if let v = dict["semanticLabel"] as? String, !v.isEmpty { semanticLabel = v }
       if let style = dict["style"] as? [String: Any] {
         if let n = style["tint"] as? NSNumber { tint = Self.colorFromARGB(n.intValue) }
         if let n = style["thumbTint"] as? NSNumber { thumbTint = Self.colorFromARGB(n.intValue) }
@@ -41,6 +43,8 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
     }
 
     super.init()
+    // What VoiceOver reads (`CNSlider.semanticLabel`).
+    slider.accessibilityLabel = semanticLabel
 
     self.step = step
 
@@ -71,6 +75,11 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
+      case "setSemanticLabel":
+        // What VoiceOver reads (`CNSlider.semanticLabel`).
+        let label = (call.arguments as? [String: Any])?["label"] as? String
+        self.slider.accessibilityLabel = (label?.isEmpty ?? true) ? nil : label
+        result(nil)
       case "setValue":
         if let args = call.arguments as? [String: Any], let value = (args["value"] as? NSNumber)?.doubleValue {
           let animated = (args["animated"] as? NSNumber)?.boolValue ?? false

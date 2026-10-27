@@ -170,6 +170,7 @@ class CNButton extends StatefulWidget {
     this.imageAsset,
     this.config = const CNButtonConfig(),
     this.autoHideOnModal = true,
+    this.semanticLabel,
   }) : badgeCount = null,
        super();
 
@@ -193,6 +194,7 @@ class CNButton extends StatefulWidget {
     this.badgeCount,
     this.config = const CNButtonConfig(style: CNButtonStyle.glass),
     this.autoHideOnModal = true,
+    this.semanticLabel,
   }) : label = null,
        assert(
          icon != null || customIcon != null || imageAsset != null,
@@ -242,6 +244,13 @@ class CNButton extends StatefulWidget {
   /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
   final bool autoHideOnModal;
 
+  /// What VoiceOver reads for the button.
+  ///
+  /// Without it, VoiceOver reads [label], or for an icon-only button the SF
+  /// Symbol's built-in name — which describes the picture, not the action
+  /// (`moon` is read as "do not disturb"). Set it on every icon-only button.
+  final String? semanticLabel;
+
   /// Whether this instance is configured as the icon variant.
   bool get isIcon => icon != null || customIcon != null || imageAsset != null;
 
@@ -277,6 +286,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
   IconData? _lastCustomIcon;
   int? _lastBadgeCount;
   bool? _lastInteraction;
+  String? _lastSemanticLabel;
   String? _lastLabelFontFamily;
   double? _lastLabelFontSize;
   int? _lastLabelColor;
@@ -509,6 +519,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
     final creationParams = <String, dynamic>{
       if (widget.label != null) 'buttonTitle': widget.label,
+      if (widget.semanticLabel != null) 'semanticLabel': widget.semanticLabel,
       if (customIconBytes != null) 'buttonCustomIconBytes': customIconBytes,
       if (imageAsset != null) ...{
         if (assetPath != null) 'buttonAssetPath': assetPath,
@@ -741,6 +752,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     _lastCustomIcon = widget.customIcon;
     _lastBadgeCount = widget.badgeCount;
     _lastInteraction = widget.config.interaction;
+    _lastSemanticLabel = widget.semanticLabel;
     _lastLabelFontFamily = widget.config.labelFontFamily;
     _lastLabelFontSize = widget.config.labelFontSize;
     _lastLabelColor = widget.config.labelColor != null
@@ -1079,6 +1091,14 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
       });
       _lastInteraction = widget.config.interaction;
     }
+
+    // Sync the VoiceOver label
+    if (_lastSemanticLabel != widget.semanticLabel) {
+      await ch.invokeMethod('setSemanticLabel', {
+        'label': widget.semanticLabel,
+      });
+      _lastSemanticLabel = widget.semanticLabel;
+    }
   }
 
   Future<void> _syncBrightnessIfNeeded() async {
@@ -1287,6 +1307,14 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     if (!widget.config.interaction) {
       result = IgnorePointer(ignoring: true, child: button);
     }
+    if (widget.semanticLabel != null) {
+      result = Semantics(
+        label: widget.semanticLabel,
+        button: true,
+        excludeSemantics: true,
+        child: result,
+      );
+    }
 
     // Add badge if badgeCount is provided
     if (widget.badgeCount != null && widget.badgeCount! > 0) {
@@ -1478,6 +1506,14 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     Widget result = button;
     if (!widget.config.interaction) {
       result = IgnorePointer(ignoring: true, child: button);
+    }
+    if (widget.semanticLabel != null) {
+      result = Semantics(
+        label: widget.semanticLabel,
+        button: true,
+        excludeSemantics: true,
+        child: result,
+      );
     }
 
     // Add badge if badgeCount is provided

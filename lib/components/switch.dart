@@ -55,6 +55,7 @@ class CNSwitch extends StatefulWidget {
     this.height = 44.0,
     this.color,
     this.autoHideOnModal = true,
+    this.semanticLabel,
   });
 
   /// Whether the switch is on.
@@ -84,6 +85,13 @@ class CNSwitch extends StatefulWidget {
   /// iOS < 26 (Flutter fallback path).
   final bool autoHideOnModal;
 
+  /// What VoiceOver reads for the switch.
+  ///
+  /// A native switch cannot borrow the text next to it the way a Flutter
+  /// widget in `MergeSemantics` can, so without this VoiceOver announces it
+  /// with no name. Pass the same text as its visible label, e.g. `'Wi-Fi'`.
+  final String? semanticLabel;
+
   @override
   State<CNSwitch> createState() => _CNSwitchState();
 }
@@ -99,6 +107,7 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
 
   bool? _lastValue;
   bool? _lastEnabled;
+  String? _lastSemanticLabel;
   bool? _lastIsDark;
   int? _lastTint;
   bool get _isDark => ThemeHelper.isDark(context);
@@ -143,22 +152,26 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
     if (!shouldUseNative) {
       // For non-iOS/macOS, use Material Switch
       if (!isIOSOrMacOS) {
-        return SizedBox(
-          height: widget.height,
-          child: Switch(
-            value: widget.value,
-            onChanged: widget.enabled ? widget.onChanged : null,
+        return _labelled(
+          SizedBox(
+            height: widget.height,
+            child: Switch(
+              value: widget.value,
+              onChanged: widget.enabled ? widget.onChanged : null,
+            ),
           ),
         );
       }
 
       // For iOS/macOS < 26, use CupertinoSwitch
-      return SizedBox(
-        height: widget.height,
-        child: CupertinoSwitch(
-          value: widget.value,
-          onChanged: widget.enabled ? widget.onChanged : null,
-          activeTrackColor: _effectiveColor,
+      return _labelled(
+        SizedBox(
+          height: widget.height,
+          child: CupertinoSwitch(
+            value: widget.value,
+            onChanged: widget.enabled ? widget.onChanged : null,
+            activeTrackColor: _effectiveColor,
+          ),
         ),
       );
     }
@@ -186,6 +199,7 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
 
     final creationParams = <String, dynamic>{
       'value': widget.value,
+      if (widget.semanticLabel != null) 'semanticLabel': widget.semanticLabel,
       'enabled': widget.enabled,
       'isDark': _isDark,
       'style': encodeStyle(context, tint: _effectiveColor),
@@ -259,8 +273,19 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
   void _cacheCurrentProps() {
     _lastValue = widget.value;
     _lastEnabled = widget.enabled;
+    _lastSemanticLabel = widget.semanticLabel;
     _lastIsDark = _isDark;
     _lastTint = resolveColorToArgb(_effectiveColor, context);
+  }
+
+  /// Joins [CNSwitch.semanticLabel] to the fallback switch's own node, so it
+  /// is read together with its on/off state.
+  Widget _labelled(Widget child) {
+    final label = widget.semanticLabel;
+    if (label == null) return child;
+    return MergeSemantics(
+      child: Semantics(label: label, child: child),
+    );
   }
 
   Future<void> _syncPropsToNativeIfNeeded() async {
@@ -273,6 +298,13 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
     if (_lastEnabled != widget.enabled) {
       await channel.invokeMethod('setEnabled', {'enabled': widget.enabled});
       _lastEnabled = widget.enabled;
+    }
+
+    if (_lastSemanticLabel != widget.semanticLabel) {
+      await channel.invokeMethod('setSemanticLabel', {
+        'label': widget.semanticLabel,
+      });
+      _lastSemanticLabel = widget.semanticLabel;
     }
 
     if (_lastValue != widget.value) {

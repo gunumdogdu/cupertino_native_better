@@ -14,6 +14,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   private var isInteractive: Bool = true
   private var currentButtonStyle: String = "automatic"
   private var usesSwiftUI: Bool = false
+  /// What VoiceOver reads for the button (`CNButton.semanticLabel`). Nil keeps
+  /// the default: the title, or the SF Symbol's own name for icon-only buttons.
+  private var semanticLabel: String?
+  /// The SwiftUI button before any accessibility label is applied, so the
+  /// label can be changed or removed later.
+  private var swiftUIBase: AnyView?
   private var makeRound: Bool = false
   // Issue #40: optional label-style overrides applied via attributedTitle.
   private var labelFontFamily: String? = nil
@@ -96,6 +102,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let geInteractive = dict["glassEffectInteractive"] as? NSNumber { glassEffectInteractive = geInteractive.boolValue }
       if let bc = dict["badgeCount"] as? NSNumber { badgeCount = bc.intValue }
       if let inter = dict["interaction"] as? NSNumber { interaction = inter.boolValue }
+      if let label = dict["semanticLabel"] as? String, !label.isEmpty { semanticLabel = label }
       // Issue #40: label style overrides
       if let f = dict["labelFontFamily"] as? String, !f.isEmpty { self.labelFontFamily = f }
       if let s = dict["labelFontSize"] as? NSNumber, s.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: s) }
@@ -316,9 +323,16 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     // Add touch blocking overlay if not interactive
     updateTouchBlockingOverlay()
 
+    applySemanticLabel()
+
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
+      case "setSemanticLabel":
+        let label = (call.arguments as? [String: Any])?["label"] as? String
+        self.semanticLabel = (label?.isEmpty ?? true) ? nil : label
+        self.applySemanticLabel()
+        result(nil)
       case "setInteractive":
         if let args = call.arguments as? [String: Any],
            let interactive = (args["interactive"] as? NSNumber)?.boolValue {
@@ -721,6 +735,20 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     }
   }
 
+  /// Applies [semanticLabel] to whichever button is in use; nil restores the
+  /// default label.
+  private func applySemanticLabel() {
+    if usesSwiftUI, let base = swiftUIBase, let hosting = hostingController {
+      if let label = semanticLabel {
+        hosting.rootView = AnyView(base.accessibilityLabel(Text(label)))
+      } else {
+        hosting.rootView = base
+      }
+    } else {
+      button?.accessibilityLabel = semanticLabel
+    }
+  }
+
   @available(iOS 26.0, *)
   private func setupSwiftUIButton(
     title: String?,
@@ -825,7 +853,9 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       badgeCount: badgeCount
     )
     
-    let hostingController = UIHostingController(rootView: AnyView(swiftUIButton))
+    let base = AnyView(swiftUIButton)
+    self.swiftUIBase = base
+    let hostingController = UIHostingController(rootView: base)
     hostingController.view.backgroundColor = UIColor.clear
     self.hostingController = hostingController
     

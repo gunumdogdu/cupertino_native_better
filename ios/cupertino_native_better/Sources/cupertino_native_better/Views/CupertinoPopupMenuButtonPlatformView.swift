@@ -46,6 +46,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     self.button = UIButton(type: .system)
 
     var title: String? = nil
+    var semanticLabel: String? = nil
     var iconName: String? = nil
     var iconSize: CGFloat? = nil
     var iconColor: UIColor? = nil
@@ -68,6 +69,9 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
 
     if let dict = args as? [String: Any] {
       if let t = dict["buttonTitle"] as? String { title = t }
+      if let label = dict["semanticLabel"] as? String, !label.isEmpty {
+        semanticLabel = label
+      }
       if let data = dict["buttonCustomIconBytes"] as? FlutterStandardTypedData {
         buttonCustomIconBytes = data.data
       }
@@ -193,9 +197,17 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       )
     }
 
+    // What VoiceOver reads (`CNPopupMenuButton.semanticLabel`); nil keeps the
+    // title, or the SF Symbol's own name for an icon-only button.
+    button.accessibilityLabel = semanticLabel
+
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
+      case "setSemanticLabel":
+        let label = (call.arguments as? [String: Any])?["label"] as? String
+        self.button.accessibilityLabel = (label?.isEmpty ?? true) ? nil : label
+        result(nil)
       case "setTransitioning":
         // Issue #29 follow-up: apply halo-containment clipping only while
         // the enclosing route is animating OR while a modal/sheet/popup

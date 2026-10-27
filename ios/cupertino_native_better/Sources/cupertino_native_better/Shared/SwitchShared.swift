@@ -12,7 +12,9 @@ struct CupertinoSwitchView: View {
 
   @ViewBuilder
   private var configuredToggle: some View {
-    let base = Toggle("", isOn: $model.value)
+    // The label is hidden on screen but is what VoiceOver reads
+    // (`CNSwitch.semanticLabel`).
+    let base = Toggle(model.label, isOn: $model.value)
       .labelsHidden()
       .disabled(!model.enabled)
 
@@ -52,6 +54,7 @@ class SwitchModel: ObservableObject {
   @Published var value: Bool
   @Published var enabled: Bool
   @Published var tintColor: Color = .accentColor
+  @Published var label: String = ""
   var onChange: (Bool) -> Void
 
   init(value: Bool, enabled: Bool, onChange: @escaping (Bool) -> Void) {

@@ -14,10 +14,12 @@ class CupertinoSwitchPlatformView: NSObject, FlutterPlatformView {
     var enabled: Bool = true
     var isDark: Bool = false
     var initialTint: UIColor? = nil
+    var semanticLabel = ""
     if let dict = args as? [String: Any] {
       if let v = dict["value"] as? NSNumber { initialValue = v.boolValue }
       if let v = dict["enabled"] as? NSNumber { enabled = v.boolValue }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
+      if let v = dict["semanticLabel"] as? String { semanticLabel = v }
       if let style = dict["style"] as? [String: Any], let tintNum = style["tint"] as? NSNumber {
         initialTint = Self.colorFromARGB(tintNum.intValue)
       }
@@ -26,6 +28,7 @@ class CupertinoSwitchPlatformView: NSObject, FlutterPlatformView {
     let model = SwitchModel(value: initialValue, enabled: enabled) { newValue in
       channel.invokeMethod("valueChanged", arguments: ["value": newValue])
     }
+    model.label = semanticLabel
     self.hostingController = UIHostingController(rootView: CupertinoSwitchView(model: model))
     self.hostingController.view.backgroundColor = .clear
     self.hostingController.view.isOpaque = false
@@ -49,6 +52,9 @@ class CupertinoSwitchPlatformView: NSObject, FlutterPlatformView {
 
     channel.setMethodCallHandler { call, result in
       switch call.method {
+      case "setSemanticLabel":
+        model.label = (call.arguments as? [String: Any])?["label"] as? String ?? ""
+        result(nil)
       case "setValue":
         if let args = call.arguments as? [String: Any], let value = (args["value"] as? NSNumber)?.boolValue {
           model.value = value

@@ -91,6 +91,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.buttonStyle = CNButtonStyle.plain,
     this.preserveTopToBottomOrder = false,
     this.autoHideOnModal = true,
+    this.semanticLabel,
   }) : buttonIcon = null,
        buttonCustomIcon = null,
        buttonCustomIconColor = null,
@@ -112,6 +113,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.buttonStyle = CNButtonStyle.glass,
     this.preserveTopToBottomOrder = false,
     this.autoHideOnModal = true,
+    this.semanticLabel,
   }) : buttonLabel = null,
        round = true,
        width = size,
@@ -184,6 +186,14 @@ class CNPopupMenuButton extends StatefulWidget {
   /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
   final bool autoHideOnModal;
 
+  /// What VoiceOver reads for the button.
+  ///
+  /// Without it, VoiceOver reads [buttonLabel], or for an icon-only button
+  /// the SF Symbol's built-in name — which describes the picture, not the
+  /// action (`paintpalette.fill` is read as "Paint palette, filled"). Set it
+  /// on every icon-only button.
+  final String? semanticLabel;
+
   /// Whether this instance is configured as an icon button variant.
   bool get isIconButton =>
       buttonIcon != null ||
@@ -206,6 +216,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   bool? _lastIsDark;
   int? _lastTint;
   String? _lastTitle;
+  String? _lastSemanticLabel;
   String? _lastIconName;
   double? _lastIconSize;
   int? _lastIconColor;
@@ -591,6 +602,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
     final creationParams = <String, dynamic>{
       if (widget.buttonLabel != null) 'buttonTitle': widget.buttonLabel,
+      if (widget.semanticLabel != null) 'semanticLabel': widget.semanticLabel,
       if (buttonIconBytes != null) 'buttonCustomIconBytes': buttonIconBytes,
       if (widget.buttonImageAsset != null) ...{
         // Use resolved asset path
@@ -740,6 +752,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     _lastTint = resolveColorToArgb(_effectiveTint, context);
     _lastIsDark = _isDark;
     _lastTitle = widget.buttonLabel;
+    _lastSemanticLabel = widget.semanticLabel;
     _lastIconName = widget.buttonIcon?.name;
     _lastIconSize = widget.buttonIcon?.size;
     _lastIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
@@ -950,6 +963,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       'imageAssetData': updImageAssetData,
       'imageAssetFormats': updImageAssetFormats,
     });
+
+    if (_lastSemanticLabel != widget.semanticLabel) {
+      _lastSemanticLabel = widget.semanticLabel;
+      await ch.invokeMethod('setSemanticLabel', {
+        'label': widget.semanticLabel,
+      });
+    }
   }
 
   Future<void> _syncBrightnessIfNeeded() async {
@@ -980,6 +1000,19 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
   Widget _buildCupertinoFallback(BuildContext context) {
     // For iOS/macOS < 26 and non-iOS/macOS, use CupertinoActionSheet
+    final label = widget.semanticLabel;
+    if (label != null) {
+      return Semantics(
+        label: label,
+        button: true,
+        excludeSemantics: true,
+        child: _buildCupertinoFallbackButton(context),
+      );
+    }
+    return _buildCupertinoFallbackButton(context);
+  }
+
+  Widget _buildCupertinoFallbackButton(BuildContext context) {
     return SizedBox(
       height: widget.height,
       width: widget.isIconButton && widget.round
