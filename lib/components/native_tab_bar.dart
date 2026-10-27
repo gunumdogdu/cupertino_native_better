@@ -47,6 +47,12 @@ class CNTabAccessory {
 /// observe. A tab with no list and no search role hosts your Flutter content
 /// (root mode) or a placeholder (modal). iOS 26+ only; a no-op elsewhere.
 ///
+/// On iPhone Duo (iOS 27.1, app built with Xcode 27.1) the tab bar moves to
+/// the system vertical bar on its own — on the outer display, and in
+/// landscape on the inner display. Pass `sidebarOnWideScreens: true` to turn
+/// the tabs into a native sidebar on the open inner display: beside the
+/// content in landscape, behind a sidebar button in portrait.
+///
 /// ```dart
 /// CNTabBarNative.enable(
 ///   tabs: [
@@ -89,6 +95,7 @@ class CNTabBarNative {
     bool? isDark,
     bool asRoot = false,
     bool nativeSearchFilter = true,
+    bool sidebarOnWideScreens = false,
     void Function(int index)? onTabSelected,
     void Function(int tabIndex, int itemIndex)? onListItemTap,
     void Function(String query)? onSearchChanged,
@@ -145,6 +152,7 @@ class CNTabBarNative {
       'isDark': isDark ?? false,
       'asRoot': asRoot,
       'nativeSearchFilter': nativeSearchFilter,
+      'sidebar': sidebarOnWideScreens,
     });
 
     _enabled = true;

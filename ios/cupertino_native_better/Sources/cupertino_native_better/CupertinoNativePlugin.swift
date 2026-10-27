@@ -62,6 +62,13 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
 
     // Setup the alert presenter (UIAlertController, no platform view)
     CNAlertManager.shared.setup(messenger: registrar.messenger())
+
+    // Setup the foldable observer (hinge, vertical bar, reserved regions)
+    CNFoldableManager.shared.setup(messenger: registrar.messenger())
+
+    // Register the vertical tab rail platform view
+    let tabRailFactory = CNTabRailViewFactory(messenger: registrar.messenger())
+    registrar.register(tabRailFactory, withId: "CNTabRail")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

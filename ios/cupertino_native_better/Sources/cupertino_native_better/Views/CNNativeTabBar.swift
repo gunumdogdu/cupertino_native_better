@@ -224,6 +224,9 @@ final class CNMinTabStore: ObservableObject {
     @Published var query: String = ""
     @Published var accessory: CNMinTabConfig.Accessory?
     let nativeSearchFilter: Bool
+    /// Sidebar on wide screens (`.sidebarAdaptable`); fixed at enable time,
+    /// since switching the TabView style rebuilds it.
+    let sidebar: Bool
 
     init(config: CNMinTabConfig) {
         tabs = config.tabs
@@ -233,6 +236,7 @@ final class CNMinTabStore: ObservableObject {
         selection = min(max(config.selectedIndex, 0), max(config.tabs.count - 1, 0))
         accessory = config.accessory
         nativeSearchFilter = config.nativeSearchFilter
+        sidebar = config.sidebar
     }
 
     func setSelection(_ index: Int) {
@@ -288,6 +292,7 @@ struct CNMinTabConfig {
     let selectedIndex: Int
     let asRoot: Bool
     let nativeSearchFilter: Bool
+    let sidebar: Bool
 
     init(args: [String: Any]) {
         let tabsData = args["tabs"] as? [[String: Any]] ?? []
@@ -313,6 +318,7 @@ struct CNMinTabConfig {
         selectedIndex = args["selectedIndex"] as? Int ?? 0
         asRoot = args["asRoot"] as? Bool ?? false
         nativeSearchFilter = args["nativeSearchFilter"] as? Bool ?? true
+        sidebar = args["sidebar"] as? Bool ?? false
     }
 
     static func parseItems(_ data: [[String: Any]]) -> [ListItem] {
@@ -382,6 +388,7 @@ struct CNMinimizingTabView: View {
                 .badge(badgeText)
             }
         }
+        .modifier(CNTabSidebarModifier(enabled: store.sidebar))
         .tint(store.tint.map { Color($0) })
         .tabBarMinimizeBehavior(behavior)
         .onChange(of: store.selection) { _, newValue in
@@ -590,5 +597,36 @@ final class CNFlutterHostController: UIViewController {
         child.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(child.view)
         child.didMove(toParent: self)
+    }
+}
+
+/// Turns on the adaptable sidebar for `sidebarOnWideScreens`: a sidebar on
+/// wide screens such as the open inner display of iPhone Duo, the tab bar
+/// (or the system vertical bar) everywhere else.
+@available(iOS 18.0, *)
+private struct CNTabSidebarModifier: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            placement(content.tabViewStyle(.sidebarAdaptable))
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder
+    private func placement(_ view: some View) -> some View {
+#if canImport(SwiftUI, _version: 8.0)
+        // iOS 27 lets the sidebar be the default on iPhone as well; the iOS
+        // 18 API only adapts on iPad.
+        if #available(iOS 27.0, *) {
+            view.defaultTabBarPlacement(.sidebar)
+        } else {
+            view.defaultAdaptableTabBarPlacement(.sidebar)
+        }
+#else
+        view.defaultAdaptableTabBarPlacement(.sidebar)
+#endif
     }
 }

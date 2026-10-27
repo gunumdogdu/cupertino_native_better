@@ -31,6 +31,9 @@
 /// - [CNSearchBar] - Expandable search bar with animations
 /// - [CNToast] - Toast notifications with glass effects
 /// - [CNAlert] - Native alert dialog with actions and text fields
+/// - [CNTabRail] - Vertical tab bar (rail or sidebar) for the side of the screen
+/// - [CNTabScaffold] - Tab layout that moves the tabs to the side on iPhone Duo
+/// - [CNFoldable] - iPhone Duo hinge, vertical bar and fold regions
 /// - [LiquidGlassContainer] - Apply glass effects to any widget
 ///
 /// ## Platform Support
@@ -60,6 +63,9 @@ export 'components/icon.dart';
 export 'components/slider.dart';
 export 'components/switch.dart';
 export 'components/tab_bar.dart';
+export 'components/tab_rail.dart';
+export 'components/tab_scaffold.dart';
+export 'components/foldable.dart';
 export 'components/native_tab_bar.dart';
 export 'components/action_sheet.dart';
 export 'components/bottom_sheet.dart' show CNBottomSheet, CNSheetGeometryProbe;
