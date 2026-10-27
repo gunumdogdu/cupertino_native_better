@@ -6,7 +6,24 @@ import 'package:flutter/cupertino.dart';
 /// all four minimize behaviors, tint color, dark mode, and every callback
 /// (logged below; the log is visible after you close the tab bar).
 class NativeTabBarDemoPage extends StatefulWidget {
-  const NativeTabBarDemoPage({super.key});
+  const NativeTabBarDemoPage({
+    super.key,
+    this.autoLaunch = false,
+    this.initialAsRoot = false,
+    this.sidebarOnWideScreens = false,
+  });
+
+  /// Launches the native tab bar on the first frame instead of waiting for
+  /// the Launch button. Used by `lib/duo_probe_entry.dart`, since the
+  /// simulator has no tap automation.
+  final bool autoLaunch;
+
+  /// Starting value of the "as root" switch.
+  final bool initialAsRoot;
+
+  /// Passed to [CNTabBarNative.enable]: a sidebar on wide screens such as
+  /// the open inner display of iPhone Duo.
+  final bool sidebarOnWideScreens;
 
   @override
   State<NativeTabBarDemoPage> createState() => _NativeTabBarDemoPageState();
@@ -21,6 +38,17 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
   int _flutterTaps = 0;
   Color _tint = CupertinoColors.systemBlue;
   final List<String> _log = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _asRoot = widget.initialAsRoot;
+    if (widget.autoLaunch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _launch();
+      });
+    }
+  }
 
   static const _tints = <MapEntry<String, Color>>[
     MapEntry('Blue', CupertinoColors.systemBlue),
@@ -164,6 +192,7 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
       tintColor: _tint,
       isDark: _dark,
       asRoot: _asRoot,
+      sidebarOnWideScreens: widget.sidebarOnWideScreens,
       onDismissed: () => setState(() => _launched = false),
       onTabSelected: (i) {
         _addLog('onTabSelected($i)');

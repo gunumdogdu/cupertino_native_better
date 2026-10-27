@@ -25,10 +25,13 @@ class _SegmentedControlDemoPageState extends State<SegmentedControlDemoPage> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           children: [
-            Row(
+            // Wrap rather than Row + Spacer, so the two labels move onto
+            // separate lines instead of overflowing at large text sizes.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 12,
               children: [
                 Text('Basic'),
-                Spacer(),
                 Text('Selected: ${_basicSegmentedControlIndex + 1}'),
               ],
             ),
@@ -42,10 +45,13 @@ class _SegmentedControlDemoPageState extends State<SegmentedControlDemoPage> {
 
             const SizedBox(height: 48),
 
-            Row(
+            // Wrap rather than Row + Spacer, so the two labels move onto
+            // separate lines instead of overflowing at large text sizes.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 12,
               children: [
                 Text('Colored'),
-                Spacer(),
                 Text('Selected: ${_shrinkWrappedSegmentedControlIndex + 1}'),
               ],
             ),
@@ -60,10 +66,13 @@ class _SegmentedControlDemoPageState extends State<SegmentedControlDemoPage> {
 
             const SizedBox(height: 48),
 
-            Row(
+            // Wrap rather than Row + Spacer, so the two labels move onto
+            // separate lines instead of overflowing at large text sizes.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 12,
               children: [
                 Text('Shrink wrap'),
-                Spacer(),
                 Text('Selected: ${_coloredSegmentedControlIndex + 1}'),
               ],
             ),
@@ -78,10 +87,13 @@ class _SegmentedControlDemoPageState extends State<SegmentedControlDemoPage> {
 
             const SizedBox(height: 48),
 
-            Row(
+            // Wrap rather than Row + Spacer, so the two labels move onto
+            // separate lines instead of overflowing at large text sizes.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 12,
               children: [
                 Text('Icons'),
-                Spacer(),
                 Text('Selected: ${_iconSegmentedControlIndex + 1}'),
               ],
             ),
