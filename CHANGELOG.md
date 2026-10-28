@@ -1,3 +1,15 @@
+## 1.8.1
+
+> Patch: `CNTabRail` (and so `CNTabScaffold`'s rail and sidebar) now draws image assets, and the first SVG image an app loads no longer occasionally fails to draw. No API changes.
+
+### Fixed — `CNTabRail` ignored `imageAsset` / `activeImageAsset`
+
+`CNTabRail` takes the same `CNTabBarItem`s as `CNTabBar`, but drew only SF Symbols and custom icons, so a tab set built from `CNImageAsset`s showed placeholder circles in the rail and the sidebar — including when `CNTabScaffold` moved tabs to the side on iPhone Duo. It now draws image assets (SVG or raster, from an asset path or `imageData`, with resolution variants) in both styles, natively and in the Flutter fallback, with the same priority as `CNTabBar`: `imageAsset` > `customIcon` > `icon`, and `activeImageAsset` for the selected tab when given. As in the system tab bar, icons are tinted and drawn at a fixed size.
+
+### Fixed — the first SVG image could fail to draw
+
+`SVGImageLoader` starts a warm-up parse on a background queue the first time it is used, and SVGKit's parser is not thread-safe. An SVG parsed on the main thread at the same moment could come back empty and fall back to a placeholder. Seen once on the first `imageAsset` of a `CNTabRail`; the same loader serves `CNTabBar`, `CNButton`, `CNIcon` and `CNPopupMenuButton`. SVG parsing is now serialised.
+
 ## 1.8.0
 
 > Minor: iPhone Duo support (#102) through four new public APIs — `CNTabScaffold`, `CNTabRail`, `CNFoldable` / `CNFoldableScope` — a new `sidebarOnWideScreens` option on `CNTabBarNative.enable`, and VoiceOver names for native controls (#88) through a new `semanticLabel` on `CNButton`, `CNPopupMenuButton`, `CNSwitch` and `CNSlider`. Nothing changes for apps that do not use them.

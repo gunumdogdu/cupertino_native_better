@@ -229,6 +229,74 @@ void main() {
       expect(find.text('count 1'), findsOneWidget);
     }, variant: android);
   });
+
+  group('CNTabRail', () {
+    const home = CNImageAsset('assets/icons/home.svg');
+    const homeFilled = CNImageAsset('assets/icons/home_filled.svg');
+    const inbox = CNImageAsset('assets/icons/inbox.png');
+
+    Future<List<CNImageAsset?>> assetsShown(
+      WidgetTester tester,
+      List<CNTabBarItem> items, {
+      int currentIndex = 0,
+    }) async {
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: Center(
+            child: CNTabRail(
+              items: items,
+              currentIndex: currentIndex,
+              onTap: (_) {},
+            ),
+          ),
+        ),
+      );
+      return tester
+          .widgetList<CNIcon>(find.byType(CNIcon))
+          .map((icon) => icon.imageAsset)
+          .toList();
+    }
+
+    final android = TargetPlatformVariant.only(TargetPlatform.android);
+
+    testWidgets('draws image assets, the active one when selected', (
+      tester,
+    ) async {
+      final shown = await assetsShown(tester, const [
+        CNTabBarItem(
+          label: 'Home',
+          imageAsset: home,
+          activeImageAsset: homeFilled,
+        ),
+        CNTabBarItem(label: 'Inbox', imageAsset: inbox),
+      ]);
+      expect(shown, [homeFilled, inbox]);
+    }, variant: android);
+
+    testWidgets('a selected item without an active asset keeps its asset', (
+      tester,
+    ) async {
+      final shown = await assetsShown(tester, const [
+        CNTabBarItem(label: 'Home', imageAsset: home),
+        CNTabBarItem(label: 'Inbox', imageAsset: inbox),
+      ], currentIndex: 1);
+      expect(shown, [home, inbox]);
+    }, variant: android);
+
+    testWidgets('an image asset takes precedence over an SF Symbol', (
+      tester,
+    ) async {
+      final shown = await assetsShown(tester, const [
+        CNTabBarItem(
+          label: 'Home',
+          icon: CNSymbol('house'),
+          imageAsset: home,
+        ),
+        CNTabBarItem(label: 'Star', icon: CNSymbol('star')),
+      ]);
+      expect(shown, [home, null]);
+    }, variant: android);
+  });
 }
 
 class _Counter extends StatefulWidget {

@@ -12,6 +12,12 @@ final class SVGImageLoader {
     private let cache = NSCache<NSString, UIImage>()
     private let preloadQueue = DispatchQueue(label: "svg.preload", qos: .userInitiated)
     private var isInitialized = false
+    /// SVGKit's parser is not thread-safe, and parsing happens both on the
+    /// preload queue and on the main thread. Without this the first SVG the
+    /// app loaded could come back nil while the warm-up parse was running.
+    /// Only parsing is locked: rendering hops to the main thread, and holding
+    /// the lock across that hop could deadlock.
+    private let parseLock = NSLock()
     
     // MARK: - Initialization
     private init() {
@@ -108,10 +114,16 @@ final class SVGImageLoader {
             """
             
             if let data = dummySVG.data(using: .utf8) {
-                _ = SVGKImage(data: data)
+                _ = self?.parse { SVGKImage(data: data) }
                 self?.isInitialized = true
             }
         }
+    }
+
+    private func parse(_ make: () -> SVGKImage?) -> SVGKImage? {
+        parseLock.lock()
+        defer { parseLock.unlock() }
+        return make()
     }
     
     private func loadSVGFromBundle(assetPath: String, size: CGSize) -> UIImage? {
@@ -125,7 +137,7 @@ final class SVGImageLoader {
     }
     
     private func loadSVGFromData(data: Data, size: CGSize) -> UIImage? {
-        guard let svgImage = SVGKImage(data: data) else {
+        guard let svgImage = parse({ SVGKImage(data: data) }) else {
             return nil
         }
         
@@ -133,7 +145,7 @@ final class SVGImageLoader {
     }
     
     private func loadSVGFromFile(path: String, size: CGSize) -> UIImage? {
-        guard let svgImage = SVGKImage(contentsOfFile: path) else {
+        guard let svgImage = parse({ SVGKImage(contentsOfFile: path) }) else {
             return nil
         }
         

@@ -136,6 +136,8 @@ final class CNTabRailStore: ObservableObject {
         let badges = dict["badges"] as? [String] ?? []
         let icons = dict["customIconBytes"] as? [Any] ?? []
         let activeIcons = dict["activeCustomIconBytes"] as? [Any] ?? []
+        let assets = Assets(dict, prefix: "imageAsset")
+        let activeAssets = Assets(dict, prefix: "activeImageAsset")
         let count = max(labels.count, symbols.count)
         items = (0..<count).map { i in
             Item(
@@ -143,8 +145,9 @@ final class CNTabRailStore: ObservableObject {
                 label: i < labels.count ? labels[i] : "",
                 symbol: i < symbols.count ? symbols[i] : "",
                 activeSymbol: i < activeSymbols.count ? activeSymbols[i] : "",
-                image: Self.image(icons, i),
-                activeImage: Self.image(activeIcons, i),
+                // Priority, as in CNTabBar: image asset > custom icon > symbol.
+                image: assets.image(i) ?? Self.image(icons, i),
+                activeImage: activeAssets.image(i) ?? Self.image(activeIcons, i),
                 badge: i < badges.count ? badges[i] : ""
             )
         }
@@ -162,6 +165,34 @@ final class CNTabRailStore: ObservableObject {
     private static func image(_ list: [Any], _ i: Int) -> UIImage? {
         guard i < list.count, let data = list[i] as? FlutterStandardTypedData else { return nil }
         return UIImage(data: data.data, scale: 3)?.withRenderingMode(.alwaysTemplate)
+    }
+
+    /// Image assets (`CNImageAsset`), sent as the same parallel lists
+    /// `CNTabBar` uses. Bytes take precedence over the asset path. Drawn as
+    /// templates, as `UITabBar` draws them, so the tint applies.
+    private struct Assets {
+        let paths: [String]
+        let data: [Any]
+        let formats: [String]
+
+        init(_ dict: [String: Any], prefix: String) {
+            paths = dict["\(prefix)Paths"] as? [String] ?? []
+            data = dict["\(prefix)Data"] as? [Any] ?? []
+            formats = dict["\(prefix)Formats"] as? [String] ?? []
+        }
+
+        func image(_ i: Int) -> UIImage? {
+            let format = i < formats.count && !formats[i].isEmpty ? formats[i] : nil
+            // The size SVGs are rasterised at; raster images are scaled to fit.
+            let size = CGSize(width: 22, height: 22)
+            var image: UIImage?
+            if i < data.count, let bytes = data[i] as? FlutterStandardTypedData {
+                image = ImageUtils.createImageFromData(bytes.data, format: format, size: size)
+            } else if i < paths.count, !paths[i].isEmpty {
+                image = ImageUtils.loadFlutterAsset(paths[i], size: size, format: format)
+            }
+            return image?.withRenderingMode(.alwaysTemplate)
+        }
     }
 }
 

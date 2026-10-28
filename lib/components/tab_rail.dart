@@ -43,8 +43,10 @@ class CNTabRail extends StatefulWidget {
     this.tint,
   });
 
-  /// The tabs. SF Symbols (`icon` / `activeIcon`), custom icons and badges are
-  /// supported; image assets are not.
+  /// The tabs. SF Symbols (`icon` / `activeIcon`), custom icons, image assets
+  /// (`imageAsset` / `activeImageAsset`, SVG or raster) and badges are
+  /// supported. As in the system tab bar, icons are tinted and drawn at a
+  /// fixed size.
   final List<CNTabBarItem> items;
 
   /// The selected tab.
@@ -159,11 +161,38 @@ class _CNTabRailState extends State<CNTabRail> {
   Future<Map<String, Object?>> _encodeItems() async {
     Future<Uint8List?> render(IconData? data) =>
         data == null ? Future<Uint8List?>.value() : iconDataToImageBytes(data);
+    Future<String> path(CNImageAsset? asset) => asset == null
+        ? Future<String>.value('')
+        : resolveAssetPathForPixelRatio(asset.assetPath);
+    String format(CNImageAsset? asset, String resolvedPath) => asset == null
+        ? ''
+        : asset.imageFormat ??
+              detectImageFormat(resolvedPath, asset.imageData) ??
+              '';
+
+    // Priority, as in CNTabBar: imageAsset > customIcon > icon. An image
+    // asset is used for both states unless activeImageAsset or
+    // activeCustomIcon is given.
     final icons = await Future.wait(
-      widget.items.map((e) => render(e.customIcon)),
+      widget.items.map(
+        (e) => render(e.imageAsset == null ? e.customIcon : null),
+      ),
     );
     final activeIcons = await Future.wait(
-      widget.items.map((e) => render(e.activeCustomIcon ?? e.customIcon)),
+      widget.items.map(
+        (e) => render(
+          e.activeImageAsset != null
+              ? null
+              : e.activeCustomIcon ??
+                    (e.imageAsset == null ? e.customIcon : null),
+        ),
+      ),
+    );
+    final assetPaths = await Future.wait(
+      widget.items.map((e) => path(e.imageAsset)),
+    );
+    final activeAssetPaths = await Future.wait(
+      widget.items.map((e) => path(e.activeImageAsset)),
     );
     return <String, Object?>{
       'labels': widget.items.map((e) => e.label ?? '').toList(),
@@ -174,6 +203,22 @@ class _CNTabRailState extends State<CNTabRail> {
       'badges': widget.items.map((e) => e.badge ?? '').toList(),
       'customIconBytes': icons,
       'activeCustomIconBytes': activeIcons,
+      'imageAssetPaths': assetPaths,
+      'activeImageAssetPaths': activeAssetPaths,
+      'imageAssetData': widget.items
+          .map((e) => e.imageAsset?.imageData)
+          .toList(),
+      'activeImageAssetData': widget.items
+          .map((e) => e.activeImageAsset?.imageData)
+          .toList(),
+      'imageAssetFormats': [
+        for (var i = 0; i < widget.items.length; i++)
+          format(widget.items[i].imageAsset, assetPaths[i]),
+      ],
+      'activeImageAssetFormats': [
+        for (var i = 0; i < widget.items.length; i++)
+          format(widget.items[i].activeImageAsset, activeAssetPaths[i]),
+      ],
     };
   }
 
@@ -245,6 +290,13 @@ class _CNTabRailState extends State<CNTabRail> {
     );
 
     Widget icon(CNTabBarItem item, bool selected, Color color) {
+      final asset = selected
+          ? (item.activeImageAsset ??
+                (item.activeCustomIcon == null ? item.imageAsset : null))
+          : item.imageAsset;
+      if (asset != null) {
+        return CNIcon(imageAsset: asset, size: 22, color: color);
+      }
       final custom = selected
           ? (item.activeCustomIcon ?? item.customIcon)
           : item.customIcon;
