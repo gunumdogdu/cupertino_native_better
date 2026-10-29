@@ -22,6 +22,8 @@
 //
 //   flutter run -t lib/pr_probe_entry.dart \
 //     --dart-define=PROBE=alert --dart-define=SCENARIO=textfield
+//
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=pr82
 //   (SCENARIO: twobutton | destructive | threebutton | titleonly | disabled |
 //    textfield | secure | twofields | supersede; the alert opens itself on the
 //    first frame.)
@@ -36,6 +38,7 @@ import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
 import 'demos/pr69_glass_effect_test.dart';
 import 'demos/pr72_glass_resize_test.dart';
+import 'demos/pr82_tabbar_font_first_build_test.dart';
 import 'demos/alert.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
@@ -113,6 +116,9 @@ class _ProbeApp extends StatelessWidget {
         label: _label,
         autoCycle: true,
       );
+    }
+    if (_probe == 'pr82') {
+      return const Pr82TabBarFontFirstBuildTestPage();
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);

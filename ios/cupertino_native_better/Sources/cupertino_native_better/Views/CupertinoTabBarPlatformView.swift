@@ -97,7 +97,6 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       if let sp = dict["splitSpacing"] as? NSNumber { splitSpacingVal = CGFloat(truncating: sp) }
       // content insets controlled by Flutter padding; keep zero here
     }
-    // Font is read after super.init() below to use self.
 
     // Preload SVG assets dynamically based on what's actually being used
     let allAssetPaths = Set(imageAssetPaths + activeImageAssetPaths).filter { !$0.isEmpty }
@@ -106,6 +105,13 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     }
 
     super.init()
+
+    // Read the label font before the bars are built, so the first appearance
+    // carries it (Issue #82, found by @johndavid92).
+    if let dict = args as? [String: Any] {
+      if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
+      if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
+    }
 
     container.backgroundColor = .clear
     // Always clip the container to block the iOS 26 Liquid Glass drop
@@ -195,8 +201,8 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     let count = max(labels.count, symbols.count)
     if split && count > rightCount {
       let leftEnd = count - rightCount
-      let left = UITabBar(frame: .zero)
-      let right = UITabBar(frame: .zero)
+      let left = CNLabelFontTabBar(frame: .zero)
+      let right = CNLabelFontTabBar(frame: .zero)
       tabBarLeft = left; tabBarRight = right
       left.translatesAutoresizingMaskIntoConstraints = false
       right.translatesAutoresizingMaskIntoConstraints = false
@@ -331,7 +337,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
         }
       }
     } else {
-      let bar = UITabBar(frame: .zero)
+      let bar = CNLabelFontTabBar(frame: .zero)
       tabBar = bar
       bar.delegate = self
       bar.translatesAutoresizingMaskIntoConstraints = false
@@ -420,11 +426,6 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     self.leftInsetVal = leftInset
     self.rightInsetVal = rightInset
     self.currentIconSizes = sizes.compactMap { $0 }.map { CGFloat(truncating: $0) }
-    // Read custom label font from creation params
-    if let dict = args as? [String: Any] {
-      if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
-      if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
-    }
 channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
@@ -666,8 +667,8 @@ channel.setMethodCallHandler { [weak self] call, result in
           let count = max(labels.count, symbols.count)
           if split && count > rightCount {
             let leftEnd = count - rightCount
-            let left = UITabBar(frame: .zero)
-            let right = UITabBar(frame: .zero)
+            let left = CNLabelFontTabBar(frame: .zero)
+            let right = CNLabelFontTabBar(frame: .zero)
             self.tabBarLeft = left; self.tabBarRight = right
             left.translatesAutoresizingMaskIntoConstraints = false
             right.translatesAutoresizingMaskIntoConstraints = false
@@ -780,7 +781,7 @@ channel.setMethodCallHandler { [weak self] call, result in
               }
             }
           } else {
-            let bar = UITabBar(frame: .zero)
+            let bar = CNLabelFontTabBar(frame: .zero)
             self.tabBar = bar
             bar.delegate = self
             bar.translatesAutoresizingMaskIntoConstraints = false

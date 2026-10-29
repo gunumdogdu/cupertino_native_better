@@ -66,6 +66,18 @@ import 'package:flutter/services.dart';
 ///    26.2+ (thread 809225, FB21291879), and PR #82 cannot have a visible
 ///    effect there.
 ///
+/// ### The fix (1.8.2)
+///
+/// Both causes are fixed. The font is read before the bars are built (this
+/// PR's change), and the bars are now `CNLabelFontTabBar`, which puts the
+/// appearance's font back on the title labels after every layout, because
+/// iOS 26.2+ no longer applies it. On the simulator with iOS 27 the labels
+/// were the system font before the fix, in every case below.
+///
+/// *Next tab* moves the selection through `currentIndex`. A selection
+/// change restyles the tab buttons, so it is where the font could be lost
+/// again. Taps on the bar itself do the same on a device.
+///
 /// `single` and `split` build their bars through separate paths that share
 /// `makeAppearance()`. The `searchItem` layout is a different native view
 /// with no label-font support at all, so it is not offered here.
@@ -176,6 +188,10 @@ class _Pr82TabBarFontFirstBuildTestPageState
     } on MissingPluginException {
       if (mounted) setState(() => _direct = 'failed: no channel');
     }
+  }
+
+  void _nextTab() {
+    setState(() => _tabIndex = (_tabIndex + 1) % _items.length);
   }
 
   void _toggleSize() {
@@ -322,10 +338,10 @@ class _Pr82TabBarFontFirstBuildTestPageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'Bug: the settled tab labels are the system font, not the '
-            'reference font. Size makes it appear; Remount and Sheet lose it '
-            'again. Fixed: the reference font from the first settled frame, '
-            'after Remount and after Sheet.',
+            'Bug (iOS 26.2+): the native tab labels stay in the system font, '
+            'even after Size or Direct. Fixed: they match the reference font '
+            'from the first settled frame, and after Size, Remount, Sheet, '
+            'Next tab and Direct, in single and split.',
             style: TextStyle(
               fontSize: 12,
               height: 1.35,
@@ -352,6 +368,8 @@ class _Pr82TabBarFontFirstBuildTestPageState
               _button('Remount', _remount),
               const SizedBox(width: 8),
               _button('Sheet', _showSheet),
+              const SizedBox(width: 8),
+              _button('Next tab', _nextTab),
             ],
           ),
           const SizedBox(height: 8),
