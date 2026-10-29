@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
@@ -78,11 +80,16 @@ import 'package:flutter/services.dart';
 /// change restyles the tab buttons, so it is where the font could be lost
 /// again. Taps on the bar itself do the same on a device.
 ///
+/// [autoCycle] moves to the next tab every two seconds and switches between
+/// single and split after each round, for screenshots from a device.
+///
 /// `single` and `split` build their bars through separate paths that share
 /// `makeAppearance()`. The `searchItem` layout is a different native view
 /// with no label-font support at all, so it is not offered here.
 class Pr82TabBarFontFirstBuildTestPage extends StatefulWidget {
-  const Pr82TabBarFontFirstBuildTestPage({super.key});
+  const Pr82TabBarFontFirstBuildTestPage({super.key, this.autoCycle = false});
+
+  final bool autoCycle;
 
   @override
   State<Pr82TabBarFontFirstBuildTestPage> createState() =>
@@ -140,6 +147,30 @@ class _Pr82TabBarFontFirstBuildTestPageState
   /// of which also resets [_size], so a fresh native view is always created
   /// with [_createdSize]. *Sheet* deliberately does not bump it.
   int _epoch = 1;
+
+  Timer? _cycle;
+  int _step = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoCycle) {
+      _cycle = Timer.periodic(const Duration(seconds: 2), (_) {
+        _step++;
+        if (_step % 5 == 0) {
+          _remount(split: !_split);
+        } else {
+          _nextTab();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _cycle?.cancel();
+    super.dispose();
+  }
 
   void _remount({bool? split}) {
     setState(() {

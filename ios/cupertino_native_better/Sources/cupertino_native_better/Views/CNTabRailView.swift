@@ -320,7 +320,14 @@ struct CNTabRailSwiftUI: View {
 
     @ViewBuilder
     private func badge(_ text: String) -> some View {
-        if !text.isEmpty {
+        if text == CupertinoTabBarPlatformView.dotBadge {
+            // CNTabBarItem.dotBadge: a dot without a count, as in CNTabBar.
+            Circle()
+                .fill(.red)
+                .frame(width: 9, height: 9)
+                .offset(x: -3, y: 3)
+                .accessibilityHidden(true)
+        } else if !text.isEmpty {
             Text(text)
                 .font(.system(size: 11, weight: .bold).monospacedDigit())
                 .foregroundStyle(.white)

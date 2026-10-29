@@ -38,9 +38,16 @@ class CNTabBarItem {
   final CNSymbol? activeIcon;
 
   /// Optional badge text to display on the tab bar item.
-  /// On iOS, this displays as a red badge with the text.
+  /// On iOS, this displays as a red badge with the text; pass [dotBadge] for
+  /// a small dot without a count.
   /// On macOS, badges are not supported by NSSegmentedControl.
   final String? badge;
+
+  /// A [badge] value that shows a small red dot instead of a count, e.g. for
+  /// "something new" on a tab. `UITabBarItem` has no dot badge, so
+  /// `CNTabBar` and `CNTabRail` draw it themselves. VoiceOver reads nothing
+  /// for a dot; say what is new in the tab's [label] if it matters.
+  static const String dotBadge = '\u200B';
 
   /// Optional custom icon for unselected state.
   /// Use icons from CupertinoIcons, Icons, or any custom IconData.
@@ -361,6 +368,7 @@ class _CNTabBarState extends State<CNTabBar> {
   // never feed into the widget tree.
   Map<String, dynamic>? _creationParams;
   int _prepGeneration = 0;
+  int _prepRetries = 0;
   bool _preparing = false;
 
   @override
@@ -447,8 +455,28 @@ class _CNTabBarState extends State<CNTabBar> {
         }
       }
     }
+    // Items changed before the native bar was created: its prepared params describe the old items, so
+    // prepare again for these (the stale run is dropped by the generation token).
+    if (_channel == null &&
+        _itemsSignature(oldWidget.items) != _itemsSignature(widget.items)) {
+      _prepGeneration++;
+      _preparing = false;
+      _prepRetries = 0;
+      _creationParams = null;
+      _scheduleNativePreparation();
+    }
     _syncPropsToNativeIfNeeded();
   }
+
+  /// What the native bar is built from, per item, to notice a change of items.
+  static String _itemsSignature(List<CNTabBarItem> items) => items
+      .map(
+        (e) =>
+            '${e.label}|${e.icon?.name}|${e.activeIcon?.name}|'
+            '${e.imageAsset?.assetPath}|${e.activeImageAsset?.assetPath}|'
+            '${e.customIcon?.codePoint}|${e.activeCustomIcon?.codePoint}',
+      )
+      .join('||');
 
   @override
   void dispose() {
@@ -498,9 +526,20 @@ class _CNTabBarState extends State<CNTabBar> {
             _preparing = false;
           });
         })
-        .catchError((_) {
+        .catchError((Object e) {
           if (!mounted || gen != _prepGeneration) return;
           _preparing = false;
+          // Never stay on the Flutter fallback in silence: say why, and try again a little later (an asset or
+          // the first frame may simply not have been ready yet).
+          debugPrint('[CNTabBar] native preparation failed: $e');
+          if (_prepRetries < 2) {
+            _prepRetries++;
+            Future<void>.delayed(const Duration(milliseconds: 300), () {
+              if (mounted && _creationParams == null) {
+                _scheduleNativePreparation();
+              }
+            });
+          }
         });
   }
 
@@ -663,6 +702,10 @@ class _CNTabBarState extends State<CNTabBar> {
   /// synchronously -- eliminating the nested-FutureBuilder race that caused
   /// duplicate platform-view creation attempts.
   Future<Map<String, dynamic>> _prepareCreationParams() async {
+    // One snapshot for every step: preparation awaits several times, and an app may change its items in
+    // between (a tab added once its data loads). Reading items after each await mixed the old list
+    // with the new one, indexed past its end and threw, which left the bar on the Flutter fallback.
+    final items = widget.items;
     // Render custom icons (the only truly async step for most configs)
     final iconBytes = await _renderCustomIcons();
     final customIconBytes = iconBytes[0];
@@ -682,22 +725,22 @@ class _CNTabBarState extends State<CNTabBar> {
         ? _buildSearchStyleParams(context)
         : null;
 
-    final labels = widget.items.map((e) => e.label ?? '').toList();
-    final symbols = widget.items.map((e) => e.icon?.name ?? '').toList();
-    final activeSymbols = widget.items
+    final labels = items.map((e) => e.label ?? '').toList();
+    final symbols = items.map((e) => e.icon?.name ?? '').toList();
+    final activeSymbols = items
         .map((e) => e.activeIcon?.name ?? e.icon?.name ?? '')
         .toList();
-    final badges = widget.items.map((e) => e.badge ?? '').toList();
+    final badges = items.map((e) => e.badge ?? '').toList();
 
     final imageAssetPaths = await Future.wait(
-      widget.items.map(
+      items.map(
         (e) async => e.imageAsset != null
             ? await resolveAssetPathForPixelRatio(e.imageAsset!.assetPath)
             : '',
       ),
     );
     final activeImageAssetPaths = await Future.wait(
-      widget.items.map(
+      items.map(
         (e) async => e.activeImageAsset != null
             ? await resolveAssetPathForPixelRatio(e.activeImageAsset!.assetPath)
             : '',
@@ -706,24 +749,22 @@ class _CNTabBarState extends State<CNTabBar> {
 
     if (!mounted) return const {};
 
-    final sizes = widget.items
+    final sizes = items
         .map((e) => (widget.iconSize ?? e.icon?.size ?? e.imageAsset?.size))
         .toList();
-    final colors = widget.items
+    final colors = items
         .map(
           (e) =>
               resolveColorToArgb(e.icon?.color ?? e.imageAsset?.color, context),
         )
         .toList();
 
-    final imageAssetData = widget.items
-        .map((e) => e.imageAsset?.imageData)
-        .toList();
-    final activeImageAssetData = widget.items
+    final imageAssetData = items.map((e) => e.imageAsset?.imageData).toList();
+    final activeImageAssetData = items
         .map((e) => e.activeImageAsset?.imageData)
         .toList();
     final imageAssetFormats = await Future.wait(
-      widget.items.asMap().entries.map((entry) async {
+      items.asMap().entries.map((entry) async {
         final e = entry.value;
         if (e.imageAsset == null) return '';
         final resolvedPath = imageAssetPaths[entry.key];
@@ -733,7 +774,7 @@ class _CNTabBarState extends State<CNTabBar> {
       }),
     );
     final activeImageAssetFormats = await Future.wait(
-      widget.items.asMap().entries.map((entry) async {
+      items.asMap().entries.map((entry) async {
         final e = entry.value;
         if (e.activeImageAsset == null) return '';
         final resolvedPath = activeImageAssetPaths[entry.key];
@@ -1511,17 +1552,38 @@ class _CNTabBarState extends State<CNTabBar> {
   Widget _buildTabIcon(CNTabBarItem item, {required bool isActive}) {
     const defaultSize = 25.0;
 
-    // Check for image asset (highest priority)
+    // Check for image asset (highest priority). An asset without a colour of its own takes the bar's active
+    // or inactive colour (CupertinoTabBar's IconTheme), as the native bar tints it; untinted, a template
+    // image drew black.
+    CNImageAsset tinted(CNImageAsset asset, Color? color) =>
+        asset.color != null || color == null
+        ? asset
+        : CNImageAsset(
+            asset.assetPath,
+            imageData: asset.imageData,
+            imageFormat: asset.imageFormat,
+            size: asset.size,
+            color: color,
+            mode: asset.mode,
+            gradient: asset.gradient,
+          );
     if (isActive && item.activeImageAsset != null) {
-      return CNIcon(
-        imageAsset: item.activeImageAsset,
-        size: widget.iconSize ?? item.activeImageAsset!.size,
+      return Builder(
+        builder: (context) => CNIcon(
+          imageAsset: tinted(
+            item.activeImageAsset!,
+            IconTheme.of(context).color,
+          ),
+          size: widget.iconSize ?? item.activeImageAsset!.size,
+        ),
       );
     }
     if (item.imageAsset != null) {
-      return CNIcon(
-        imageAsset: item.imageAsset,
-        size: widget.iconSize ?? item.imageAsset!.size,
+      return Builder(
+        builder: (context) => CNIcon(
+          imageAsset: tinted(item.imageAsset!, IconTheme.of(context).color),
+          size: widget.iconSize ?? item.imageAsset!.size,
+        ),
       );
     }
 

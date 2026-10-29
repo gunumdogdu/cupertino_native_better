@@ -24,6 +24,8 @@
 //     --dart-define=PROBE=alert --dart-define=SCENARIO=textfield
 //
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=pr82
+//     (also issue103, issue105; --dart-define=AUTO=true steps all three
+//     through their cases on their own, for device screenshots)
 //   (SCENARIO: twobutton | destructive | threebutton | titleonly | disabled |
 //    textfield | secure | twofields | supersede; the alert opens itself on the
 //    first frame.)
@@ -39,6 +41,8 @@ import 'demos/pr67_icon_supersample_test.dart';
 import 'demos/pr69_glass_effect_test.dart';
 import 'demos/pr72_glass_resize_test.dart';
 import 'demos/pr82_tabbar_font_first_build_test.dart';
+import 'demos/issue103_tabbar_items_change_test.dart';
+import 'demos/issue105_tabbar_dot_badge_test.dart';
 import 'demos/alert.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
@@ -57,6 +61,8 @@ const String _scenario = String.fromEnvironment(
   'SCENARIO',
   defaultValue: 'resize',
 );
+
+const bool _auto = bool.fromEnvironment('AUTO');
 
 /// Stamped into the nav bar so a before/after screenshot pair can't be mixed up.
 const String _label = String.fromEnvironment('LABEL', defaultValue: '');
@@ -118,7 +124,13 @@ class _ProbeApp extends StatelessWidget {
       );
     }
     if (_probe == 'pr82') {
-      return const Pr82TabBarFontFirstBuildTestPage();
+      return const Pr82TabBarFontFirstBuildTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue103') {
+      return const Issue103TabBarItemsChangeTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue105') {
+      return const Issue105TabBarDotBadgeTestPage(autoCycle: _auto);
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);

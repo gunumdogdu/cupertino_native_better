@@ -47,6 +47,8 @@ import 'demos/pr77_liquid_glass_parts_test.dart';
 import 'demos/pr78_action_sheet_test.dart';
 import 'demos/pr79_alert_test.dart';
 import 'demos/pr82_tabbar_font_first_build_test.dart';
+import 'demos/issue103_tabbar_items_change_test.dart';
+import 'demos/issue105_tabbar_dot_badge_test.dart';
 import 'demos/pr84_system_brightness_test.dart';
 import 'demos/pr85_tabbar_icon_precache_test.dart';
 import 'demos/pr87_tabbar_selection_after_sheet_test.dart';
@@ -608,6 +610,38 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Issue76PopupGestureTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#103 / #104: TabBar items change early'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'plus.rectangle.on.rectangle',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue103TabBarItemsChangeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#105: TabBar dot badge'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('app.badge', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue105TabBarDotBadgeTestPage(),
                       ),
                     );
                   },

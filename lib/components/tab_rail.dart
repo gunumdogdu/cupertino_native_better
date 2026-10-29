@@ -315,7 +315,9 @@ class _CNTabRailState extends State<CNTabRail> {
           selected: i == widget.currentIndex,
           button: true,
           label: widget.items[i].label,
-          value: widget.items[i].badge,
+          value: widget.items[i].badge == CNTabBarItem.dotBadge
+              ? null
+              : widget.items[i].badge,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => widget.onTap(i),
@@ -393,7 +395,9 @@ class _FallbackItem extends StatelessWidget {
           clipBehavior: Clip.none,
           children: <Widget>[
             icon,
-            if (badge != null && badge!.isNotEmpty)
+            if (badge == CNTabBarItem.dotBadge)
+              const Positioned(right: -4, top: -2, child: _Dot())
+            else if (badge != null && badge!.isNotEmpty)
               Positioned(right: -10, top: -6, child: _Badge(badge!)),
           ],
         ),
@@ -424,7 +428,9 @@ class _FallbackItem extends StatelessWidget {
               ),
             ),
           ),
-          if (badge != null && badge!.isNotEmpty)
+          if (badge == CNTabBarItem.dotBadge)
+            const _Dot()
+          else if (badge != null && badge!.isNotEmpty)
             Text(
               badge!,
               style: TextStyle(
@@ -434,6 +440,23 @@ class _FallbackItem extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// [CNTabBarItem.dotBadge]: a dot without a count.
+class _Dot extends StatelessWidget {
+  const _Dot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: const BoxDecoration(
+        color: CupertinoColors.systemRed,
+        shape: BoxShape.circle,
       ),
     );
   }

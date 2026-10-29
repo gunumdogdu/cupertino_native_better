@@ -1,3 +1,33 @@
+## 1.8.2
+
+> Patch: three `CNTabBar` fixes (#82, #103, #104) and one addition (#105, `CNTabBarItem.dotBadge`). Nothing changes for bars that do not use a custom label font, image assets in the fallback, items that change at launch, or dot badges.
+
+### Fixed — #82 `labelFontFamily` had no effect on iOS 26 and 27
+
+Two causes. `CupertinoTabBarPlatformView` built the bar's first `UITabBarAppearance` before reading `labelFontFamily` / `labelFontSize`, so a font passed at creation never reached it (found by @johndavid92 in PR #82). And since iOS 26.2 the Liquid Glass `UITabBar` ignores the `.font` in `titleTextAttributes` altogether, whether set on the appearance or per item (Apple Developer Forums thread 809225, FB21291879). The simulators for iOS 26.0 and 27 ignore it too.
+
+The font is now read before the bars are built, and the bar puts its appearance's font on the tabs' title labels after every layout itself: both copies the Liquid Glass bar keeps of each title, re-measured, and allowed to shrink a little rather than truncate when a custom font is wider than a tab (the lone tab in split mode). Bars without a custom font are not touched.
+
+Verified before and after on the simulator, iOS 27.0 and 26.0, in single and split mode: first appearance, selection changes, `setFont` from a size change, `setFont` sent straight to the native channel, remount, and a sheet round-trip.
+
+### Fixed — #103 the bar could stay on its Flutter fallback when its items changed at launch
+
+`_prepareCreationParams` awaits several times and read `widget.items` again after each await. When an app changed its items in between (a tab added once its data loads), it indexed a list built for the old items past its end; the error was swallowed and nothing prepared the bar again, so it stayed on the Flutter fallback for the session. A smaller window let the native bar appear with the old items. Preparation now uses one snapshot of the items, prepares again when the items change before the native bar exists, and logs and retries a failed preparation twice. Reported from the Kinetrio app.
+
+Verified on the simulator (iOS 27.0, 26.0) by adding a fifth tab after the first frame and 16, 40 and 100 ms later: before, the fallback stuck or the bar kept four tabs; after, five tabs on the native bar every time.
+
+### Fixed — #104 image assets drew black in the fallback
+
+The Flutter fallback passed an `imageAsset` to `CNIcon` without a colour, so template images ignored the bar's active and inactive colours and drew black. They now take those colours, as the native bar tints them; an asset with a `color` of its own keeps it.
+
+### Added — #105 `CNTabBarItem.dotBadge`
+
+`badge: CNTabBarItem.dotBadge` shows a small red dot instead of a count. `UITabBarItem` has no dot badge, and on iOS 26 and 27 a badge keeps one size whatever its text, so `CNTabBar` draws the dot at the top-right of the item's icon itself, in single and split mode, and `CNTabRail` draws it too. The dot views are kept across layouts, so the bar does not lay itself out again on every frame (checked: no layouts while idle). Requested from the Kinetrio app.
+
+### Example
+
+- New Testing screens: *#103 / #104: TabBar items change early* and *#105: TabBar dot badge*; the PR #82 screen gains *Next tab*. `pr_probe_entry.dart` opens them with `PROBE=pr82|issue103|issue105`, and `AUTO=true` steps all three screens through their cases for device screenshots.
+
 ## 1.8.1
 
 > Patch: `CNTabRail` (and so `CNTabScaffold`'s rail and sidebar) now draws image assets, and the first SVG image an app loads no longer occasionally fails to draw. No API changes.

@@ -14,7 +14,7 @@ import UIKit
 ///
 /// Only bars whose appearance carries a font are touched; otherwise the
 /// labels keep whatever the system gives them.
-final class CNLabelFontTabBar: UITabBar {
+class CNLabelFontTabBar: UITabBar {
 
   override var standardAppearance: UITabBarAppearance {
     didSet { setNeedsLayout() }

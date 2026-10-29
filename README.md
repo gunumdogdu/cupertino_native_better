@@ -284,6 +284,29 @@ await CNTabBar.precacheIcons(items, iconSize: 25);
 A bar mounted afterwards skips the fallback. SF Symbol and `imageAsset` items
 need no precaching.
 
+#### Badges, dots and label fonts
+
+```dart
+CNTabBar(
+  items: const [
+    CNTabBarItem(label: 'Inbox', icon: CNSymbol('tray'), badge: '3'),
+    // A small red dot instead of a count, e.g. for "something new".
+    CNTabBarItem(label: 'Feed', icon: CNSymbol('sparkles'), badge: CNTabBarItem.dotBadge),
+  ],
+  currentIndex: _selectedIndex,
+  onTap: (index) => setState(() => _selectedIndex = index),
+  labelFontFamily: 'Avenir Next', // any font registered with iOS
+  labelFontSize: 11,
+)
+```
+
+`UITabBarItem` has no dot badge, so `CNTabBar` and `CNTabRail` draw
+`CNTabBarItem.dotBadge` themselves. VoiceOver reads nothing for a dot, so if
+it matters, say what is new in the tab's label. Since iOS 26.2 the Liquid
+Glass tab bar ignores custom title fonts; `CNTabBar` applies
+`labelFontFamily` to the titles itself (1.8.2). A font much wider or taller
+than the system's can shrink to fit a narrow tab, or touch a large icon.
+
 ### Native iOS 26 Tab Bar (CNTabBarNative)
 
 <p align="center">
@@ -612,7 +635,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.8.1
+  cupertino_native_better: ^1.8.2
 ```
 
 ## Usage
@@ -1018,7 +1041,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.8.1
+   cupertino_native_better: ^1.8.2
    ```
 
 2. Update imports:

@@ -3,6 +3,26 @@ import UIKit
 import SVGKit
 
 class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelegate {
+  /// A badge of only a zero-width space is a dot. UITabBarItem has no dot badge, and on iOS 26 its badge
+  /// keeps one size whatever its text, so a dot is drawn by [CNDotTabBar] instead and the item carries no
+  /// system badge. Every other value is a normal badge.
+  static let dotBadge = "\u{200B}"
+  private static var dotKey: UInt8 = 0
+
+  static func isDot(_ item: UITabBarItem) -> Bool {
+    (objc_getAssociatedObject(item, &dotKey) as? Bool) == true
+  }
+
+  static func applyBadge(_ value: String?, to item: UITabBarItem) {
+    let dot = value == dotBadge
+    objc_setAssociatedObject(item, &dotKey, dot, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    if dot || value == nil || value!.isEmpty {
+      item.badgeValue = nil
+    } else {
+      item.badgeValue = value
+    }
+  }
+
   private let channel: FlutterMethodChannel
   private let container: UIView
   private var tabBar: UITabBar?
@@ -185,9 +205,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
 
         let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
         let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
-        if i < badges.count && !badges[i].isEmpty {
-          item.badgeValue = badges[i]
-        }
+        CupertinoTabBarPlatformView.applyBadge(i < badges.count ? badges[i] : nil, to: item)
         // Adjust title position for larger icons to prevent overlap
         // Default icon size is ~25pt
         if i < sizes.count, let sizeNum = sizes[i], sizeNum.doubleValue > 25 {
@@ -201,8 +219,8 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     let count = max(labels.count, symbols.count)
     if split && count > rightCount {
       let leftEnd = count - rightCount
-      let left = CNLabelFontTabBar(frame: .zero)
-      let right = CNLabelFontTabBar(frame: .zero)
+      let left = CNDotTabBar(frame: .zero)
+      let right = CNDotTabBar(frame: .zero)
       tabBarLeft = left; tabBarRight = right
       left.translatesAutoresizingMaskIntoConstraints = false
       right.translatesAutoresizingMaskIntoConstraints = false
@@ -337,7 +355,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
         }
       }
     } else {
-      let bar = CNLabelFontTabBar(frame: .zero)
+      let bar = CNDotTabBar(frame: .zero)
       tabBar = bar
       bar.delegate = self
       bar.translatesAutoresizingMaskIntoConstraints = false
@@ -545,9 +563,7 @@ channel.setMethodCallHandler { [weak self] call, result in
 
               let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
               let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
-              if i < badges.count && !badges[i].isEmpty {
-                item.badgeValue = badges[i]
-              }
+              CupertinoTabBarPlatformView.applyBadge(i < badges.count ? badges[i] : nil, to: item)
               // Adjust title position for larger icons to prevent overlap
               if i < sizes.count, let sizeNum = sizes[i] {
                 let pointSize = sizeNum.doubleValue
@@ -657,9 +673,7 @@ channel.setMethodCallHandler { [weak self] call, result in
 
               let title = (i < labels.count && !labels[i].isEmpty) ? labels[i] : nil
               let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
-              if i < badges.count && !badges[i].isEmpty {
-                item.badgeValue = badges[i]
-              }
+              CupertinoTabBarPlatformView.applyBadge(i < badges.count ? badges[i] : nil, to: item)
               items.append(item)
             }
             return items
@@ -667,8 +681,8 @@ channel.setMethodCallHandler { [weak self] call, result in
           let count = max(labels.count, symbols.count)
           if split && count > rightCount {
             let leftEnd = count - rightCount
-            let left = CNLabelFontTabBar(frame: .zero)
-            let right = CNLabelFontTabBar(frame: .zero)
+            let left = CNDotTabBar(frame: .zero)
+            let right = CNDotTabBar(frame: .zero)
             self.tabBarLeft = left; self.tabBarRight = right
             left.translatesAutoresizingMaskIntoConstraints = false
             right.translatesAutoresizingMaskIntoConstraints = false
@@ -781,7 +795,7 @@ channel.setMethodCallHandler { [weak self] call, result in
               }
             }
           } else {
-            let bar = CNLabelFontTabBar(frame: .zero)
+            let bar = CNDotTabBar(frame: .zero)
             self.tabBar = bar
             bar.delegate = self
             bar.translatesAutoresizingMaskIntoConstraints = false
@@ -898,11 +912,7 @@ channel.setMethodCallHandler { [weak self] call, result in
           // Update single bar
           if let bar = self.tabBar, let items = bar.items {
             for (i, item) in items.enumerated() {
-              if i < badges.count && !badges[i].isEmpty {
-                item.badgeValue = badges[i]
-              } else {
-                item.badgeValue = nil
-              }
+              CupertinoTabBarPlatformView.applyBadge(i < badges.count ? badges[i] : nil, to: item)
             }
           }
           // Update split bars
@@ -910,21 +920,16 @@ channel.setMethodCallHandler { [weak self] call, result in
              let right = self.tabBarRight, let rightItems = right.items {
             let leftEnd = leftItems.count
             for (i, item) in leftItems.enumerated() {
-              if i < badges.count && !badges[i].isEmpty {
-                item.badgeValue = badges[i]
-              } else {
-                item.badgeValue = nil
-              }
+              CupertinoTabBarPlatformView.applyBadge(i < badges.count ? badges[i] : nil, to: item)
             }
             for (i, item) in rightItems.enumerated() {
               let badgeIndex = leftEnd + i
-              if badgeIndex < badges.count && !badges[badgeIndex].isEmpty {
-                item.badgeValue = badges[badgeIndex]
-              } else {
-                item.badgeValue = nil
-              }
+              CupertinoTabBarPlatformView.applyBadge(badgeIndex < badges.count ? badges[badgeIndex] : nil, to: item)
             }
           }
+          self.tabBar?.setNeedsLayout()
+          self.tabBarLeft?.setNeedsLayout()
+          self.tabBarRight?.setNeedsLayout()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing badges", details: nil)) }
       case "setFont":
@@ -1127,4 +1132,3 @@ channel.setMethodCallHandler { [weak self] call, result in
   }
 
 }
-
