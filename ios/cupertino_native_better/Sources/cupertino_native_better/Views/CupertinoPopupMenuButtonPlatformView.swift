@@ -27,6 +27,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var itemModes: [String?] = []
   private var itemPalettes: [[NSNumber]] = []
   private var itemGradients: [NSNumber?] = []
+  // Subtitles and submenus. Flutter only sends them when the menu uses
+  // them; each submenu arrives as its own level, encoded like the top one.
+  private var subtitles: [String] = []
+  private var isSubmenu: [Bool] = []
+  private var submenus: [[String: Any]?] = []
   private var iconScale: CGFloat = UIScreen.main.scale
   private var preserveTopToBottomOrder: Bool = false
   // Track current button icon configuration to keep image across state updates
@@ -109,6 +114,9 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       if let gradients = dict["sfSymbolGradientEnabled"] as? [NSNumber?] { self.itemGradients = gradients }
       if let m = dict["buttonIconRenderingMode"] as? String { buttonIconMode = m }
       if let pal = dict["buttonIconPaletteColors"] as? [NSNumber] { buttonIconPalette = pal }
+      self.subtitles = (dict["subtitles"] as? [String]) ?? []
+      self.isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
+      self.submenus = Self.parseSubmenus(dict["submenus"])
       if let preserve = dict["preserveTopToBottomOrder"] as? NSNumber {
         self.preserveTopToBottomOrder = preserve.boolValue
       }
@@ -180,7 +188,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
 
     self.itemSizes = sizes
     self.itemColors = colors
-    rebuildMenu(defaultSizes: sizes, defaultColors: colors)
+    rebuildMenu()
     if #available(iOS 14.0, *) {
       button.showsMenuAsPrimaryAction = true
     } else {
@@ -240,7 +248,10 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
             self.imageAssetData = bytesArray.map { $0?.data }
           }
           self.imageAssetFormats = (args["imageAssetFormats"] as? [String]) ?? []
-          self.rebuildMenu(defaultSizes: sizes, defaultColors: colors)
+          self.subtitles = (args["subtitles"] as? [String]) ?? []
+          self.isSubmenu = ((args["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
+          self.submenus = Self.parseSubmenus(args["submenus"])
+          self.rebuildMenu()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing items", details: nil)) }
       case "setStyle":
@@ -334,14 +345,43 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     }
   }
 
-  private func rebuildMenu(defaultSizes: [Any]? = nil, defaultColors: [Any]? = nil) {
+  /// The top level of the menu, from the arrays Flutter sent at creation or
+  /// in the last `setItems`.
+  private var rootLevel: PopupMenuLevel {
+    var level = PopupMenuLevel()
+    level.labels = labels
+    level.symbols = symbols
+    level.customIconBytes = customIconBytes
+    level.customIconColors = customIconColors
+    level.imageAssetPaths = imageAssetPaths
+    level.imageAssetData = imageAssetData
+    level.imageAssetFormats = imageAssetFormats
+    level.dividers = dividers
+    level.enabled = enabled
+    level.checked = checked
+    level.isDestructive = isDestructive
+    level.sizes = itemSizes
+    level.colors = itemColors
+    level.modes = itemModes
+    level.palettes = itemPalettes
+    level.subtitles = subtitles
+    level.isSubmenu = isSubmenu
+    level.submenus = submenus
+    return level
+  }
+
+  private static func parseSubmenus(_ value: Any?) -> [[String: Any]?] {
+    return ((value as? [Any]) ?? []).map { $0 as? [String: Any] }
+  }
+
+  private func rebuildMenu() {
     // iOS 14+ native menu
     if #available(iOS 14.0, *) {
       // If preserveTopToBottomOrder is enabled, use deferred menu to check position at display time
       if preserveTopToBottomOrder {
         let deferredElement = UIDeferredMenuElement.uncached { [weak self] completion in
           guard let self = self else { completion([]); return }
-          let items = self.buildMenuItems(defaultSizes: defaultSizes, defaultColors: defaultColors)
+          let items = self.buildMenuItems(level: self.rootLevel)
 
           // Check button position at display time
           let buttonFrame = self.button.convert(self.button.bounds, to: nil)
@@ -366,172 +406,54 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       }
 
       // Standard menu building (native behavior)
-      let items = buildMenuItems(defaultSizes: defaultSizes, defaultColors: defaultColors)
+      let items = buildMenuItems(level: rootLevel)
       button.menu = UIMenu(title: "", children: items)
     }
   }
 
+  /// Builds the elements of one menu [level]. [path] is the level's own
+  /// path from the top: empty for the top level, then one index per submenu.
   @available(iOS 14.0, *)
-  private func buildMenuItems(defaultSizes: [Any]? = nil, defaultColors: [Any]? = nil) -> [UIMenuElement] {
+  private func buildMenuItems(level: PopupMenuLevel, path: [Int] = []) -> [UIMenuElement] {
     var groups: [[UIMenuElement]] = []
     var current: [UIMenuElement] = []
-    let count = max(labels.count, max(symbols.count, dividers.count))
+    let count = max(level.labels.count, max(level.symbols.count, level.dividers.count))
     let flushGroup: () -> Void = {
       if !current.isEmpty { groups.append(current); current = [] }
     }
     for i in 0..<count {
-        let isDiv = i < dividers.count ? dividers[i] : false
+        let isDiv = i < level.dividers.count ? level.dividers[i] : false
         if isDiv { flushGroup(); continue }
-        let title = i < labels.count ? labels[i] : ""
-        var image: UIImage? = nil
-        // Priority: imageAsset > customIconBytes > SF Symbol
-        
-        // Handle imageAsset (highest priority)
-        if i < self.imageAssetPaths.count, !self.imageAssetPaths[i].isEmpty {
-          let assetPath = self.imageAssetPaths[i]
-          let format = i < self.imageAssetFormats.count ? self.imageAssetFormats[i] : nil
-          let iconColorARGB: Int? = {
-            if i < self.itemColors.count, let colorNum = self.itemColors[i] as? NSNumber, !(self.itemColors[i] is NSNull) {
-              return colorNum.intValue
-            }
-            return nil
-          }()
-          let iconSize: CGFloat? = {
-            if i < self.itemSizes.count, let sizeNum = self.itemSizes[i] as? NSNumber {
-              return CGFloat(truncating: sizeNum)
-            }
-            return 18.0
-          }()
-          
-          // Use utility function to load and optionally tint image
-          if let argb = iconColorARGB, #available(iOS 13.0, *) {
-            image = ImageUtils.loadAndTintImage(
-              from: assetPath,
-              iconSize: iconSize,
-              iconColor: argb,
-              providedFormat: format,
-              scale: self.iconScale
-            )
-          } else {
-            let size = CGSize(width: iconSize ?? 18, height: iconSize ?? 18)
-            // Single-colour artwork templates losslessly and picks up the
-            // menu's own colouring; multi-colour artwork keeps its pixels.
-            image = ImageUtils.templatedIfMonochrome(
-              ImageUtils.loadFlutterAsset(assetPath, size: size, format: format, scale: self.iconScale)
-            )
-          }
-        } else if i < self.imageAssetData.count, let data = self.imageAssetData[i] {
-          let format = i < self.imageAssetFormats.count ? self.imageAssetFormats[i] : nil
-          let iconColorARGB: Int? = {
-            if i < self.itemColors.count, let colorNum = self.itemColors[i] as? NSNumber, !(self.itemColors[i] is NSNull) {
-              return colorNum.intValue
-            }
-            return nil
-          }()
-          let iconSize: CGFloat? = {
-            if i < self.itemSizes.count, let sizeNum = self.itemSizes[i] as? NSNumber {
-              return CGFloat(truncating: sizeNum)
-            }
-            return 18.0
-          }()
-          
-          // Use utility function to create and optionally tint image
-          if let argb = iconColorARGB, #available(iOS 13.0, *) {
-            image = ImageUtils.createAndTintImage(
-              from: data,
-              iconSize: iconSize,
-              iconColor: argb,
-              providedFormat: format,
-              scale: self.iconScale
-            )
-          } else {
-            let size: CGSize? = iconSize != nil ? CGSize(width: iconSize!, height: iconSize!) : nil
-            // Single-colour artwork templates losslessly and picks up the
-            // menu's own colouring; multi-colour artwork keeps its pixels.
-            image = ImageUtils.templatedIfMonochrome(
-              ImageUtils.createImageFromData(data, format: format, size: size, scale: self.iconScale)
-            )
-          }
+        let title = i < level.labels.count ? level.labels[i] : ""
+        let image = menuImage(level: level, at: i)
+        let isEnabled = i < level.enabled.count ? level.enabled[i] : true
+        let isChecked = i < level.checked.count ? level.checked[i] : false
+        let destructive = i < level.isDestructive.count ? level.isDestructive[i] : false
+        let subtitle = i < level.subtitles.count && !level.subtitles[i].isEmpty ? level.subtitles[i] : nil
+        let itemPath = path + [i]
+        // A submenu becomes a nested UIMenu. UIMenu has no disabled state,
+        // so a disabled submenu is shown as a disabled action instead.
+        if i < level.isSubmenu.count, level.isSubmenu[i], isEnabled {
+          let childLevel = (i < level.submenus.count ? level.submenus[i] : nil)
+            .map { PopupMenuLevel(dict: $0) } ?? PopupMenuLevel()
+          current.append(UIMenu(
+            title: title,
+            subtitle: subtitle,
+            image: image,
+            children: buildMenuItems(level: childLevel, path: itemPath)
+          ))
+          continue
         }
-        
-        // Handle custom icon bytes (medium priority)
-        if image == nil, i < self.customIconBytes.count, let data = self.customIconBytes[i] {
-          image = UIImage(data: data, scale: self.iconScale)?.withRenderingMode(.alwaysTemplate)
-          // Apply tint color to custom icon if provided
-          if i < self.customIconColors.count, 
-             let colorNum = self.customIconColors[i] as? NSNumber,
-             !(self.customIconColors[i] is NSNull) {
-            let tintColor = Self.colorFromARGB(colorNum.intValue)
-            image = image?.withTintColor(tintColor, renderingMode: .alwaysOriginal)
-          }
-        }
-        
-        // Handle SF Symbol (lowest priority)
-        if image == nil, i < symbols.count, !symbols[i].isEmpty {
-          image = UIImage(systemName: symbols[i])
-        }
-        if let sizes = defaultSizes, i < sizes.count,
-           let sizeNum = sizes[i] as? NSNumber {
-          let s = CGFloat(truncating: sizeNum)
-          if s > 0, let img = image { image = img.applyingSymbolConfiguration(UIImage.SymbolConfiguration(pointSize: s)) }
-        }
-        // Rendering mode: prefer explicit per-item mode when provided; else fallback to color
-        if i < self.itemModes.count, let mode = self.itemModes[i] {
-          switch mode {
-          case "hierarchical":
-            if #available(iOS 15.0, *), let colors = defaultColors, i < colors.count,
-               let colorNum = colors[i] as? NSNumber {
-              let c = Self.colorFromARGB(colorNum.intValue)
-              if let img = image {
-                let cfg = UIImage.SymbolConfiguration(hierarchicalColor: c)
-                image = img.applyingSymbolConfiguration(cfg)
-              }
-            }
-          case "palette":
-            if #available(iOS 15.0, *), i < self.itemPalettes.count, !self.itemPalettes[i].isEmpty {
-              let cols = self.itemPalettes[i].map { Self.colorFromARGB($0.intValue) }
-              if let img = image {
-                let cfg = UIImage.SymbolConfiguration(paletteColors: cols)
-                image = img.applyingSymbolConfiguration(cfg)
-              }
-            }
-          case "multicolor":
-            if #available(iOS 15.0, *) {
-              if let img = image {
-                let cfg = UIImage.SymbolConfiguration.preferringMulticolor()
-                image = img.applyingSymbolConfiguration(cfg)
-              }
-            }
-          case "monochrome":
-            // Explicit monochrome: use direct tint color if provided
-            if let colors = defaultColors, i < colors.count,
-               let colorNum = colors[i] as? NSNumber {
-              let c = Self.colorFromARGB(colorNum.intValue)
-              if let img = image, #available(iOS 13.0, *) {
-                image = img.withTintColor(c, renderingMode: .alwaysOriginal)
-              }
-            }
-          default:
-            break
-          }
-        } else if let colors = defaultColors, i < colors.count,
-                  let colorNum = colors[i] as? NSNumber {
-          let c = Self.colorFromARGB(colorNum.intValue)
-          if let img = image, #available(iOS 13.0, *) {
-            image = img.withTintColor(c, renderingMode: .alwaysOriginal)
-          }
-        }
-        let isEnabled = i < enabled.count ? enabled[i] : true
-        let isChecked = i < checked.count ? checked[i] : false
-        let destructive = i < self.isDestructive.count ? self.isDestructive[i] : false
         // Compose menu attributes: .destructive paints the label red
         // (system destructive color); .disabled greys it out.
         var attrs: UIMenuElement.Attributes = []
         if !isEnabled { attrs.insert(.disabled) }
         if destructive { attrs.insert(.destructive) }
         let action = UIAction(title: title, image: image, attributes: attrs) { [weak self] _ in
-          self?.channel.invokeMethod("itemSelected", arguments: ["index": i])
+          // `index` is the top-level entry, as before; `path` the full path.
+          self?.channel.invokeMethod("itemSelected", arguments: ["index": itemPath[0], "path": itemPath])
         }
+        action.subtitle = subtitle
         action.state = isChecked ? .on : .off
         current.append(action)
       }
@@ -540,6 +462,150 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       UIMenu(title: "", options: .displayInline, children: group)
     }
     return children
+  }
+
+  /// The icon of entry [i] of [level].
+  /// Priority: imageAsset > customIconBytes > SF Symbol
+  private func menuImage(level: PopupMenuLevel, at i: Int) -> UIImage? {
+    var image: UIImage? = nil
+    // Priority: imageAsset > customIconBytes > SF Symbol
+    
+    // Handle imageAsset (highest priority)
+    if i < level.imageAssetPaths.count, !level.imageAssetPaths[i].isEmpty {
+      let assetPath = level.imageAssetPaths[i]
+      let format = i < level.imageAssetFormats.count ? level.imageAssetFormats[i] : nil
+      let iconColorARGB: Int? = {
+        if i < level.colors.count, let colorNum = level.colors[i] as? NSNumber, !(level.colors[i] is NSNull) {
+          return colorNum.intValue
+        }
+        return nil
+      }()
+      let iconSize: CGFloat? = {
+        if i < level.sizes.count, let sizeNum = level.sizes[i] as? NSNumber {
+          return CGFloat(truncating: sizeNum)
+        }
+        return 18.0
+      }()
+      
+      // Use utility function to load and optionally tint image
+      if let argb = iconColorARGB, #available(iOS 13.0, *) {
+        image = ImageUtils.loadAndTintImage(
+          from: assetPath,
+          iconSize: iconSize,
+          iconColor: argb,
+          providedFormat: format,
+          scale: self.iconScale
+        )
+      } else {
+        let size = CGSize(width: iconSize ?? 18, height: iconSize ?? 18)
+        // Single-colour artwork templates losslessly and picks up the
+        // menu's own colouring; multi-colour artwork keeps its pixels.
+        image = ImageUtils.templatedIfMonochrome(
+          ImageUtils.loadFlutterAsset(assetPath, size: size, format: format, scale: self.iconScale)
+        )
+      }
+    } else if i < level.imageAssetData.count, let data = level.imageAssetData[i] {
+      let format = i < level.imageAssetFormats.count ? level.imageAssetFormats[i] : nil
+      let iconColorARGB: Int? = {
+        if i < level.colors.count, let colorNum = level.colors[i] as? NSNumber, !(level.colors[i] is NSNull) {
+          return colorNum.intValue
+        }
+        return nil
+      }()
+      let iconSize: CGFloat? = {
+        if i < level.sizes.count, let sizeNum = level.sizes[i] as? NSNumber {
+          return CGFloat(truncating: sizeNum)
+        }
+        return 18.0
+      }()
+      
+      // Use utility function to create and optionally tint image
+      if let argb = iconColorARGB, #available(iOS 13.0, *) {
+        image = ImageUtils.createAndTintImage(
+          from: data,
+          iconSize: iconSize,
+          iconColor: argb,
+          providedFormat: format,
+          scale: self.iconScale
+        )
+      } else {
+        let size: CGSize? = iconSize != nil ? CGSize(width: iconSize!, height: iconSize!) : nil
+        // Single-colour artwork templates losslessly and picks up the
+        // menu's own colouring; multi-colour artwork keeps its pixels.
+        image = ImageUtils.templatedIfMonochrome(
+          ImageUtils.createImageFromData(data, format: format, size: size, scale: self.iconScale)
+        )
+      }
+    }
+    
+    // Handle custom icon bytes (medium priority)
+    if image == nil, i < level.customIconBytes.count, let data = level.customIconBytes[i] {
+      image = UIImage(data: data, scale: self.iconScale)?.withRenderingMode(.alwaysTemplate)
+      // Apply tint color to custom icon if provided
+      if i < level.customIconColors.count, 
+         let colorNum = level.customIconColors[i] as? NSNumber,
+         !(level.customIconColors[i] is NSNull) {
+        let tintColor = Self.colorFromARGB(colorNum.intValue)
+        image = image?.withTintColor(tintColor, renderingMode: .alwaysOriginal)
+      }
+    }
+    
+    // Handle SF Symbol (lowest priority)
+    if image == nil, i < level.symbols.count, !level.symbols[i].isEmpty {
+      image = UIImage(systemName: level.symbols[i])
+    }
+    if i < level.sizes.count,
+       let sizeNum = level.sizes[i] as? NSNumber {
+      let s = CGFloat(truncating: sizeNum)
+      if s > 0, let img = image { image = img.applyingSymbolConfiguration(UIImage.SymbolConfiguration(pointSize: s)) }
+    }
+    // Rendering mode: prefer explicit per-item mode when provided; else fallback to color
+    if i < level.modes.count, let mode = level.modes[i] {
+      switch mode {
+      case "hierarchical":
+        if #available(iOS 15.0, *), i < level.colors.count,
+           let colorNum = level.colors[i] as? NSNumber {
+          let c = Self.colorFromARGB(colorNum.intValue)
+          if let img = image {
+            let cfg = UIImage.SymbolConfiguration(hierarchicalColor: c)
+            image = img.applyingSymbolConfiguration(cfg)
+          }
+        }
+      case "palette":
+        if #available(iOS 15.0, *), i < level.palettes.count, !level.palettes[i].isEmpty {
+          let cols = level.palettes[i].map { Self.colorFromARGB($0.intValue) }
+          if let img = image {
+            let cfg = UIImage.SymbolConfiguration(paletteColors: cols)
+            image = img.applyingSymbolConfiguration(cfg)
+          }
+        }
+      case "multicolor":
+        if #available(iOS 15.0, *) {
+          if let img = image {
+            let cfg = UIImage.SymbolConfiguration.preferringMulticolor()
+            image = img.applyingSymbolConfiguration(cfg)
+          }
+        }
+      case "monochrome":
+        // Explicit monochrome: use direct tint color if provided
+        if i < level.colors.count,
+           let colorNum = level.colors[i] as? NSNumber {
+          let c = Self.colorFromARGB(colorNum.intValue)
+          if let img = image, #available(iOS 13.0, *) {
+            image = img.withTintColor(c, renderingMode: .alwaysOriginal)
+          }
+        }
+      default:
+        break
+      }
+    } else if i < level.colors.count,
+              let colorNum = level.colors[i] as? NSNumber {
+      let c = Self.colorFromARGB(colorNum.intValue)
+      if let img = image, #available(iOS 13.0, *) {
+        image = img.withTintColor(c, renderingMode: .alwaysOriginal)
+      }
+    }
+    return image
   }
 
   @objc private func onButtonPressedLegacy(_ sender: UIButton) {
@@ -802,5 +868,58 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         }
       }
     }
+  }
+}
+
+/// One level of the popup menu: the parallel arrays Flutter sends for a list
+/// of entries (one slot per item, submenu or divider), and each submenu's own
+/// level in `submenus`.
+private struct PopupMenuLevel {
+  var labels: [String] = []
+  var symbols: [String] = []
+  var customIconBytes: [Data?] = []
+  var customIconColors: [Any] = []
+  var imageAssetPaths: [String] = []
+  var imageAssetData: [Data?] = []
+  var imageAssetFormats: [String] = []
+  var dividers: [Bool] = []
+  var enabled: [Bool] = []
+  var checked: [Bool] = []
+  var isDestructive: [Bool] = []
+  var sizes: [Any] = []
+  var colors: [Any] = []
+  var modes: [String?] = []
+  var palettes: [[NSNumber]] = []
+  var subtitles: [String] = []
+  var isSubmenu: [Bool] = []
+  var submenus: [[String: Any]?] = []
+
+  init() {}
+
+  /// Reads a level encoded by `encodePopupMenuEntries`, with the same keys
+  /// and types as the top level.
+  init(dict: [String: Any]) {
+    labels = (dict["labels"] as? [String]) ?? []
+    symbols = (dict["sfSymbols"] as? [String]) ?? []
+    if let bytesArray = dict["customIconBytes"] as? [FlutterStandardTypedData?] {
+      customIconBytes = bytesArray.map { $0?.data }
+    }
+    customIconColors = (dict["customIconColors"] as? [Any]) ?? []
+    imageAssetPaths = (dict["imageAssetPaths"] as? [String]) ?? []
+    if let bytesArray = dict["imageAssetData"] as? [FlutterStandardTypedData?] {
+      imageAssetData = bytesArray.map { $0?.data }
+    }
+    imageAssetFormats = (dict["imageAssetFormats"] as? [String]) ?? []
+    dividers = ((dict["isDivider"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    enabled = ((dict["enabled"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    checked = ((dict["checked"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    isDestructive = ((dict["isDestructive"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    sizes = (dict["sfSymbolSizes"] as? [Any]) ?? []
+    colors = (dict["sfSymbolColors"] as? [Any]) ?? []
+    modes = (dict["sfSymbolRenderingModes"] as? [String?]) ?? []
+    palettes = (dict["sfSymbolPaletteColors"] as? [[NSNumber]]) ?? []
+    subtitles = (dict["subtitles"] as? [String]) ?? []
+    isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
   }
 }

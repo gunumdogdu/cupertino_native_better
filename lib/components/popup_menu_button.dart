@@ -8,6 +8,7 @@ import '../style/button_style.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/popup_menu_encoder.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
@@ -23,6 +24,7 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
   /// Creates a selectable popup menu item.
   const CNPopupMenuItem({
     required this.label,
+    this.subtitle,
     this.icon,
     this.customIcon,
     this.imageAsset,
@@ -34,6 +36,12 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
 
   /// Display label for the item.
   final String label;
+
+  /// Optional second line shown under the [label].
+  ///
+  /// `UIAction.subtitle` on iOS, `NSMenuItem.subtitle` on macOS 14.4+, and a
+  /// smaller second line in the `CupertinoActionSheet` fallback.
+  final String? subtitle;
 
   /// Optional SF Symbol shown before the label.
   /// Priority: [imageAsset] > [customIcon] > [icon]
@@ -73,6 +81,62 @@ class CNPopupMenuDivider extends CNPopupMenuEntry {
   const CNPopupMenuDivider();
 }
 
+/// An entry that opens a nested menu of [items].
+///
+/// On iOS it is a `UIMenu` nested in the button's menu, on macOS an
+/// `NSMenuItem` with a submenu, and in the `CupertinoActionSheet` fallback a
+/// row that opens a second sheet. Submenus can contain submenus.
+///
+/// Selecting an item inside it calls [CNPopupMenuButton.onPathSelected] with
+/// the item's full path, and [CNPopupMenuButton.onSelected] with the index of
+/// the top-level entry the item is under.
+class CNPopupMenuSubmenu extends CNPopupMenuEntry {
+  /// Creates an entry that opens a nested menu.
+  const CNPopupMenuSubmenu({
+    required this.label,
+    required this.items,
+    this.subtitle,
+    this.icon,
+    this.customIcon,
+    this.imageAsset,
+    this.iconColor,
+    this.enabled = true,
+  });
+
+  /// Display label for the submenu entry, also used as the nested menu's
+  /// title.
+  final String label;
+
+  /// Entries of the nested menu: items, dividers and further submenus.
+  final List<CNPopupMenuEntry> items;
+
+  /// Optional second line shown under the [label].
+  ///
+  /// `UIMenu.subtitle` on iOS, `NSMenuItem.subtitle` on macOS 14.4+, and a
+  /// smaller second line in the `CupertinoActionSheet` fallback.
+  final String? subtitle;
+
+  /// Optional SF Symbol shown before the label.
+  /// Priority: [imageAsset] > [customIcon] > [icon]
+  final CNSymbol? icon;
+
+  /// Optional custom icon from CupertinoIcons, Icons, or any IconData.
+  /// If provided, this takes precedence over [icon] but not [imageAsset].
+  final IconData? customIcon;
+
+  /// Optional image asset (SVG, PNG, etc.) shown before the label.
+  /// If provided, this takes precedence over [icon] and [customIcon].
+  final CNImageAsset? imageAsset;
+
+  /// Optional color for custom icons. This applies a tint color to the custom icon.
+  /// For SF Symbols, use the [icon]'s color parameter instead.
+  final Color? iconColor;
+
+  /// Whether the nested menu can be opened. A disabled submenu is shown
+  /// greyed out, like a disabled item.
+  final bool enabled;
+}
+
 // Reusable style enum for buttons across widgets (popup menu, future CNButton, ...)
 
 /// A Cupertino-native popup menu button.
@@ -84,7 +148,8 @@ class CNPopupMenuButton extends StatefulWidget {
     super.key,
     required this.buttonLabel,
     required this.items,
-    required this.onSelected,
+    this.onSelected,
+    this.onPathSelected,
     this.tint,
     this.height = 32.0,
     this.shrinkWrap = false,
@@ -97,7 +162,11 @@ class CNPopupMenuButton extends StatefulWidget {
        buttonCustomIconColor = null,
        buttonImageAsset = null,
        width = null,
-       round = false;
+       round = false,
+       assert(
+         onSelected != null || onPathSelected != null,
+         'CNPopupMenuButton needs onSelected or onPathSelected.',
+       );
 
   /// Creates a round, icon-only popup menu button.
   CNPopupMenuButton.icon({
@@ -107,7 +176,8 @@ class CNPopupMenuButton extends StatefulWidget {
     this.buttonCustomIconColor,
     this.buttonImageAsset,
     required this.items,
-    required this.onSelected,
+    this.onSelected,
+    this.onPathSelected,
     this.tint,
     double size = 44.0, // button diameter (width = height)
     this.buttonStyle = CNButtonStyle.glass,
@@ -125,6 +195,10 @@ class CNPopupMenuButton extends StatefulWidget {
           buttonCustomIcon != null ||
           buttonImageAsset != null,
       'At least one of buttonIcon, buttonCustomIcon, or buttonImageAsset must be provided',
+    );
+    assert(
+      onSelected != null || onPathSelected != null,
+      'CNPopupMenuButton.icon needs onSelected or onPathSelected.',
     );
   }
 
@@ -156,8 +230,26 @@ class CNPopupMenuButton extends StatefulWidget {
   /// Entries that populate the popup menu.
   final List<CNPopupMenuEntry> items;
 
-  /// Called with the selected index when the user makes a selection.
-  final ValueChanged<int> onSelected;
+  /// Called with the index in [items] of the selected entry, dividers
+  /// included.
+  ///
+  /// For an item inside a [CNPopupMenuSubmenu], the index is the one of the
+  /// top-level entry it is under, so `items[index]` can be a
+  /// [CNPopupMenuSubmenu]. Use [onPathSelected] to know which item was
+  /// selected in a submenu.
+  ///
+  /// At least one of [onSelected] and [onPathSelected] must be set. When
+  /// both are, both are called for every selection.
+  final ValueChanged<int>? onSelected;
+
+  /// Called with the path to the selected item, for every selection.
+  ///
+  /// Each step is an index in a list of entries, dividers included: `[3]`
+  /// is `items[3]`, and `[2, 1]` the second entry of the submenu at
+  /// `items[2]`. A path always ends on a [CNPopupMenuItem].
+  ///
+  /// Required when [items] contain a [CNPopupMenuSubmenu].
+  final ValueChanged<List<int>>? onPathSelected;
 
   /// Tint color for the control.
   final Color? tint;
@@ -225,6 +317,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   Offset? _downPosition;
   bool _pressed = false;
 
+  /// Rendered custom icons of the menu entries, by entry, from the last
+  /// [_renderCustomIcons]. `setItems` sends the submenus' ones again.
+  Map<CNPopupMenuEntry, Uint8List?> _menuIconBytes = Map.identity();
+
   // Issue #29 halo containment: clip native view while enclosing route is
   // animating. Modal-up containment is now handled by ModalHideMixin
   // (maybeHiddenPlaceholder + native setInteractive); the legacy modal trigger
@@ -243,9 +339,35 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   }
 
   @override
+  void initState() {
+    super.initState();
+    _debugCheckSubmenuCallback();
+  }
+
+  @override
   void didUpdateWidget(covariant CNPopupMenuButton oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _debugCheckSubmenuCallback();
     _syncPropsToNativeIfNeeded();
+  }
+
+  // The constructors cannot walk `items` (they are const), so the submenu
+  // check runs here.
+  void _debugCheckSubmenuCallback() {
+    assert(
+      widget.onPathSelected != null ||
+          !widget.items.any((e) => e is CNPopupMenuSubmenu),
+      'CNPopupMenuButton has a CNPopupMenuSubmenu but no onPathSelected: '
+      'onSelected only reports the index of the submenu, not which of its '
+      'items was selected.',
+    );
+  }
+
+  /// Reports a selection at [path] to the callbacks that are set.
+  void _dispatchSelection(List<int> path) {
+    if (path.isEmpty) return;
+    widget.onSelected?.call(path.first);
+    widget.onPathSelected?.call(List<int>.unmodifiable(path));
   }
 
   @override
@@ -355,12 +477,12 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     // Check if we need to render custom icons or image assets
     final hasCustomButtonIcon = widget.buttonCustomIcon != null;
     final hasButtonImageAsset = widget.buttonImageAsset != null;
-    final hasCustomMenuIcons = widget.items.any(
-      (e) => e is CNPopupMenuItem && e.customIcon != null,
-    );
-    final hasMenuImageAssets = widget.items.any(
-      (e) => e is CNPopupMenuItem && e.imageAsset != null,
-    );
+    final hasCustomMenuIcons = walkPopupMenuEntries(
+      widget.items,
+    ).any((e) => popupMenuEntryVisual(e)?.customIcon != null);
+    final hasMenuImageAssets = walkPopupMenuEntries(
+      widget.items,
+    ).any((e) => popupMenuEntryVisual(e)?.imageAsset != null);
 
     if (hasCustomButtonIcon ||
         hasCustomMenuIcons ||
@@ -369,10 +491,11 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       // Create a key that changes when button or menu icons change
       final buttonIconKey =
           '${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}_${widget.buttonCustomIconColor?.toARGB32() ?? 0}';
-      final menuIconsKey = widget.items
+      final menuIconsKey = walkPopupMenuEntries(widget.items)
           .map((e) {
-            if (e is CNPopupMenuItem) {
-              return '${e.imageAsset?.assetPath}_${e.imageAsset?.imageData?.length ?? 0}_${e.customIcon?.hashCode ?? 0}_${e.iconColor?.toARGB32() ?? 0}';
+            final v = popupMenuEntryVisual(e);
+            if (v != null) {
+              return '${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}_${v.iconColor?.toARGB32() ?? 0}';
             }
             return '';
           })
@@ -413,7 +536,9 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
   Future<Map<String, dynamic>> _renderCustomIcons(BuildContext context) async {
     Uint8List? buttonIconBytes;
-    final menuIconBytes = <Uint8List?>[];
+    // By entry rather than by position, so that dividers and submenus cannot
+    // shift an icon onto another entry.
+    final menuIconBytes = Map<CNPopupMenuEntry, Uint8List?>.identity();
 
     // Handle button icon - imageAsset takes precedence over customIcon
     if (widget.buttonImageAsset != null) {
@@ -428,25 +553,17 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     }
 
     // Handle menu item icons - imageAsset takes precedence over customIcon
-    for (final e in widget.items) {
-      if (e is CNPopupMenuDivider) {
-        menuIconBytes.add(null);
-      } else if (e is CNPopupMenuItem) {
-        if (e.imageAsset != null) {
-          // ImageAsset doesn't need async rendering, it's already data
-          menuIconBytes.add(null); // Will be handled in _buildNativePopupMenu
-        } else if (e.customIcon != null) {
-          final bytes = await iconDataToImageBytes(
-            e.customIcon!,
-            size: e.icon?.size ?? 20.0,
-            color: e.iconColor ?? CupertinoColors.label,
-          );
-          menuIconBytes.add(bytes);
-        } else {
-          menuIconBytes.add(null);
-        }
-      }
+    // (an image asset doesn't need async rendering, it's already data)
+    for (final e in walkPopupMenuEntries(widget.items)) {
+      final v = popupMenuEntryVisual(e);
+      if (v == null || v.imageAsset != null || v.customIcon == null) continue;
+      menuIconBytes[e] = await iconDataToImageBytes(
+        v.customIcon!,
+        size: v.icon?.size ?? 20.0,
+        color: v.iconColor ?? CupertinoColors.label,
+      );
     }
+    _menuIconBytes = menuIconBytes;
 
     return {'buttonIconBytes': buttonIconBytes, 'menuIconBytes': menuIconBytes};
   }
@@ -469,33 +586,6 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final capturedButtonPaletteColors = widget.buttonIcon?.paletteColors
         ?.map((c) => resolveColorToArgb(c, context))
         .toList();
-    // Pre-capture menu item colors
-    final capturedMenuItemColors = <int?>[];
-    final capturedMenuItemIconColors = <int?>[];
-    final capturedMenuItemPalettes = <List<int?>?>[];
-    for (final item in widget.items) {
-      if (item is CNPopupMenuItem) {
-        capturedMenuItemIconColors.add(
-          resolveColorToArgb(item.iconColor, context),
-        );
-        capturedMenuItemColors.add(
-          resolveColorToArgb(
-            item.imageAsset?.color ?? item.icon?.color,
-            context,
-          ),
-        );
-        capturedMenuItemPalettes.add(
-          item.icon?.paletteColors
-              ?.map((c) => resolveColorToArgb(c, context))
-              .toList(),
-        );
-      } else {
-        capturedMenuItemIconColors.add(null);
-        capturedMenuItemColors.add(null);
-        capturedMenuItemPalettes.add(null);
-      }
-    }
-
     // Resolve button image asset path if present
     String? resolvedButtonAssetPath;
     if (widget.buttonImageAsset != null &&
@@ -506,99 +596,31 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     }
     if (!mounted) return const SizedBox();
 
-    // Resolve menu item image assets concurrently
-    final resolvedMenuPaths = await Future.wait(
-      widget.items.map((e) async {
-        if (e is CNPopupMenuItem && e.imageAsset != null) {
-          return await resolveAssetPathForPixelRatio(e.imageAsset!.assetPath);
+    // Resolve menu image assets concurrently, submenus included
+    final menuAssetPaths = Map<CNPopupMenuEntry, String>.identity();
+    await Future.wait(
+      walkPopupMenuEntries(widget.items).map((e) async {
+        final asset = popupMenuEntryVisual(e)?.imageAsset;
+        if (asset != null) {
+          menuAssetPaths[e] = await resolveAssetPathForPixelRatio(
+            asset.assetPath,
+          );
         }
-        return null;
       }),
     );
     if (!mounted) return const SizedBox();
 
     final buttonIconBytes = customIconData?['buttonIconBytes'] as Uint8List?;
     final menuIconBytes =
-        customIconData?['menuIconBytes'] as List<Uint8List?>? ?? [];
+        customIconData?['menuIconBytes'] as Map<CNPopupMenuEntry, Uint8List?>?;
 
     // Flatten entries into parallel arrays for the platform view.
-    final labels = <String>[];
-    final symbols = <String>[];
-    final customIconBytesArray = <Uint8List?>[];
-    final customIconColors = <int?>[];
-    final imageAssetPaths = <String>[];
-    final imageAssetData = <Uint8List?>[];
-    final imageAssetFormats = <String>[];
-    final isDivider = <bool>[];
-    final enabled = <bool>[];
-    final checked = <bool>[];
-    final isDestructive = <bool>[];
-    final sizes = <double?>[];
-    final colors = <int?>[];
-    final modes = <String?>[];
-    final palettes = <List<int?>?>[];
-    final gradients = <bool?>[];
-
-    var menuIconIndex = 0;
-    for (var i = 0; i < widget.items.length; i++) {
-      final e = widget.items[i];
-      if (e is CNPopupMenuDivider) {
-        labels.add('');
-        symbols.add('');
-        customIconBytesArray.add(null);
-        customIconColors.add(null);
-        imageAssetPaths.add('');
-        imageAssetData.add(null);
-        imageAssetFormats.add('');
-        isDivider.add(true);
-        enabled.add(false);
-        checked.add(false);
-        isDestructive.add(false);
-        sizes.add(null);
-        colors.add(null);
-        modes.add(null);
-        palettes.add(null);
-        gradients.add(null);
-      } else if (e is CNPopupMenuItem) {
-        labels.add(e.label);
-        symbols.add(e.icon?.name ?? '');
-        customIconBytesArray.add(
-          menuIconIndex < menuIconBytes.length
-              ? menuIconBytes[menuIconIndex]
-              : null,
-        );
-        customIconColors.add(capturedMenuItemIconColors[i]);
-
-        // Handle imageAsset for menu items
-        if (e.imageAsset != null) {
-          // Use pre-resolved path
-          final resolvedPath = resolvedMenuPaths[i]!;
-          imageAssetPaths.add(resolvedPath);
-          imageAssetData.add(e.imageAsset!.imageData);
-          // Auto-detect format if not provided (use resolved path)
-          imageAssetFormats.add(
-            e.imageAsset!.imageFormat ??
-                detectImageFormat(resolvedPath, e.imageAsset!.imageData) ??
-                '',
-          );
-        } else {
-          imageAssetPaths.add('');
-          imageAssetData.add(null);
-          imageAssetFormats.add('');
-        }
-
-        isDivider.add(false);
-        enabled.add(e.enabled);
-        checked.add(e.checked);
-        isDestructive.add(e.isDestructive);
-        sizes.add(e.imageAsset?.size ?? e.icon?.size);
-        colors.add(capturedMenuItemColors[i]);
-        modes.add(e.imageAsset?.mode?.name ?? e.icon?.mode?.name);
-        palettes.add(capturedMenuItemPalettes[i]);
-        gradients.add(e.imageAsset?.gradient ?? e.icon?.gradient);
-        menuIconIndex++;
-      }
-    }
+    final menu = encodePopupMenuEntries(
+      widget.items,
+      resolveColor: (c) => resolveColorToArgb(c, context),
+      customIconBytes: menuIconBytes ?? const {},
+      assetPaths: menuAssetPaths,
+    );
 
     final creationParams = <String, dynamic>{
       if (widget.buttonLabel != null) 'buttonTitle': widget.buttonLabel,
@@ -625,22 +647,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         'buttonIconColor': capturedButtonIconColor,
       if (widget.isIconButton) 'round': true,
       'buttonStyle': widget.buttonStyle.name,
-      'labels': labels,
-      'sfSymbols': symbols,
-      'customIconBytes': customIconBytesArray,
-      'customIconColors': customIconColors,
-      'imageAssetPaths': imageAssetPaths,
-      'imageAssetData': imageAssetData,
-      'imageAssetFormats': imageAssetFormats,
-      'isDivider': isDivider,
-      'enabled': enabled,
-      'checked': checked,
-      'isDestructive': isDestructive,
-      'sfSymbolSizes': sizes,
-      'sfSymbolColors': colors,
-      'sfSymbolRenderingModes': modes,
-      'sfSymbolPaletteColors': palettes,
-      'sfSymbolGradientEnabled': gradients,
+      ...menu,
       'isDark': capturedIsDark,
       'style': capturedStyle,
       if (widget.buttonIcon?.mode != null)
@@ -655,10 +662,11 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     // Create a comprehensive key that includes all parameters affecting platform view creation
     final buttonIconKey =
         '${widget.buttonLabel}_${widget.buttonIcon?.name}_${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}';
-    final itemsKey = widget.items
+    final itemsKey = walkPopupMenuEntries(widget.items)
         .map((e) {
-          if (e is CNPopupMenuItem) {
-            return '${e.label}_${e.icon?.name}_${e.imageAsset?.assetPath}_${e.imageAsset?.imageData?.length ?? 0}_${e.customIcon?.hashCode ?? 0}';
+          final v = popupMenuEntryVisual(e);
+          if (v != null) {
+            return '${v.label}_${v.icon?.name}_${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}';
           }
           return 'divider';
         })
@@ -766,7 +774,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     if (call.method == 'itemSelected') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
-      if (idx != null) widget.onSelected(idx);
+      final path = (args?['path'] as List?)
+          ?.map((step) => (step as num).toInt())
+          .toList();
+      _dispatchSelection(path ?? [?idx]);
     }
     return null;
   }
@@ -787,75 +798,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final ch = _channel;
     if (ch == null) return;
     // Prepare popup items upfront to avoid using BuildContext after awaits.
-    final updLabels = <String>[];
-    final updSymbols = <String>[];
-    final updIsDivider = <bool>[];
-    final updEnabled = <bool>[];
-    final updChecked = <bool>[];
-    final updIsDestructive = <bool>[];
-    final updSizes = <double?>[];
-    final updColors = <int?>[];
-    final updModes = <String?>[];
-    final updPalettes = <List<int?>?>[];
-    final updGradients = <bool?>[];
-    final updImageAssetPaths = <String>[];
-    final updImageAssetData = <Uint8List?>[];
-    final updImageAssetFormats = <String>[];
-    for (final e in widget.items) {
-      if (e is CNPopupMenuDivider) {
-        updLabels.add('');
-        updSymbols.add('');
-        updIsDivider.add(true);
-        updEnabled.add(false);
-        updChecked.add(false);
-        updIsDestructive.add(false);
-        updSizes.add(null);
-        updColors.add(null);
-        updModes.add(null);
-        updPalettes.add(null);
-        updGradients.add(null);
-        updImageAssetPaths.add('');
-        updImageAssetData.add(null);
-        updImageAssetFormats.add('');
-      } else if (e is CNPopupMenuItem) {
-        updLabels.add(e.label);
-        updSymbols.add(e.icon?.name ?? '');
-        updIsDivider.add(false);
-        updEnabled.add(e.enabled);
-        updChecked.add(e.checked);
-        updIsDestructive.add(e.isDestructive);
-        updSizes.add(e.imageAsset?.size ?? e.icon?.size);
-        updColors.add(
-          resolveColorToArgb(e.imageAsset?.color ?? e.icon?.color, context),
-        );
-        updModes.add(e.imageAsset?.mode?.name ?? e.icon?.mode?.name);
-        updPalettes.add(
-          e.icon?.paletteColors
-              ?.map((c) => resolveColorToArgb(c, context))
-              .toList(),
-        );
-        updGradients.add(e.imageAsset?.gradient ?? e.icon?.gradient);
-
-        // Handle imageAsset for menu items
-        if (e.imageAsset != null) {
-          updImageAssetPaths.add(e.imageAsset!.assetPath);
-          updImageAssetData.add(e.imageAsset!.imageData);
-          // Auto-detect format if not provided
-          updImageAssetFormats.add(
-            e.imageAsset!.imageFormat ??
-                detectImageFormat(
-                  e.imageAsset!.assetPath,
-                  e.imageAsset!.imageData,
-                ) ??
-                '',
-          );
-        } else {
-          updImageAssetPaths.add('');
-          updImageAssetData.add(null);
-          updImageAssetFormats.add('');
-        }
-      }
-    }
+    // Image asset paths are sent unresolved, as `setItems` always did.
+    final updItems = encodePopupMenuEntries(
+      widget.items,
+      resolveColor: (c) => resolveColorToArgb(c, context),
+      customIconBytes: _menuIconBytes,
+      includeCustomIcons: false,
+    );
     // Capture context-dependent values before any awaits
     final tint = resolveColorToArgb(_effectiveTint, context);
     final preIconName = widget.buttonIcon?.name;
@@ -947,22 +896,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       }
     }
 
-    await ch.invokeMethod('setItems', {
-      'labels': updLabels,
-      'sfSymbols': updSymbols,
-      'isDivider': updIsDivider,
-      'enabled': updEnabled,
-      'checked': updChecked,
-      'isDestructive': updIsDestructive,
-      'sfSymbolSizes': updSizes,
-      'sfSymbolColors': updColors,
-      'sfSymbolRenderingModes': updModes,
-      'sfSymbolPaletteColors': updPalettes,
-      'sfSymbolGradientEnabled': updGradients,
-      'imageAssetPaths': updImageAssetPaths,
-      'imageAssetData': updImageAssetData,
-      'imageAssetFormats': updImageAssetFormats,
-    });
+    await ch.invokeMethod('setItems', updItems);
 
     if (_lastSemanticLabel != widget.semanticLabel) {
       _lastSemanticLabel = widget.semanticLabel;
@@ -1012,6 +946,87 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     return _buildCupertinoFallbackButton(context);
   }
 
+  /// Shows [entries] in a `CupertinoActionSheet` and returns the path to the
+  /// selected item, opening a further sheet for each submenu on the way.
+  /// Returns null when the user cancels.
+  Future<List<int>?> _showFallbackSheet(
+    BuildContext context,
+    List<CNPopupMenuEntry> entries, {
+    String? title,
+  }) async {
+    final selected = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (ctx) {
+        return CupertinoActionSheet(
+          title: title != null ? Text(title) : null,
+          actions: [
+            for (var i = 0; i < entries.length; i++)
+              if (entries[i] case final CNPopupMenuItem item)
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.of(ctx).pop(i),
+                  isDestructiveAction: item.isDestructive,
+                  child: _fallbackLabel(ctx, item.label, item.subtitle),
+                )
+              else if (entries[i] case final CNPopupMenuSubmenu submenu)
+                CupertinoActionSheetAction(
+                  onPressed: () => Navigator.of(ctx).pop(i),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: _fallbackLabel(
+                          ctx,
+                          submenu.label,
+                          submenu.subtitle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(CupertinoIcons.chevron_forward, size: 16),
+                    ],
+                  ),
+                )
+              else
+                const SizedBox(height: 8),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(ctx).pop(),
+            isDefaultAction: true,
+            child: const Text('Cancel'),
+          ),
+        );
+      },
+    );
+    if (selected == null) return null;
+    final entry = entries[selected];
+    if (entry is! CNPopupMenuSubmenu) return [selected];
+    if (!context.mounted) return null;
+    final rest = await _showFallbackSheet(
+      context,
+      entry.items,
+      title: entry.label,
+    );
+    return rest == null ? null : [selected, ...rest];
+  }
+
+  /// An action sheet row's label, with the [subtitle] as a smaller second
+  /// line when there is one.
+  Widget _fallbackLabel(BuildContext context, String label, String? subtitle) {
+    if (subtitle == null || subtitle.isEmpty) return Text(label);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 13,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildCupertinoFallbackButton(BuildContext context) {
     return SizedBox(
       height: widget.height,
@@ -1023,34 +1038,12 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
             ? const EdgeInsets.all(4)
             : const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         onPressed: () async {
-          final selected = await showCupertinoModalPopup<int>(
-            context: context,
-            builder: (ctx) {
-              return CupertinoActionSheet(
-                title: widget.buttonLabel != null
-                    ? Text(widget.buttonLabel!)
-                    : null,
-                actions: [
-                  for (var i = 0; i < widget.items.length; i++)
-                    if (widget.items[i] is CNPopupMenuItem)
-                      CupertinoActionSheetAction(
-                        onPressed: () => Navigator.of(ctx).pop(i),
-                        isDestructiveAction:
-                            (widget.items[i] as CNPopupMenuItem).isDestructive,
-                        child: Text((widget.items[i] as CNPopupMenuItem).label),
-                      )
-                    else
-                      const SizedBox(height: 8),
-                ],
-                cancelButton: CupertinoActionSheetAction(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  isDefaultAction: true,
-                  child: const Text('Cancel'),
-                ),
-              );
-            },
+          final path = await _showFallbackSheet(
+            context,
+            widget.items,
+            title: widget.buttonLabel,
           );
-          if (selected != null) widget.onSelected(selected);
+          if (path != null) _dispatchSelection(path);
         },
         child: widget.isIconButton
             ? (widget.buttonIcon != null
