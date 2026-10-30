@@ -268,6 +268,11 @@ class CNPopupMenuButton extends StatefulWidget {
   /// By default (false), iOS native behavior keeps the first item closest to
   /// the button. When the menu opens upward, this means item 1 appears at the
   /// bottom. Set to true to always display items 1,2,3,4 from top to bottom.
+  ///
+  /// On iOS 16+ this uses the system's fixed menu order
+  /// (`preferredMenuElementOrder = .fixed`), which also keeps the order of
+  /// submenus. On iOS 15 the top-level items are reversed when the button is
+  /// in the lower part of the screen; submenus keep the system order there.
   final bool preserveTopToBottomOrder;
 
   /// When true (default), destroys the native popup menu's PlatformView while a

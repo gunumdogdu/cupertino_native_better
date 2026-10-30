@@ -379,6 +379,14 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     if #available(iOS 14.0, *) {
       // If preserveTopToBottomOrder is enabled, use deferred menu to check position at display time
       if preserveTopToBottomOrder {
+        // iOS 16+ keeps the given order itself, whichever way the menu
+        // opens, submenus included. The reversal below only reaches the
+        // top level, so a submenu opened upward showed its items reversed.
+        if #available(iOS 16.0, *) {
+          button.preferredMenuElementOrder = .fixed
+          button.menu = UIMenu(title: "", children: buildMenuItems(level: rootLevel))
+          return
+        }
         let deferredElement = UIDeferredMenuElement.uncached { [weak self] completion in
           guard let self = self else { completion([]); return }
           let items = self.buildMenuItems(level: self.rootLevel)
