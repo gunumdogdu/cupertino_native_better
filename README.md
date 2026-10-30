@@ -160,7 +160,7 @@ This approach works reliably in **both debug and release builds**.
 | `CNFoldable` | iPhone Duo hinge (status + angle), vertical-bar side, fold and camera regions | - |
 | `CNSlider` | Native slider with min/max range and step support | `CNSliderController` |
 | `CNSwitch` | Native toggle switch with animated state changes | `CNSwitchController` |
-| `CNPopupMenuButton` | Native popup menu with dividers, icons, and image assets | - |
+| `CNPopupMenuButton` | Native popup menu with dividers, icons, image assets, subtitles and submenus | - |
 | `CNPopupMenuButton.icon` | Circular icon-only popup menu variant | - |
 | `CNActionSheet` | Native `UIAlertController` action sheet with destructive styling | - |
 | `CNAlert` | Native `UIAlertController` alert with text fields and destructive styling | - |
@@ -791,6 +791,42 @@ CNPopupMenuButton.icon(
   onSelected: (index) {},
 )
 ```
+
+#### Subtitles and submenus
+
+`subtitle` adds a second line under an item's label. `CNPopupMenuSubmenu` opens a nested menu, and can itself contain submenus. On iOS they are the system's `UIAction.subtitle` and nested `UIMenu`; on macOS `NSMenuItem.subtitle` (macOS 14.4+) and `NSMenuItem.submenu`; the `CupertinoActionSheet` fallback shows the subtitle as a smaller line and opens each submenu as a second sheet.
+
+```dart
+CNPopupMenuButton(
+  buttonLabel: 'Actions',
+  items: const [
+    CNPopupMenuItem(label: 'Rename', subtitle: 'Also renames the file'),
+    CNPopupMenuDivider(),
+    CNPopupMenuSubmenu(
+      label: 'Export',
+      subtitle: '3 formats',
+      icon: CNSymbol('square.and.arrow.up'),
+      items: [
+        CNPopupMenuItem(label: 'PDF'),
+        CNPopupMenuSubmenu(
+          label: 'Spreadsheet',
+          items: [
+            CNPopupMenuItem(label: 'CSV'),
+            CNPopupMenuItem(label: 'Numbers'),
+          ],
+        ),
+      ],
+    ),
+  ],
+  onPathSelected: (path) {
+    // [0]       → Rename
+    // [2, 0]    → Export › PDF
+    // [2, 1, 0] → Export › Spreadsheet › CSV
+  },
+)
+```
+
+`onPathSelected` is called for every selection with the path to the selected item: one index per level, dividers included, as in `onSelected`. `onSelected` still gets an index in `items`; for an item inside a submenu, that is the index of the top-level submenu it is under. At least one of the two callbacks is required, and `onPathSelected` is required as soon as `items` contain a submenu. When both are set, both are called.
 
 ### Action Sheet
 

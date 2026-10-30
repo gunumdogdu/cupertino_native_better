@@ -1,3 +1,30 @@
+## Unreleased
+
+> Minor: subtitles and submenus in `CNPopupMenuButton`, through `CNPopupMenuItem.subtitle`, a new `CNPopupMenuSubmenu` entry and a new `onPathSelected` callback; `onSelected` becomes optional. Nothing changes for menus that do not use them.
+
+### Added — subtitles and submenus in `CNPopupMenuButton`
+
+- **`CNPopupMenuItem.subtitle`** shows a second line under the label: `UIAction.subtitle` on iOS, `NSMenuItem.subtitle` on macOS 14.4+, a smaller line in the `CupertinoActionSheet` fallback.
+- **`CNPopupMenuSubmenu`** opens a nested menu of `items`, which can hold further submenus. It takes the same label, subtitle, icon and `enabled` options as an item. It is a nested `UIMenu` on iOS and an `NSMenuItem.submenu` on macOS; the fallback opens it as a second action sheet. `UIMenu` has no disabled state, so a disabled submenu is shown as a disabled action and cannot be opened.
+- **`onPathSelected(List<int> path)`** is called for every selection with the path to the selected item, one index per level, dividers included: `[3]` for `items[3]`, `[2, 1]` for the second entry of the submenu at `items[2]`.
+- **`onSelected` is now optional.** It keeps its index, and for an item inside a submenu it gets the index of the top-level submenu it is under, so every selection reaches whichever callback is set. A debug assertion requires at least one of the two callbacks, and another one `onPathSelected` when `items` contain a submenu, since `onSelected` alone cannot tell which of its items was chosen.
+
+Verified on the simulator (iPhone 17, iOS 26.0) and on macOS 26.2: subtitles, nested submenus, a disabled submenu, and the values both callbacks receive.
+
+The platform channel only gains keys: a level that uses no subtitle and no submenu is encoded to exactly the arrays it was before (covered by a test), and `itemSelected` still carries `index`, now with `path` beside it. Entries are now encoded by one recursive function, `encodePopupMenuEntries`, shared by creation and `setItems`, which also builds each submenu's level.
+
+### Changed — `preserveTopToBottomOrder` uses the system's fixed order on iOS 16+
+
+`preserveTopToBottomOrder` reversed the top-level items itself when the button sat in the lower 60 % of the screen, so that a menu opening upward still read 1, 2, 3 from the top. That reversal cannot reach a submenu: opened from a button at the bottom of the screen, its items showed in reverse. On iOS 16+ the option now sets `preferredMenuElementOrder = .fixed`, which keeps the given order whichever way the menu opens, submenus included; the top level reads the same as before. On iOS 15 the reversal is unchanged.
+
+### Fixed — a `customIcon` after a divider showed another item's icon
+
+The rendered custom icons were collected with one slot per entry, dividers included, but read back with a counter that only counted items. After the first divider every item read the slot before its own: the icon of the previous item, or the divider's empty one. The icons are now looked up by entry, which submenus needed anyway.
+
+### Example
+
+- New Testing screen: *PopupMenu subtitles & submenus*, with nested and disabled submenus, a custom icon after a divider, and a log of both callbacks.
+
 ## 1.8.2
 
 > Patch: three `CNTabBar` fixes (#82, #103, #104) and one addition (#105, `CNTabBarItem.dotBadge`). Nothing changes for bars that do not use a custom label font, image assets in the fallback, items that change at launch, or dot badges.

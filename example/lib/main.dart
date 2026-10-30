@@ -53,6 +53,7 @@ import 'demos/pr84_system_brightness_test.dart';
 import 'demos/pr85_tabbar_icon_precache_test.dart';
 import 'demos/pr87_tabbar_selection_after_sheet_test.dart';
 import 'demos/issue55_popup_menu_destructive_test.dart';
+import 'demos/popup_menu_submenus_test.dart';
 import 'demos/pr42_tabbar_iconsize_customicon_test.dart';
 import 'demos/issue33_svg_tabbar_test.dart';
 import 'demos/stack_positioned_tabbar_test.dart';
@@ -865,6 +866,20 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Issue55PopupMenuDestructiveTest(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('PopupMenu subtitles & submenus'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('list.bullet.indent', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const PopupMenuSubmenusTest(),
                       ),
                     );
                   },
