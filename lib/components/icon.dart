@@ -116,7 +116,14 @@ class _CNIconState extends State<CNIcon> {
 
     if (!PlatformViewGuard.isReady) {
       PlatformViewGuard.ensureScheduled();
-      return _buildFlutterIcon(context);
+      if (widget.customIcon != null && widget.imageAsset == null) {
+        return _buildFlutterIcon(context);
+      }
+      // Leave the slot empty: `_buildFlutterIcon`'s circle placeholder shows
+      // as a black dot for the guard's debug-only 500 ms on iOS < 26.
+      final size =
+          widget.size ?? widget.imageAsset?.size ?? widget.symbol?.size ?? 24.0;
+      return SizedBox(width: size, height: widget.height ?? size);
     }
 
     // Priority: imageAsset > customIcon > symbol
