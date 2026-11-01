@@ -49,6 +49,9 @@ import 'demos/pr79_alert_test.dart';
 import 'demos/pr82_tabbar_font_first_build_test.dart';
 import 'demos/issue103_tabbar_items_change_test.dart';
 import 'demos/issue105_tabbar_dot_badge_test.dart';
+import 'demos/pr96_99_icon_tap_placeholder_test.dart';
+import 'demos/pr97_98_tabbar_mount_test.dart';
+import 'demos/pr100_tabbar_font_runtime_test.dart';
 import 'demos/pr84_system_brightness_test.dart';
 import 'demos/pr85_tabbar_icon_precache_test.dart';
 import 'demos/pr87_tabbar_selection_after_sheet_test.dart';
@@ -836,6 +839,49 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Pr85TabBarIconPrecacheTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('PR #96 / #99: CNIcon taps and placeholder'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('hand.tap', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Pr96And99IconTapPlaceholderTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('PR #97 / #98: TabBar mount'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('dock.rectangle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Pr97And98TabBarMountTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('PR #100: TabBar font at runtime'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('textformat.size', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Pr100TabBarFontRuntimeTestPage(),
                       ),
                     );
                   },
