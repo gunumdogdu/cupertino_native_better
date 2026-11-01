@@ -302,10 +302,12 @@ CNTabBar(
 
 `UITabBarItem` has no dot badge, so `CNTabBar` and `CNTabRail` draw
 `CNTabBarItem.dotBadge` themselves. VoiceOver reads nothing for a dot, so if
-it matters, say what is new in the tab's label. Since iOS 26.2 the Liquid
-Glass tab bar ignores custom title fonts; `CNTabBar` applies
-`labelFontFamily` to the titles itself (1.8.2). A font much wider or taller
-than the system's can shrink to fit a narrow tab, or touch a large icon.
+it matters, say what is new in the tab's label. `labelFontFamily` and
+`labelFontSize` apply to the native bar, at creation and when they change;
+`labelFontSize` alone sizes the system font, and setting both back to null
+restores the native label (1.8.3). A taller label moves the icon up to keep
+clear of it, and a title wider than a narrow tab (the lone tab in split mode)
+shrinks to fit.
 
 ### Native iOS 26 Tab Bar (CNTabBarNative)
 
@@ -635,7 +637,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.8.2
+  cupertino_native_better: ^1.8.3
 ```
 
 ## Usage
@@ -1041,7 +1043,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.8.2
+   cupertino_native_better: ^1.8.3
    ```
 
 2. Update imports:

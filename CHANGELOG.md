@@ -1,3 +1,35 @@
+## 1.8.3
+
+> Patch: six fixes contributed by @yagizdo (#95-#100). Each was reproduced on 1.8.2 and verified with the fix on the iOS 27 simulator (#100 also on iOS 26.0 and 26.2), and all six together on an iPhone with iOS 27.2; #95 by code review, as no iOS 18 simulator was available. No API changes.
+
+### Fixed — #98 the tab bar selection jumped through every tab when the bar appeared (#101)
+
+Right after a native `CNTabBar` was created, the label-refresh workaround (#6) selected each tab in turn, yielding to the run loop between them, so the Liquid Glass pill visited every tab — twice — before resting on `currentIndex` (#35, #101). The cycle now runs in one block without animation, so only the final state is drawn, in single and split mode; labels still render. It also no longer turns UIKit animations off app-wide during each cycle. Because a cycle can no longer be interrupted, two cycles can no longer overlap and restore the wrong tab after a sheet closes (#86).
+
+### Fixed — #97 a flat Flutter tab bar flashed before the Liquid Glass bar
+
+On iOS 26 and later every new `CNTabBar` showed the pre-iOS 26 `CupertinoTabBar` fallback for a frame or two (longer in debug builds) while the native bar was prepared. The slot now stays empty, at the bar's height, until the native bar lands. Added on top: if native preparation fails and every retry is used up, the bar shows the fallback after all, so a failure never leaves an app without a tab bar.
+
+### Fixed — #100 `labelFontFamily` and `labelFontSize` on the native bar
+
+The native bar now draws the label font itself: the appearance carries it before the items exist, and a change at runtime sets the items again so their views pick it up. `labelFontSize` without `labelFontFamily` now sizes the system font (SF Medium, SF Semibold in the selection pill), setting both back to null restores the native label, and a taller label moves the icon up by half its extra height and itself down by half, so the two stay clear of each other. This replaces 1.8.2's label override, which is reduced to letting a custom-font title shrink to fit a narrow tab — the lone tab in split mode.
+
+### Fixed — #96 taps on a native `CNIcon` inside a button were lost
+
+`CNIcon` draws SF Symbols in a `UiKitView`, whose recognizer won the gesture arena over an enclosing `CupertinoButton` or `GestureDetector`: the button dimmed but `onPressed` never ran, and only taps on the padding counted. The icon now stays out of the arena while keeping its hit area. This affects the iOS < 26 fallbacks of `CNButton.icon`, `CNPopupMenuButton` and the `CNTabBar` fallback, and any app that puts a `CNIcon` in its own button.
+
+### Fixed — #99 `CNIcon` showed a filled circle before its native view (debug builds)
+
+While `PlatformViewGuard` waits after a cold start or hot restart (debug and profile builds only), `CNIcon` drew a filled circle for SF Symbols and image assets. The slot now stays empty at the icon's size until the native view lands.
+
+### Fixed — #95 `CNActionSheet` crashed on iPhone below iOS 26
+
+Below iOS 26 a compact-width action sheet is presented by a controller that throws when its delegate is set. The delegate is now set only on iOS 26 and later or for popover presentations, and cleared only when it was set.
+
+### Example
+
+- Testing screens for #96 / #99 (`CNIcon` taps and placeholder), #97 / #98 (tab bar mount) and #100 (label font at runtime), and an integration test that taps a `CNIcon` inside a button through the gesture arena. `pr_probe_entry.dart` gains `PROBE=pr86|pr96|pr97|pr100` and `PROBE=tour`, which plays them one after another for a device recording.
+
 ## 1.8.2
 
 > Patch: three `CNTabBar` fixes (#82, #103, #104) and one addition (#105, `CNTabBarItem.dotBadge`). Nothing changes for bars that do not use a custom label font, image assets in the fallback, items that change at launch, or dot badges.
