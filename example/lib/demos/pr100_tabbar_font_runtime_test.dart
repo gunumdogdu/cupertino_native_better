@@ -32,8 +32,9 @@ import 'package:flutter/cupertino.dart';
 ///  * **Fixed:** every step matches the strip, "no font" brings back the
 ///    native label, and labels clear their icons.
 ///
-/// [autoCycle] steps every two seconds, alternating single and split each
-/// round.
+/// [autoCycle] steps every two seconds through no font, size 15, Courier
+/// 15, Chalkduster 12 and no font again on the same bar, then switches
+/// between single and split and starts over.
 class Pr100TabBarFontRuntimeTestPage extends StatefulWidget {
   const Pr100TabBarFontRuntimeTestPage({super.key, this.autoCycle = false});
 
@@ -85,7 +86,7 @@ class _Pr100TabBarFontRuntimeTestPageState
   ];
 
   int _step = 0;
-  int _rounds = 0;
+  int _tick = 0;
   int _index = 0;
   bool _split = false;
   Timer? _cycle;
@@ -96,7 +97,7 @@ class _Pr100TabBarFontRuntimeTestPageState
   void initState() {
     super.initState();
     if (widget.autoCycle) {
-      _cycle = Timer.periodic(const Duration(seconds: 2), (_) => _next());
+      _cycle = Timer.periodic(const Duration(seconds: 2), (_) => _autoStep());
     }
   }
 
@@ -107,12 +108,17 @@ class _Pr100TabBarFontRuntimeTestPageState
   }
 
   void _next() {
+    setState(() => _step = (_step + 1) % _steps.length);
+  }
+
+  /// Five steps per layout, the last one back to no font on the same bar;
+  /// then the other layout.
+  void _autoStep() {
     setState(() {
-      _step = (_step + 1) % _steps.length;
-      if (_step == 0 && widget.autoCycle) {
-        _rounds++;
-        _split = _rounds.isOdd;
-      }
+      _tick++;
+      const List<int> order = <int>[0, 1, 2, 3, 0];
+      _step = order[_tick % order.length];
+      if (_tick % order.length == 0) _split = !_split;
     });
   }
 
