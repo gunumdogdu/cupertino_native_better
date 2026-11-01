@@ -76,7 +76,11 @@ final class CNActionSheetManager: NSObject {
         // Take that sheet down first, so its actions can no longer fire, then
         // answer the call it belonged to.
         if let stale = presentedAlert {
-            stale.presentationController?.delegate = nil
+            // Only clear a delegate `show` set: the setter throws on the
+            // presentation controllers that were never given one.
+            if stale.presentationController?.delegate === self {
+                stale.presentationController?.delegate = nil
+            }
             stale.dismiss(animated: false)
             presentedAlert = nil
         }
@@ -115,8 +119,16 @@ final class CNActionSheetManager: NSObject {
         applyAnchor(config.anchorRect, to: alert, in: window, presenter: presenter)
 
         // Catches a dismissal that fires no action handler — tapping outside an
-        // anchored popover, or a swipe-down.
-        alert.presentationController?.delegate = self
+        // anchored popover, or a swipe-down. Below iOS 26 a compact-width
+        // sheet presents through the alert presentation controller, which
+        // raises NSInternalInconsistencyException on any delegate assignment.
+        // Nothing is lost there: an outside tap runs the cancel handler, and
+        // without a cancel action it does nothing.
+        if #available(iOS 26.0, *) {
+            alert.presentationController?.delegate = self
+        } else if needsSyntheticSource(in: window) {
+            alert.presentationController?.delegate = self
+        }
 
         presentedAlert = alert
         presenter.present(alert, animated: true)
