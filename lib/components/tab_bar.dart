@@ -371,6 +371,11 @@ class _CNTabBarState extends State<CNTabBar> {
   int _prepRetries = 0;
   bool _preparing = false;
 
+  /// Native preparation failed and every retry is used up. The bar then
+  /// shows its Flutter fallback instead of the empty slot it keeps while
+  /// preparing, so a failure never leaves the app without a tab bar.
+  bool _prepFailed = false;
+
   @override
   void initState() {
     super.initState();
@@ -462,6 +467,7 @@ class _CNTabBarState extends State<CNTabBar> {
       _prepGeneration++;
       _preparing = false;
       _prepRetries = 0;
+      _prepFailed = false;
       _creationParams = null;
       _scheduleNativePreparation();
     }
@@ -539,6 +545,8 @@ class _CNTabBarState extends State<CNTabBar> {
                 _scheduleNativePreparation();
               }
             });
+          } else {
+            setState(() => _prepFailed = true);
           }
         });
   }
@@ -597,7 +605,7 @@ class _CNTabBarState extends State<CNTabBar> {
     }
 
     if (_creationParams == null) {
-      return SizedBox(height: h);
+      return _prepFailed ? _buildFlutterFallback(context) : SizedBox(height: h);
     }
 
     // Issue #31: when a modal/sheet is presented over our route, hide
