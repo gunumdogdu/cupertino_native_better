@@ -24,13 +24,16 @@
 //     --dart-define=PROBE=alert --dart-define=SCENARIO=textfield
 //
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=pr82
-//     (also issue103, issue105, pr96, pr97, pr100; --dart-define=AUTO=true steps all three
+//     (also issue103, issue105, pr96, pr97, pr100, and tour, which plays
+//     them one after another for a screen recording; --dart-define=AUTO=true steps all three
 //     through their cases on their own, for device screenshots)
 //   (SCENARIO: twobutton | destructive | threebutton | titleonly | disabled |
 //    textfield | secure | twofields | supersede; the alert opens itself on the
 //    first frame.)
 //
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
+
+import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
@@ -132,6 +135,9 @@ class _ProbeApp extends StatelessWidget {
     if (_probe == 'issue103') {
       return const Issue103TabBarItemsChangeTestPage(autoCycle: _auto);
     }
+    if (_probe == 'tour') {
+      return const _Tour();
+    }
     if (_probe == 'pr96') {
       return const Pr96And99IconTapPlaceholderTestPage();
     }
@@ -151,5 +157,73 @@ class _ProbeApp extends StatelessWidget {
       initialIcon: _icon,
       initialSize: double.tryParse(_size),
     );
+  }
+}
+
+/// Plays the tab bar and icon screens one after another, each stepping
+/// through its own cases, so one release build and one screen recording on a
+/// device cover them all.
+class _Tour extends StatefulWidget {
+  const _Tour();
+
+  @override
+  State<_Tour> createState() => _TourState();
+}
+
+class _TourState extends State<_Tour> {
+  static final List<(Duration, Widget Function())> _stops =
+      <(Duration, Widget Function())>[
+        (
+          const Duration(seconds: 13),
+          () => const Pr97And98TabBarMountTestPage(autoCycle: true),
+        ),
+        (
+          const Duration(seconds: 13),
+          () => const Issue105TabBarDotBadgeTestPage(autoCycle: true),
+        ),
+        (
+          const Duration(seconds: 11),
+          () => const Pr82TabBarFontFirstBuildTestPage(autoCycle: true),
+        ),
+        (
+          const Duration(seconds: 13),
+          () => const Issue103TabBarItemsChangeTestPage(autoCycle: true),
+        ),
+        (
+          const Duration(seconds: 21),
+          () => const Pr100TabBarFontRuntimeTestPage(autoCycle: true),
+        ),
+        (
+          const Duration(seconds: 6),
+          () => const Pr96And99IconTapPlaceholderTestPage(),
+        ),
+      ];
+
+  int _stop = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  void _schedule() {
+    _timer = Timer(_stops[_stop].$1, () {
+      if (!mounted || _stop == _stops.length - 1) return;
+      setState(() => _stop++);
+      _schedule();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return KeyedSubtree(key: ValueKey<int>(_stop), child: _stops[_stop].$2());
   }
 }
