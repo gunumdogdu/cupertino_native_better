@@ -24,7 +24,7 @@
 //     --dart-define=PROBE=alert --dart-define=SCENARIO=textfield
 //
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=pr82
-//     (also issue103, issue105, pr96, pr97, pr100, and tour, which plays
+//     (also pr86, issue103, issue105, pr96, pr97, pr100, and tour, which plays
 //     them one after another for a screen recording; --dart-define=AUTO=true steps all three
 //     through their cases on their own, for device screenshots)
 //   (SCENARIO: twobutton | destructive | threebutton | titleonly | disabled |
@@ -44,6 +44,7 @@ import 'demos/pr67_icon_supersample_test.dart';
 import 'demos/pr69_glass_effect_test.dart';
 import 'demos/pr72_glass_resize_test.dart';
 import 'demos/pr82_tabbar_font_first_build_test.dart';
+import 'demos/pr87_tabbar_selection_after_sheet_test.dart';
 import 'demos/issue103_tabbar_items_change_test.dart';
 import 'demos/issue105_tabbar_dot_badge_test.dart';
 import 'demos/pr96_99_icon_tap_placeholder_test.dart';
@@ -134,6 +135,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue103') {
       return const Issue103TabBarItemsChangeTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'pr86') {
+      return const Pr87TabBarSelectionAfterSheetTestPage();
     }
     if (_probe == 'tour') {
       return const _Tour();
