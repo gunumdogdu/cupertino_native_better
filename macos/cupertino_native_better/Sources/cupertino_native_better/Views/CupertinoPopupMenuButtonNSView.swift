@@ -14,6 +14,11 @@ class CupertinoPopupMenuButtonNSView: NSView {
   private var defaultModes: [String?] = []
   private var defaultPalettes: [[NSNumber]] = []
   private var defaultGradients: [NSNumber?] = []
+  // Subtitles and submenus. Flutter only sends them when the menu uses
+  // them; each submenu arrives as its own level, encoded like the top one.
+  private var subtitles: [String] = []
+  private var isSubmenu: [Bool] = []
+  private var submenus: [[String: Any]?] = []
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativePopupMenuButton_\(viewId)", binaryMessenger: messenger)
@@ -53,6 +58,9 @@ class CupertinoPopupMenuButtonNSView: NSView {
       if let modes = dict["sfSymbolRenderingModes"] as? [String?] { self.defaultModes = modes }
       if let palettes = dict["sfSymbolPaletteColors"] as? [[NSNumber]] { self.defaultPalettes = palettes }
       if let gradients = dict["sfSymbolGradientEnabled"] as? [NSNumber?] { self.defaultGradients = gradients }
+      self.subtitles = (dict["subtitles"] as? [String]) ?? []
+      self.isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
+      self.submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
       if let m = dict["buttonIconRenderingMode"] as? String { buttonIconMode = m }
       if let pal = dict["buttonIconPaletteColors"] as? [NSNumber] { buttonIconPalette = pal }
       sizes = (dict["sfSymbolSizes"] as? [NSNumber]) ?? []
@@ -136,7 +144,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
     self.enabled = enabled.map { $0.boolValue }
     self.defaultSizes = sizes
     self.defaultColors = colors
-    rebuildMenu(defaultSizes: sizes, defaultColors: colors)
+    rebuildMenu()
 
     button.target = self
     button.action = #selector(onButtonPressed(_:))
@@ -158,7 +166,10 @@ class CupertinoPopupMenuButtonNSView: NSView {
           self.defaultModes = (args["sfSymbolRenderingModes"] as? [String?]) ?? []
           self.defaultPalettes = (args["sfSymbolPaletteColors"] as? [[NSNumber]]) ?? []
           self.defaultGradients = (args["sfSymbolGradientEnabled"] as? [NSNumber?]) ?? []
-          self.rebuildMenu(defaultSizes: self.defaultSizes, defaultColors: self.defaultColors)
+          self.subtitles = (args["subtitles"] as? [String]) ?? []
+          self.isSubmenu = ((args["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
+          self.submenus = ((args["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
+          self.rebuildMenu()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing items", details: nil)) }
       case "setStyle":
@@ -255,39 +266,83 @@ class CupertinoPopupMenuButtonNSView: NSView {
     popupMenu.popUp(positioning: nil, at: location, in: sender)
   }
 
-  private func rebuildMenu(defaultSizes: [NSNumber]? = nil, defaultColors: [NSNumber]? = nil) {
-    popupMenu = NSMenu()
-    let count = max(labels.count, max(symbols.count, dividers.count))
+  /// The top level of the menu, from the arrays Flutter sent at creation or
+  /// in the last `setItems`.
+  private var rootLevel: PopupMenuLevel {
+    var level = PopupMenuLevel()
+    level.labels = labels
+    level.symbols = symbols
+    level.dividers = dividers
+    level.enabled = enabled
+    level.sizes = defaultSizes
+    level.colors = defaultColors
+    level.modes = defaultModes
+    level.palettes = defaultPalettes
+    level.subtitles = subtitles
+    level.isSubmenu = isSubmenu
+    level.submenus = submenus
+    return level
+  }
+
+  private func rebuildMenu() {
+    popupMenu = buildMenu(level: rootLevel)
+  }
+
+  /// Builds the menu of one [level]. [path] is the level's own path from the
+  /// top: empty for the top level, then one index per submenu.
+  private func buildMenu(level: PopupMenuLevel, path: [Int] = []) -> NSMenu {
+    let menu = NSMenu()
+    let count = max(level.labels.count, max(level.symbols.count, level.dividers.count))
     for i in 0..<count {
-      if i < dividers.count, dividers[i] {
-        popupMenu.addItem(.separator())
+      if i < level.dividers.count, level.dividers[i] {
+        menu.addItem(.separator())
         continue
       }
-      let title = i < labels.count ? labels[i] : ""
-      let mi = NSMenuItem(title: title, action: #selector(onSelectMenuItem(_:)), keyEquivalent: "")
-      mi.target = self
-      mi.tag = i
-      if i < enabled.count { mi.isEnabled = enabled[i] }
-      if i < symbols.count, !symbols[i].isEmpty {
-        if var img = NSImage(systemSymbolName: symbols[i], accessibilityDescription: nil) {
-          if #available(macOS 12.0, *), let sizes = defaultSizes, i < sizes.count {
-            let s = CGFloat(truncating: sizes[i])
+      let title = i < level.labels.count ? level.labels[i] : ""
+      let itemPath = path + [i]
+      let isEnabled = i < level.enabled.count ? level.enabled[i] : true
+      let mi: NSMenuItem
+      if i < level.isSubmenu.count, level.isSubmenu[i] {
+        mi = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        // The menu auto-enables any item with a submenu, so a disabled
+        // submenu gets none: an item without action or submenu is disabled.
+        if isEnabled {
+          let childLevel = (i < level.submenus.count ? level.submenus[i] : nil)
+            .map { PopupMenuLevel(dict: $0) } ?? PopupMenuLevel()
+          let submenu = buildMenu(level: childLevel, path: itemPath)
+          submenu.title = title
+          mi.submenu = submenu
+        }
+      } else {
+        mi = NSMenuItem(title: title, action: #selector(onSelectMenuItem(_:)), keyEquivalent: "")
+        mi.target = self
+        mi.tag = i
+        mi.representedObject = itemPath
+        if i < level.enabled.count { mi.isEnabled = level.enabled[i] }
+      }
+      if #available(macOS 14.4, *), i < level.subtitles.count, !level.subtitles[i].isEmpty {
+        mi.subtitle = level.subtitles[i]
+      }
+      if i < level.symbols.count, !level.symbols[i].isEmpty {
+        if var img = NSImage(systemSymbolName: level.symbols[i], accessibilityDescription: nil) {
+          if #available(macOS 12.0, *), i < level.sizes.count {
+            let s = CGFloat(truncating: level.sizes[i])
             if s > 0 {
               let cfg = NSImage.SymbolConfiguration(pointSize: s, weight: .regular)
               img = img.withSymbolConfiguration(cfg) ?? img
             }
           }
-          if #available(macOS 12.0, *), i < defaultModes.count, let mode = defaultModes[i] {
+          if #available(macOS 12.0, *), i < level.modes.count, let mode = level.modes[i] {
             switch mode {
             case "hierarchical":
-              if let colors = defaultColors, i < colors.count {
-                let c = Self.colorFromARGB(colors[i].intValue)
+              if i < level.colors.count {
+                let c = Self.colorFromARGB(level.colors[i].intValue)
                 let cfg = NSImage.SymbolConfiguration(hierarchicalColor: c)
                 img = img.withSymbolConfiguration(cfg) ?? img
               }
             case "palette":
-              if i < defaultPalettes.count, !defaultPalettes[i].isEmpty {
-                let cols = defaultPalettes[i].map { Self.colorFromARGB($0.intValue) }
+              if i < level.palettes.count, !level.palettes[i].isEmpty {
+                let cols = level.palettes[i].map { Self.colorFromARGB($0.intValue) }
                 let cfg = NSImage.SymbolConfiguration(paletteColors: cols)
                 img = img.withSymbolConfiguration(cfg) ?? img
               }
@@ -295,27 +350,30 @@ class CupertinoPopupMenuButtonNSView: NSView {
               let cfg = NSImage.SymbolConfiguration.preferringMulticolor()
               img = img.withSymbolConfiguration(cfg) ?? img
             case "monochrome":
-              if let colors = defaultColors, i < colors.count {
-                let c = Self.colorFromARGB(colors[i].intValue)
+              if i < level.colors.count {
+                let c = Self.colorFromARGB(level.colors[i].intValue)
                 img = img.tinted(with: c)
               }
             default:
               break
             }
-          } else if #available(macOS 12.0, *), let colors = defaultColors, i < colors.count {
-            let c = Self.colorFromARGB(colors[i].intValue)
+          } else if #available(macOS 12.0, *), i < level.colors.count {
+            let c = Self.colorFromARGB(level.colors[i].intValue)
             let cfg = NSImage.SymbolConfiguration(hierarchicalColor: c)
             img = img.withSymbolConfiguration(cfg) ?? img
           }
           mi.image = img
         }
       }
-      popupMenu.addItem(mi)
+      menu.addItem(mi)
     }
+    return menu
   }
 
   @objc private func onSelectMenuItem(_ sender: NSMenuItem) {
-    channel.invokeMethod("itemSelected", arguments: ["index": sender.tag])
+    // `index` is the top-level entry, as before; `path` the full path.
+    let path = (sender.representedObject as? [Int]) ?? [sender.tag]
+    channel.invokeMethod("itemSelected", arguments: ["index": path[0], "path": path])
   }
 
   private static func colorFromARGB(_ argb: Int) -> NSColor {
@@ -337,5 +395,40 @@ private extension NSImage {
     draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
     img.unlockFocus()
     return img
+  }
+}
+
+/// One level of the popup menu: the parallel arrays Flutter sends for a list
+/// of entries (one slot per item, submenu or divider), and each submenu's own
+/// level in `submenus`.
+private struct PopupMenuLevel {
+  var labels: [String] = []
+  var symbols: [String] = []
+  var dividers: [Bool] = []
+  var enabled: [Bool] = []
+  var sizes: [NSNumber] = []
+  var colors: [NSNumber] = []
+  var modes: [String?] = []
+  var palettes: [[NSNumber]] = []
+  var subtitles: [String] = []
+  var isSubmenu: [Bool] = []
+  var submenus: [[String: Any]?] = []
+
+  init() {}
+
+  /// Reads a level encoded by `encodePopupMenuEntries`, with the same keys
+  /// and types as the top level.
+  init(dict: [String: Any]) {
+    labels = (dict["labels"] as? [String]) ?? []
+    symbols = (dict["sfSymbols"] as? [String]) ?? []
+    dividers = ((dict["isDivider"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    enabled = ((dict["enabled"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    sizes = (dict["sfSymbolSizes"] as? [NSNumber]) ?? []
+    colors = (dict["sfSymbolColors"] as? [NSNumber]) ?? []
+    modes = (dict["sfSymbolRenderingModes"] as? [String?]) ?? []
+    palettes = (dict["sfSymbolPaletteColors"] as? [[NSNumber]]) ?? []
+    subtitles = (dict["subtitles"] as? [String]) ?? []
+    isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
   }
 }
