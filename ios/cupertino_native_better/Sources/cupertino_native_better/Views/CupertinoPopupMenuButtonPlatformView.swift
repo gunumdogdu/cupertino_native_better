@@ -457,11 +457,12 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         var attrs: UIMenuElement.Attributes = []
         if !isEnabled { attrs.insert(.disabled) }
         if destructive { attrs.insert(.destructive) }
-        let action = UIAction(title: title, image: image, attributes: attrs) { [weak self] _ in
+        // The subtitle goes through the initializer: `action.subtitle` is
+        // UIMenuLeaf's setter, which needs iOS 16.
+        let action = UIAction(title: title, subtitle: subtitle, image: image, attributes: attrs) { [weak self] _ in
           // `index` is the top-level entry, as before; `path` the full path.
           self?.channel.invokeMethod("itemSelected", arguments: ["index": itemPath[0], "path": itemPath])
         }
-        action.subtitle = subtitle
         action.state = isChecked ? .on : .off
         current.append(action)
       }
