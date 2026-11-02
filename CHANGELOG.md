@@ -7,7 +7,7 @@
 - **`CNPopupMenuItem.subtitle`** shows a second line under the label: `UIAction.subtitle` on iOS, `NSMenuItem.subtitle` on macOS 14.4+, a smaller line in the `CupertinoActionSheet` fallback.
 - **`CNPopupMenuSubmenu`** opens a nested menu of `items`, which can hold further submenus. It takes the same label, subtitle, icon and `enabled` options as an item. It is a nested `UIMenu` on iOS and an `NSMenuItem.submenu` on macOS; the fallback opens it as a second action sheet. `UIMenu` has no disabled state, so a disabled submenu is shown as a disabled action and cannot be opened.
 - **`onPathSelected(List<int> path)`** is called for every selection with the path to the selected item, one index per level, dividers included: `[3]` for `items[3]`, `[2, 1]` for the second entry of the submenu at `items[2]`.
-- **`onSelected` is now optional.** It keeps its index, and for an item inside a submenu it gets the index of the top-level submenu it is under, so every selection reaches whichever callback is set. A debug assertion requires at least one of the two callbacks, and another one `onPathSelected` when `items` contain a submenu, since `onSelected` alone cannot tell which of its items was chosen.
+- **`onSelected` is now optional.** It keeps its index, and for an item inside a submenu it gets the index of the top-level submenu it is under, so every selection reaches whichever callback is set. A debug assertion requires at least one of the two callbacks, and another one `onPathSelected` when `items` contain a submenu, since `onSelected` alone cannot tell which of its items was chosen. Its type is now `ValueChanged<int>?`: call sites compile unchanged, but code that calls `button.onSelected(i)` on a `CNPopupMenuButton` needs a `?.` or `!`.
 
 Verified on the simulator (iPhone 17, iOS 26.0) and on macOS 26.2: subtitles, nested submenus, a disabled submenu, and the values both callbacks receive.
 
@@ -19,11 +19,24 @@ The platform channel only gains keys: a level that uses no subtitle and no subme
 
 ### Fixed — a `customIcon` after a divider showed another item's icon
 
-The rendered custom icons were collected with one slot per entry, dividers included, but read back with a counter that only counted items. After the first divider every item read the slot before its own: the icon of the previous item, or the divider's empty one. The icons are now looked up by entry, which submenus needed anyway.
+The rendered custom icons were collected with one slot per entry, dividers included, but read back with a counter that only counted items. After the first divider every item read the slot before its own: the icon of the previous item, or the divider's empty one. The icons are now looked up by the icon itself (icon, size and colour), which submenus needed anyway, and which also finds them again after a rebuild whose items are new objects.
+
+### Fixed — the `CNPopupMenuButton` fallback ignored `enabled`
+
+The `CupertinoActionSheet` used below iOS 26 and on other platforms reported a disabled item when tapped and opened a disabled submenu. Both are now dimmed and ignore taps.
+
+### Fixed — #94 `CNTabBarNative` showed an empty accessory pill on iOS 26.1+ (#93)
+
+Since iOS 26.1, `tabViewBottomAccessory` draws its pill even around an empty view, so `bottomAccessory: null` and `setBottomAccessory(null)` left an empty glass pill above the tab bar. The accessory is now disabled when there is none, through the iOS 26.1 `tabViewBottomAccessory(isEnabled:)`; switching it on and off keeps the selected tab. Apps built with Xcode 26.0, whose SDK lacks that call, keep the previous one. Verified on iOS 26.0, 26.2 and 27.0 simulators.
+
+### Fixed — #107 `CNTabBar` resent its items on the first rebuild when `iconSize` was set
+
+The native bar's `iconSize` was not remembered at creation, so the first rebuild after it (a theme change, any parent `setState`) saw a changed size and replaced every tab item of a bar that was already up to date. Bars without `iconSize` were not affected.
 
 ### Example
 
 - New Testing screen: *PopupMenu subtitles & submenus*, with nested and disabled submenus, a custom icon after a divider, and a log of both callbacks.
+- Testing screens for #94 (*TabBarNative null accessory*, `PROBE=pr94`) and for popup menu icons after a rebuild (`PROBE=pr106`), and widget tests for #107 and the popup menu fixes.
 
 ## 1.8.3
 
