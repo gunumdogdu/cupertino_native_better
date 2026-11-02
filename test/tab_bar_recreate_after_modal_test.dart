@@ -77,6 +77,9 @@ void main() {
                 ],
                 currentIndex: 0,
                 tint: p.tint,
+                split: p.split,
+                rightCount: p.rightCount,
+                splitSpacing: p.splitSpacing,
                 labelFontSize: p.labelFontSize,
                 onTap: (_) {},
               ),
@@ -200,6 +203,33 @@ void main() {
     },
     skip: skip,
   );
+
+  testWidgets(
+    'a split layout set since the first mount is the recreated bar\'s layout',
+    (tester) async {
+      final navKey = GlobalKey<NavigatorState>();
+      final props = ValueNotifier(const _Props());
+      await pumpBar(tester, navKey: navKey, props: props);
+
+      props.value = const _Props(split: true, rightCount: 2, splitSpacing: 24);
+      await tester.pump(const Duration(milliseconds: 100));
+      await openAndCloseSheet(tester, navKey);
+
+      final create = calls.lastWhere((c) => c.method == 'create');
+      final bytes = (create.arguments as Map)['params'] as Uint8List;
+      final params =
+          const StandardMessageCodec().decodeMessage(
+                ByteData.sublistView(bytes),
+              )
+              as Map<Object?, Object?>;
+      expect(params, containsPair('split', true));
+      expect(params, containsPair('rightCount', 2));
+      expect(params, containsPair('splitSpacing', 24.0));
+
+      await tearDownBar(tester);
+    },
+    skip: skip,
+  );
 }
 
 class _Props {
@@ -208,6 +238,9 @@ class _Props {
     this.badge = '3',
     this.tint,
     this.brightness = Brightness.light,
+    this.split = false,
+    this.rightCount = 1,
+    this.splitSpacing = 8,
     this.labelFontSize,
   });
 
@@ -215,5 +248,8 @@ class _Props {
   final String? badge;
   final Color? tint;
   final Brightness brightness;
+  final bool split;
+  final int rightCount;
+  final double splitSpacing;
   final double? labelFontSize;
 }

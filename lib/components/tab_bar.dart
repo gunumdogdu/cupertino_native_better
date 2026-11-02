@@ -644,6 +644,11 @@ class _CNTabBarState extends State<CNTabBar> {
     if (_creationParams!['selectedIndex'] != widget.currentIndex) {
       _creationParams!['selectedIndex'] = widget.currentIndex;
     }
+    // Same for the split layout: a bar created again after a modal must not
+    // come back with the layout of the first mount.
+    _creationParams!['split'] = _hasSearch ? true : widget.split;
+    _creationParams!['rightCount'] = widget.rightCount;
+    _creationParams!['splitSpacing'] = widget.splitSpacing;
 
     final platformView = _buildNativeTabBarPlatformView(_creationParams!);
 
