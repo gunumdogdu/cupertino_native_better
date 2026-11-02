@@ -431,6 +431,49 @@ restores the native label (1.8.3). A taller label moves the icon up to keep
 clear of it, and a title wider than a narrow tab (the lone tab in split mode)
 shrinks to fit.
 
+#### Items that open a menu
+
+`menuItems` turns an item into a button that opens a native menu instead of
+selecting itself, for example a "+" that lets the user pick what to create.
+It takes the same entries as `CNPopupMenuButton`, with subtitles and
+submenus, and the chosen entry goes to `onMenuSelected` with its path.
+
+```dart
+CNTabBar(
+  split: true,
+  rightCount: 1,
+  items: [
+    const CNTabBarItem(label: 'Home', icon: CNSymbol('house.fill')),
+    const CNTabBarItem(label: 'Library', icon: CNSymbol('books.vertical.fill')),
+    const CNTabBarItem(label: 'Profile', icon: CNSymbol('person.fill')),
+    CNTabBarItem(
+      icon: const CNSymbol('plus'),
+      menuItems: const [
+        CNPopupMenuItem(label: 'New note', subtitle: 'Text, lists and photos'),
+        CNPopupMenuItem(label: 'New folder'),
+        CNPopupMenuDivider(),
+        CNPopupMenuSubmenu(label: 'Import', items: [
+          CNPopupMenuItem(label: 'Photo'),
+          CNPopupMenuItem(label: 'File'),
+        ]),
+      ],
+    ),
+  ],
+  currentIndex: _selectedIndex,
+  onTap: (index) => setState(() => _selectedIndex = index),
+  // index 3, path [3, 1] for Import > File.
+  onMenuSelected: (index, path) => openCreatePage(path),
+)
+```
+
+An item with a menu never gets selected nor calls `onTap`, and its glass
+still reacts under the finger. Sliding a finger along the bar onto it opens
+the menu too. Menu entries show SF Symbols and image
+assets, not `customIcon`. On the Flutter fallback (iOS < 26, Android, web),
+the menu opens as a `CupertinoActionSheet`, as `CNPopupMenuButton`'s does.
+On the iOS 26 bar with a `searchItem`, and on the native macOS bar, the item
+is a plain tab.
+
 ### Native iOS 26 Tab Bar (CNTabBarNative)
 
 > **`CNTabBarNative` is not a Flutter widget — it is a full native takeover.**
