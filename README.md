@@ -1241,34 +1241,34 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
 
 ## Contributors
 
-This package is better for every one of these people.
-
 <p align="center">
-  <a href="https://github.com/yagizdo"><img src="https://github.com/yagizdo.png?size=240" width="104" height="104" alt="Yılmaz Yağız Dokumacı"></a>
+  <a href="https://github.com/gunumdogdu" title="Emir Gunumdogdu"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/gunumdogdu.png" width="104" height="104" alt="Emir Gunumdogdu"></a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/yagizdo" title="Yılmaz Yağız Dokumacı"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/yagizdo.png" width="104" height="104" alt="Yılmaz Yağız Dokumacı"></a>
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/yagizdo">Yılmaz Yağız Dokumacı (@yagizdo)</a></strong><br>
-  10 merged pull requests, among them the native <code>CNActionSheet</code> and <code>CNAlert</code>, Swift Package Manager builds,
-  system brightness, the tab bar's native label fonts, and a long run of tab bar and icon fixes.
+  <strong><a href="https://github.com/gunumdogdu">Emir Gunumdogdu</a></strong> created and maintains the package.<br>
+  <strong><a href="https://github.com/yagizdo">Yılmaz Yağız Dokumacı</a></strong> has merged 10 pull requests, among them the native <code>CNActionSheet</code> and <code>CNAlert</code>,
+  Swift Package Manager builds, system brightness, the tab bar's native label fonts, and a long run of tab bar and icon fixes.
 </p>
 
 <p align="center">
-  <a href="https://github.com/anirudhrao-github" title="anirudhrao-github"><img src="https://github.com/anirudhrao-github.png?size=120" width="56" height="56" alt="anirudhrao-github"></a>
-  <a href="https://github.com/azharul-islam" title="Azharul Islam"><img src="https://github.com/azharul-islam.png?size=120" width="56" height="56" alt="Azharul Islam"></a>
-  <a href="https://github.com/Azzeccagarbugli" title="Francesco Coppola"><img src="https://github.com/Azzeccagarbugli.png?size=120" width="56" height="56" alt="Francesco Coppola"></a>
-  <a href="https://github.com/Honahec" title="Hao Chen"><img src="https://github.com/Honahec.png?size=120" width="56" height="56" alt="Hao Chen"></a>
-  <a href="https://github.com/MohamedAboElM3aTy" title="Mohamed Abo El Maaty Zaky"><img src="https://github.com/MohamedAboElM3aTy.png?size=120" width="56" height="56" alt="Mohamed Abo El Maaty Zaky"></a>
-  <a href="https://github.com/TjarkGomollaDev" title="Tjark"><img src="https://github.com/TjarkGomollaDev.png?size=120" width="56" height="56" alt="Tjark"></a>
-  <a href="https://github.com/fbernack" title="Franz Bernack"><img src="https://github.com/fbernack.png?size=120" width="56" height="56" alt="Franz Bernack"></a>
-  <a href="https://github.com/johan-perso" title="Johan"><img src="https://github.com/johan-perso.png?size=120" width="56" height="56" alt="Johan"></a>
-  <a href="https://github.com/johndavid92" title="VishalKevadiya"><img src="https://github.com/johndavid92.png?size=120" width="56" height="56" alt="VishalKevadiya"></a>
-  <a href="https://github.com/jonathanfristedt" title="Jonathan Fristedt"><img src="https://github.com/jonathanfristedt.png?size=120" width="56" height="56" alt="Jonathan Fristedt"></a>
-  <a href="https://github.com/josec-ecw" title="José Cano"><img src="https://github.com/josec-ecw.png?size=120" width="56" height="56" alt="José Cano"></a>
-  <a href="https://github.com/tgrushka" title="Tom Grushka"><img src="https://github.com/tgrushka.png?size=120" width="56" height="56" alt="Tom Grushka"></a>
+  <a href="https://github.com/anirudhrao-github" title="anirudhrao-github"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/anirudhrao-github.png" width="56" height="56" alt="anirudhrao-github"></a>
+  <a href="https://github.com/azharul-islam" title="Azharul Islam"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/azharul-islam.png" width="56" height="56" alt="Azharul Islam"></a>
+  <a href="https://github.com/Azzeccagarbugli" title="Francesco Coppola"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/Azzeccagarbugli.png" width="56" height="56" alt="Francesco Coppola"></a>
+  <a href="https://github.com/Honahec" title="Hao Chen"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/Honahec.png" width="56" height="56" alt="Hao Chen"></a>
+  <a href="https://github.com/MohamedAboElM3aTy" title="Mohamed Abo El Maaty Zaky"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/MohamedAboElM3aTy.png" width="56" height="56" alt="Mohamed Abo El Maaty Zaky"></a>
+  <a href="https://github.com/TjarkGomollaDev" title="Tjark"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/TjarkGomollaDev.png" width="56" height="56" alt="Tjark"></a>
+  <a href="https://github.com/fbernack" title="Franz Bernack"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/fbernack.png" width="56" height="56" alt="Franz Bernack"></a>
+  <a href="https://github.com/johan-perso" title="Johan"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/johan-perso.png" width="56" height="56" alt="Johan"></a>
+  <a href="https://github.com/johndavid92" title="VishalKevadiya"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/johndavid92.png" width="56" height="56" alt="VishalKevadiya"></a>
+  <a href="https://github.com/jonathanfristedt" title="Jonathan Fristedt"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/jonathanfristedt.png" width="56" height="56" alt="Jonathan Fristedt"></a>
+  <a href="https://github.com/josec-ecw" title="José Cano"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/josec-ecw.png" width="56" height="56" alt="José Cano"></a>
+  <a href="https://github.com/tgrushka" title="Tom Grushka"><img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/contributors/tgrushka.png" width="56" height="56" alt="Tom Grushka"></a>
 </p>
 
-<p align="center"><sub>[anirudhrao-github](https://github.com/anirudhrao-github), [Azharul Islam](https://github.com/azharul-islam), [Francesco Coppola](https://github.com/Azzeccagarbugli), [Hao Chen](https://github.com/Honahec), [Mohamed Abo El Maaty Zaky](https://github.com/MohamedAboElM3aTy), [Tjark](https://github.com/TjarkGomollaDev), [Franz Bernack](https://github.com/fbernack), [Johan](https://github.com/johan-perso), [VishalKevadiya](https://github.com/johndavid92), [Jonathan Fristedt](https://github.com/jonathanfristedt), [José Cano](https://github.com/josec-ecw), [Tom Grushka](https://github.com/tgrushka)</sub></p>
+<p align="center">Thank you to everyone who has made this package better.</p>
 
 ## Contributing
 

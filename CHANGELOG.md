@@ -1,6 +1,10 @@
-## Unreleased
+## 1.9.0
 
-> Minor: subtitles and submenus in `CNPopupMenuButton`, through `CNPopupMenuItem.subtitle`, a new `CNPopupMenuSubmenu` entry and a new `onPathSelected` callback; `onSelected` becomes optional. Nothing changes for menus that do not use them.
+> Minor: subtitles and submenus in `CNPopupMenuButton` (#106, thanks @johan-perso), `CNTabBarNative.enable(showCloseButton:)`, fixes from @tgrushka (#94) and @Honahec (#107), and a new pub.dev page with native recordings of every component. Nothing changes for code that does not use the new options; `CNPopupMenuButton.onSelected` becomes nullable (see below).
+
+### Docs — a new pub.dev page
+
+The README opens with recordings of the example app's new **Showcase** screens (Display & Brightness, Files, Photos, Account, Music and iPhone Duo), built only from this package's native widgets and recorded on the iOS 27 simulator, followed by a close-up of each component and a Contributors section. The pubspec screenshots are the new showcase and four of the recordings, 2.5 MB instead of 6.4 MB.
 
 ### Added — subtitles and submenus in `CNPopupMenuButton`
 
