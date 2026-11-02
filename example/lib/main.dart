@@ -52,6 +52,7 @@ import 'demos/issue105_tabbar_dot_badge_test.dart';
 import 'demos/pr96_99_icon_tap_placeholder_test.dart';
 import 'demos/pr97_98_tabbar_mount_test.dart';
 import 'demos/pr100_tabbar_font_runtime_test.dart';
+import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/pr84_system_brightness_test.dart';
 import 'demos/pr85_tabbar_icon_precache_test.dart';
 import 'demos/pr87_tabbar_selection_after_sheet_test.dart';
@@ -882,6 +883,20 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Pr100TabBarFontRuntimeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('PR #94: TabBarNative null accessory'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('rectangle.dashed', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Pr94TabAccessoryNullTestPage(),
                       ),
                     );
                   },
