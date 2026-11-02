@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoColors;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -44,6 +45,26 @@ PopupMenuEntryVisual? popupMenuEntryVisual(CNPopupMenuEntry entry) {
   return null;
 }
 
+/// What a rendered custom icon depends on. Rendered icons are kept by this
+/// key, not by entry: items built in `build()` are new objects on every
+/// build, and an unchanged icon must still be found in the next build's.
+typedef PopupMenuIconKey = ({IconData icon, double size, Color color});
+
+/// The key of [entry]'s custom icon, or null when it has none to render (an
+/// image asset takes precedence over a custom icon).
+PopupMenuIconKey? popupMenuIconKey(CNPopupMenuEntry entry) {
+  final visual = popupMenuEntryVisual(entry);
+  final icon = visual?.customIcon;
+  if (visual == null || visual.imageAsset != null || icon == null) {
+    return null;
+  }
+  return (
+    icon: icon,
+    size: visual.icon?.size ?? 20.0,
+    color: visual.iconColor ?? CupertinoColors.label,
+  );
+}
+
 /// Every entry of [entries] and of their submenus, depth first.
 Iterable<CNPopupMenuEntry> walkPopupMenuEntries(
   List<CNPopupMenuEntry> entries,
@@ -67,7 +88,7 @@ Iterable<CNPopupMenuEntry> walkPopupMenuEntries(
 /// the same way, and null for the other slots.
 ///
 /// [customIconBytes] holds the rendered [CNPopupMenuItem.customIcon] of each
-/// entry, looked up by the entry itself. [assetPaths] holds the resolved
+/// entry, looked up by its [popupMenuIconKey]. [assetPaths] holds the resolved
 /// path of each entry's image asset; an entry missing from it uses the raw
 /// [CNImageAsset.assetPath].
 ///
@@ -78,7 +99,7 @@ Iterable<CNPopupMenuEntry> walkPopupMenuEntries(
 Map<String, Object?> encodePopupMenuEntries(
   List<CNPopupMenuEntry> entries, {
   required int? Function(Color? color) resolveColor,
-  Map<CNPopupMenuEntry, Uint8List?> customIconBytes = const {},
+  Map<PopupMenuIconKey, Uint8List?> customIconBytes = const {},
   Map<CNPopupMenuEntry, String> assetPaths = const {},
   bool includeCustomIcons = true,
 }) {
@@ -136,7 +157,7 @@ Map<String, Object?> encodePopupMenuEntries(
     final asset = visual.imageAsset;
     labels.add(visual.label);
     symbols.add(icon?.name ?? '');
-    customIcons.add(customIconBytes[e]);
+    customIcons.add(customIconBytes[popupMenuIconKey(e)]);
     customIconColors.add(resolveColor(visual.iconColor));
     if (asset != null) {
       final path = assetPaths[e] ?? asset.assetPath;

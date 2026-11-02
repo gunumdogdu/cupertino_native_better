@@ -117,10 +117,11 @@ void main() {
       final encoded = encodePopupMenuEntries(
         const [a, CNPopupMenuDivider(), b, submenu],
         resolveColor: argb,
-        customIconBytes: Map.identity()
-          ..[a] = bytesA
-          ..[b] = bytesB
-          ..[child] = bytesC,
+        customIconBytes: {
+          popupMenuIconKey(a)!: bytesA,
+          popupMenuIconKey(b)!: bytesB,
+          popupMenuIconKey(child)!: bytesC,
+        },
       );
 
       expect(encoded['customIconBytes'], [bytesA, null, bytesB, null]);
@@ -140,7 +141,7 @@ void main() {
           CNPopupMenuSubmenu(label: 'More', items: [child]),
         ],
         resolveColor: argb,
-        customIconBytes: Map.identity()..[child] = bytes,
+        customIconBytes: {popupMenuIconKey(child)!: bytes},
         includeCustomIcons: false,
       );
 

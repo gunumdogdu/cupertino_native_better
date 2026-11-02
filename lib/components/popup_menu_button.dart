@@ -322,9 +322,9 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   Offset? _downPosition;
   bool _pressed = false;
 
-  /// Rendered custom icons of the menu entries, by entry, from the last
-  /// [_renderCustomIcons]. `setItems` sends the submenus' ones again.
-  Map<CNPopupMenuEntry, Uint8List?> _menuIconBytes = Map.identity();
+  /// Rendered custom icons of the menu entries, by [popupMenuIconKey], from
+  /// the last [_renderCustomIcons]. `setItems` sends the submenus' ones again.
+  Map<PopupMenuIconKey, Uint8List?> _menuIconBytes = {};
 
   // Issue #29 halo containment: clip native view while enclosing route is
   // animating. Modal-up containment is now handled by ModalHideMixin
@@ -541,9 +541,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
   Future<Map<String, dynamic>> _renderCustomIcons(BuildContext context) async {
     Uint8List? buttonIconBytes;
-    // By entry rather than by position, so that dividers and submenus cannot
-    // shift an icon onto another entry.
-    final menuIconBytes = Map<CNPopupMenuEntry, Uint8List?>.identity();
+    // By icon rather than by position, so that dividers and submenus cannot
+    // shift an icon onto another entry, and the icons of the previous build
+    // still match while this one renders.
+    final menuIconBytes = <PopupMenuIconKey, Uint8List?>{};
 
     // Handle button icon - imageAsset takes precedence over customIcon
     if (widget.buttonImageAsset != null) {
@@ -560,12 +561,12 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     // Handle menu item icons - imageAsset takes precedence over customIcon
     // (an image asset doesn't need async rendering, it's already data)
     for (final e in walkPopupMenuEntries(widget.items)) {
-      final v = popupMenuEntryVisual(e);
-      if (v == null || v.imageAsset != null || v.customIcon == null) continue;
-      menuIconBytes[e] = await iconDataToImageBytes(
-        v.customIcon!,
-        size: v.icon?.size ?? 20.0,
-        color: v.iconColor ?? CupertinoColors.label,
+      final key = popupMenuIconKey(e);
+      if (key == null || menuIconBytes.containsKey(key)) continue;
+      menuIconBytes[key] = await iconDataToImageBytes(
+        key.icon,
+        size: key.size,
+        color: key.color,
       );
     }
     _menuIconBytes = menuIconBytes;
@@ -617,7 +618,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
     final buttonIconBytes = customIconData?['buttonIconBytes'] as Uint8List?;
     final menuIconBytes =
-        customIconData?['menuIconBytes'] as Map<CNPopupMenuEntry, Uint8List?>?;
+        customIconData?['menuIconBytes'] as Map<PopupMenuIconKey, Uint8List?>?;
 
     // Flatten entries into parallel arrays for the platform view.
     final menu = encodePopupMenuEntries(
@@ -967,13 +968,15 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
           actions: [
             for (var i = 0; i < entries.length; i++)
               if (entries[i] case final CNPopupMenuItem item)
-                CupertinoActionSheetAction(
+                _fallbackAction(
+                  enabled: item.enabled,
                   onPressed: () => Navigator.of(ctx).pop(i),
                   isDestructiveAction: item.isDestructive,
                   child: _fallbackLabel(ctx, item.label, item.subtitle),
                 )
               else if (entries[i] case final CNPopupMenuSubmenu submenu)
-                CupertinoActionSheetAction(
+                _fallbackAction(
+                  enabled: submenu.enabled,
                   onPressed: () => Navigator.of(ctx).pop(i),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1011,6 +1014,23 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       title: entry.label,
     );
     return rest == null ? null : [selected, ...rest];
+  }
+
+  /// An action sheet row. `CupertinoActionSheetAction` has no disabled
+  /// state, so a disabled entry is dimmed and ignores taps.
+  Widget _fallbackAction({
+    required bool enabled,
+    required VoidCallback onPressed,
+    bool isDestructiveAction = false,
+    required Widget child,
+  }) {
+    final action = CupertinoActionSheetAction(
+      onPressed: enabled ? onPressed : () {},
+      isDestructiveAction: isDestructiveAction,
+      child: enabled ? child : Opacity(opacity: 0.4, child: child),
+    );
+    if (enabled) return action;
+    return Semantics(enabled: false, child: IgnorePointer(child: action));
   }
 
   /// An action sheet row's label, with the [subtitle] as a smaller second

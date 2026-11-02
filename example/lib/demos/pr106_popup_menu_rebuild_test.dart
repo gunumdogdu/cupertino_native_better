@@ -22,7 +22,8 @@ import 'package:flutter/cupertino.dart';
 ///
 /// ### How this screen proves it
 ///
-/// Both menus use non-`const` items with a custom icon on every row.
+/// Both menus use non-`const` items with a custom icon on every row; each
+/// row's subtitle names the build it comes from.
 /// *Rebuild* bumps a counter in `setState`; [autoCycle] does it twice, one
 /// second apart, after the first frame. Then open both menus, and Nested's
 /// *Share* submenu.
@@ -70,28 +71,45 @@ class _Pr106PopupMenuRebuildTestPageState
 
   @override
   Widget build(BuildContext context) {
+    // Not const: each build makes new entries, as items that depend on state
+    // do. The subtitle also shows which build the open menu comes from.
+    final tag = 'build $_rebuilds';
     final flatItems = <CNPopupMenuEntry>[
       CNPopupMenuItem(
         label: 'Mail',
+        subtitle: tag,
         customIcon: CupertinoIcons.mail,
-        checked: _rebuilds.isEven,
       ),
-      const CNPopupMenuItem(label: 'Heart', customIcon: CupertinoIcons.heart),
+      CNPopupMenuItem(
+        label: 'Heart',
+        subtitle: tag,
+        customIcon: CupertinoIcons.heart,
+      ),
       const CNPopupMenuDivider(),
-      const CNPopupMenuItem(label: 'Star', customIcon: CupertinoIcons.star),
+      CNPopupMenuItem(
+        label: 'Star',
+        subtitle: tag,
+        customIcon: CupertinoIcons.star,
+      ),
     ];
     final nestedItems = <CNPopupMenuEntry>[
-      const CNPopupMenuItem(label: 'Home', customIcon: CupertinoIcons.house),
+      CNPopupMenuItem(
+        label: 'Home',
+        subtitle: tag,
+        customIcon: CupertinoIcons.house,
+      ),
       CNPopupMenuSubmenu(
         label: 'Share',
+        subtitle: tag,
         items: [
           CNPopupMenuItem(
             label: 'Mail',
+            subtitle: tag,
             customIcon: CupertinoIcons.mail,
-            checked: _rebuilds.isEven,
           ),
-          const CNPopupMenuItem(
+          CNPopupMenuItem(
             label: 'Phone',
+            subtitle: tag,
             customIcon: CupertinoIcons.phone,
           ),
         ],
