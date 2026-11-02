@@ -51,6 +51,11 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
   private var currentIconSizes: [CGFloat] = [] // Track icon sizes for dynamic height calculation
   private var labelFontFamily: String? = nil
   private var labelFontSize: CGFloat = 0 // 0 means system default (~10pt)
+  /// The menu each item opens instead of selecting itself (null for a plain
+  /// item), encoded by `encodePopupMenuEntries`.
+  private var currentMenus: [[String: Any]?] = []
+  /// The selected item, so a tap on an item with a menu can put it back.
+  private var currentIndex: Int = 0
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeTabBar_\(viewId)", binaryMessenger: messenger)
@@ -131,6 +136,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     if let dict = args as? [String: Any] {
       if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
       if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
+      self.currentMenus = Self.parseMenus(dict["menus"])
     }
 
     container.backgroundColor = .clear
@@ -444,6 +450,8 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     self.leftInsetVal = leftInset
     self.rightInsetVal = rightInset
     self.currentIconSizes = sizes.compactMap { $0 }.map { CGFloat(truncating: $0) }
+    self.currentIndex = selectedIndex
+    applyMenus()
 channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
@@ -501,6 +509,7 @@ channel.setMethodCallHandler { [weak self] call, result in
             self.iconScale = CGFloat(truncating: scale)
           }
           let selectedIndex = (args["selectedIndex"] as? NSNumber)?.intValue ?? 0
+          self.currentIndex = selectedIndex
           self.currentLabels = labels
           self.currentSymbols = symbols
           self.currentActiveSymbols = activeSymbols
@@ -586,10 +595,12 @@ channel.setMethodCallHandler { [weak self] call, result in
               let idx = selectedIndex - leftEnd
               if idx >= 0 && idx < items.count { right.selectedItem = items[idx]; left.selectedItem = nil }
             }
+            self.applyMenus()
             result(nil)
           } else if let bar = self.tabBar {
             bar.items = buildItems(0..<count)
             if let items = bar.items, selectedIndex >= 0, selectedIndex < items.count { bar.selectedItem = items[selectedIndex] }
+            self.applyMenus()
             result(nil)
           } else {
             result(FlutterError(code: "state_error", message: "Tab bars not initialized", details: nil))
@@ -604,6 +615,7 @@ channel.setMethodCallHandler { [weak self] call, result in
           let rightInset = self.rightInsetVal
           if let sp = args["splitSpacing"] as? NSNumber { self.splitSpacingVal = CGFloat(truncating: sp) }
           let selectedIndex = (args["selectedIndex"] as? NSNumber)?.intValue ?? 0
+          self.currentIndex = selectedIndex
           // Remove existing bars
           self.tabBar?.removeFromSuperview(); self.tabBar = nil
           self.tabBarLeft?.removeFromSuperview(); self.tabBarLeft = nil
@@ -843,10 +855,16 @@ channel.setMethodCallHandler { [weak self] call, result in
             }
           }
           self.isSplit = split; self.rightCountVal = rightCount; self.leftInsetVal = leftInset; self.rightInsetVal = rightInset
+          self.applyMenus()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing layout", details: nil)) }
+      case "setMenus":
+        self.currentMenus = Self.parseMenus((call.arguments as? [String: Any])?["menus"])
+        self.applyMenus()
+        result(nil)
       case "setSelectedIndex":
         if let args = call.arguments as? [String: Any], let idx = (args["index"] as? NSNumber)?.intValue {
+          self.currentIndex = idx
           // Defense-in-depth against the modal-recreate flow: suppress the
           // iOS 26 Liquid Glass selection-pill morph animation. Without this,
           // if Dart pushes setSelectedIndex over an existing channel (post-
@@ -1086,21 +1104,80 @@ channel.setMethodCallHandler { [weak self] call, result in
     }
   }
 
+  private static func parseMenus(_ value: Any?) -> [[String: Any]?] {
+    return ((value as? [Any]) ?? []).map { $0 as? [String: Any] }
+  }
+
+  /// Gives each bar the menus of its items, which open from a clear button
+  /// over the item and report `menuSelected` with the item's index and the
+  /// path of the chosen entry.
+  private func applyMenus() {
+    let bars: [(UITabBar?, Int)] = tabBar != nil
+      ? [(tabBar, 0)]
+      : [(tabBarLeft, 0), (tabBarRight, tabBarLeft?.items?.count ?? 0)]
+    for (bar, offset) in bars {
+      guard let bar = bar as? CNDotTabBar else { continue }
+      var menus: [Int: UIMenu] = [:]
+      for local in 0..<(bar.items?.count ?? 0) {
+        let index = offset + local
+        guard index < currentMenus.count, let dict = currentMenus[index] else { continue }
+        let children = PopupMenuBuilder.elements(level: PopupMenuLevel(dict: dict), iconScale: iconScale) { [weak self] path in
+          self?.channel.invokeMethod("menuSelected", arguments: ["index": index, "path": path])
+        }
+        menus[local] = UIMenu(title: "", children: children)
+      }
+      bar.itemMenus = menus
+    }
+  }
+
+  /// Selects [currentIndex] again. The bar animates it, so the selection
+  /// slides back instead of jumping.
+  private func restoreSelection() {
+    if let bar = self.tabBar, let items = bar.items {
+      bar.selectedItem = currentIndex >= 0 && currentIndex < items.count ? items[currentIndex] : nil
+      return
+    }
+    let leftCount = tabBarLeft?.items?.count ?? 0
+    if currentIndex < leftCount, let items = tabBarLeft?.items {
+      tabBarLeft?.selectedItem = items[currentIndex]
+      tabBarRight?.selectedItem = nil
+    } else if let items = tabBarRight?.items, currentIndex - leftCount < items.count {
+      tabBarRight?.selectedItem = items[currentIndex - leftCount]
+      tabBarLeft?.selectedItem = nil
+    }
+  }
+
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+    // An item with a menu opens it instead of being selected, but the
+    // bar's own gestures, which also get its button's touches, select it:
+    // put the selection back, report nothing, and open the menu if a
+    // finger slid onto the item rather than tapping its button. After this
+    // call, as the bar finishes selecting the item once it returns.
+    if let bar = tabBar as? CNDotTabBar, let items = bar.items,
+       let local = items.firstIndex(of: item), bar.opensMenu(at: local) {
+      DispatchQueue.main.async { [weak self, weak bar] in
+        self?.restoreSelection()
+        bar?.showMenu(at: local)
+      }
+      return
+    }
     // Single bar case
     if let single = self.tabBar, single === tabBar, let items = single.items, let idx = items.firstIndex(of: item) {
+      currentIndex = idx
       channel.invokeMethod("valueChanged", arguments: ["index": idx])
       return
     }
     // Split left
     if let left = tabBarLeft, left === tabBar, let items = left.items, let idx = items.firstIndex(of: item) {
       tabBarRight?.selectedItem = nil
+      currentIndex = idx
       channel.invokeMethod("valueChanged", arguments: ["index": idx])
       return
     }
     // Split right
     if let right = tabBarRight, right === tabBar, let items = right.items, let idx = items.firstIndex(of: item), let left = tabBarLeft, let leftItems = left.items {
       tabBarLeft?.selectedItem = nil
+      currentIndex = leftItems.count + idx
       channel.invokeMethod("valueChanged", arguments: ["index": leftItems.count + idx])
       return
     }

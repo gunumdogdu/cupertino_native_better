@@ -8,9 +8,12 @@ import '../style/sf_symbol.dart';
 import '../style/tab_bar_search_item.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/platform_view_guard.dart';
+import '../utils/popup_menu_encoder.dart';
+import '../utils/popup_menu_fallback_sheet.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import 'icon.dart';
+import 'popup_menu_button.dart';
 
 /// Immutable data describing a single tab bar item.
 class CNTabBarItem {
@@ -24,6 +27,7 @@ class CNTabBarItem {
     this.activeCustomIcon,
     this.imageAsset,
     this.activeImageAsset,
+    this.menuItems,
   });
 
   /// Optional tab item label.
@@ -73,6 +77,21 @@ class CNTabBarItem {
   /// Optional image asset for selected state.
   /// If not provided, [imageAsset] is used for both states.
   final CNImageAsset? activeImageAsset;
+
+  /// A menu the item opens instead of selecting itself, with the same
+  /// entries as [CNPopupMenuButton]: items, dividers and submenus.
+  ///
+  /// Tapping the item, or sliding a finger along the bar onto it, opens the
+  /// menu: the item never gets selected nor calls [CNTabBar.onTap], and a
+  /// chosen entry is reported to [CNTabBar.onMenuSelected]. Custom icons
+  /// ([CNPopupMenuItem.customIcon]) are not shown in these menus.
+  ///
+  /// On the iOS 26+ native bar it is a native menu. On the Flutter fallback
+  /// (iOS < 26, Android, web) it opens as a `CupertinoActionSheet`, with a
+  /// further sheet for each submenu, as [CNPopupMenuButton] does. On the
+  /// iOS 26+ bar with a [CNTabBar.searchItem], and on the native macOS bar,
+  /// the item is a plain tab.
+  final List<CNPopupMenuEntry>? menuItems;
 }
 
 /// A Cupertino-native tab bar. Uses native UITabBar/NSTabView style visuals.
@@ -122,6 +141,7 @@ class CNTabBar extends StatefulWidget {
     this.labelFontSize,
     this.autoHideOnModal = true,
     this.autoHideOnPageTransition = true,
+    this.onMenuSelected,
   }) : assert(items.length >= 2, 'Tab bar must have at least 2 items'),
        assert(
          items.length <= 5,
@@ -278,6 +298,11 @@ class CNTabBar extends StatefulWidget {
   /// the tab bar.
   final bool autoHideOnPageTransition;
 
+  /// Called when an entry is chosen in the menu of an item with
+  /// [CNTabBarItem.menuItems]: [index] is the item, [path] the entry, as in
+  /// [CNPopupMenuButton.onPathSelected].
+  final void Function(int index, List<int> path)? onMenuSelected;
+
   /// Renders the custom icons of [items] ahead of the bar's first mount.
   ///
   /// Pass the same [items] and [iconSize] as the bar, so its first build
@@ -334,6 +359,7 @@ class _CNTabBarState extends State<CNTabBar> {
   int? _lastRightCount;
   double? _lastSplitSpacing;
   double? _lastIconSize;
+  String? _lastMenusKey;
   String? _lastLabelFontFamily;
   double? _lastLabelFontSize;
 
@@ -815,6 +841,7 @@ class _CNTabBarState extends State<CNTabBar> {
       'activeImageAssetData': activeImageAssetData,
       'imageAssetFormats': imageAssetFormats,
       'activeImageAssetFormats': activeImageAssetFormats,
+      'menus': _encodeMenus(),
       'iconScale': capturedDevicePixelRatio,
       'sfSymbolSizes': sizes,
       'sfSymbolColors': colors,
@@ -961,6 +988,14 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastSplitSpacing = widget.splitSpacing;
     _lastLabelFontFamily = widget.labelFontFamily;
     _lastLabelFontSize = widget.labelFontSize;
+    // The bar is built from the creation params, prepared at the first
+    // mount and reused when it comes back after a modal: send the item
+    // menus if they changed since.
+    final menus = _encodeMenus();
+    _lastMenusKey = menus.toString();
+    if (_lastMenusKey != _creationParams?['menus'].toString()) {
+      ch.invokeMethod('setMenus', {'menus': menus}).catchError((_) => null);
+    }
 
     // Force refresh for label rendering (Issue #6: sporadic missing
     // labels with 5 items). The Swift-side `refresh` cycles
@@ -1007,8 +1042,27 @@ class _CNTabBarState extends State<CNTabBar> {
     }
   }
 
+  /// The menu of each item, or null for a plain item.
+  List<Map<String, Object?>?> _encodeMenus() => [
+    for (final item in widget.items)
+      item.menuItems == null
+          ? null
+          : encodePopupMenuEntries(
+              item.menuItems!,
+              resolveColor: (c) => resolveColorToArgb(c, context),
+              includeCustomIcons: false,
+            ),
+  ];
+
   Future<dynamic> _onMethodCall(MethodCall call) async {
-    if (call.method == 'valueChanged') {
+    if (call.method == 'menuSelected') {
+      final args = call.arguments as Map?;
+      final idx = (args?['index'] as num?)?.toInt();
+      final path = (args?['path'] as List?)?.cast<num>().map((e) => e.toInt());
+      if (idx != null && path != null && path.isNotEmpty) {
+        widget.onMenuSelected?.call(idx, List.unmodifiable(path));
+      }
+    } else if (call.method == 'valueChanged') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
       if (idx != null) {
@@ -1062,6 +1116,15 @@ class _CNTabBarState extends State<CNTabBar> {
       }
       if (style.isNotEmpty) {
         await ch.invokeMethod('setStyle', style);
+      }
+
+      // Item menus: entries carry no callback, so their encoding tells
+      // whether they changed.
+      final menus = _encodeMenus();
+      final menusKey = menus.toString();
+      if (_lastMenusKey != menusKey) {
+        await ch.invokeMethod('setMenus', {'menus': menus});
+        _lastMenusKey = menusKey;
       }
 
       // Items update (for hot reload or dynamic changes)
@@ -1253,6 +1316,24 @@ class _CNTabBarState extends State<CNTabBar> {
     } catch (_) {}
   }
 
+  /// A tap on the Flutter fallback: an item with [CNTabBarItem.menuItems]
+  /// opens its menu as an action sheet instead of being selected.
+  Future<void> _onFallbackTap(int index) async {
+    final menuItems = widget.items[index].menuItems;
+    if (menuItems == null) {
+      widget.onTap(index);
+      return;
+    }
+    final path = await showPopupMenuFallbackSheet(
+      context,
+      menuItems,
+      title: widget.items[index].label,
+    );
+    if (path != null && mounted) {
+      widget.onMenuSelected?.call(index, List.unmodifiable(path));
+    }
+  }
+
   /// Builds the Flutter fallback for non-iOS 26+ platforms.
   /// Includes search functionality when searchItem is provided.
   Widget _buildFlutterFallback(BuildContext context) {
@@ -1271,7 +1352,7 @@ class _CNTabBarState extends State<CNTabBar> {
             ),
         ],
         currentIndex: widget.currentIndex,
-        onTap: widget.onTap,
+        onTap: _onFallbackTap,
         backgroundColor: widget.backgroundColor,
         inactiveColor: CupertinoColors.inactiveGray,
         activeColor: tintColor,
@@ -1396,7 +1477,7 @@ class _CNTabBarState extends State<CNTabBar> {
           for (int i = 0; i < widget.items.length; i++)
             Flexible(
               child: GestureDetector(
-                onTap: () => widget.onTap(i),
+                onTap: () => _onFallbackTap(i),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
