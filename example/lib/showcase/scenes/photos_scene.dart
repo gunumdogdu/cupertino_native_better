@@ -4,8 +4,8 @@ import 'package:flutter/cupertino.dart';
 /// A Photos-style viewer: Liquid Glass buttons and a glass button group
 /// over full-bleed images, which the glass picks up as you swipe.
 ///
-/// Images: "Beauty in the Details" by Scott Webb and "New Horizons 1" by
-/// Ahmed Saffu, both CC0 (Unsplash, via Wikimedia Commons).
+/// Images: violet.jpg was made for this showcase; "New Horizons 1" by Ahmed
+/// Saffu is CC0 (Unsplash, via Wikimedia Commons).
 class PhotosScene extends StatefulWidget {
   const PhotosScene({super.key});
 
@@ -15,7 +15,7 @@ class PhotosScene extends StatefulWidget {
 
 class _PhotosSceneState extends State<PhotosScene> {
   static const _images = [
-    'assets/showcase/facets.jpg',
+    'assets/showcase/violet.jpg',
     'assets/showcase/horizon.jpg',
   ];
   static const _dates = ['Today', 'Yesterday'];

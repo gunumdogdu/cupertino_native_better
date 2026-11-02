@@ -14,14 +14,16 @@ topics:
   - native-widgets
 
 screenshots:
-  - description: 'iPhone Duo: tabs move to a vertical rail when folded, and layouts split at the fold'
-    path: screenshots/iphone_duo_preview.gif
-  - description: 'iOS 26 Liquid Glass buttons with native blur effects'
-    path: screenshots/button_preview.png
-  - description: 'Native tab bar with badges and glass styling'
-    path: screenshots/tab_bar_preview.png
-  - description: 'Native iOS slider with glass thumb effect'
-    path: screenshots/slider_preview.jpg
+  - description: 'Native iOS 26 and iOS 27 controls in Flutter apps: settings, files, photos, music and account screens'
+    path: screenshots/showcase.jpg
+  - description: 'A settings page built from the native segmented control, slider, switches and pop-up menu, switching to dark mode'
+    path: screenshots/display.gif
+  - description: 'The native tab bar and a pop-up menu with a Sort By submenu'
+    path: screenshots/files.gif
+  - description: 'CNTabBarNative: the tab bar minimizes on scroll, with a now-playing accessory'
+    path: screenshots/music.gif
+  - description: 'iPhone Duo: tabs in the vertical bar when closed, and a layout split at the fold'
+    path: screenshots/iphone_duo.gif
 
 environment:
   sdk: ^3.9.0

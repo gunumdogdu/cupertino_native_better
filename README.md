@@ -1,29 +1,107 @@
-# cupertino_native_better
-
-[![Pub Version](https://img.shields.io/pub/v/cupertino_native_better)](https://pub.dev/packages/cupertino_native_better)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20macOS-lightgrey)](https://flutter.dev)
-[![Docs](https://img.shields.io/badge/docs-gunumdogdu.com%2Fdocs-0a7?logo=readthedocs&logoColor=white)](https://gunumdogdu.com/docs)
-
-📖 **Full documentation, component reference, and live previews → [gunumdogdu.com/docs](https://gunumdogdu.com/docs)**
-
-Native iOS 26+ **Liquid Glass** widgets for Flutter with pixel-perfect fidelity. This package renders authentic Apple UI components using native platform views, providing the genuine iOS/macOS look and feel that Flutter's built-in widgets cannot achieve.
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/preview.jpg" alt="Preview" width="600"/>
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/banner.png" width="100%" alt="cupertino_native_better: iOS 26, iOS 27 and iPhone Duo. The real iOS controls, in Flutter.">
 </p>
 
-## Quick Start
+<p align="center">
+  <strong>The real iOS&nbsp;26 and iOS&nbsp;27 controls, in Flutter.</strong><br>
+  Liquid Glass tab bars, buttons, menus, sliders, switches, alerts and sheets, drawn by UIKit and SwiftUI themselves.
+</p>
+
+<p align="center">
+  <a href="https://pub.dev/packages/cupertino_native_better"><img src="https://img.shields.io/pub/v/cupertino_native_better?color=0A84FF" alt="pub version"></a>
+  <a href="https://pub.dev/packages/cupertino_native_better/score"><img src="https://img.shields.io/pub/points/cupertino_native_better?color=34C759" alt="pub points"></a>
+  <a href="https://github.com/gunumdogdu/cupertino_native_better/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-8E8E93" alt="MIT license"></a>
+  <a href="https://gunumdogdu.com/docs"><img src="https://img.shields.io/badge/docs-gunumdogdu.com-5E5CE6" alt="Documentation"></a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_display.gif" width="250" alt="A Display and Brightness page built from the native segmented control, slider, switches and pop-up menu, switching to dark mode">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_files.gif" width="250" alt="A Files app on the native tab bar, with a pop-up menu that opens a Sort By submenu">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_music.gif" width="250" alt="A Music app on CNTabBarNative: the tab bar minimizes on scroll and the now-playing accessory moves inline">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_photos.gif" width="250" alt="A Photos viewer: Liquid Glass buttons and a glass button group over two images, tinting themselves as you swipe">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_account.gif" width="250" alt="An account page opening the native alert and the native action sheet">
+</p>
+
+<p align="center"><sub>Every screen on this page is the example app, recorded on the iOS&nbsp;27 simulator. Nothing is mocked up.</sub></p>
+
+## Why it looks right
+
+- **Apple's own controls.** Each widget is a native UIKit or SwiftUI view, so the Liquid Glass, the animations, the menus and the haptics are the system's, and they keep up with every iOS release.
+- **Liquid Glass everywhere it belongs.** Tab bars that minimize on scroll, glass buttons and button groups that blend, slider thumbs that turn to glass under your finger, menus with submenus, alerts and anchored action sheets.
+- **iPhone Duo ready.** Tabs move to the vertical bar when folded and to a sidebar when open, and layouts can split at the hinge.
+- **Light and dark for free.** Every control follows the app's brightness.
+- **Runs everywhere else, too.** Below iOS&nbsp;26 and on Android and the web, each widget falls back to its Cupertino counterpart, so one codebase covers every platform.
+- **Accessible.** Native controls carry their VoiceOver names, values and traits.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/light_dark.png" width="520" alt="The Display and Brightness page in light and in dark mode">
+</p>
+
+## What's new in 1.9.0
+
+- **Subtitles and submenus in `CNPopupMenuButton`**, nested as deep as you like, with `onPathSelected` reporting the full path. Thanks [@johan-perso](https://github.com/johan-perso).
+- **`CNTabBarNative` no longer shows an empty accessory pill on iOS&nbsp;26.1+** when `bottomAccessory` is null. Thanks [@tgrushka](https://github.com/tgrushka).
+- **`CNTabBarNative.enable(showCloseButton: false)`** for root-mode apps whose tab bar is the whole app.
+- **`CNTabBar` no longer rebuilds its items on the first rebuild** when `iconSize` is set. Thanks [@Honahec](https://github.com/Honahec).
+
+The full list is in the [changelog](https://pub.dev/packages/cupertino_native_better/changelog).
+
+## Installation
+
+```yaml
+dependencies:
+  cupertino_native_better: ^1.9.0
+```
+
+Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26; earlier versions get the Cupertino fallbacks. The iOS deployment target is 15.0.
+
+## Quick start
 
 ```dart
 import 'package:cupertino_native_better/cupertino_native_better.dart';
+import 'package:flutter/cupertino.dart';
 
-void main() {
-  runApp(MyApp());
+void main() => runApp(
+  CupertinoApp(
+    // Keeps Liquid Glass views below sheets and dialogs. Required.
+    navigatorObservers: [CNTabBarRouteObserver()],
+    home: const HomePage(),
+  ),
+);
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  bool _wifi = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CNButton(
+              label: 'Get Started',
+              config: const CNButtonConfig(style: CNButtonStyle.prominentGlass),
+              onPressed: () {},
+            ),
+            CNSwitch(value: _wifi, onChanged: (v) => setState(() => _wifi = v)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 ```
-
-> **Note:** `PlatformVersion` auto-initializes on first access. No need to call `initialize()` anymore!
 
 ### Required Setup: register `CNTabBarRouteObserver`
 
@@ -94,58 +172,177 @@ Without one of these, the package falls back to a conservative "hide every CN-wi
 
 Each affected widget also has an `autoHideOnModal: bool = true` constructor parameter so you can opt out per-instance if you ever need the old behavior.
 
-## Performance Best Practices
+## Components
 
-### ⚠️ LiquidGlassContainer & Lists
+### Slider, switch and segmented control
 
-`LiquidGlassContainer` uses a **Platform View** (`UiKitView` / `AppKitView`) under the hood. While powerful, platform views are more expensive than standard Flutter widgets.
+The system's own controls, so the slider thumb turns to glass while you drag it and the switch stretches as it flips.
 
-*   **DO NOT** use `LiquidGlassContainer` inside long scrolling lists (`ListView.builder`, `GridView`) with many items. This will cause significant performance drops (jank).
-*   **DO** use `LiquidGlassContainer` for static elements like Cards, Headers, Navigation Bars, or Floating Action Buttons.
-
-## Why cupertino_native_better?
-
-### Comparison with Other Packages
-
-| Feature | cupertino_native_better | cupertino_native_plus | cupertino_native |
-|---------|:-----------------------:|:---------------------:|:----------------:|
-| iOS 26+ Liquid Glass | **Yes** | Yes | No |
-| Release Build Version Detection | **Fixed** | Broken | N/A |
-| SF Symbol Fallback (iOS < 26) | **CNIcon renders natively** | Placeholder icons | N/A |
-| Button Label + Icon Fallback | **Both render correctly** | Label disappears | N/A |
-| Tab Bar Icon Fallback | **CNIcon renders natively** | Empty circles | N/A |
-| Image Asset Support (PNG/SVG) | **Full support** | Partial | No |
-| Automatic Asset Resolution | **Yes (1x-4x)** | No | No |
-| Dark Mode Sync | **Automatic** | Manual | Manual |
-| Glass Effect Unioning | **Yes** | Yes | No |
-| macOS Support | **Yes** | Yes | Yes |
-
-### The Problem with Other Packages
-
-**cupertino_native_plus** has a critical bug: it uses platform channels to detect iOS versions, which fails with *"Null check operator used on a null value"* in release builds. This causes:
-
-- `shouldUseNativeGlass` returns `false` even on iOS 26+
-- Falls back to old Cupertino widgets incorrectly
-- Icons show as "..." or empty circles on iOS 18
-- Button labels disappear when buttons have both icon and label
-
-### Our Solution
-
-**cupertino_native_better** fixes all these issues:
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/slider.gif" width="420" alt="A native slider: the thumb turns to Liquid Glass while it is dragged"><br>
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/switch.gif" width="420" alt="A native switch flipping on"><br>
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/segmented_control.gif" width="420" alt="A native segmented control selecting Dark, which switches the page to dark mode">
+</p>
 
 ```dart
-// We parse Platform.operatingSystemVersion directly
-// Example: "Version 26.1 (Build 23B82)" -> 26
-static int? _getIOSVersionManually() {
-  final versionString = Platform.operatingSystemVersion;
-  final match = RegExp(r'Version (\d+)\.').firstMatch(versionString);
-  return int.tryParse(match?.group(1) ?? '');
-}
+CNSlider(value: _brightness, onChanged: (v) => setState(() => _brightness = v))
+
+CNSwitch(value: _trueTone, onChanged: (v) => setState(() => _trueTone = v))
+
+CNSegmentedControl(
+  labels: const ['Light', 'Dark', 'Automatic'],
+  selectedIndex: _appearance,
+  onValueChanged: (i) => setState(() => _appearance = i),
+)
 ```
 
-This approach works reliably in **both debug and release builds**.
+### Pop-up menus with subtitles and submenus
 
-## Features
+A real `UIMenu`: subtitles, checkmarks, SF Symbols, destructive items and submenus nested as deep as you need.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/popup_menu.gif" width="300" alt="A native pop-up menu opening a Sort By submenu and re-sorting the list by name">
+</p>
+
+```dart
+CNPopupMenuButton.icon(
+  buttonIcon: const CNSymbol('ellipsis'),
+  items: [
+    const CNPopupMenuItem(label: 'New Folder', icon: CNSymbol('folder.badge.plus')),
+    const CNPopupMenuDivider(),
+    CNPopupMenuSubmenu(
+      label: 'Sort By',
+      subtitle: 'Date',
+      icon: const CNSymbol('arrow.up.arrow.down'),
+      items: [
+        for (final name in ['Name', 'Kind', 'Date', 'Size'])
+          CNPopupMenuItem(label: name, checked: name == 'Date'),
+      ],
+    ),
+  ],
+  onPathSelected: (path) {}, // [2, 0] = Sort By › Name
+)
+```
+
+### Tab bar
+
+`CNTabBar` is a native `UITabBar` for your own layout, with badges, image assets, a split mode and a separate search tab.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/tab_bar.gif" width="420" alt="The native tab bar switching between Recents, Shared and Browse">
+</p>
+
+```dart
+CNTabBar(
+  items: const [
+    CNTabBarItem(label: 'Recents', icon: CNSymbol('clock'), activeIcon: CNSymbol('clock.fill')),
+    CNTabBarItem(label: 'Shared', icon: CNSymbol('folder.badge.person.crop')),
+    CNTabBarItem(label: 'Browse', icon: CNSymbol('folder'), activeIcon: CNSymbol('folder.fill')),
+  ],
+  currentIndex: _tab,
+  onTap: (i) => setState(() => _tab = i),
+  searchItem: const CNTabBarSearchItem(placeholder: 'Search'),
+)
+```
+
+### Native tab bar with minimize on scroll
+
+`CNTabBarNative` presents a SwiftUI `TabView`: the bar minimizes while you scroll, a bottom accessory rides above it, and the search tab is the system's.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/native_tab_bar.gif" width="420" alt="The native TabView: the tab bar minimizes on scroll, the now-playing accessory moves inline, then Library and Search open">
+</p>
+
+```dart
+await CNTabBarNative.enable(
+  asRoot: true,
+  showCloseButton: false,
+  bottomAccessory: const CNTabAccessory(text: 'Morning Run Mix', sfSymbol: CNSymbol('play.fill')),
+  tabs: [
+    CNTab(title: 'Home', sfSymbol: const CNSymbol('house.fill'), nativeList: homeList),
+    CNTab(title: 'Library', sfSymbol: const CNSymbol('square.stack.fill'), badgeCount: 3, nativeList: libraryList),
+    CNTab(title: 'Search', isSearchTab: true, nativeList: searchList),
+  ],
+);
+```
+
+### Buttons and Liquid Glass
+
+Glass and prominent glass buttons, icon buttons with badges, and `CNGlassButtonGroup`, whose buttons share one piece of glass. The glass picks up the colour of whatever is behind it.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/glass_buttons.gif" width="420" alt="Liquid Glass buttons and a glass button group over a photo, tinting themselves as the photo changes">
+</p>
+
+```dart
+CNButton.icon(icon: const CNSymbol('square.and.arrow.up'), onPressed: share)
+
+CNGlassButtonGroup(
+  buttons: [
+    CNButtonData.icon(icon: const CNSymbol('heart'), onPressed: like,
+        config: const CNButtonDataConfig(glassEffectUnionId: 'actions')),
+    CNButtonData.icon(icon: const CNSymbol('info.circle'), onPressed: info,
+        config: const CNButtonDataConfig(glassEffectUnionId: 'actions')),
+  ],
+)
+```
+
+### Alerts and action sheets
+
+`UIAlertController`, with text fields, cancel and destructive actions. On iOS&nbsp;26 an action sheet anchors to the control that opened it.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/alert.gif" width="330" alt="A native alert with Cancel and a destructive Sign Out action">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/action_sheet.gif" width="330" alt="A native action sheet anchored to the Delete Account row">
+</p>
+
+```dart
+final result = await CNAlert.show<String>(
+  context: context,
+  title: 'Sign Out?',
+  actions: const [
+    CNAlertAction(label: 'Cancel', isCancel: true),
+    CNAlertAction(label: 'Sign Out', value: 'out', isDestructive: true),
+  ],
+);
+```
+
+### iPhone Duo
+
+`CNTabScaffold` puts the tabs where the system would: in the vertical bar when the device is closed, in a sidebar when it is open. `CNFoldable` reports the hinge, so a layout can split exactly at the fold.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/iphone_duo.gif" width="600" alt="iPhone Duo: tabs in the vertical bar when closed, then the device opens and, half folded, the list and the selected file split at the hinge">
+</p>
+
+```dart
+CNFoldableScope(
+  child: CNTabScaffold(
+    items: tabs,
+    currentIndex: _tab,
+    onTap: (i) => setState(() => _tab = i),
+    sidebarOnWideScreens: true,
+    body: page,
+  ),
+)
+```
+
+### And more
+
+| Widget | What it is |
+|---|---|
+| `CNIcon` | SF Symbols drawn by the system, in every rendering mode, plus your own image assets and `IconData` |
+| `CNSearchBar` | An expanding native search field |
+| `CNToast` | Toasts on Liquid Glass, with success, error, warning, info and loading styles |
+| `CNFloatingIsland` | A glass island that expands into more content |
+| `CNBottomSheet` | Sheets that keep the glass behind them where it belongs |
+| `LiquidGlassContainer` | Liquid Glass behind any Flutter widget |
+| `CNTabRail` | A vertical glass tab rail or sidebar |
+| `CNGlassCard` | An experimental glass card with an optional breathing glow |
+
+Open the example app's **Showcase** section to try every screen above on your own device.
+
+## Guides
 
 ### Widgets
 
@@ -171,82 +368,7 @@ This approach works reliably in **both debug and release builds**.
 | `CNTabBarNative` | **iOS 26 Native Tab Bar** with UITabBarController + search | - |
 | `CNToast` | Toast notifications with Liquid Glass effects | - |
 
-### Icon Support
-
-All widgets support three icon types with unified priority:
-
-1. **Image Assets** (highest priority) - PNG, SVG, JPG with automatic resolution selection
-2. **Custom Icons** - Any `IconData` (CupertinoIcons, Icons, custom)
-3. **SF Symbols** - Native Apple SF Symbols with rendering modes
-
-```dart
-// SF Symbol
-CNButton(
-  label: 'Settings',
-  icon: CNSymbol('gear', size: 20),
-  onPressed: () {},
-)
-
-// Custom Icon
-CNButton(
-  label: 'Home',
-  customIcon: CupertinoIcons.home,
-  onPressed: () {},
-)
-
-// Image Asset
-CNButton(
-  label: 'Custom',
-  imageAsset: CNImageAsset('assets/icons/custom.png', size: 20),
-  onPressed: () {},
-)
-```
-
-### Button Styles
-
-```dart
-CNButtonStyle.plain           // Minimal, text-only
-CNButtonStyle.gray            // Subtle gray background
-CNButtonStyle.tinted          // Tinted text
-CNButtonStyle.bordered        // Bordered outline
-CNButtonStyle.borderedProminent // Accent-colored border
-CNButtonStyle.filled          // Solid filled background
-CNButtonStyle.glass           // Liquid Glass effect (iOS 26+)
-CNButtonStyle.prominentGlass  // Prominent glass effect (iOS 26+)
-```
-
-### Glass Effect Unioning
-
-Multiple buttons can share a unified glass effect:
-
-```dart
-Row(
-  children: [
-    CNButton(
-      label: 'Left',
-      config: CNButtonConfig(
-        style: CNButtonStyle.glass,
-        glassEffectUnionId: 'toolbar',
-      ),
-      onPressed: () {},
-    ),
-    CNButton(
-      label: 'Right',
-      config: CNButtonConfig(
-        style: CNButtonStyle.glass,
-        glassEffectUnionId: 'toolbar',
-      ),
-      onPressed: () {},
-    ),
-  ],
-)
-```
-
 ### Tab Bar with Split Mode
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/tab_bar_preview.png" width="300" alt="Tab Bar Preview"/>
-</p>
 
 ```dart
 CNTabBar(
@@ -310,12 +432,6 @@ clear of it, and a title wider than a narrow tab (the lone tab in split mode)
 shrinks to fit.
 
 ### Native iOS 26 Tab Bar (CNTabBarNative)
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/cntabbarnative_preview.gif" width="280" alt="CNTabBarNative: minimize-on-scroll, bottom accessory, and native iOS 26 search tab"/>
-</p>
-
-<p align="center"><em>Minimize-on-scroll, the bottom accessory pill, and the native iOS 26 search tab — all rendered natively.</em></p>
 
 > **`CNTabBarNative` is not a Flutter widget — it is a full native takeover.**
 > Calling `CNTabBarNative.enable(...)` presents a real iOS 26 Liquid Glass tab bar
@@ -549,10 +665,6 @@ This mirrors `UISearchTab.automaticallyActivatesSearch` from UIKit.
 
 ### iPhone Duo (foldable)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/iphone_duo_preview.gif" width="560" alt="iPhone Duo: the tab bar moves to a vertical rail when folded, and the layout splits at the fold when partially open"/>
-</p>
-
 iPhone Duo folds. Closed, it uses its outer display; open, its larger inner display; partially open, it stands in a *book* pose (fold top to bottom) or a *tabletop* pose (fold left to right). On the outer display, and on the inner display in landscape, iOS 27.1 moves the status bar and the tab bar to a **vertical bar** on one edge.
 
 **`CNTabBarNative`** gets the vertical bar automatically once your app is built with Xcode 27.1. Add `sidebarOnWideScreens: true` to turn the tabs into a native sidebar on the open inner display: beside the content in landscape, behind a sidebar button in portrait.
@@ -631,22 +743,80 @@ CNSlider(value: volume, semanticLabel: 'Volume', onChanged: setVolume)
 
 > **Known Flutter limitation ([flutter/flutter#194389](https://github.com/flutter/flutter/issues/194389)):** VoiceOver *touch exploration* — moving a finger over the screen to find an element — does not reach a native control that shares its area with a scrolling Flutter list, because Flutter's accessibility hit test returns the list first. That covers controls placed inside a `ListView`, and a `CNTabBar` or `CNTabScaffold` bar floating over scrolling content. `CNTabBarNative` is not affected: its tab bar is a real `UITabBarController` outside Flutter's view. Where touch exploration of the tab bar matters, prefer `CNTabBarNative`.
 
-## Installation
+### Icon Support
 
-Add to your `pubspec.yaml`:
+All widgets support three icon types with unified priority:
 
-```yaml
-dependencies:
-  cupertino_native_better: ^1.8.3
+1. **Image Assets** (highest priority) - PNG, SVG, JPG with automatic resolution selection
+2. **Custom Icons** - Any `IconData` (CupertinoIcons, Icons, custom)
+3. **SF Symbols** - Native Apple SF Symbols with rendering modes
+
+```dart
+// SF Symbol
+CNButton(
+  label: 'Settings',
+  icon: CNSymbol('gear', size: 20),
+  onPressed: () {},
+)
+
+// Custom Icon
+CNButton(
+  label: 'Home',
+  customIcon: CupertinoIcons.home,
+  onPressed: () {},
+)
+
+// Image Asset
+CNButton(
+  label: 'Custom',
+  imageAsset: CNImageAsset('assets/icons/custom.png', size: 20),
+  onPressed: () {},
+)
+```
+
+### Button Styles
+
+```dart
+CNButtonStyle.plain           // Minimal, text-only
+CNButtonStyle.gray            // Subtle gray background
+CNButtonStyle.tinted          // Tinted text
+CNButtonStyle.bordered        // Bordered outline
+CNButtonStyle.borderedProminent // Accent-colored border
+CNButtonStyle.filled          // Solid filled background
+CNButtonStyle.glass           // Liquid Glass effect (iOS 26+)
+CNButtonStyle.prominentGlass  // Prominent glass effect (iOS 26+)
+```
+
+### Glass Effect Unioning
+
+Multiple buttons can share a unified glass effect:
+
+```dart
+Row(
+  children: [
+    CNButton(
+      label: 'Left',
+      config: CNButtonConfig(
+        style: CNButtonStyle.glass,
+        glassEffectUnionId: 'toolbar',
+      ),
+      onPressed: () {},
+    ),
+    CNButton(
+      label: 'Right',
+      config: CNButtonConfig(
+        style: CNButtonStyle.glass,
+        glassEffectUnionId: 'toolbar',
+      ),
+      onPressed: () {},
+    ),
+  ],
+)
 ```
 
 ## Usage
 
 ### Basic Button
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/button_preview.png" width="300" alt="Button Preview"/>
-</p>
 
 ```dart
 CNButton(
@@ -664,19 +834,7 @@ CNButton(
 
 ### Button Styles Gallery
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/button_preview_2.png" width="300" alt="Glass Button Styles"/>
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/button_preview_3.png" width="300" alt="Filled Button Styles"/>
-</p>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/button_preview_4.png" width="300" alt="More Button Styles"/>
-</p>
-
 ### Icon-Only Button
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/icon_button_preview.png" width="300" alt="Icon Button Preview"/>
-</p>
 
 ```dart
 CNButton.icon(
@@ -687,10 +845,6 @@ CNButton.icon(
 ```
 
 ### Native Icons
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/icon_preview.png" width="300" alt="Icon Preview"/>
-</p>
 
 ```dart
 CNIcon(
@@ -704,10 +858,6 @@ CNIcon(
 ```
 
 ### Slider with Controller
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/slider_preview.jpg" width="300" alt="Slider Preview"/>
-</p>
 
 ```dart
 final controller = CNSliderController();
@@ -728,10 +878,6 @@ controller.setValue(0.75);
 
 ### Switch with Controller
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/switch_preview.png" width="300" alt="Switch Preview"/>
-</p>
-
 ```dart
 final controller = CNSwitchController();
 
@@ -750,11 +896,6 @@ controller.setEnabled(false); // Disable interaction
 ```
 
 ### Popup Menu Button
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/popup_menu_preview.png" width="300" alt="Popup Menu Button"/>
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/popup_menu_opened_preview.jpg" width="300" alt="Popup Menu Opened"/>
-</p>
 
 ```dart
 // Text-labeled popup menu
@@ -973,10 +1114,6 @@ second `CNAlert.show` replaced this alert. Things to know:
 
 ### Segmented Control
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/screenshots/segmented_control_preview.png" width="300" alt="Segmented Control Preview"/>
-</p>
-
 ```dart
 // Text-only segments
 CNSegmentedControl(
@@ -1034,6 +1171,15 @@ CNGlassCard(
 )
 ```
 
+## Performance Best Practices
+
+### ⚠️ LiquidGlassContainer & Lists
+
+`LiquidGlassContainer` uses a **Platform View** (`UiKitView` / `AppKitView`) under the hood. While powerful, platform views are more expensive than standard Flutter widgets.
+
+*   **DO NOT** use `LiquidGlassContainer` inside long scrolling lists (`ListView.builder`, `GridView`) with many items. This will cause significant performance drops (jank).
+*   **DO** use `LiquidGlassContainer` for static elements like Cards, Headers, Navigation Bars, or Floating Action Buttons.
+
 ## Platform Fallbacks
 
 | Platform | Liquid Glass | SF Symbols | Other Widgets |
@@ -1079,7 +1225,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.8.3
+   cupertino_native_better: ^1.9.0
    ```
 
 2. Update imports:
@@ -1092,6 +1238,37 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    ```
 
 3. No other code changes needed - API is fully compatible!
+
+## Contributors
+
+This package is better for every one of these people.
+
+<p align="center">
+  <a href="https://github.com/yagizdo"><img src="https://github.com/yagizdo.png?size=240" width="104" height="104" alt="Yılmaz Yağız Dokumacı"></a>
+</p>
+
+<p align="center">
+  <strong><a href="https://github.com/yagizdo">Yılmaz Yağız Dokumacı (@yagizdo)</a></strong><br>
+  10 merged pull requests, among them the native <code>CNActionSheet</code> and <code>CNAlert</code>, Swift Package Manager builds,
+  system brightness, the tab bar's native label fonts, and a long run of tab bar and icon fixes.
+</p>
+
+<p align="center">
+  <a href="https://github.com/anirudhrao-github" title="anirudhrao-github"><img src="https://github.com/anirudhrao-github.png?size=120" width="56" height="56" alt="anirudhrao-github"></a>
+  <a href="https://github.com/azharul-islam" title="Azharul Islam"><img src="https://github.com/azharul-islam.png?size=120" width="56" height="56" alt="Azharul Islam"></a>
+  <a href="https://github.com/Azzeccagarbugli" title="Francesco Coppola"><img src="https://github.com/Azzeccagarbugli.png?size=120" width="56" height="56" alt="Francesco Coppola"></a>
+  <a href="https://github.com/Honahec" title="Hao Chen"><img src="https://github.com/Honahec.png?size=120" width="56" height="56" alt="Hao Chen"></a>
+  <a href="https://github.com/MohamedAboElM3aTy" title="Mohamed Abo El Maaty Zaky"><img src="https://github.com/MohamedAboElM3aTy.png?size=120" width="56" height="56" alt="Mohamed Abo El Maaty Zaky"></a>
+  <a href="https://github.com/TjarkGomollaDev" title="Tjark"><img src="https://github.com/TjarkGomollaDev.png?size=120" width="56" height="56" alt="Tjark"></a>
+  <a href="https://github.com/fbernack" title="Franz Bernack"><img src="https://github.com/fbernack.png?size=120" width="56" height="56" alt="Franz Bernack"></a>
+  <a href="https://github.com/johan-perso" title="Johan"><img src="https://github.com/johan-perso.png?size=120" width="56" height="56" alt="Johan"></a>
+  <a href="https://github.com/johndavid92" title="VishalKevadiya"><img src="https://github.com/johndavid92.png?size=120" width="56" height="56" alt="VishalKevadiya"></a>
+  <a href="https://github.com/jonathanfristedt" title="Jonathan Fristedt"><img src="https://github.com/jonathanfristedt.png?size=120" width="56" height="56" alt="Jonathan Fristedt"></a>
+  <a href="https://github.com/josec-ecw" title="José Cano"><img src="https://github.com/josec-ecw.png?size=120" width="56" height="56" alt="José Cano"></a>
+  <a href="https://github.com/tgrushka" title="Tom Grushka"><img src="https://github.com/tgrushka.png?size=120" width="56" height="56" alt="Tom Grushka"></a>
+</p>
+
+<p align="center"><sub>[anirudhrao-github](https://github.com/anirudhrao-github), [Azharul Islam](https://github.com/azharul-islam), [Francesco Coppola](https://github.com/Azzeccagarbugli), [Hao Chen](https://github.com/Honahec), [Mohamed Abo El Maaty Zaky](https://github.com/MohamedAboElM3aTy), [Tjark](https://github.com/TjarkGomollaDev), [Franz Bernack](https://github.com/fbernack), [Johan](https://github.com/johan-perso), [VishalKevadiya](https://github.com/johndavid92), [Jonathan Fristedt](https://github.com/jonathanfristedt), [José Cano](https://github.com/josec-ecw), [Tom Grushka](https://github.com/tgrushka)</sub></p>
 
 ## Contributing
 
