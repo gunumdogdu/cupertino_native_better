@@ -34,6 +34,9 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=submenus
 //     (CNPopupMenuButton subtitles and submenus; open the menus by hand)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=split5
+//     (CNTabBar split with five items; use the buttons by hand)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -56,6 +59,7 @@ import 'demos/pr100_tabbar_font_runtime_test.dart';
 import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/alert.dart';
 import 'demos/popup_menu_submenus_test.dart';
+import 'demos/tabbar_split_five_items_test.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
@@ -141,6 +145,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'submenus') {
       return const PopupMenuSubmenusTest();
+    }
+    if (_probe == 'split5') {
+      return const TabBarSplitFiveItemsTestPage();
     }
     if (_probe == 'pr82') {
       return const Pr82TabBarFontFirstBuildTestPage(autoCycle: _auto);
