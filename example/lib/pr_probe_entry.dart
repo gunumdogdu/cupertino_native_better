@@ -50,6 +50,7 @@ import 'demos/issue105_tabbar_dot_badge_test.dart';
 import 'demos/pr96_99_icon_tap_placeholder_test.dart';
 import 'demos/pr97_98_tabbar_mount_test.dart';
 import 'demos/pr100_tabbar_font_runtime_test.dart';
+import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/alert.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
@@ -150,6 +151,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'pr100') {
       return const Pr100TabBarFontRuntimeTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'pr94') {
+      return const Pr94TabAccessoryNullTestPage(autoCycle: true);
     }
     if (_probe == 'issue105') {
       return const Issue105TabBarDotBadgeTestPage(autoCycle: _auto);

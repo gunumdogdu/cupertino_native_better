@@ -359,12 +359,33 @@ struct CNMinimizingTabView: View {
         // modifier (the `if let … else base` form) changes the structure, which
         // rebuilds the TabView and resets its selection to tab 0 — the glitch
         // seen when entering/leaving the tab that hides its accessory.
-        base.tabViewBottomAccessory {
-            if let accessory = store.accessory {
-                accessoryView(accessory)
-            } else {
-                EmptyView()
+        //
+        // iOS 26.1 draws an empty accessory pill for `EmptyView()`; only
+        // `isEnabled: false` hides it (#93). That API needs the iOS 26.1 SDK,
+        // which Xcode 26.1 (Swift 6.2.1) is the first to ship.
+#if compiler(>=6.2.1)
+        if #available(iOS 26.1, *) {
+            base.tabViewBottomAccessory(isEnabled: store.accessory != nil) {
+                accessoryContent
             }
+        } else {
+            base.tabViewBottomAccessory {
+                accessoryContent
+            }
+        }
+#else
+        base.tabViewBottomAccessory {
+            accessoryContent
+        }
+#endif
+    }
+
+    @ViewBuilder
+    private var accessoryContent: some View {
+        if let accessory = store.accessory {
+            accessoryView(accessory)
+        } else {
+            EmptyView()
         }
     }
 
@@ -542,8 +563,6 @@ struct CNMinimizingTabView: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessory.text)
     }
 }
 
