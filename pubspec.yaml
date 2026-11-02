@@ -1,5 +1,5 @@
 name: cupertino_native_better
-description: Native iOS Liquid Glass widgets for Flutter with pixel-perfect fidelity. Includes Button, Icon, TabBar, Slider, Switch, and more with reliable version detection.
+description: The real iOS 26 and iOS 27 Liquid Glass controls in Flutter: native tab bars, buttons, menus, sliders, switches, alerts and sheets, with Cupertino fallbacks.
 version: 1.8.3
 homepage: https://github.com/gunumdogdu/cupertino_native_better
 repository: https://github.com/gunumdogdu/cupertino_native_better
