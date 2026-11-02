@@ -31,6 +31,9 @@
 //    textfield | secure | twofields | supersede; the alert opens itself on the
 //    first frame.)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=submenus
+//     (CNPopupMenuButton subtitles and submenus; open the menus by hand)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -51,6 +54,7 @@ import 'demos/pr96_99_icon_tap_placeholder_test.dart';
 import 'demos/pr97_98_tabbar_mount_test.dart';
 import 'demos/pr100_tabbar_font_runtime_test.dart';
 import 'demos/alert.dart';
+import 'demos/popup_menu_submenus_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const String _backdrop = String.fromEnvironment(
@@ -129,6 +133,9 @@ class _ProbeApp extends StatelessWidget {
         label: _label,
         autoCycle: true,
       );
+    }
+    if (_probe == 'submenus') {
+      return const PopupMenuSubmenusTest();
     }
     if (_probe == 'pr82') {
       return const Pr82TabBarFontFirstBuildTestPage(autoCycle: _auto);
