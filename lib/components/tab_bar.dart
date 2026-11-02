@@ -1233,6 +1233,7 @@ class _CNTabBarState extends State<CNTabBar> {
         .map((e) => e.activeIcon?.name ?? e.icon?.name ?? '')
         .toList();
     _lastBadges = widget.items.map((e) => e.badge ?? '').toList();
+    _lastIconSize = widget.iconSize;
     // Note: Custom icon bytes are cached in _syncPropsToNativeIfNeeded when rendered
   }
 
