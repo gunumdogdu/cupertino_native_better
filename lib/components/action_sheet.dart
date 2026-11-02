@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/theme_helper.dart';
 import 'bottom_sheet.dart';
 
 /// Channel owned by `CNActionSheetManager` on the iOS side. It carries no
@@ -174,6 +175,7 @@ class CNActionSheet {
       message: message,
       cancelLabel: cancelLabel,
       anchorRect: anchorRect,
+      isDark: ThemeHelper.isDark(context),
     );
   }
 
@@ -183,6 +185,7 @@ class CNActionSheet {
     required String? message,
     required String? cancelLabel,
     required Rect? anchorRect,
+    required bool isDark,
   }) async {
     final payload = debugBuildActionSheetPayload(
       actions: actions,
@@ -190,6 +193,7 @@ class CNActionSheet {
       message: message,
       cancelLabel: cancelLabel,
       anchorRect: anchorRect,
+      isDark: isDark,
     );
 
     try {
@@ -259,11 +263,13 @@ Map<String, Object?> debugBuildActionSheetPayload({
   String? message,
   String? cancelLabel,
   Rect? anchorRect,
+  bool isDark = false,
 }) {
   return <String, Object?>{
     'title': title,
     'message': message,
     'cancelLabel': cancelLabel,
+    'isDark': isDark,
     'actions': [
       for (final action in actions)
         <String, Object?>{

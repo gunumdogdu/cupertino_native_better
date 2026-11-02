@@ -79,6 +79,52 @@ void main() {
       expect(payload['title'], isNull);
       expect(payload['message'], isNull);
       expect(payload['cancelLabel'], isNull);
+      expect(payload['isDark'], false);
+    });
+  });
+
+  group('CNActionSheet.show follows the app theme', () {
+    Future<Object?> sentIsDark(
+      WidgetTester tester, {
+      Brightness? theme,
+      Brightness system = Brightness.light,
+    }) async {
+      MethodCall? received;
+      mockChannel((call) async {
+        received = call;
+        return null;
+      });
+      tester.platformDispatcher.platformBrightnessTestValue = system;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+      await _withPlatform(TargetPlatform.iOS, () async {
+        final context = await _pumpContext(tester, brightness: theme);
+        await CNActionSheet.show<String>(
+          context: context,
+          actions: const [CNActionSheetAction(label: 'Share', value: 's')],
+          cancelLabel: 'Cancel',
+        );
+      });
+      return (received!.arguments as Map)['isDark'];
+    }
+
+    testWidgets('light theme on a dark system sends false', (tester) async {
+      expect(
+        await sentIsDark(
+          tester,
+          theme: Brightness.light,
+          system: Brightness.dark,
+        ),
+        false,
+      );
+    });
+
+    testWidgets('dark theme on a light system sends true', (tester) async {
+      expect(await sentIsDark(tester, theme: Brightness.dark), true);
+    });
+
+    testWidgets('no theme brightness follows the system', (tester) async {
+      expect(await sentIsDark(tester, system: Brightness.dark), true);
     });
   });
 
@@ -368,10 +414,14 @@ Future<void> _withPlatform(
 
 /// Pumps a minimal Cupertino app and returns a [BuildContext] below a
 /// [Navigator], which the fallback path needs to push its route.
-Future<BuildContext> _pumpContext(WidgetTester tester) async {
+Future<BuildContext> _pumpContext(
+  WidgetTester tester, {
+  Brightness? brightness,
+}) async {
   late BuildContext captured;
   await tester.pumpWidget(
     CupertinoApp(
+      theme: CupertinoThemeData(brightness: brightness),
       home: Builder(
         builder: (context) {
           captured = context;
