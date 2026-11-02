@@ -15,7 +15,15 @@ import UIKit
 ///
 /// Only bars whose appearance carries a font are touched; otherwise the
 /// labels keep whatever the system gives them.
+///
+/// iOS 26 also sizes each title for the width the bar has when it builds the
+/// item views and keeps that size when the bar later gets wider, so a bar laid
+/// out narrow or at 0x0 before Flutter gives the platform view its size kept
+/// "…" titles. This bar builds the item views again whenever its width changes.
 class CNLabelFontTabBar: UITabBar {
+
+  /// The width the item views were last built for.
+  private var itemsBuiltForWidth: CGFloat = 0
 
   override var standardAppearance: UITabBarAppearance {
     didSet { setNeedsLayout() }
@@ -23,8 +31,12 @@ class CNLabelFontTabBar: UITabBar {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    guard #available(iOS 26.0, *), hasCustomFont else { return }
-    allowShrinking(in: self)
+    guard #available(iOS 26.0, *) else { return }
+    if bounds.width > 0, abs(bounds.width - itemsBuiltForWidth) > 0.5 {
+      itemsBuiltForWidth = bounds.width
+      reloadItemViews()
+    }
+    if hasCustomFont { allowShrinking(in: self) }
   }
 
   /// Whether the appearance asks for a font of its own: the stacked layout's,
@@ -49,5 +61,23 @@ class CNLabelFontTabBar: UITabBar {
         label.setNeedsDisplay()
       }
     }
+  }
+}
+
+extension UITabBar {
+  /// Sets the items again so the bar builds their views anew, laid out for its
+  /// current width and appearance, and keeps the selected item. The delegate
+  /// is detached meanwhile, as in `refresh`, so no selection reaches Flutter.
+  func reloadItemViews() {
+    guard let items = items, !items.isEmpty else { return }
+    let selected = selectedItem
+    let barDelegate = delegate
+    delegate = nil
+    UIView.performWithoutAnimation {
+      self.items = nil
+      self.items = items
+      selectedItem = selected
+    }
+    delegate = barDelegate
   }
 }
