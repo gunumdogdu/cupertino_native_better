@@ -55,6 +55,7 @@ import 'demos/pr97_98_tabbar_mount_test.dart';
 import 'demos/pr100_tabbar_font_runtime_test.dart';
 import 'demos/alert.dart';
 import 'demos/popup_menu_submenus_test.dart';
+import 'demos/pr106_popup_menu_rebuild_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const String _backdrop = String.fromEnvironment(
@@ -133,6 +134,9 @@ class _ProbeApp extends StatelessWidget {
         label: _label,
         autoCycle: true,
       );
+    }
+    if (_probe == 'pr106') {
+      return const Pr106PopupMenuRebuildTestPage(autoCycle: true);
     }
     if (_probe == 'submenus') {
       return const PopupMenuSubmenusTest();
