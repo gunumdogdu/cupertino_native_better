@@ -25,6 +25,10 @@ The rendered custom icons were collected with one slot per entry, dividers inclu
 
 The `CupertinoActionSheet` used below iOS 26 and on other platforms reported a disabled item when tapped and opened a disabled submenu. Both are now dimmed and ignore taps.
 
+### Added — `CNTabBarNative.enable(showCloseButton:)`
+
+`showCloseButton: false` hides the close button in each tab's navigation bar, for a root-mode app whose tab bar is the whole app; it then closes only through `disable()`. Defaults to `true`, as before.
+
 ### Fixed — #94 `CNTabBarNative` showed an empty accessory pill on iOS 26.1+ (#93)
 
 Since iOS 26.1, `tabViewBottomAccessory` draws its pill even around an empty view, so `bottomAccessory: null` and `setBottomAccessory(null)` left an empty glass pill above the tab bar. The accessory is now disabled when there is none, through the iOS 26.1 `tabViewBottomAccessory(isEnabled:)`; switching it on and off keeps the selected tab. Apps built with Xcode 26.0, whose SDK lacks that call, keep the previous one. Verified on iOS 26.0, 26.2 and 27.0 simulators.

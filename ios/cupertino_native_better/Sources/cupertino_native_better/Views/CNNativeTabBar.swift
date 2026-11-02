@@ -227,6 +227,8 @@ final class CNMinTabStore: ObservableObject {
     /// Sidebar on wide screens (`.sidebarAdaptable`); fixed at enable time,
     /// since switching the TabView style rebuilds it.
     let sidebar: Bool
+    /// False for a root-mode app whose tab bar is the whole app.
+    let showCloseButton: Bool
 
     init(config: CNMinTabConfig) {
         tabs = config.tabs
@@ -237,6 +239,7 @@ final class CNMinTabStore: ObservableObject {
         accessory = config.accessory
         nativeSearchFilter = config.nativeSearchFilter
         sidebar = config.sidebar
+        showCloseButton = config.showCloseButton
     }
 
     func setSelection(_ index: Int) {
@@ -293,6 +296,7 @@ struct CNMinTabConfig {
     let asRoot: Bool
     let nativeSearchFilter: Bool
     let sidebar: Bool
+    let showCloseButton: Bool
 
     init(args: [String: Any]) {
         let tabsData = args["tabs"] as? [[String: Any]] ?? []
@@ -319,6 +323,7 @@ struct CNMinTabConfig {
         asRoot = args["asRoot"] as? Bool ?? false
         nativeSearchFilter = args["nativeSearchFilter"] as? Bool ?? true
         sidebar = args["sidebar"] as? Bool ?? false
+        showCloseButton = args["showCloseButton"] as? Bool ?? true
     }
 
     static func parseItems(_ data: [[String: Any]]) -> [ListItem] {
@@ -506,9 +511,11 @@ struct CNMinimizingTabView: View {
 
     @ToolbarContentBuilder
     private func closeToolbar() -> some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button { onClose() } label: { Image(systemName: "xmark") }
-                .accessibilityLabel("Close")
+        if store.showCloseButton {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { onClose() } label: { Image(systemName: "xmark") }
+                    .accessibilityLabel("Close")
+            }
         }
     }
 

@@ -2,6 +2,7 @@ import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 import 'demos/slider.dart';
+import 'showcase/showcase_app.dart' show buildShowcaseScene;
 import 'demos/switch.dart';
 import 'demos/segmented_control.dart';
 import 'demos/icon.dart';
@@ -208,6 +209,104 @@ class HomePage extends StatelessWidget {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
+            CupertinoListSection.insetGrouped(
+              header: Text('Showcase'),
+              children: [
+                CupertinoListTile(
+                  title: Text('Display & Brightness'),
+                  subtitle: Text('Segmented control, slider, switches, menu'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('sun.max.fill', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => buildShowcaseScene('display'),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Files'),
+                  subtitle: Text('Tab bar with search, menu with submenus'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('folder.fill', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => buildShowcaseScene('files'),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Photos'),
+                  subtitle: Text('Liquid Glass buttons over images'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('photo.fill', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => buildShowcaseScene('photos'),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Account'),
+                  subtitle: Text('Native alert and action sheet'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'person.crop.circle.fill',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => buildShowcaseScene('account'),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Music'),
+                  subtitle: Text('CNTabBarNative: minimize, accessory, search'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('music.note', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => buildShowcaseScene('music'),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('iPhone Duo'),
+                  subtitle: Text('Vertical bar, sidebar, split at the fold'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('iphone.gen3', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => buildShowcaseScene('duo'),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
             CupertinoListSection.insetGrouped(
               header: Text('Components'),
               children: [

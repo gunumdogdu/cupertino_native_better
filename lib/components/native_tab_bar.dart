@@ -85,6 +85,10 @@ class CNTabBarNative {
   static Future<bool> checkIsEnabled() async => _enabled;
 
   /// Present the native tab bar configured from [tabs].
+  ///
+  /// [showCloseButton] false hides the close button in each tab's navigation
+  /// bar, for a root-mode app whose tab bar is the whole app; it is then
+  /// closed only by [disable].
   static Future<void> enable({
     required List<CNTab> tabs,
     int selectedIndex = 0,
@@ -96,6 +100,7 @@ class CNTabBarNative {
     bool asRoot = false,
     bool nativeSearchFilter = true,
     bool sidebarOnWideScreens = false,
+    bool showCloseButton = true,
     void Function(int index)? onTabSelected,
     void Function(int tabIndex, int itemIndex)? onListItemTap,
     void Function(String query)? onSearchChanged,
@@ -153,6 +158,7 @@ class CNTabBarNative {
       'asRoot': asRoot,
       'nativeSearchFilter': nativeSearchFilter,
       'sidebar': sidebarOnWideScreens,
+      'showCloseButton': showCloseButton,
     });
 
     _enabled = true;

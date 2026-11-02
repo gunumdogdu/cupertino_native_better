@@ -67,6 +67,7 @@ flutter:
     - assets/icons/2.0x/
     - assets/icons/3.0x/
     - assets/icons/4.0x/
+    - assets/showcase/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
