@@ -1,3 +1,10 @@
+## Unreleased
+
+### Fixed — `CNTabBar(split: true)` on iOS 26+
+
+- **A single right item is a circle again with five items**, instead of a narrow pill with its icon and label shrunk. When the two groups are laid out by proportion, the right bar got 1/5 of the width with five items, and iOS 26 draws one item in a bar that narrow as a pill. The right group now gets at least 100 pt, the width it gets with four items on a 402 pt wide phone; two items or more already get enough.
+- **`splitSpacing` is the gap between the two glass capsules.** iOS 26 draws each capsule at its content's size and centres it in its bar, leaving about 22 pt of empty bar on each side, so the visible gap was `splitSpacing` plus about 44 pt. The two bars now overlap by that empty part, which holds no item. With the default 12 pt the gap looks like the one in Apple's apps.
+
 ## 1.9.0
 
 > Minor: subtitles and submenus in `CNPopupMenuButton` (#106, thanks @johan-perso), `CNTabBarNative.enable(showCloseButton:)`, fixes from @tgrushka (#94) and @Honahec (#107), and a new pub.dev page with native recordings of every component. Nothing changes for code that does not use the new options; `CNPopupMenuButton.onSelected` becomes nullable (see below).
