@@ -375,6 +375,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
               button.tintColor = Self.colorFromARGB(n.intValue)
             // Re-apply style so configuration picks up new base colors
               self.applyButtonStyle(buttonStyle: self.currentButtonStyle, round: self.makeRound)
+          } else if (args["clearTint"] as? NSNumber)?.boolValue == true {
+              // Back to the colour of a button created without a tint.
+              if #available(iOS 13.0, *) { button.tintColor = .label } else { button.tintColor = nil }
+              self.applyButtonStyle(buttonStyle: self.currentButtonStyle, round: self.makeRound)
           }
           if let bs = args["buttonStyle"] as? String {
             self.currentButtonStyle = bs

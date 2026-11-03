@@ -817,8 +817,12 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
         : null;
     final labelWeight = widget.config.labelFontWeight?.value;
 
-    if (_lastTint != tint && tint != null) {
-      await ch.invokeMethod('setStyle', {'tint': tint});
+    if (_lastTint != tint) {
+      // A tint set back to null resets the native one.
+      await ch.invokeMethod(
+        'setStyle',
+        tint != null ? {'tint': tint} : {'clearTint': true},
+      );
       _lastTint = tint;
     }
     if (_lastStyle != widget.config.style) {
@@ -1115,8 +1119,12 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
       _lastIsDark = isDark;
     }
     // Also propagate theme-driven tint changes (e.g., accent color changes)
-    if (_lastTint != tint && tint != null) {
-      await ch.invokeMethod('setStyle', {'tint': tint});
+    if (_lastTint != tint) {
+      // A tint set back to null resets the native one.
+      await ch.invokeMethod(
+        'setStyle',
+        tint != null ? {'tint': tint} : {'clearTint': true},
+      );
       _lastTint = tint;
     }
   }

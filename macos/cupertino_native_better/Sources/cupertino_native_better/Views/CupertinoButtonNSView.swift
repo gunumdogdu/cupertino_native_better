@@ -251,6 +251,10 @@ class CupertinoButtonNSView: NSView {
             } else {
                 button.contentTintColor = color
             }
+          } else if #available(macOS 10.14, *), (args["clearTint"] as? NSNumber)?.boolValue == true {
+            // Back to the colours of a button created without a tint.
+            button.bezelColor = nil
+            button.contentTintColor = nil
           }
           if let bs = args["buttonStyle"] as? String {
             self.currentButtonStyle = bs
