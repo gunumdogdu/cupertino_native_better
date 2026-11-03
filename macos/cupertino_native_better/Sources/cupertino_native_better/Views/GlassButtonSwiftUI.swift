@@ -23,7 +23,7 @@ struct GlassButtonSwiftUI: View {
   let badgeCount: Int?
 
   /// `prominentClearGlass` tints the glass itself with [tint], so its content
-  /// keeps the system's automatic foreground.
+  /// is white, as on `prominentGlass`.
   private var isProminentClear: Bool { style == "prominentClearGlass" }
 
   var body: some View {
@@ -35,16 +35,16 @@ struct GlassButtonSwiftUI: View {
             .resizable()
             .scaledToFit()
             .frame(width: iconSize, height: iconSize)
-            .foregroundColor(isProminentClear ? iconColor : (tint != nil ? tint : iconColor))
+            .foregroundColor(isProminentClear ? (iconColor ?? .white) : (tint != nil ? tint : iconColor))
         } else if let iconName = iconName {
           Image(systemName: iconName)
             .font(.system(size: iconSize))
-            .foregroundColor(iconColor)
+            .foregroundColor(isProminentClear ? (iconColor ?? .white) : iconColor)
         }
 
         if let title = title {
           Text(title)
-            .foregroundColor(isProminentClear ? nil : tint)
+            .foregroundColor(isProminentClear ? .white : tint)
         }
       }
       .padding(config.padding)

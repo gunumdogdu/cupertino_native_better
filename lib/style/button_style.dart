@@ -47,9 +47,9 @@ enum CNButtonStyle {
   /// With a `glassEffectUnionId` or `glassEffectId`, the SwiftUI path uses
   /// `Glass.clear` tinted with the button's tint, since SwiftUI's prominent
   /// glass button style draws its own glass and cannot join a glass union.
-  /// On both paths the label and icon keep the system foreground, dark in
-  /// light mode; an icon colour, or `CNButtonConfig.labelColor` without a
-  /// glass ID, overrides it.
+  /// On both paths the label and icon are white, as on [prominentGlass]; an
+  /// icon colour, or `CNButtonConfig.labelColor` without a glass ID,
+  /// overrides it.
   /// On macOS without those IDs it looks like [prominentGlass]. Below
   /// iOS/macOS 26 it falls back like [prominentGlass].
   prominentClearGlass,

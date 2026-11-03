@@ -32,13 +32,12 @@ struct GlassButtonSwiftUI: View {
   /// the control tint; when neither is provided the system/glass default
   /// (automatic adaptive foreground) applies.
   private var effectiveIconColor: Color? {
-    if isProminentClear { return iconColor }
+    if isProminentClear { return iconColor ?? .white }
     return iconColor ?? tint
   }
 
   /// `prominentClearGlass` tints the glass itself with [tint], so its content
-  /// keeps the system's automatic foreground, as
-  /// `UIButton.Configuration.prominentClearGlass()` does.
+  /// is white, as on `prominentGlass` and the UIKit path.
   private var isProminentClear: Bool { style == "prominentClearGlass" }
 
   var body: some View {
@@ -59,7 +58,7 @@ struct GlassButtonSwiftUI: View {
 
         if let title = title {
           Text(title)
-            .foregroundColor(isProminentClear ? nil : (tint != nil ? Color(tint!) : nil))
+            .foregroundColor(isProminentClear ? .white : (tint != nil ? Color(tint!) : nil))
         }
       }
       .padding(config.padding)

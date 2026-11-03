@@ -946,6 +946,9 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         case "filled", "borderedProminent", "prominentGlass", "prominentClearGlass":
           // Treat prominentGlass like filled: color the background and let system pick readable foreground
           config.baseBackgroundColor = tint
+          // UIKit keeps the dark label color on prominentClearGlass, which is
+          // unreadable on a dark tint. Use white, as prominentGlass does.
+          if buttonStyle == "prominentClearGlass" { config.baseForegroundColor = .white }
         case "tinted", "bordered", "gray", "plain", "glass", "clearGlass":
           // Foreground-only tint
           config.baseForegroundColor = tint

@@ -78,12 +78,6 @@ class CNTabBarNative {
   /// Whether the tab bar is currently presented.
   static bool get isEnabled => _enabled;
 
-  /// Deprecated: use [isEnabled] (synchronous). Kept for backward compatibility.
-  @Deprecated(
-    'Use isEnabled instead. Will be removed in a future major release.',
-  )
-  static Future<bool> checkIsEnabled() async => _enabled;
-
   /// Present the native tab bar configured from [tabs].
   ///
   /// [showCloseButton] false hides the close button in each tab's navigation
@@ -106,18 +100,6 @@ class CNTabBarNative {
     void Function(String query)? onSearchChanged,
     VoidCallback? onAccessoryTap,
     VoidCallback? onDismissed,
-    @Deprecated(
-      'No longer fired — use onSearchChanged. Will be removed in a future major release.',
-    )
-    void Function(String query)? onSearchSubmitted,
-    @Deprecated(
-      'No longer fired — use onSearchChanged. Will be removed in a future major release.',
-    )
-    VoidCallback? onSearchCancelled,
-    @Deprecated(
-      'No longer fired — use onSearchChanged. Will be removed in a future major release.',
-    )
-    void Function(bool isActive)? onSearchActiveChanged,
   }) async {
     // iOS 26+ only — no-op elsewhere.
     if (defaultTargetPlatform != TargetPlatform.iOS ||

@@ -74,7 +74,6 @@ import 'demos/alert.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // No longer need to call PlatformVersion.initialize() - it auto-initializes!
   runApp(const MyApp());
 }
 
