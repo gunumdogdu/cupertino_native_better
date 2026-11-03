@@ -11,6 +11,7 @@ class NativeTabBarDemoPage extends StatefulWidget {
     this.autoLaunch = false,
     this.initialAsRoot = false,
     this.sidebarOnWideScreens = false,
+    this.initialProminent = false,
   });
 
   /// Launches the native tab bar on the first frame instead of waiting for
@@ -20,6 +21,9 @@ class NativeTabBarDemoPage extends StatefulWidget {
 
   /// Starting value of the "as root" switch.
   final bool initialAsRoot;
+
+  /// Starting value of the "prominent New tab" switch.
+  final bool initialProminent;
 
   /// Passed to [CNTabBarNative.enable]: a sidebar on wide screens such as
   /// the open inner display of iPhone Duo.
@@ -34,6 +38,7 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
   bool _dark = false;
   bool _showAccessory = true;
   bool _asRoot = false;
+  bool _prominent = false;
   bool _launched = false;
   int _flutterTaps = 0;
   Color _tint = CupertinoColors.systemBlue;
@@ -43,6 +48,7 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
   void initState() {
     super.initState();
     _asRoot = widget.initialAsRoot;
+    _prominent = widget.initialProminent;
     if (widget.autoLaunch) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _launch();
@@ -181,6 +187,13 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
           isSearchTab: true,
           nativeList: CNNativeList(items: _searchItems),
         ),
+        if (_prominent)
+          CNTab(
+            title: 'New',
+            sfSymbol: CNSymbol('plus'),
+            isProminent: true,
+            nativeList: CNNativeList(items: _profileItems),
+          ),
       ],
       minimizeBehavior: _behavior,
       bottomAccessory: _showAccessory
@@ -353,6 +366,15 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
                 CupertinoSwitch(
                   value: _asRoot,
                   onChanged: (v) => setState(() => _asRoot = v),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                const Expanded(child: Text('Prominent "New" tab (iOS 27)')),
+                CupertinoSwitch(
+                  value: _prominent,
+                  onChanged: (v) => setState(() => _prominent = v),
                 ),
               ],
             ),

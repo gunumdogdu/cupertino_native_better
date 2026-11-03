@@ -272,6 +272,7 @@ struct CNMinTabConfig {
         let title: String
         let symbol: String?
         let isSearch: Bool
+        let isProminent: Bool
         var badge: Int?
         var listItems: [ListItem]?
     }
@@ -306,6 +307,7 @@ struct CNMinTabConfig {
                 title: d["title"] as? String ?? "",
                 symbol: d["sfSymbol"] as? String,
                 isSearch: d["isSearch"] as? Bool ?? false,
+                isProminent: d["isProminent"] as? Bool ?? false,
                 badge: d["badgeCount"] as? Int,
                 listItems: items.map { CNMinTabConfig.parseItems($0) }
             )
@@ -394,6 +396,17 @@ struct CNMinimizingTabView: View {
         }
     }
 
+    /// The search tab morphs into a search field; the prominent one (iOS 27)
+    /// is drawn apart from the others. `TabRole.prominent` is in the iOS 27
+    /// SDK, which ships SwiftUI 8.
+    private func role(of tab: CNMinTabConfig.Tab) -> TabRole? {
+        if tab.isSearch { return .search }
+#if canImport(SwiftUI, _version: 8.0)
+        if tab.isProminent, #available(iOS 27.0, *) { return .prominent }
+#endif
+        return nil
+    }
+
     private var base: some View {
         TabView(selection: $store.selection) {
             ForEach(store.tabs.indices, id: \.self) { index in
@@ -402,7 +415,7 @@ struct CNMinimizingTabView: View {
                 Tab(tab.title.isEmpty ? (tab.isSearch ? "Search" : "Tab \(index + 1)") : tab.title,
                     systemImage: tab.symbol ?? (tab.isSearch ? "magnifyingglass" : "circle"),
                     value: index,
-                    role: tab.isSearch ? .search : nil) {
+                    role: role(of: tab)) {
                     if tab.isSearch {
                         searchContent(items: tab.listItems ?? [],
                                       title: tab.title.isEmpty ? "Search" : tab.title,

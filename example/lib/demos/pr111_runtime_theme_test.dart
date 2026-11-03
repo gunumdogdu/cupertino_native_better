@@ -81,9 +81,7 @@ class _Pr111RuntimeThemeTestPageState extends State<Pr111RuntimeThemeTestPage> {
                         onPressed: () => CNAlert.show<int>(
                           context: context,
                           title: 'Alert',
-                          actions: const [
-                            CNAlertAction(label: 'OK', value: 1),
-                          ],
+                          actions: const [CNAlertAction(label: 'OK', value: 1)],
                         ),
                       ),
                     ],

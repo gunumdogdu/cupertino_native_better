@@ -70,6 +70,7 @@ import 'demos/prs_109_110_tabbar_test.dart';
 import 'demos/popup_menu_submenus_test.dart';
 import 'demos/tabbar_split_five_items_test.dart';
 import 'demos/tabbar_item_menus_test.dart';
+import 'demos/native_tab_bar_demo.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
@@ -160,6 +161,13 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'split5') {
       return const TabBarSplitFiveItemsTestPage();
+    }
+    if (_probe == 'prominent') {
+      return const NativeTabBarDemoPage(
+        autoLaunch: true,
+        initialAsRoot: true,
+        initialProminent: true,
+      );
     }
     if (_probe == 'tabmenus') {
       return const TabBarItemMenusTestPage();

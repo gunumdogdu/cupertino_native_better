@@ -140,6 +140,7 @@ class CNTabBarNative {
             'title': t.title,
             'sfSymbol': t.sfSymbol?.name,
             'isSearch': t.isSearchTab,
+            if (t.isProminent) 'isProminent': true,
             'badgeCount': t.badgeCount,
             if (t.nativeList != null)
               'nativeList': {
@@ -322,6 +323,16 @@ class CNTab {
   /// detached search button that morphs into a search field.
   final bool isSearchTab;
 
+  /// Whether this tab is the prominent one (iOS 27+).
+  ///
+  /// iOS 27 draws a prominent tab apart from the others, as a glass circle
+  /// with its icon at the trailing end of the bar, for the tab users reach
+  /// for most, such as composing something new; a search tab then sits with
+  /// the other tabs. It still selects like any tab. Below iOS 27, and in apps
+  /// built with an SDK older than iOS 27, it is a regular tab. Only one tab
+  /// should be prominent, and not the search tab.
+  final bool isProminent;
+
   /// Badge count to display on the tab.
   final int? badgeCount;
 
@@ -338,6 +349,7 @@ class CNTab {
     this.sfSymbol,
     this.activeSfSymbol,
     this.isSearchTab = false,
+    this.isProminent = false,
     this.badgeCount,
     this.nativeList,
   });
