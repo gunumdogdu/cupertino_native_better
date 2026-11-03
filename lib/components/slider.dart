@@ -46,10 +46,25 @@ class CNSliderController {
   }
 }
 
+/// How a [CNSlider] draws its track and thumb.
+enum CNSliderStyle {
+  /// The standard slider, with a thumb.
+  standard,
+
+  /// No thumb: a thicker track that fills up to the value, as in media
+  /// players (`UISlider.Style.thumbless`, iOS 26+). macOS has no such style
+  /// and keeps the thumb, as do the Flutter fallbacks.
+  thumbless,
+}
+
 /// A Cupertino-native slider rendered by the host platform.
 ///
 /// On iOS/macOS this embeds UISlider/NSSlider via a platform view and falls
 /// back to Flutter's [Slider] on other platforms.
+///
+/// On iOS 26+ and macOS 26+ the track can show tick marks ([numberOfTicks]
+/// or [tickValues]), snap to them ([allowsTickValuesOnly]) and fill from a
+/// [neutralValue]; iOS 26+ also has a [CNSliderStyle.thumbless] [style].
 class CNSlider extends StatefulWidget {
   /// Creates a Cupertino-native slider.
   const CNSlider({
@@ -68,7 +83,19 @@ class CNSlider extends StatefulWidget {
     this.step,
     this.autoHideOnModal = true,
     this.semanticLabel,
-  });
+    this.style = CNSliderStyle.standard,
+    this.numberOfTicks,
+    this.tickValues,
+    this.allowsTickValuesOnly = true,
+    this.neutralValue,
+  }) : assert(
+         numberOfTicks == null || tickValues == null,
+         'Set numberOfTicks or tickValues, not both',
+       ),
+       assert(
+         numberOfTicks == null || numberOfTicks > 1,
+         'numberOfTicks needs at least the two ends of the track',
+       );
 
   /// Current slider value.
   final double value;
@@ -122,6 +149,35 @@ class CNSlider extends StatefulWidget {
   /// with no name. Pass the same text as its visible label, e.g. `'Volume'`.
   final String? semanticLabel;
 
+  /// How the slider draws its track and thumb. [CNSliderStyle.thumbless]
+  /// needs iOS 26+; elsewhere the slider keeps its thumb.
+  final CNSliderStyle style;
+
+  /// Draws this many evenly spaced tick marks along the track, the first at
+  /// [min] and the last at [max] (`UISlider.TrackConfiguration
+  /// (numberOfTicks:)` on iOS 26+, SwiftUI slider ticks on macOS 26+).
+  ///
+  /// Below iOS/macOS 26 nothing is drawn, but with [allowsTickValuesOnly]
+  /// the Flutter fallback snaps to the same values (`divisions`). UIKit
+  /// draws no tick marks on a [CNSliderStyle.thumbless] slider.
+  final int? numberOfTicks;
+
+  /// Draws tick marks at these values, which need not be evenly spaced.
+  /// Use this or [numberOfTicks], not both.
+  ///
+  /// Below iOS/macOS 26 nothing is drawn, but with [allowsTickValuesOnly]
+  /// the Flutter fallback snaps to the nearest of these values.
+  final List<double>? tickValues;
+
+  /// Whether the slider only settles on tick values. Like UIKit, defaults to
+  /// true; it only applies when [numberOfTicks] or [tickValues] is set.
+  final bool allowsTickValuesOnly;
+
+  /// The value the filled part of the track starts from, so a slider from
+  /// -10 to 10 can fill outward from 0 (iOS 26+, macOS 26+). Null fills from
+  /// [min]. The Flutter fallbacks always fill from [min].
+  final double? neutralValue;
+
   @override
   State<CNSlider> createState() => _CNSliderState();
 }
@@ -146,7 +202,84 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
   int? _lastTrackTint;
   int? _lastTrackBgTint;
   double? _lastStep;
+  CNSliderStyle? _lastStyle;
+  Map<String, Object>? _lastTrackConfiguration;
   bool get _isDark => ThemeHelper.isDark(context);
+
+  bool get _hasTicks =>
+      widget.numberOfTicks != null || widget.tickValues != null;
+
+  /// The tick and neutral-value options sent to the native slider. Empty
+  /// when none is used.
+  Map<String, Object> get _trackConfiguration => <String, Object>{
+    if (widget.numberOfTicks != null) 'numberOfTicks': widget.numberOfTicks!,
+    if (widget.tickValues != null) 'tickValues': widget.tickValues!,
+    if (_hasTicks) 'allowsTickValuesOnly': widget.allowsTickValuesOnly,
+    if (widget.neutralValue != null) 'neutralValue': widget.neutralValue!,
+  };
+
+  /// Compares two [_trackConfiguration]s, `tickValues` by content, so a
+  /// list rebuilt with the same values is not sent again.
+  static bool _sameTrackConfiguration(
+    Map<String, Object>? a,
+    Map<String, Object> b,
+  ) {
+    if (a == null || a.length != b.length) return false;
+    for (final entry in b.entries) {
+      final old = a[entry.key];
+      final same = old is List<double> && entry.value is List<double>
+          ? listEquals(old, entry.value as List<double>)
+          : old == entry.value;
+      if (!same) return false;
+    }
+    return true;
+  }
+
+  /// The tick values the Flutter fallback snaps to, or null when it does not
+  /// snap.
+  List<double>? get _fallbackSnapValues {
+    if (!_hasTicks || !widget.allowsTickValuesOnly) return null;
+    final explicit = widget.tickValues;
+    if (explicit != null) {
+      return explicit.isEmpty ? null : explicit;
+    }
+    final n = widget.numberOfTicks!;
+    final span = widget.max - widget.min;
+    return [for (var i = 0; i < n; i++) widget.min + span * i / (n - 1)];
+  }
+
+  /// `divisions` for the Flutter fallback: the number of gaps between
+  /// evenly spaced ticks from [CNSlider.min] to [CNSlider.max], or null when
+  /// the ticks are not spaced that way.
+  int? get _fallbackDivisions {
+    final values = _fallbackSnapValues;
+    if (values == null || values.length < 2) return null;
+    final sorted = [...values]..sort();
+    final span = widget.max - widget.min;
+    if (span <= 0) return null;
+    final gap = span / (sorted.length - 1);
+    const epsilon = 1e-9;
+    for (var i = 0; i < sorted.length; i++) {
+      if ((sorted[i] - (widget.min + gap * i)).abs() > epsilon * span.abs()) {
+        return null;
+      }
+    }
+    return sorted.length - 1;
+  }
+
+  /// The fallback's `onChanged`: snaps to the nearest tick value when the
+  /// ticks are not evenly spaced (`divisions` covers the even case).
+  ValueChanged<double> get _fallbackOnChanged {
+    final values = _fallbackSnapValues;
+    if (values == null || _fallbackDivisions != null) return widget.onChanged;
+    return (v) {
+      var nearest = values.first;
+      for (final t in values) {
+        if ((t - v).abs() < (nearest - v).abs()) nearest = t;
+      }
+      widget.onChanged(nearest);
+    };
+  }
 
   CNSliderController? _internalController;
 
@@ -202,7 +335,8 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
               value: widget.value.clamp(widget.min, widget.max).toDouble(),
               min: widget.min,
               max: widget.max,
-              onChanged: widget.enabled ? widget.onChanged : null,
+              divisions: _fallbackDivisions,
+              onChanged: widget.enabled ? _fallbackOnChanged : null,
             ),
           ),
         );
@@ -217,7 +351,8 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
             value: widget.value.clamp(widget.min, widget.max).toDouble(),
             min: widget.min,
             max: widget.max,
-            onChanged: widget.enabled ? widget.onChanged : null,
+            divisions: _fallbackDivisions,
+            onChanged: widget.enabled ? _fallbackOnChanged : null,
             activeColor: _effectiveTrackTint ?? CupertinoColors.activeBlue,
             thumbColor: _effectiveThumbTint ?? CupertinoColors.white,
           ),
@@ -252,6 +387,9 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
         trackBackgroundTint: _effectiveTrackBgTint,
       ),
       if (widget.step != null) 'step': widget.step,
+      if (widget.style != CNSliderStyle.standard)
+        'sliderStyle': widget.style.name,
+      ..._trackConfiguration,
     };
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -335,6 +473,8 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
     _lastTrackTint = resolveColorToArgb(_effectiveTrackTint, context);
     _lastTrackBgTint = resolveColorToArgb(_effectiveTrackBgTint, context);
     _lastStep = widget.step;
+    _lastStyle = widget.style;
+    _lastTrackConfiguration = _trackConfiguration;
   }
 
   /// Joins [CNSlider.semanticLabel] to the fallback slider's own node, so it
@@ -417,6 +557,20 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
     if (_lastStep != widget.step && widget.step != null) {
       await channel.invokeMethod('setStep', {'step': widget.step});
       _lastStep = widget.step;
+    }
+
+    if (_lastStyle != widget.style) {
+      _lastStyle = widget.style;
+      await channel.invokeMethod('setSliderStyle', {
+        'sliderStyle': widget.style.name,
+      });
+    }
+
+    final trackConfig = _trackConfiguration;
+    if (!_sameTrackConfiguration(_lastTrackConfiguration, trackConfig)) {
+      _lastTrackConfiguration = trackConfig;
+      // Sent whole, so removed options are cleared natively.
+      await channel.invokeMethod('setTrackConfiguration', trackConfig);
     }
   }
 

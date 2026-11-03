@@ -19,6 +19,14 @@ class CupertinoIconPlatformView: NSObject, FlutterPlatformView {
   private var palette: [UIColor] = []
   private var renderingMode: String?
   private var gradientEnabled: Bool = false
+  /// The running symbol effect (`CNIcon.effect`), as `CNSymbolEffect.toMap()`.
+  private var symbolEffect: [String: Any]?
+  /// How a change of SF Symbol animates (`CNIcon.replaceTransition`); nil
+  /// swaps it at once.
+  private var replaceTransition: String?
+  /// The SF Symbol shown now, so a replace transition plays only when the
+  /// symbol itself changes, not on a colour or size change.
+  private var shownSymbolName: String?
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeIcon_\(viewId)", binaryMessenger: messenger)
@@ -43,6 +51,8 @@ class CupertinoIconPlatformView: NSObject, FlutterPlatformView {
         if let mode = style["iconRenderingMode"] as? String { self.renderingMode = mode }
         if let g = style["iconGradientEnabled"] as? NSNumber { self.gradientEnabled = g.boolValue }
       }
+      if let effect = dict["symbolEffect"] as? [String: Any] { self.symbolEffect = effect }
+      if let t = dict["replaceTransition"] as? String { self.replaceTransition = t }
     }
 
     super.init()
@@ -62,6 +72,7 @@ class CupertinoIconPlatformView: NSObject, FlutterPlatformView {
       imageView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
     ])
 
+    // Also starts `symbolEffect`, if any.
     rebuild()
 
     channel.setMethodCallHandler { [weak self] call, result in
@@ -127,6 +138,23 @@ class CupertinoIconPlatformView: NSObject, FlutterPlatformView {
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+      case "setSymbolEffect":
+        let effect = (call.arguments as? [String: Any])?["effect"] as? [String: Any]
+        let old = self.symbolEffect
+        self.symbolEffect = effect
+        if #available(iOS 17.0, *), self.imageView.image?.isSymbolImage == true {
+          SymbolEffectPlayer.transition(from: old, to: effect, on: self.imageView)
+        }
+        result(nil)
+      case "playSymbolEffect":
+        if let effect = (call.arguments as? [String: Any])?["effect"] as? [String: Any],
+           #available(iOS 17.0, *), self.imageView.image?.isSymbolImage == true {
+          SymbolEffectPlayer.play(effect, on: self.imageView)
+        }
+        result(nil)
+      case "setReplaceTransition":
+        self.replaceTransition = (call.arguments as? [String: Any])?["transition"] as? String
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -153,7 +181,11 @@ class CupertinoIconPlatformView: NSObject, FlutterPlatformView {
       img = UIImage(systemName: name)
     }
     
-    guard var image = img else { imageView.image = nil; return }
+    guard var image = img else {
+      imageView.image = nil
+      shownSymbolName = nil
+      return
+    }
 
     // Apply size configuration
     if let s = size {
@@ -205,7 +237,30 @@ class CupertinoIconPlatformView: NSObject, FlutterPlatformView {
       // if #available(iOS 18.0, *), let cfg = UIImage.SymbolConfiguration.preferringGradient() { image = image.applyingSymbolConfiguration(cfg) ?? image }
     }
 
-    imageView.image = image
+    // Only an SF Symbol replacing another one animates; anything else, and
+    // every first image, is set directly.
+    let symbolName: String? = (imageData == nil && assetPath == nil && customIconBytes == nil && !name.isEmpty) ? name : nil
+    if #available(iOS 17.0, *), let transition = replaceTransition,
+       let newName = symbolName, let oldName = shownSymbolName, newName != oldName,
+       imageView.image?.isSymbolImage == true, image.isSymbolImage {
+      // The running effect carries over to the new symbol.
+      SymbolEffectPlayer.replace(with: image, on: imageView, transition: transition)
+    } else {
+      imageView.image = image
+      restartSymbolEffect()
+    }
+    shownSymbolName = symbolName
+  }
+
+  /// A new image stops the running symbol effect, and adding it again is
+  /// ignored while it is still registered, so remove it and start it again.
+  /// `drawOff` restarts without animation, so the symbol stays hidden; a
+  /// finished `drawOn` needs nothing, as the new image is already visible.
+  private func restartSymbolEffect() {
+    guard let effect = symbolEffect, effect["type"] as? String != "drawOn",
+          #available(iOS 17.0, *), imageView.image?.isSymbolImage == true else { return }
+    imageView.removeAllSymbolEffects(animated: false)
+    SymbolEffectPlayer.start(effect, on: imageView, animated: effect["type"] as? String != "drawOff")
   }
 
   // Use shared utility functions

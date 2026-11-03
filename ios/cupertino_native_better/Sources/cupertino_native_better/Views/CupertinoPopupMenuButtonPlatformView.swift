@@ -630,15 +630,19 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       case "prominentGlass":
         // Use tinted fallback during transitions to prevent glass sampling artifacts
         if #available(iOS 26.0, *), !isTransitioning { config = .prominentGlass() } else { config = .tinted() }
+      case "clearGlass":
+        if #available(iOS 26.0, *), !isTransitioning { config = .clearGlass() } else { config = .tinted() }
+      case "prominentClearGlass":
+        if #available(iOS 26.0, *), !isTransitioning { config = .prominentClearGlass() } else { config = .tinted() }
       default:
         config = .plain()
       }
       config.cornerStyle = round ? .capsule : .dynamic
       if let tint = button.tintColor {
         switch buttonStyle {
-        case "filled", "borderedProminent", "prominentGlass":
+        case "filled", "borderedProminent", "prominentGlass", "prominentClearGlass":
           config.baseBackgroundColor = tint
-        case "tinted", "bordered", "gray", "plain", "glass":
+        case "tinted", "bordered", "gray", "plain", "glass", "clearGlass":
           config.baseForegroundColor = tint
         default:
           break
@@ -700,7 +704,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
 
     // Only swap styles if using glass style on iOS 26+
     if #available(iOS 26.0, *) {
-      if currentButtonStyle == "glass" || currentButtonStyle == "prominentGlass" {
+      if ["glass", "prominentGlass", "clearGlass", "prominentClearGlass"].contains(currentButtonStyle) {
         DispatchQueue.main.async {
           self.applyButtonStyle(buttonStyle: self.currentButtonStyle, round: self.isRoundButton)
         }

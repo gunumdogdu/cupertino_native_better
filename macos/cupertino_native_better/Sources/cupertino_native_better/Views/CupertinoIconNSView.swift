@@ -12,6 +12,18 @@ class CupertinoIconNSView: NSView {
   private var palette: [NSColor] = []
   private var renderingMode: String?
   private var gradientEnabled: Bool = false
+  /// The running symbol effect (`CNIcon.effect`), as `CNSymbolEffect.toMap()`.
+  private var symbolEffect: [String: Any]?
+  /// How a change of SF Symbol animates (`CNIcon.replaceTransition`); nil
+  /// swaps it at once.
+  private var replaceTransition: String?
+  /// The SF Symbol shown now, so a replace transition plays only when the
+  /// symbol itself changes.
+  private var shownSymbolName: String?
+  /// Set once the icon uses any symbol effect or replace transition. Symbol
+  /// effects only play on symbol images, so from then on colour goes through
+  /// `contentTintColor` instead of being painted into a bitmap copy.
+  private var usesSymbolAnimation = false
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeIcon_\(viewId)", binaryMessenger: messenger)
@@ -27,6 +39,9 @@ class CupertinoIconNSView: NSView {
         if let mode = style["iconRenderingMode"] as? String { self.renderingMode = mode }
         if let g = style["iconGradientEnabled"] as? NSNumber { self.gradientEnabled = g.boolValue }
       }
+      if let effect = dict["symbolEffect"] as? [String: Any] { self.symbolEffect = effect }
+      if let t = dict["replaceTransition"] as? String { self.replaceTransition = t }
+      self.usesSymbolAnimation = self.symbolEffect != nil || self.replaceTransition != nil
     }
 
     super.init(frame: .zero)
@@ -45,6 +60,7 @@ class CupertinoIconNSView: NSView {
       imageView.bottomAnchor.constraint(equalTo: bottomAnchor)
     ])
 
+    // Also starts `symbolEffect`, if any.
     rebuild()
 
     channel.setMethodCallHandler { [weak self] call, result in
@@ -79,6 +95,26 @@ class CupertinoIconNSView: NSView {
           self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+      case "setSymbolEffect":
+        let effect = (call.arguments as? [String: Any])?["effect"] as? [String: Any]
+        let old = self.symbolEffect
+        self.symbolEffect = effect
+        self.switchToSymbolAnimation()
+        if #available(macOS 14.0, *) {
+          SymbolEffectPlayer.transition(from: old, to: effect, on: self.imageView)
+        }
+        result(nil)
+      case "playSymbolEffect":
+        self.switchToSymbolAnimation()
+        if let effect = (call.arguments as? [String: Any])?["effect"] as? [String: Any],
+           #available(macOS 14.0, *) {
+          SymbolEffectPlayer.play(effect, on: self.imageView)
+        }
+        result(nil)
+      case "setReplaceTransition":
+        self.replaceTransition = (call.arguments as? [String: Any])?["transition"] as? String
+        self.switchToSymbolAnimation()
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -87,9 +123,23 @@ class CupertinoIconNSView: NSView {
 
   required init?(coder: NSCoder) { return nil }
 
+  /// Redraws the symbol as a symbol image the first time an effect or a
+  /// replace transition is used.
+  private func switchToSymbolAnimation() {
+    if usesSymbolAnimation { return }
+    usesSymbolAnimation = true
+    rebuild()
+  }
+
   private func rebuild() {
     guard var image = NSImage(systemSymbolName: name, accessibilityDescription: nil) else {
       imageView.image = nil
+      shownSymbolName = nil
+      return
+    }
+
+    if usesSymbolAnimation {
+      showAnimatableSymbol(image)
       return
     }
 
@@ -134,6 +184,57 @@ class CupertinoIconNSView: NSView {
     // Gradient toggle is no-op until supported natively on macOS
 
     imageView.image = image
+    shownSymbolName = name
+  }
+
+  /// Shows `image` as a symbol image, coloured with `contentTintColor`, so
+  /// symbol effects and replace transitions can play on it.
+  private func showAnimatableSymbol(_ base: NSImage) {
+    var image = base
+    var tint: NSColor? = color ?? .black
+    if let s = size, #available(macOS 12.0, *) {
+      image = image.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: s, weight: .regular)) ?? image
+    }
+    switch renderingMode {
+    case "hierarchical":
+      if #available(macOS 12.0, *), let c = color {
+        image = image.withSymbolConfiguration(NSImage.SymbolConfiguration(hierarchicalColor: c)) ?? image
+        tint = nil
+      }
+    case "palette":
+      if #available(macOS 12.0, *), !palette.isEmpty {
+        image = image.withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: palette)) ?? image
+        tint = nil
+      }
+    case "multicolor":
+      if #available(macOS 12.0, *) {
+        image = image.withSymbolConfiguration(NSImage.SymbolConfiguration.preferringMulticolor()) ?? image
+        tint = nil
+      }
+    default:
+      break
+    }
+    imageView.contentTintColor = tint
+    if #available(macOS 14.0, *), let transition = replaceTransition,
+       let old = shownSymbolName, old != name, imageView.image != nil {
+      // The running effect carries over to the new symbol.
+      SymbolEffectPlayer.replace(with: image, on: imageView, transition: transition)
+    } else {
+      imageView.image = image
+      restartSymbolEffect()
+    }
+    shownSymbolName = name
+  }
+
+  /// A new image stops the running symbol effect, and adding it again is
+  /// ignored while it is still registered, so remove it and start it again.
+  /// `drawOff` restarts without animation, so the symbol stays hidden; a
+  /// finished `drawOn` needs nothing, as the new image is already visible.
+  private func restartSymbolEffect() {
+    guard let effect = symbolEffect, effect["type"] as? String != "drawOn",
+          #available(macOS 14.0, *) else { return }
+    imageView.removeAllSymbolEffects(animated: false)
+    SymbolEffectPlayer.start(effect, on: imageView, animated: effect["type"] as? String != "drawOff")
   }
 
 }

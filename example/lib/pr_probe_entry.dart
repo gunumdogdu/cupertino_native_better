@@ -47,6 +47,15 @@
 //     `xcrun simctl ui <udid> appearance`; FALLBACK=true draws the Flutter
 //     fallback, which iOS 26+ never shows, by claiming to be Android)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=symboleffects
+//     (2.0.0: CNIcon symbol effects and replace transitions, on timers)
+//
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=clearglass
+//     (2.0.0: CNButton clearGlass / prominentClearGlass over a photo)
+//
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=slider26
+//     (2.0.0: CNSlider thumbless style, ticks and neutral value, on a timer)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -84,6 +93,7 @@ import 'demos/native_tab_bar_demo.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
 import 'demos/date_picker.dart';
+import 'demos/upgrades_2_0_probes.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -173,6 +183,15 @@ class _ProbeApp extends StatelessWidget {
         label: _label,
         autoCycle: true,
       );
+    }
+    if (_probe == 'symboleffects') {
+      return const SymbolEffectsProbePage();
+    }
+    if (_probe == 'clearglass') {
+      return const ClearGlassProbePage();
+    }
+    if (_probe == 'slider26') {
+      return const Slider26ProbePage();
     }
     if (_probe == 'pr106') {
       return const Pr106PopupMenuRebuildTestPage(autoCycle: true);

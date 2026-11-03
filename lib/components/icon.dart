@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../style/sf_symbol.dart';
+import '../style/symbol_effect.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
 import '../utils/platform_view_guard.dart';
@@ -13,6 +14,11 @@ import '../utils/version_detector.dart';
 ///
 /// Renders an `SFSymbol` on iOS/macOS using native APIs for best fidelity,
 /// displays a custom image asset, or renders IconData.
+///
+/// SF Symbols can animate with Apple's symbol effects: [effect] runs while it
+/// is set, [triggeredEffect] plays once each time [effectTrigger] changes, and
+/// [replaceTransition] animates a change of [CNSymbol.name]. See
+/// [CNSymbolEffect].
 class CNIcon extends StatefulWidget {
   /// Creates a platform-rendered SF Symbol icon.
   const CNIcon({
@@ -25,6 +31,10 @@ class CNIcon extends StatefulWidget {
     this.mode,
     this.gradient,
     this.height,
+    this.effect,
+    this.triggeredEffect,
+    this.effectTrigger,
+    this.replaceTransition,
   }) : assert(
          symbol != null || imageAsset != null || customIcon != null,
          'At least one of symbol, imageAsset, or customIcon must be provided',
@@ -57,6 +67,36 @@ class CNIcon extends StatefulWidget {
   /// Optional fixed height; defaults to the icon's size.
   final double? height;
 
+  /// A symbol effect that runs for as long as it is set, such as
+  /// `CNSymbolEffect.pulse()` while recording. Set it to null to stop it, or
+  /// to another effect to switch.
+  ///
+  /// Switching between [CNSymbolEffect.drawOff] and [CNSymbolEffect.drawOn]
+  /// draws the symbol out and back in.
+  ///
+  /// Applies to SF Symbols on iOS 17+ and macOS 14+; each effect's own
+  /// minimum is listed on [CNSymbolEffectType]. Elsewhere the icon stays
+  /// still.
+  final CNSymbolEffect? effect;
+
+  /// The effect played once each time [effectTrigger] changes. Defaults to
+  /// `CNSymbolEffect.bounce()`.
+  ///
+  /// [CNSymbolEffect.scale] and [CNSymbolEffect.drawOff] have no one-shot
+  /// form and do nothing here; use them as [effect].
+  final CNSymbolEffect? triggeredEffect;
+
+  /// Plays [triggeredEffect] once whenever this value changes, compared with
+  /// `==`, from one build to the next — for example a counter of new
+  /// messages. The value the icon is first built with plays nothing.
+  final Object? effectTrigger;
+
+  /// How the icon animates to a new symbol when [CNSymbol.name] changes.
+  ///
+  /// Null (the default) swaps the symbol without animation. Applies to SF
+  /// Symbols on iOS 17+ and macOS 14+.
+  final CNSymbolReplaceTransition? replaceTransition;
+
   @override
   State<CNIcon> createState() => _CNIconState();
 }
@@ -69,6 +109,9 @@ class _CNIconState extends State<CNIcon> {
   int? _lastColor;
   String? _lastMode;
   bool? _lastGradient;
+  CNSymbolEffect? _lastEffect;
+  Object? _lastEffectTrigger;
+  CNSymbolReplaceTransition? _lastReplaceTransition;
 
   bool get _isDark => ThemeHelper.isDark(context);
 
@@ -239,6 +282,9 @@ class _CNIconState extends State<CNIcon> {
               .map((c) => resolveColorToArgb(c, context))
               .toList(),
       },
+      if (widget.effect != null) 'symbolEffect': widget.effect!.toMap(),
+      if (widget.replaceTransition != null)
+        'replaceTransition': widget.replaceTransition!.name,
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
@@ -286,6 +332,9 @@ class _CNIconState extends State<CNIcon> {
 
   void _cacheCurrentProps() {
     _lastIsDark = _isDark;
+    _lastEffect = widget.effect;
+    _lastEffectTrigger = widget.effectTrigger;
+    _lastReplaceTransition = widget.replaceTransition;
 
     // Determine current source and cache accordingly
     if (widget.imageAsset != null) {
@@ -319,6 +368,23 @@ class _CNIconState extends State<CNIcon> {
   Future<void> _syncPropsToNativeIfNeeded() async {
     final channel = _channel;
     if (channel == null) return;
+
+    // Symbol animation values, read before any await so that overlapping
+    // syncs see each change once.
+    final effect = widget.effect;
+    final effectChanged = _lastEffect != effect;
+    _lastEffect = effect;
+    final triggered = _lastEffectTrigger != widget.effectTrigger;
+    _lastEffectTrigger = widget.effectTrigger;
+    final transition = widget.replaceTransition;
+    if (_lastReplaceTransition != transition) {
+      _lastReplaceTransition = transition;
+      // Sent before `setSymbol` so a name change in the same build animates.
+      await channel.invokeMethod('setReplaceTransition', {
+        'transition': transition?.name,
+      });
+      if (!mounted) return;
+    }
 
     // Determine current source and resolve values
     String name = '';
@@ -428,6 +494,18 @@ class _CNIconState extends State<CNIcon> {
 
     if (style.isNotEmpty) {
       await channel.invokeMethod('setStyle', style);
+    }
+
+    if (effectChanged) {
+      await channel.invokeMethod('setSymbolEffect', {
+        'effect': effect?.toMap(),
+      });
+    }
+    if (triggered) {
+      await channel.invokeMethod('playSymbolEffect', {
+        'effect': (widget.triggeredEffect ?? const CNSymbolEffect.bounce())
+            .toMap(),
+      });
     }
   }
 
