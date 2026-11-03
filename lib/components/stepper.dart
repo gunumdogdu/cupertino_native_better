@@ -12,10 +12,12 @@ import '../utils/modal_hide_mixin.dart';
 /// A Cupertino-native stepper: a − / + control that changes a number by a
 /// fixed [step].
 ///
-/// On iOS 26+ this embeds a `UIStepper`, on macOS 26+ an `NSStepper` (the
-/// small up/down arrows that sit next to a text field), through a platform
-/// view. Below iOS/macOS 26 and on other platforms it draws a Flutter
-/// stepper shaped like the iOS 18 `UIStepper`.
+/// On iOS 26+ this embeds the system stepper through a platform view, as a
+/// SwiftUI `Stepper`: it draws the same control as `UIStepper`, which on
+/// iOS 26+ ignores a tint and has no disabled look. On macOS 26+ it embeds
+/// an `NSStepper` (the small up/down arrows that sit next to a text field).
+/// Below iOS/macOS 26 and on other platforms it draws a Flutter stepper
+/// shaped like the iOS 18 `UIStepper`.
 ///
 /// The stepper shows no number of its own; put the value in a label next to
 /// it, as iOS does:
@@ -77,8 +79,8 @@ class CNStepper extends StatefulWidget {
   /// When false (default), the button at the limit is disabled.
   final bool wraps;
 
-  /// When true (default), holding − or + keeps changing the value, faster
-  /// the longer it is held.
+  /// When true (default), holding − or + keeps changing the value while it
+  /// is held. When false, each press changes it once.
   final bool autorepeat;
 
   /// Whether the control is interactive.
@@ -111,8 +113,8 @@ class CNStepper extends StatefulWidget {
   State<CNStepper> createState() => _CNStepperState();
 }
 
-/// Size of the iOS stepper, in logical pixels: the native `UIStepper` on
-/// iOS 26+ and the iOS 18 one the fallback copies.
+/// Size of the iOS stepper, in logical pixels: the native one on iOS 26+
+/// (about 92 x 32) and the iOS 18 one the fallback copies.
 const Size _kIOSStepperSize = Size(94, 32);
 
 /// Size of the box an `NSStepper` is centred in on macOS.
@@ -194,7 +196,7 @@ class _CNStepperState extends State<CNStepper> with ModalHideMixin<CNStepper> {
         : _kIOSStepperSize;
 
     // Issue #53 fix: when a modal is presented above our host route, destroy
-    // the native UIStepper to remove its PlatformView from the shared iOS
+    // the native stepper to remove its PlatformView from the shared iOS
     // PlatformView container.
     final hidden = maybeHiddenPlaceholder(
       height: size.height,
@@ -313,7 +315,7 @@ class _CNStepperState extends State<CNStepper> with ModalHideMixin<CNStepper> {
     final int? tint = resolveColorToArgb(widget.color, context);
     final double value = _clampedValue;
 
-    // The range goes first: UIStepper clamps the value to the range it has.
+    // The range goes first, so the value is not clamped to the old one.
     if (_lastMin != widget.min || _lastMax != widget.max) {
       _lastMin = widget.min;
       _lastMax = widget.max;
