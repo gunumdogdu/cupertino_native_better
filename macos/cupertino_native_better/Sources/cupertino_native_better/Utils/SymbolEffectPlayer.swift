@@ -1,11 +1,12 @@
 import Cocoa
 import Symbols
 
-/// Plays the SF Symbol effects Flutter sends as `CNSymbolEffect.toMap()` on a
-/// `NSImageView`.
+/// Plays the SF Symbol effects Flutter sends as `CNSymbolEffect.toMap()` on
+/// an `NSImageView`.
 ///
 /// The macOS port of the iOS `SymbolEffectPlayer`. Every effect is gated by
-/// the macOS version that introduced it (14, 15 or 26). Where it is missing the call does nothing, so the symbol stays still.
+/// the macOS version that introduced it (14, 15 or 26). Where it is missing
+/// the call does nothing, so the symbol stays still.
 enum SymbolEffectPlayer {
   /// Whether `effect` is `drawOn` or `drawOff`, which show or hide the symbol
   /// instead of animating it in place.
@@ -19,29 +20,29 @@ enum SymbolEffectPlayer {
   /// Starts `effect` as a running effect that lasts until it is removed.
   @available(macOS 14.0, *)
   static func start(_ effect: [String: Any], on view: NSImageView, animated: Bool = true) {
-    let opts = options(effect)
+    let opts = options(effect, defaultRepeat: .forever)
     switch effect["type"] as? String {
     case "bounce":
       // Bounce only runs indefinitely from macOS 15 on.
       if #available(macOS 15.0, *) {
-        view.addSymbolEffect(bounce(effect), options: opts, animated: animated)
+        indefinite(bounce(effect), on: view, options: opts, animated: animated)
       }
     case "pulse":
-      view.addSymbolEffect(pulse(effect), options: opts, animated: animated)
+      indefinite(pulse(effect), on: view, options: opts, animated: animated)
     case "variableColor":
-      view.addSymbolEffect(variableColor(effect), options: opts, animated: animated)
+      indefinite(variableColor(effect), on: view, options: opts, animated: animated)
     case "scale":
-      view.addSymbolEffect(scale(effect), options: opts, animated: animated)
+      indefinite(scale(effect), on: view, options: opts, animated: animated)
     case "wiggle":
-      if #available(macOS 15.0, *) { view.addSymbolEffect(wiggle(effect), options: opts, animated: animated) }
+      if #available(macOS 15.0, *) { indefinite(wiggle(effect), on: view, options: opts, animated: animated) }
     case "breathe":
-      if #available(macOS 15.0, *) { view.addSymbolEffect(breathe(effect), options: opts, animated: animated) }
+      if #available(macOS 15.0, *) { indefinite(breathe(effect), on: view, options: opts, animated: animated) }
     case "rotate":
-      if #available(macOS 15.0, *) { view.addSymbolEffect(rotate(effect), options: opts, animated: animated) }
+      if #available(macOS 15.0, *) { indefinite(rotate(effect), on: view, options: opts, animated: animated) }
     case "drawOn":
-      if #available(macOS 26.0, *) { view.addSymbolEffect(drawOn(effect), options: opts, animated: animated) }
+      if #available(macOS 26.0, *) { indefinite(drawOn(effect), on: view, options: opts, animated: animated) }
     case "drawOff":
-      if #available(macOS 26.0, *) { view.addSymbolEffect(drawOff(effect), options: opts, animated: animated) }
+      if #available(macOS 26.0, *) { indefinite(drawOff(effect), on: view, options: opts, animated: animated) }
     default:
       break
     }
@@ -78,25 +79,25 @@ enum SymbolEffectPlayer {
   /// do nothing.
   @available(macOS 14.0, *)
   static func play(_ effect: [String: Any], on view: NSImageView) {
-    let opts = options(effect, oneShot: true)
+    let opts = options(effect, defaultRepeat: .once)
     switch effect["type"] as? String {
     case "bounce":
-      view.addSymbolEffect(bounce(effect), options: opts)
+      discrete(bounce(effect), on: view, options: opts)
     case "pulse":
-      view.addSymbolEffect(pulse(effect), options: opts)
+      discrete(pulse(effect), on: view, options: opts)
     case "variableColor":
-      view.addSymbolEffect(variableColor(effect), options: opts)
+      discrete(variableColor(effect), on: view, options: opts)
     case "wiggle":
-      if #available(macOS 15.0, *) { view.addSymbolEffect(wiggle(effect), options: opts) }
+      if #available(macOS 15.0, *) { discrete(wiggle(effect), on: view, options: opts) }
     case "breathe":
-      if #available(macOS 15.0, *) { view.addSymbolEffect(breathe(effect), options: opts) }
+      if #available(macOS 15.0, *) { discrete(breathe(effect), on: view, options: opts) }
     case "rotate":
-      if #available(macOS 15.0, *) { view.addSymbolEffect(rotate(effect), options: opts) }
+      if #available(macOS 15.0, *) { discrete(rotate(effect), on: view, options: opts) }
     case "drawOn":
       // Hide the symbol at once, then draw it in.
       if #available(macOS 26.0, *) {
-        view.addSymbolEffect(DrawOffSymbolEffect.drawOff, options: .default, animated: false)
-        view.addSymbolEffect(drawOn(effect), options: options(effect))
+        indefinite(DrawOffSymbolEffect.drawOff, on: view, options: .default, animated: false)
+        indefinite(drawOn(effect), on: view, options: options(effect), animated: true)
       }
     default:
       break
@@ -131,11 +132,18 @@ enum SymbolEffectPlayer {
 
   // MARK: - Options
 
-  /// Speed and repeat behaviour. A one-shot effect without a repeat of its
-  /// own is asked to play once, so effects that can also run indefinitely,
-  /// such as pulse, stop after one play.
+  /// What an effect that can repeat does when Flutter sets no repeat.
+  private enum DefaultRepeat { case system, forever, once }
+
+  /// The effects whose repeat behaviour can be chosen. The system defaults
+  /// differ per effect (a running breathe plays once and stops, a triggered
+  /// pulse keeps going), so these get an explicit one.
+  private static let repeatable: Set<String> = ["bounce", "pulse", "variableColor", "wiggle", "breathe", "rotate"]
+
+  /// Speed and repeat behaviour. Without a repeat from Flutter, a running
+  /// effect repeats until it is removed and a triggered one plays once.
   @available(macOS 14.0, *)
-  private static func options(_ m: [String: Any], oneShot: Bool = false) -> SymbolEffectOptions {
+  private static func options(_ m: [String: Any], defaultRepeat: DefaultRepeat = .system) -> SymbolEffectOptions {
     var opts = SymbolEffectOptions.default
     if let speed = (m["speed"] as? NSNumber)?.doubleValue, speed > 0 {
       opts = opts.speed(speed)
@@ -154,9 +162,40 @@ enum SymbolEffectPlayer {
         opts = count != nil ? opts.repeat(count) : opts.repeating
       }
     default:
-      if oneShot { opts = opts.nonRepeating }
+      guard repeatable.contains(m["type"] as? String ?? "") else { break }
+      switch defaultRepeat {
+      case .forever:
+        if #available(macOS 15.0, *) { opts = opts.repeat(.continuous) } else { opts = opts.repeating }
+      case .once:
+        if #available(macOS 15.0, *) { opts = opts.repeat(.periodic(1)) } else { opts = opts.repeat(1) }
+      case .system:
+        break
+      }
     }
     return opts
+  }
+
+  // MARK: - Adding
+
+  // AppKit takes every effect through one method; which overload of
+  // `addSymbolEffect` Swift picks decides whether an effect that is both
+  // discrete and indefinite (pulse, variableColor, and from macOS 15 bounce,
+  // wiggle, breathe and rotate) plays once or keeps running. Calling it from
+  // a generic function that only knows one of the two protocols picks that
+  // overload, whatever else the effect conforms to.
+
+  @available(macOS 14.0, *)
+  private static func discrete<E: SymbolEffect & DiscreteSymbolEffect>(
+    _ effect: E, on view: NSImageView, options: SymbolEffectOptions
+  ) {
+    view.addSymbolEffect(effect, options: options, animated: true)
+  }
+
+  @available(macOS 14.0, *)
+  private static func indefinite<E: SymbolEffect & IndefiniteSymbolEffect>(
+    _ effect: E, on view: NSImageView, options: SymbolEffectOptions, animated: Bool
+  ) {
+    view.addSymbolEffect(effect, options: options, animated: animated)
   }
 
   // MARK: - Effects

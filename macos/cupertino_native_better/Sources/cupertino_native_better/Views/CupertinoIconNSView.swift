@@ -217,12 +217,13 @@ class CupertinoIconNSView: NSView {
     imageView.contentTintColor = tint
     if #available(macOS 14.0, *), let transition = replaceTransition,
        let old = shownSymbolName, old != name, imageView.image != nil {
+      // The running effect carries over to the new symbol.
       SymbolEffectPlayer.replace(with: image, on: imageView, transition: transition)
     } else {
       imageView.image = image
+      restartSymbolEffect()
     }
     shownSymbolName = name
-    restartSymbolEffect()
   }
 
   /// A new image stops the running symbol effect, and adding it again is
