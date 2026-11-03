@@ -9,6 +9,17 @@
 - VoiceOver reads each such item once, as a button named by its title, or by its symbol's own description when it has no title.
 - `CNPopupMenuButton` and the tab bar now build their menus with the same code (`PopupMenuBuilder.swift`, and `popup_menu_fallback_sheet.dart` for the sheet); `CNPopupMenuButton` behaves as before.
 
+### Added — `CNPopupMenuButton`: palettes, inline sections, items that keep the menu open
+
+- **`CNPopupMenuSubmenu.style`** shows a submenu's items in the parent menu instead of a nested one: `inline` as a section under its label, `palette` as one row of icons (iOS 17+), like the formatting row of a text menu. Their items report the same paths as nested ones. On macOS both are a section with a header; the action sheet fallback lists them in place.
+- **`CNPopupMenuSubmenu.elementSize`** (`small`, `medium`, `large`) sets how big its items are (iOS 16+): `small` fits several icons on a row.
+- **`CNPopupMenuItem.keepsMenuPresented`** keeps the menu open after the item is chosen (iOS 16+), for actions the user repeats, such as zooming in.
+- The same options work in `CNTabBarItem.menuItems`. A menu that uses none of them sends exactly the payload it did before.
+
+### Added — `CNTab.isProminent`, the iOS 27 prominent tab
+
+`CNTabBarNative` can mark one tab as prominent: iOS 27 draws it apart from the others, as a glass circle with its icon at the trailing end of the bar, for the tab users reach for most. A search tab then sits with the other tabs. Below iOS 27, and in apps built with an older SDK, it is a regular tab.
+
 ### Fixed
 
 - **Dot badges in right-to-left layouts** were drawn on the mirrored item: the icons are found from left to right, and the first item is the rightmost there.
