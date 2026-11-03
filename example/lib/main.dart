@@ -50,6 +50,7 @@ import 'demos/pr79_alert_test.dart';
 import 'demos/pr82_tabbar_font_first_build_test.dart';
 import 'demos/issue103_tabbar_items_change_test.dart';
 import 'demos/issue105_tabbar_dot_badge_test.dart';
+import 'demos/tabbar_split_five_items_test.dart';
 import 'demos/tabbar_item_menus_test.dart';
 import 'demos/pr96_99_icon_tap_placeholder_test.dart';
 import 'demos/pr97_98_tabbar_mount_test.dart';
@@ -748,6 +749,23 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Issue105TabBarDotBadgeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('TabBar split: five items'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'circle.righthalf.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const TabBarSplitFiveItemsTestPage(),
                       ),
                     );
                   },

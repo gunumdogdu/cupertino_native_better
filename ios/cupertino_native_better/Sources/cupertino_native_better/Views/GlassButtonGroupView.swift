@@ -444,8 +444,10 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     
     super.init()
     
-    // Sync Flutter's brightness mode with Swift at initialization
+    // Sync Flutter's brightness mode with Swift at initialization. On the
+    // container too, so the UIKit badge views drawn there follow it.
     if #available(iOS 13.0, *) {
+      self.container.overrideUserInterfaceStyle = isDark ? .dark : .light
       self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
     }
     
@@ -516,6 +518,17 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
           result(nil)
         } else {
           result(FlutterError(code: "bad_args", message: "Missing buttons", details: nil))
+        }
+      case "setBrightness":
+        if let args = call.arguments as? [String: Any],
+           let isDark = (args["isDark"] as? NSNumber)?.boolValue {
+          if #available(iOS 13.0, *) {
+            self.container.overrideUserInterfaceStyle = isDark ? .dark : .light
+            self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
+          }
+          result(nil)
+        } else {
+          result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil))
         }
       case "setTransitioning":
         let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false

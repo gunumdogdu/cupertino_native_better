@@ -287,11 +287,7 @@ void main() {
       tester,
     ) async {
       final shown = await assetsShown(tester, const [
-        CNTabBarItem(
-          label: 'Home',
-          icon: CNSymbol('house'),
-          imageAsset: home,
-        ),
+        CNTabBarItem(label: 'Home', icon: CNSymbol('house'), imageAsset: home),
         CNTabBarItem(label: 'Star', icon: CNSymbol('star')),
       ]);
       expect(shown, [home, null]);

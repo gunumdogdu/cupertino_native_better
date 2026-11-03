@@ -40,8 +40,9 @@
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/light_dark.png" width="520" alt="The Display and Brightness page in light and in dark mode">
 </p>
 
-## What's new in 1.9.0
+## What's new in 1.9
 
+- **1.9.1 fixes `CNTabBar`** after a sheet (badges, labels and tint no longer revert), after a width change (no more cut labels), with five items in split mode, and with a custom `height` on iOS&nbsp;26. Native widgets, action sheets and alerts follow the app theme, the pre-iOS&nbsp;26 tab bar shows badges, and `CNActionSheet` no longer crashes on a large iPhone in landscape below iOS&nbsp;26. Thanks [@yagizdo](https://github.com/yagizdo) and [@johan-perso](https://github.com/johan-perso).
 - **Subtitles and submenus in `CNPopupMenuButton`**, nested as deep as you like, with `onPathSelected` reporting the full path. Thanks [@johan-perso](https://github.com/johan-perso).
 - **`CNTabBarNative` no longer shows an empty accessory pill on iOS&nbsp;26.1+** when `bottomAccessory` is null. Thanks [@tgrushka](https://github.com/tgrushka).
 - **`CNTabBarNative.enable(showCloseButton: false)`** for root-mode apps whose tab bar is the whole app.
@@ -53,7 +54,7 @@ The full list is in the [changelog](https://pub.dev/packages/cupertino_native_be
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.9.0
+  cupertino_native_better: ^1.9.1
 ```
 
 Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26; earlier versions get the Cupertino fallbacks. The iOS deployment target is 15.0.
@@ -1268,7 +1269,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.9.0
+   cupertino_native_better: ^1.9.1
    ```
 
 2. Update imports:

@@ -98,6 +98,11 @@ final class CNActionSheetManager: NSObject {
         let alert = UIAlertController(title: config.title,
                                       message: config.message,
                                       preferredStyle: .actionSheet)
+        // The sheet takes the window's traits, which follow the system
+        // appearance, not the Flutter theme. Pin it to the app's theme.
+        if let isDark = config.isDark {
+            alert.overrideUserInterfaceStyle = isDark ? .dark : .light
+        }
 
         for (index, entry) in config.actions.enumerated() {
             let action = UIAlertAction(
@@ -119,14 +124,17 @@ final class CNActionSheetManager: NSObject {
         applyAnchor(config.anchorRect, to: alert, in: window, presenter: presenter)
 
         // Catches a dismissal that fires no action handler — tapping outside an
-        // anchored popover, or a swipe-down. Below iOS 26 a compact-width
-        // sheet presents through the alert presentation controller, which
-        // raises NSInternalInconsistencyException on any delegate assignment.
-        // Nothing is lost there: an outside tap runs the cancel handler, and
-        // without a cancel action it does nothing.
+        // anchored popover, or a swipe-down. Below iOS 26 an iPhone sheet
+        // presents through the alert presentation controller, which raises
+        // NSInternalInconsistencyException on any delegate assignment. That
+        // holds in a regular-width window too: a Plus or Pro Max iPhone in
+        // landscape still presents that way, so the check is on the
+        // presentation controller, not the size class. Nothing is lost there:
+        // an outside tap runs the cancel handler, and without a cancel action
+        // it does nothing.
         if #available(iOS 26.0, *) {
             alert.presentationController?.delegate = self
-        } else if needsSyntheticSource(in: window) {
+        } else if alert.presentationController is UIPopoverPresentationController {
             alert.presentationController?.delegate = self
         }
 
@@ -147,7 +155,10 @@ final class CNActionSheetManager: NSObject {
     /// nothing, so a centred sheet there shows exactly the actions Dart passed.
     /// The one case that needs a synthetic source is a popover presentation
     /// with no anchor, where UIKit raises `NSInternalInconsistencyException`
-    /// without one: always on iPad, and in any regular-width window.
+    /// without one: always on iPad, and possibly in a regular-width window.
+    /// Below iOS 26 a Plus or Pro Max iPhone in landscape is regular-width yet
+    /// still presents through the alert controller; a source given there is
+    /// simply unused.
     private func applyAnchor(_ anchorRect: CGRect?,
                              to alert: UIAlertController,
                              in window: UIWindow?,
@@ -176,11 +187,13 @@ final class CNActionSheetManager: NSObject {
         // it up from the bottom.
     }
 
-    /// Whether an unanchored sheet will be presented as a popover. Decided on
-    /// the device and the window, not the presenter: a presenter inside an
-    /// iPad form sheet reports compact width while the sheet still pops over
-    /// from the regular-width window, and UIKit would throw on the missing
-    /// source.
+    /// Whether an unanchored sheet may be presented as a popover, and so needs
+    /// a source. Decided on the device and the window, not the presenter: a
+    /// presenter inside an iPad form sheet reports compact width while the
+    /// sheet still pops over from the regular-width window, and UIKit would
+    /// throw on the missing source. It errs towards true; the delegate, which
+    /// UIKit forbids on an alert presentation, is gated separately on the
+    /// actual presentation controller.
     private func needsSyntheticSource(in window: UIWindow?) -> Bool {
         if UIDevice.current.userInterfaceIdiom == .pad { return true }
         return window?.traitCollection.horizontalSizeClass == .regular
@@ -256,11 +269,13 @@ final class CNActionSheetManager: NSObject {
         let cancelLabel: String?
         let actions: [Action]
         let anchorRect: CGRect?
+        let isDark: Bool?
 
         init(args: [String: Any]) {
             title = args["title"] as? String
             message = args["message"] as? String
             cancelLabel = args["cancelLabel"] as? String
+            isDark = args["isDark"] as? Bool
 
             let raw = args["actions"] as? [[String: Any]] ?? []
             actions = raw.map { entry in

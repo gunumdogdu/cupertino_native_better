@@ -14,6 +14,7 @@ import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import 'icon.dart';
 import 'popup_menu_button.dart';
+import 'tab_badge.dart';
 
 /// Immutable data describing a single tab bar item.
 class CNTabBarItem {
@@ -190,6 +191,9 @@ class CNTabBar extends StatefulWidget {
   /// Must be less than the total number of items. Follows Apple's HIG
   /// recommendation for maintaining balanced visual hierarchy.
   ///
+  /// On iOS 26+, the right group gets at least 100 pt, so a single item stays
+  /// a circle with its label instead of a narrow pill.
+  ///
   /// Note: When [searchItem] is provided, this value is ignored as the
   /// search tab automatically becomes the right-side floating element.
   final int rightCount; // how many trailing items to pin right when split
@@ -200,6 +204,7 @@ class CNTabBar extends StatefulWidget {
   /// Gap between left/right halves when split.
   ///
   /// Defaults to 12pt following Apple's HIG recommendations for visual separation.
+  /// On iOS 26+, it is the gap between the two glass capsules.
   final double splitSpacing; // gap between left/right halves when split
 
   /// Optional search tab configuration.
@@ -670,6 +675,11 @@ class _CNTabBarState extends State<CNTabBar> {
     if (_creationParams!['selectedIndex'] != widget.currentIndex) {
       _creationParams!['selectedIndex'] = widget.currentIndex;
     }
+    // Same for the split layout: a bar created again after a modal must not
+    // come back with the layout of the first mount.
+    _creationParams!['split'] = _hasSearch ? true : widget.split;
+    _creationParams!['rightCount'] = widget.rightCount;
+    _creationParams!['splitSpacing'] = widget.splitSpacing;
 
     final platformView = _buildNativeTabBarPlatformView(_creationParams!);
 
@@ -962,14 +972,23 @@ class _CNTabBarState extends State<CNTabBar> {
           );
 
     final h = widget.height ?? _intrinsicHeight ?? 50.0;
-    if (!widget.split && widget.shrinkCentered) {
-      final w = _intrinsicWidth;
-      return ClipRect(
-        child: SizedBox(height: h, width: w, child: platformView),
+    final w = !widget.split && widget.shrinkCentered ? _intrinsicWidth : null;
+    final own = _intrinsicHeight;
+    if (_keepsNativeHeight && own != null && own > h) {
+      return SizedBox(
+        height: h,
+        child: OverflowBox(
+          alignment: Alignment.bottomCenter,
+          minHeight: own,
+          maxHeight: own,
+          child: ClipRect(
+            child: SizedBox(height: own, width: w, child: platformView),
+          ),
+        ),
       );
     }
     return ClipRect(
-      child: SizedBox(height: h, child: platformView),
+      child: SizedBox(height: h, width: w, child: platformView),
     );
   }
 
@@ -978,24 +997,29 @@ class _CNTabBarState extends State<CNTabBar> {
     _channel = ch;
     ch.setMethodCallHandler(_onMethodCall);
     _lastIndex = widget.currentIndex;
-    _lastTint = resolveColorToArgb(_effectiveTint, context);
-    _lastBg = resolveColorToArgb(widget.backgroundColor, context);
-    _lastIsDark = _isDark;
+    // The native bar was built from _creationParams, prepared once at the
+    // first mount. Seed the diff state from them, not from the widget, so
+    // props changed since then (a badge, a label, the tint, the theme) are
+    // sent to a bar created again after a modal closes (autoHideOnModal).
+    final params = _creationParams!;
+    final style = params['style'] as Map<String, dynamic>;
+    _lastTint = style['tint'] as int?;
+    _lastBg = style['backgroundColor'] as int?;
+    _lastIsDark = params['isDark'] as bool?;
     _requestIntrinsicSize();
-    _cacheItems();
+    _lastLabels = params['labels'] as List<String>;
+    _lastSymbols = params['sfSymbols'] as List<String>;
+    _lastActiveSymbols = params['activeSfSymbols'] as List<String>;
+    _lastBadges = params['badges'] as List<String>;
+    _lastIconSize = widget.iconSize;
     _lastSplit = widget.split;
     _lastRightCount = widget.rightCount;
     _lastSplitSpacing = widget.splitSpacing;
-    _lastLabelFontFamily = widget.labelFontFamily;
-    _lastLabelFontSize = widget.labelFontSize;
-    // The bar is built from the creation params, prepared at the first
-    // mount and reused when it comes back after a modal: send the item
-    // menus if they changed since.
-    final menus = _encodeMenus();
-    _lastMenusKey = menus.toString();
-    if (_lastMenusKey != _creationParams?['menus'].toString()) {
-      ch.invokeMethod('setMenus', {'menus': menus}).catchError((_) => null);
-    }
+    _lastLabelFontFamily = params['labelFontFamily'] as String?;
+    _lastLabelFontSize = params['labelFontSize'] as double?;
+    _lastMenusKey = params['menus'].toString();
+    _syncBrightnessIfNeeded();
+    _syncPropsToNativeIfNeeded();
 
     // Force refresh for label rendering (Issue #6: sporadic missing
     // labels with 5 items). The Swift-side `refresh` cycles
@@ -1289,19 +1313,20 @@ class _CNTabBarState extends State<CNTabBar> {
     }
   }
 
-  void _cacheItems() {
-    _lastLabels = widget.items.map((e) => e.label ?? '').toList();
-    _lastSymbols = widget.items.map((e) => e.icon?.name ?? '').toList();
-    _lastActiveSymbols = widget.items
-        .map((e) => e.activeIcon?.name ?? e.icon?.name ?? '')
-        .toList();
-    _lastBadges = widget.items.map((e) => e.badge ?? '').toList();
-    _lastIconSize = widget.iconSize;
-    // Note: Custom icon bytes are cached in _syncPropsToNativeIfNeeded when rendered
-  }
+  /// iOS 26 squeezes the native bar when its platform view is shorter than
+  /// the height it measures for itself (about 97 pt on an iPhone 17 Pro, the
+  /// top 14 of them room for the selection pill): with `height: 85` the glass
+  /// capsule came out short and the labels sat on the icons. iOS 27 lays the
+  /// same bar out right. So on iOS 26 a bar given a shorter [CNTabBar.height]
+  /// keeps its own height, aligned to the bottom of the box, and its
+  /// transparent top reaches above it. A taller height is used as it is.
+  bool get _keepsNativeHeight =>
+      widget.height != null &&
+      defaultTargetPlatform == TargetPlatform.iOS &&
+      PlatformVersion.iosVersion == 26;
 
   Future<void> _requestIntrinsicSize() async {
-    if (widget.height != null) return;
+    if (widget.height != null && !_keepsNativeHeight) return;
     final ch = _channel;
     if (ch == null) return;
     try {
@@ -1311,7 +1336,9 @@ class _CNTabBarState extends State<CNTabBar> {
       if (!mounted) return;
       setState(() {
         if (h != null && h > 0) _intrinsicHeight = h;
-        if (w != null && w > 0) _intrinsicWidth = w;
+        // A bar given a height only measures for _keepsNativeHeight and
+        // keeps the width it had.
+        if (w != null && w > 0 && widget.height == null) _intrinsicWidth = w;
       });
     } catch (_) {}
   }
@@ -1346,8 +1373,8 @@ class _CNTabBarState extends State<CNTabBar> {
         items: [
           for (final item in widget.items)
             BottomNavigationBarItem(
-              icon: _buildTabIcon(item, isActive: false),
-              activeIcon: _buildTabIcon(item, isActive: true),
+              icon: _withBadge(item, _buildTabIcon(item, isActive: false)),
+              activeIcon: _withBadge(item, _buildTabIcon(item, isActive: true)),
               label: item.label,
             ),
         ],
@@ -1486,15 +1513,19 @@ class _CNTabBarState extends State<CNTabBar> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: FittedBox(
-                          child: _buildTabIcon(
-                            widget.items[i],
-                            isActive: widget.currentIndex == i,
+                      _withBadge(
+                        widget.items[i],
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: FittedBox(
+                            child: _buildTabIcon(
+                              widget.items[i],
+                              isActive: widget.currentIndex == i,
+                            ),
                           ),
                         ),
+                        inline: true,
                       ),
                       if (widget.items[i].label != null &&
                           widget.items[i].label!.isNotEmpty) ...[
@@ -1637,6 +1668,64 @@ class _CNTabBarState extends State<CNTabBar> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Puts [item]'s badge on a fallback [icon] at the size and place
+  /// `UITabBarItem` draws it on iOS 18, measured against the icon's glyph.
+  /// Stacked (icon above label): an 18pt badge whose centre sits 4.5pt past
+  /// the icon's trailing edge, top-aligned with it. [inline] (icon beside
+  /// label, as in landscape): a 14pt badge whose trailing edge is pinned, so
+  /// a longer count grows over the icon, not the label. A dot goes where
+  /// `CNDotTabBar` puts it. Null and empty badges show nothing, as in the
+  /// native `applyBadge`. VoiceOver reads the count as the tab's value; a dot
+  /// has none. The icon keeps the same place in the tree whether or not there
+  /// is a badge, so adding or clearing one does not rebuild it.
+  Widget _withBadge(CNTabBarItem item, Widget icon, {bool inline = false}) {
+    final badge = item.badge;
+    final hasBadge = badge != null && badge.isNotEmpty;
+    final dot = badge == CNTabBarItem.dotBadge;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return Semantics(
+      value: hasBadge && !dot ? badge : null,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          icon,
+          if (hasBadge && dot)
+            const PositionedDirectional(
+              end: -TabBadgeDot.size * 0.35,
+              top: -TabBadgeDot.size * 0.3,
+              child: TabBadgeDot(),
+            )
+          else if (hasBadge && inline)
+            PositionedDirectional(
+              end: -5.5,
+              top: -2.5,
+              child: TabBadge(
+                badge,
+                height: 14,
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+              ),
+            )
+          else if (hasBadge)
+            PositionedDirectional(
+              end: -4.5,
+              top: 0,
+              child: FractionalTranslation(
+                translation: Offset(rtl ? -0.5 : 0.5, 0),
+                child: TabBadge(
+                  badge,
+                  height: 18,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  padding: 5.5,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

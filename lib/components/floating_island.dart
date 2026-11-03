@@ -203,6 +203,8 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   // modal-depth trigger has been removed to avoid a double-fire blink.
   Animation<double>? _secondaryRouteAnim;
 
+  bool? _lastIsDark;
+
   CNFloatingIslandController get _controller =>
       widget.controller ??
       (_internalController ??= CNFloatingIslandController());
@@ -231,6 +233,22 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _attachSecondaryRouteAnim();
+    _syncBrightnessIfNeeded();
+  }
+
+  Future<void> _syncBrightnessIfNeeded() async {
+    final ch = _controller._channel;
+    if (ch == null) return;
+    final isDark = ThemeHelper.isDark(context);
+    if (_lastIsDark != isDark) {
+      try {
+        await ch.invokeMethod('setBrightness', {'isDark': isDark});
+        _lastIsDark = isDark;
+      } catch (_) {
+        // The native view is gone, e.g. hidden under a sheet; it is created
+        // again with the current brightness.
+      }
+    }
   }
 
   void _attachSecondaryRouteAnim() {
@@ -297,6 +315,7 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
     final ch = MethodChannel('CNFloatingIsland_$id');
     _controller._attach(ch);
     ch.setMethodCallHandler(_onMethodCall);
+    _lastIsDark = ThemeHelper.isDark(context);
     _onCreationBumpContainment();
   }
 

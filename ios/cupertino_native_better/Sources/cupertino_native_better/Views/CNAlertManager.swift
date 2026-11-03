@@ -133,6 +133,10 @@ final class CNAlertManager: NSObject {
         let alert = UIAlertController(title: config.title,
                                       message: config.message,
                                       preferredStyle: .alert)
+        // Follow the app's theme rather than the window's.
+        if let isDark = config.isDark {
+            alert.overrideUserInterfaceStyle = isDark ? .dark : .light
+        }
 
         // UIKit requires every text field to be added before the controller is
         // presented, and before the actions read them back.
@@ -253,10 +257,12 @@ final class CNAlertManager: NSObject {
         let message: String?
         let actions: [Action]
         let textFields: [TextField]
+        let isDark: Bool?
 
         init(args: [String: Any]) {
             title = args["title"] as? String
             message = args["message"] as? String
+            isDark = args["isDark"] as? Bool
 
             let rawActions = args["actions"] as? [[String: Any]] ?? []
             actions = rawActions.map { entry in

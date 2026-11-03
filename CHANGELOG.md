@@ -13,6 +13,44 @@
 
 - **Dot badges in right-to-left layouts** were drawn on the mirrored item: the icons are found from left to right, and the first item is the rightmost there.
 
+## 1.9.1
+
+> Patch: six fixes contributed by @yagizdo (#108-#111, #114) and @johan-perso (#112), with review follow-ups, and a fix for a squeezed tab bar on iOS 26. #109, #110, #111 and #112 were reproduced on 1.9.0 and verified with the fix on the iOS 26.2 and iOS 27 simulators. #108 and #114 change only what runs below iOS 26 and were verified by code review and widget tests, as no iOS 18 simulator was available. No API changes.
+
+### Fixed — #108 `CNActionSheet` crashed on a large iPhone in landscape below iOS 26
+
+1.8.3 (#95) set the presentation delegate when the window had a regular width, as on an iPad. A Plus or Pro Max iPhone in landscape has one too, but UIKit still presents the sheet as an alert there, and setting that controller's delegate threw `NSInternalInconsistencyException`. Below iOS 26 the delegate is now set only when the sheet is presented as a popover.
+
+### Fixed — #110 a sheet undid tab bar changes made after the bar appeared
+
+With `autoHideOnModal` (the default), `CNTabBar` removes its native bar while a sheet is up and creates it again when the sheet closes, from the values it was first created with. A badge, label, tint, theme, label font or split layout changed since then came back with its old value. The new bar now gets the current values.
+
+### Fixed — #109 cut or shrunk labels after the tab bar changed width
+
+On iOS 26 and 27 a bar first laid out narrow or invisible, inside `Opacity(0)` or built narrower off screen, kept labels sized for that width: "Favo…", missing labels, or a smaller font. The bar now lays its items out again when its width changes. A bar whose width animates does this on every frame.
+
+### Fixed — #112 the split tab bar with five items, and `splitSpacing`, on iOS 26+
+
+- **A single right item is a circle again with five items**, instead of a narrow pill with its icon and label shrunk. When the two groups are laid out by proportion, the right bar got 1/5 of the width with five items, and iOS 26 draws one item in a bar that narrow as a pill. The right group now gets at least 100 pt, the width it gets with four items on a 402 pt wide phone; two items or more already get enough.
+- **`splitSpacing` is the gap between the two glass capsules.** iOS 26 draws each capsule at its content's size and centres it in its bar, leaving about 22 pt of empty bar on each side, so the visible gap was `splitSpacing` plus about 44 pt. The two bars now overlap by that empty part, which holds no item. With the default 12 pt the gap looks like the one in Apple's apps.
+
+### Fixed — `CNTabBar.height` below the bar's own height on iOS 26
+
+On iOS 26 the native bar measures about 97 pt for itself, the top 14 of them room for the selection pill. With a smaller `height`, such as 85, the glass capsule came out short and the labels sat on the icons. On iOS 26 such a bar now keeps its own height at the bottom of the box, its transparent top reaching above it; the space it takes in the layout does not change. Taller heights, and iOS 27, are unchanged.
+
+### Fixed — #111 native widgets and modals follow the app theme
+
+- **`CNSearchBar`, `CNFloatingIsland` and `CNGlassButtonGroup`** read the theme only when they were created. After a switch to dark they stayed light-styled on iOS 27; on iOS 26.2 the glass followed the backdrop, but the search placeholder stayed light. They now switch with the theme, as `CNButton`, `CNSlider` and the other controls already did.
+- **`CNActionSheet` and `CNAlert`** opened in the system appearance instead of the app theme, so a light app on a dark phone got a dark sheet. Both now open in the app's brightness.
+
+### Fixed — #114 tab badges below iOS 26
+
+Below iOS 26 `CNTabBar` draws a Flutter fallback, which ignored `CNTabBarItem.badge` and `dotBadge`. Both fallback bars, with and without a `searchItem`, now draw them at the size and place `UITabBarItem` uses on iOS 18, and VoiceOver reads the count as the tab's value. Badges sit on the leading side in right-to-left layouts, keep their size with large text, and appearing or clearing no longer rebuilds the icon. `CNTabRail`'s fallback badge now uses the dark system red in dark mode.
+
+### Example
+
+- Testing screens for #109 / #110 (`PROBE=pr109fade|pr109narrow|pr110`, with `--dart-define=OBSERVER=true` for #110), #111 (`pr111`), #112 (`split5`), the iOS 26 height fix (`overlap`), and issues #60, #68 and #70 (`issue60|issue68|issue70`).
+
 ## 1.9.0
 
 > Minor: subtitles and submenus in `CNPopupMenuButton` (#106, thanks @johan-perso), `CNTabBarNative.enable(showCloseButton:)`, fixes from @tgrushka (#94) and @Honahec (#107), and a new pub.dev page with native recordings of every component. Nothing changes for code that does not use the new options; `CNPopupMenuButton.onSelected` becomes nullable (see below).

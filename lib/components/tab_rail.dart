@@ -9,6 +9,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
+import 'tab_badge.dart';
 import 'tab_bar.dart' show CNTabBarItem;
 
 /// How [CNTabRail] draws its items.
@@ -396,9 +397,9 @@ class _FallbackItem extends StatelessWidget {
           children: <Widget>[
             icon,
             if (badge == CNTabBarItem.dotBadge)
-              const Positioned(right: -4, top: -2, child: _Dot())
+              const Positioned(right: -4, top: -2, child: TabBadgeDot())
             else if (badge != null && badge!.isNotEmpty)
-              Positioned(right: -10, top: -6, child: _Badge(badge!)),
+              Positioned(right: -10, top: -6, child: TabBadge(badge!)),
           ],
         ),
       );
@@ -429,7 +430,7 @@ class _FallbackItem extends StatelessWidget {
             ),
           ),
           if (badge == CNTabBarItem.dotBadge)
-            const _Dot()
+            const TabBadgeDot()
           else if (badge != null && badge!.isNotEmpty)
             Text(
               badge!,
@@ -440,50 +441,6 @@ class _FallbackItem extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// [CNTabBarItem.dotBadge]: a dot without a count.
-class _Dot extends StatelessWidget {
-  const _Dot();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 9,
-      height: 9,
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemRed,
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-      padding: EdgeInsets.symmetric(horizontal: text.length > 1 ? 5 : 0),
-      decoration: const BoxDecoration(
-        color: CupertinoColors.systemRed,
-        borderRadius: BorderRadius.all(Radius.circular(9)),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: CupertinoColors.white,
-        ),
       ),
     );
   }
