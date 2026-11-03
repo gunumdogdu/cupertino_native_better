@@ -515,91 +515,118 @@ class _CNSearchBarState extends State<CNSearchBar>
         widget.placeholderColor ??
         CupertinoColors.placeholderText.resolveFrom(context);
 
-    return AnimatedBuilder(
-      animation: _expandAnimation,
-      builder: (context, child) {
-        final expandedWidth = MediaQuery.of(context).size.width;
-        final currentWidth = widget.expandable
-            ? widget.collapsedWidth +
-                  (expandedWidth - widget.collapsedWidth) *
-                      _expandAnimation.value
-            : expandedWidth;
-
-        return Row(
+    // Caps the row at the parent's width; an unbounded parent (a horizontal
+    // scroll view) gets the screen width.
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width),
+      child: AnimatedBuilder(
+        animation: _expandAnimation,
+        builder: (context, child) => Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              width: currentWidth,
-              height: widget.expandedHeight,
-              child: GestureDetector(
-                onTap: _onTap,
-                child: LiquidGlassContainer(
-                  config: LiquidGlassConfig(
-                    effect: CNGlassEffect.regular,
-                    shape: CNGlassEffectShape.capsule,
-                    tint: effectiveBackgroundColor,
-                    interactive: true,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.search,
-                          size: 18,
-                          color: effectiveTint,
+            // The bar expands into what the Cancel button leaves of the row.
+            Flexible(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final expandedWidth = constraints.maxWidth;
+                  final currentWidth = widget.expandable
+                      ? widget.collapsedWidth +
+                            (expandedWidth - widget.collapsedWidth) *
+                                _expandAnimation.value
+                      : expandedWidth;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    width: currentWidth,
+                    height: widget.expandedHeight,
+                    child: GestureDetector(
+                      onTap: _onTap,
+                      child: LiquidGlassContainer(
+                        config: LiquidGlassConfig(
+                          effect: CNGlassEffect.regular,
+                          shape: CNGlassEffectShape.capsule,
+                          tint: effectiveBackgroundColor,
+                          interactive: true,
                         ),
-                        if (_expandAnimation.value > 0.3) ...[
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Opacity(
-                              opacity: (_expandAnimation.value - 0.3) / 0.7,
-                              child: CupertinoTextField(
-                                controller: _textController,
-                                focusNode: _focusNode,
-                                placeholder: widget.placeholder,
-                                placeholderStyle: TextStyle(
-                                  color: effectivePlaceholderColor,
-                                ),
-                                style: TextStyle(color: effectiveTextColor),
-                                decoration: null,
-                                padding: EdgeInsets.zero,
-                                onSubmitted: _onSubmitted,
-                              ),
-                            ),
-                          ),
-                          if (_searchText.isNotEmpty)
-                            GestureDetector(
-                              onTap: _onClear,
-                              child: Icon(
-                                CupertinoIcons.xmark_circle_fill,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(
+                            children: [
+                              Icon(
+                                CupertinoIcons.search,
                                 size: 18,
-                                color: effectivePlaceholderColor,
+                                color: effectiveTint,
                               ),
-                            ),
-                        ],
-                      ],
+                              if (_expandAnimation.value > 0.3) ...[
+                                // The gap sits inside Expanded: the field
+                                // appears while AnimatedContainer still lags
+                                // near collapsedWidth, too narrow for a fixed
+                                // 8 px gap.
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Opacity(
+                                      opacity:
+                                          (_expandAnimation.value - 0.3) / 0.7,
+                                      child: CupertinoTextField(
+                                        controller: _textController,
+                                        focusNode: _focusNode,
+                                        placeholder: widget.placeholder,
+                                        placeholderStyle: TextStyle(
+                                          color: effectivePlaceholderColor,
+                                        ),
+                                        style: TextStyle(
+                                          color: effectiveTextColor,
+                                        ),
+                                        decoration: null,
+                                        padding: EdgeInsets.zero,
+                                        onSubmitted: _onSubmitted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (_searchText.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: _onClear,
+                                    child: Icon(
+                                      CupertinoIcons.xmark_circle_fill,
+                                      size: 18,
+                                      color: effectivePlaceholderColor,
+                                    ),
+                                  ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
-            if (widget.showCancelButton && _isExpanded) ...[
+            // Hidden but still sized while collapsing, so the bar does not
+            // first widen into the space Cancel gives back.
+            if (widget.showCancelButton &&
+                (_isExpanded || _animationController.isAnimating)) ...[
               const SizedBox(width: 8),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _onCancelTap,
-                child: Text(
-                  widget.cancelText,
-                  style: TextStyle(color: effectiveTint),
+              Visibility(
+                visible: _isExpanded,
+                maintainSize: true,
+                maintainAnimation: true,
+                maintainState: true,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _onCancelTap,
+                  child: Text(
+                    widget.cancelText,
+                    style: TextStyle(color: effectiveTint),
+                  ),
                 ),
               ),
             ],
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }
