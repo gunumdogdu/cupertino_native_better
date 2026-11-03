@@ -37,12 +37,18 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=split5
 //     (CNTabBar split with five items; use the buttons by hand)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=stepper
+//     (CNStepper; the values and the tint change every 1.5 s. Add
+//     --dart-define=FALLBACK=true to draw the Flutter fallbacks instead.)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
 
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 
 import 'demos/action_sheet.dart';
@@ -68,6 +74,7 @@ import 'demos/prs_109_110_tabbar_test.dart';
 import 'demos/popup_menu_submenus_test.dart';
 import 'demos/tabbar_split_five_items_test.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
+import 'demos/stepper.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -89,11 +96,16 @@ const String _scenario = String.fromEnvironment(
 
 const bool _auto = bool.fromEnvironment('AUTO');
 
+/// Makes every widget take its Flutter fallback, to look at the fallbacks of
+/// the new controls on an iOS 26+ simulator.
+const bool _fallback = bool.fromEnvironment('FALLBACK');
+
 /// Stamped into the nav bar so a before/after screenshot pair can't be mixed up.
 const String _label = String.fromEnvironment('LABEL', defaultValue: '');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (_fallback) debugDefaultTargetPlatformOverride = TargetPlatform.android;
   if (_probe == 'pr67report') {
     WidgetsBinding.instance.addPostFrameCallback((_) => pr67PrintReport());
   }
@@ -211,6 +223,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);
+    }
+    if (_probe == 'stepper') {
+      return const StepperDemoPage(autoCycle: true);
     }
     return Pr67IconSupersampleTestPage(
       initialIcon: _icon,
