@@ -114,6 +114,10 @@ class CupertinoTabBarNSView: NSView {
           self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+      case "setMenus":
+        // Item menus (`CNTabBarItem.menuItems`) are not drawn on this bar;
+        // answering keeps the rest of the Dart update going.
+        result(nil)
       default:
         result(FlutterMethodNotImplemented)
       }

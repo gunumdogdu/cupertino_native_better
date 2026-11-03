@@ -301,7 +301,8 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
                     result(FlutterError(code: "bad_args", message: "Missing badge counts", details: nil))
                 }
 
-            case "refresh", "setLabels", "setSfSymbols", "setBadges", "setLayout":
+            // Item menus (`CNTabBarItem.menuItems`) are not drawn on this bar.
+            case "refresh", "setLabels", "setSfSymbols", "setBadges", "setLayout", "setMenus":
                 result(nil)
 
             default:
