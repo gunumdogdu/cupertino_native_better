@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 import 'demos/slider.dart';
 import 'showcase/showcase_app.dart' show buildShowcaseScene;
 import 'demos/switch.dart';
+import 'demos/date_picker.dart';
 import 'demos/segmented_control.dart';
 import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
@@ -335,6 +336,20 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const SwitchDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Date Picker'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('calendar', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const DatePickerDemoPage(),
                       ),
                     );
                   },
