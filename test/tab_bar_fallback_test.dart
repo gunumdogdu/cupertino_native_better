@@ -1,3 +1,4 @@
+import 'package:cupertino_native_better/components/tab_badge.dart';
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -123,5 +124,113 @@ void main() {
       },
       variant: TargetPlatformVariant.only(TargetPlatform.android),
     );
+  });
+
+  group('CNTabBar fallback badges', () {
+    const items = [
+      CNTabBarItem(label: 'Home', icon: CNSymbol('house'), badge: '3'),
+      CNTabBarItem(label: 'Inbox', icon: CNSymbol('tray'), badge: '99+'),
+      CNTabBarItem(
+        label: 'Alerts',
+        icon: CNSymbol('bell'),
+        badge: CNTabBarItem.dotBadge,
+      ),
+      CNTabBarItem(label: 'People', icon: CNSymbol('person'), badge: ''),
+      CNTabBarItem(label: 'Settings', icon: CNSymbol('gear')),
+    ];
+
+    Future<void> pumpBar(
+      WidgetTester tester,
+      List<CNTabBarItem> items, {
+      int currentIndex = 0,
+      bool search = false,
+    }) async {
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: CNTabBar(
+                items: items,
+                currentIndex: currentIndex,
+                onTap: (_) {},
+                searchItem: search ? const CNTabBarSearchItem() : null,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+
+    final dots = find.byType(TabBadgeDot);
+    final badges = find.byType(TabBadge);
+
+    for (final search in [false, true]) {
+      final bar = search ? 'with searchItem' : 'without searchItem';
+
+      testWidgets('$bar: counts and a dot show; null and empty do not', (
+        tester,
+      ) async {
+        await pumpBar(tester, items, search: search);
+        expect(find.text('3'), findsOneWidget);
+        expect(find.text('99+'), findsOneWidget);
+        expect(badges, findsNWidgets(2));
+        // The dot draws no count.
+        expect(dots, findsOneWidget);
+        expect(find.text(CNTabBarItem.dotBadge), findsNothing);
+        expect(
+          find.descendant(of: dots, matching: find.byType(Text)),
+          findsNothing,
+        );
+      });
+
+      testWidgets('$bar: VoiceOver reads the count, not the dot', (
+        tester,
+      ) async {
+        final handle = tester.ensureSemantics();
+        await pumpBar(tester, items, search: search);
+        expect(find.bySemanticsLabel(RegExp('Home')), findsOneWidget);
+        expect(
+          tester.getSemantics(find.bySemanticsLabel(RegExp('Home'))).value,
+          '3',
+        );
+        expect(
+          tester.getSemantics(find.bySemanticsLabel(RegExp('Inbox'))).value,
+          '99+',
+        );
+        expect(
+          tester.getSemantics(find.bySemanticsLabel(RegExp('Alerts'))).value,
+          isEmpty,
+        );
+        handle.dispose();
+      });
+
+      testWidgets('$bar: a badge stays put when its tab is selected', (
+        tester,
+      ) async {
+        await pumpBar(tester, items, currentIndex: 1, search: search);
+        final unselected = tester.getRect(badges.first);
+        await pumpBar(tester, items, currentIndex: 0, search: search);
+        expect(tester.getRect(badges.first), unselected);
+      });
+
+      testWidgets('$bar: a badge changed at runtime is redrawn', (
+        tester,
+      ) async {
+        await pumpBar(tester, items, search: search);
+        await pumpBar(tester, [
+          for (final item in items)
+            CNTabBarItem(
+              label: item.label,
+              icon: item.icon,
+              badge: item.label == 'Home' ? null : '7',
+            ),
+        ], search: search);
+        expect(find.text('3'), findsNothing);
+        expect(find.text('7'), findsNWidgets(4));
+        expect(dots, findsNothing);
+      });
+    }
   });
 }
