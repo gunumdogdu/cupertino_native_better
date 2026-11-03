@@ -35,16 +35,31 @@ enum PopupMenuBuilder {
           let childLevel = (i < level.submenus.count ? level.submenus[i] : nil)
             .map { PopupMenuLevel(dict: $0) } ?? PopupMenuLevel()
           let style = i < level.submenuStyles.count ? level.submenuStyles[i] : nil
+          var children = elements(level: childLevel, path: itemPath, iconScale: iconScale, onSelect: onSelect)
+          // A level without dividers is one untitled group; a palette or an
+          // element size lays out the submenu's own children, so it gets the
+          // items themselves.
+          if children.count == 1, let group = children[0] as? UIMenu, group.title.isEmpty {
+            children = group.children
+          }
           let menu = UIMenu(
             title: title,
             subtitle: subtitle,
             image: image,
             options: Self.options(style: style),
-            children: elements(level: childLevel, path: itemPath, iconScale: iconScale, onSelect: onSelect)
+            children: children
           )
           if #available(iOS 16.0, *), i < level.elementSizes.count,
              let size = Self.elementSize(level.elementSizes[i]) {
             menu.preferredElementSize = size
+          }
+          // An inline menu inside the inline group below is flattened into
+          // it, losing its palette and element size: it is a section of its
+          // own instead.
+          if menu.options.contains(.displayInline) {
+            flushGroup()
+            groups.append([menu])
+            continue
           }
           current.append(menu)
           continue
@@ -67,7 +82,10 @@ enum PopupMenuBuilder {
       }
     flushGroup()
     let children: [UIMenuElement] = groups.map { group in
-      UIMenu(title: "", options: .displayInline, children: group)
+      if group.count == 1, let menu = group[0] as? UIMenu, menu.options.contains(.displayInline) {
+        return menu
+      }
+      return UIMenu(title: "", options: .displayInline, children: group)
     }
     return children
   }
