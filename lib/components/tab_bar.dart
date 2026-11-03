@@ -645,6 +645,11 @@ class _CNTabBarState extends State<CNTabBar> {
     if (_creationParams!['selectedIndex'] != widget.currentIndex) {
       _creationParams!['selectedIndex'] = widget.currentIndex;
     }
+    // Same for the split layout: a bar created again after a modal must not
+    // come back with the layout of the first mount.
+    _creationParams!['split'] = _hasSearch ? true : widget.split;
+    _creationParams!['rightCount'] = widget.rightCount;
+    _creationParams!['splitSpacing'] = widget.splitSpacing;
 
     final platformView = _buildNativeTabBarPlatformView(_creationParams!);
 
@@ -952,16 +957,28 @@ class _CNTabBarState extends State<CNTabBar> {
     _channel = ch;
     ch.setMethodCallHandler(_onMethodCall);
     _lastIndex = widget.currentIndex;
-    _lastTint = resolveColorToArgb(_effectiveTint, context);
-    _lastBg = resolveColorToArgb(widget.backgroundColor, context);
-    _lastIsDark = _isDark;
+    // The native bar was built from _creationParams, prepared once at the
+    // first mount. Seed the diff state from them, not from the widget, so
+    // props changed since then (a badge, a label, the tint, the theme) are
+    // sent to a bar created again after a modal closes (autoHideOnModal).
+    final params = _creationParams!;
+    final style = params['style'] as Map<String, dynamic>;
+    _lastTint = style['tint'] as int?;
+    _lastBg = style['backgroundColor'] as int?;
+    _lastIsDark = params['isDark'] as bool?;
     _requestIntrinsicSize();
-    _cacheItems();
+    _lastLabels = params['labels'] as List<String>;
+    _lastSymbols = params['sfSymbols'] as List<String>;
+    _lastActiveSymbols = params['activeSfSymbols'] as List<String>;
+    _lastBadges = params['badges'] as List<String>;
+    _lastIconSize = widget.iconSize;
     _lastSplit = widget.split;
     _lastRightCount = widget.rightCount;
     _lastSplitSpacing = widget.splitSpacing;
-    _lastLabelFontFamily = widget.labelFontFamily;
-    _lastLabelFontSize = widget.labelFontSize;
+    _lastLabelFontFamily = params['labelFontFamily'] as String?;
+    _lastLabelFontSize = params['labelFontSize'] as double?;
+    _syncBrightnessIfNeeded();
+    _syncPropsToNativeIfNeeded();
 
     // Force refresh for label rendering (Issue #6: sporadic missing
     // labels with 5 items). The Swift-side `refresh` cycles
@@ -1225,17 +1242,6 @@ class _CNTabBarState extends State<CNTabBar> {
         // Ignore MissingPluginException during hot reload or view recreation
       }
     }
-  }
-
-  void _cacheItems() {
-    _lastLabels = widget.items.map((e) => e.label ?? '').toList();
-    _lastSymbols = widget.items.map((e) => e.icon?.name ?? '').toList();
-    _lastActiveSymbols = widget.items
-        .map((e) => e.activeIcon?.name ?? e.icon?.name ?? '')
-        .toList();
-    _lastBadges = widget.items.map((e) => e.badge ?? '').toList();
-    _lastIconSize = widget.iconSize;
-    // Note: Custom icon bytes are cached in _syncPropsToNativeIfNeeded when rendered
   }
 
   Future<void> _requestIntrinsicSize() async {
