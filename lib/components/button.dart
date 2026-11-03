@@ -117,7 +117,8 @@ class CNButtonConfig {
   ///
   /// When null, the label uses the configuration's natural foreground
   /// (driven by [CNButton.tint] for non-filled styles, or the system
-  /// foreground for filled / borderedProminent / prominentGlass).
+  /// foreground for filled / borderedProminent / prominentGlass /
+  /// prominentClearGlass).
   /// Set this to override that decision.
   final Color? labelColor;
 
@@ -312,12 +313,14 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
   bool get _isDark => ThemeHelper.isDark(context);
 
-  /// Regular glass resolves its content foreground from the material's
-  /// automatic appearance, so no accent fallback is applied. Other styles
-  /// keep the primary fallback.
+  /// Regular and clear glass resolve their content foreground from the
+  /// material's automatic appearance, so no accent fallback is applied.
+  /// Other styles keep the primary fallback.
   Color? get _effectiveTint {
     final tint = widget.tint;
-    if (tint != null || widget.config.style != CNButtonStyle.glass) {
+    if (tint != null ||
+        (widget.config.style != CNButtonStyle.glass &&
+            widget.config.style != CNButtonStyle.clearGlass)) {
       return tint ?? ThemeHelper.getPrimaryColor(context);
     }
     return null;
@@ -1532,8 +1535,10 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
       case CNButtonStyle.filled:
       case CNButtonStyle.borderedProminent:
       case CNButtonStyle.prominentGlass:
+      case CNButtonStyle.prominentClearGlass:
         return _effectiveTint;
       case CNButtonStyle.glass:
+      case CNButtonStyle.clearGlass:
         // For iOS < 26, approximate glass with tinted appearance.
         // `_effectiveTint` is null for glass so the native side can pick its
         // own foreground, but the pre-26 fallback still needs a colour — take
@@ -1551,8 +1556,10 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
       case CNButtonStyle.filled:
       case CNButtonStyle.borderedProminent:
       case CNButtonStyle.prominentGlass:
+      case CNButtonStyle.prominentClearGlass:
         return _effectiveTint ?? Theme.of(context).primaryColor;
       case CNButtonStyle.glass:
+      case CNButtonStyle.clearGlass:
         return Theme.of(context).primaryColor.withValues(alpha: 0.1);
       default:
         return Colors.transparent;

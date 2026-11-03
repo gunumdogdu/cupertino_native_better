@@ -840,6 +840,21 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
               ],
             ),
             const SizedBox(height: 48),
+            const Text('Clear glass (iOS 26+)'),
+            const SizedBox(height: 12),
+            const Text(
+              'clearGlass and prominentClearGlass next to glass and prominentGlass, over a photo',
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.secondaryLabel,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: ClearGlassShowcase(onPressed: _set),
+            ),
+            const SizedBox(height: 48),
             const Text('Liquid Glass Effects (iOS 26+)'),
             const SizedBox(height: 12),
             const Text(
@@ -1687,4 +1702,184 @@ class _ButtonGroupTestState extends State<_ButtonGroupTest> {
       ],
     );
   }
+}
+
+/// Clear glass buttons next to the regular glass styles, over
+/// `assets/showcase/violet.jpg`. Used by the button demo and by
+/// `PROBE=clearglass`.
+class ClearGlassShowcase extends StatelessWidget {
+  const ClearGlassShowcase({super.key, this.onPressed});
+
+  final ValueChanged<String>? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    void tap(String what) => onPressed?.call(what);
+    const pink = CupertinoColors.systemPink;
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/showcase/violet.jpg'),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _OnPhotoLabel('glass · clearGlass · clearGlass + white tint'),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                CNButton(
+                  label: 'Glass',
+                  onPressed: () => tap('Glass'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.glass,
+                    shrinkWrap: true,
+                  ),
+                ),
+                CNButton(
+                  label: 'Clear',
+                  onPressed: () => tap('Clear'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.clearGlass,
+                    shrinkWrap: true,
+                  ),
+                ),
+                CNButton(
+                  label: 'Clear',
+                  tint: CupertinoColors.white,
+                  onPressed: () => tap('Clear white'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.clearGlass,
+                    shrinkWrap: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const _OnPhotoLabel('prominentGlass · prominentClearGlass'),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                CNButton(
+                  label: 'Prominent',
+                  tint: pink,
+                  onPressed: () => tap('Prominent'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.prominentGlass,
+                    shrinkWrap: true,
+                  ),
+                ),
+                CNButton(
+                  label: 'Prominent clear',
+                  tint: pink,
+                  onPressed: () => tap('Prominent clear'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.prominentClearGlass,
+                    shrinkWrap: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const _OnPhotoLabel(
+              'icon buttons: glass · clear · clear · prominent clear',
+            ),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                CNButton.icon(
+                  icon: const CNSymbol('play.fill', size: 20),
+                  onPressed: () => tap('Play glass'),
+                  config: const CNButtonConfig(style: CNButtonStyle.glass),
+                ),
+                CNButton.icon(
+                  icon: const CNSymbol('play.fill', size: 20),
+                  onPressed: () => tap('Play clear'),
+                  config: const CNButtonConfig(style: CNButtonStyle.clearGlass),
+                ),
+                CNButton.icon(
+                  icon: const CNSymbol('heart.fill', size: 20),
+                  tint: CupertinoColors.white,
+                  onPressed: () => tap('Heart clear'),
+                  config: const CNButtonConfig(style: CNButtonStyle.clearGlass),
+                ),
+                CNButton.icon(
+                  icon: const CNSymbol('square.and.arrow.up', size: 20),
+                  tint: pink,
+                  onPressed: () => tap('Share prominent clear'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.prominentClearGlass,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const _OnPhotoLabel(
+              'with glassEffectId (SwiftUI path): glass · clear · prominent clear',
+            ),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                CNButton(
+                  label: 'Glass',
+                  onPressed: () => tap('SwiftUI glass'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.glass,
+                    glassEffectId: 'clear-showcase-glass',
+                    shrinkWrap: true,
+                  ),
+                ),
+                CNButton(
+                  label: 'Clear',
+                  onPressed: () => tap('SwiftUI clear'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.clearGlass,
+                    glassEffectId: 'clear-showcase-clear',
+                    shrinkWrap: true,
+                  ),
+                ),
+                CNButton(
+                  label: 'Pink',
+                  tint: pink,
+                  onPressed: () => tap('SwiftUI prominent clear'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.prominentClearGlass,
+                    glassEffectId: 'clear-showcase-prominent',
+                    shrinkWrap: true,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OnPhotoLabel extends StatelessWidget {
+  const _OnPhotoLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(
+      text,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: CupertinoColors.white,
+      ),
+    ),
+  );
 }

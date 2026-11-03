@@ -924,6 +924,18 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         } else {
           config = .tinted()
         }
+      case "clearGlass":
+        if #available(iOS 26.0, *) {
+          config = .clearGlass()
+        } else {
+          config = .tinted()
+        }
+      case "prominentClearGlass":
+        if #available(iOS 26.0, *) {
+          config = .prominentClearGlass()
+        } else {
+          config = .tinted()
+        }
       default:
         config = .plain()
       }
@@ -931,10 +943,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       // Apply theme tint to configuration in a platform-standard way
       if let tint = button.tintColor {
         switch buttonStyle {
-        case "filled", "borderedProminent", "prominentGlass":
+        case "filled", "borderedProminent", "prominentGlass", "prominentClearGlass":
           // Treat prominentGlass like filled: color the background and let system pick readable foreground
           config.baseBackgroundColor = tint
-        case "tinted", "bordered", "gray", "plain", "glass":
+        case "tinted", "bordered", "gray", "plain", "glass", "clearGlass":
           // Foreground-only tint
           config.baseForegroundColor = tint
         default:

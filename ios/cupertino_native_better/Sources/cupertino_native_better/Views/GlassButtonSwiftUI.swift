@@ -32,8 +32,14 @@ struct GlassButtonSwiftUI: View {
   /// the control tint; when neither is provided the system/glass default
   /// (automatic adaptive foreground) applies.
   private var effectiveIconColor: Color? {
+    if isProminentClear { return iconColor }
     return iconColor ?? tint
   }
+
+  /// `prominentClearGlass` tints the glass itself with [tint], so its content
+  /// keeps the system's automatic foreground, as
+  /// `UIButton.Configuration.prominentClearGlass()` does.
+  private var isProminentClear: Bool { style == "prominentClearGlass" }
 
   var body: some View {
     Button(action: onPressed) {
@@ -53,7 +59,7 @@ struct GlassButtonSwiftUI: View {
 
         if let title = title {
           Text(title)
-            .foregroundColor(tint != nil ? Color(tint!) : nil)
+            .foregroundColor(isProminentClear ? nil : (tint != nil ? Color(tint!) : nil))
         }
       }
       .padding(config.padding)
@@ -84,8 +90,19 @@ struct GlassButtonSwiftUI: View {
   }
   
   private func glassEffectForStyle(_ style: String, interactive: Bool) -> Glass {
-    // Always use .regular for now - prominent glass API may be available in future
-    var glass = Glass.regular
+    // Regular glass for every style but the clear ones. The prominent styles
+    // cannot use SwiftUI's `.glassProminent` button style, which draws its own
+    // glass and so cannot join a `glassEffectUnion`; `prominentClearGlass`
+    // tints the clear glass instead.
+    var glass: Glass
+    switch style {
+    case "clearGlass":
+      glass = .clear
+    case "prominentClearGlass":
+      glass = Glass.clear.tint(tint)
+    default:
+      glass = .regular
+    }
     
     // Make glass interactive if requested
     if interactive {

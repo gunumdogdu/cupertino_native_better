@@ -171,12 +171,15 @@ class CupertinoButtonNSView: NSView {
       case "filled": nsButton.bezelStyle = .rounded
       case "glass": nsButton.bezelStyle = .texturedRounded
       case "prominentGlass": nsButton.bezelStyle = .texturedRounded
+      // AppKit has no clear glass bezel; the clear styles look like glass.
+      case "clearGlass": nsButton.bezelStyle = .texturedRounded
+      case "prominentClearGlass": nsButton.bezelStyle = .texturedRounded
       default: nsButton.bezelStyle = .rounded
     }
       if makeRound { nsButton.bezelStyle = .circular }
       nsButton.setButtonType(.momentaryPushIn)
     if #available(macOS 10.14, *), let c = tint {
-      if ["filled", "borderedProminent", "prominentGlass"].contains(buttonStyle) {
+      if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(buttonStyle) {
           nsButton.bezelColor = c
           nsButton.contentTintColor = .white
       } else {
@@ -242,7 +245,7 @@ class CupertinoButtonNSView: NSView {
           } else if let button = self.button {
           if #available(macOS 10.14, *), let n = args["tint"] as? NSNumber {
             let color = Self.colorFromARGB(n.intValue)
-            if ["filled", "borderedProminent", "prominentGlass"].contains(self.currentButtonStyle) {
+            if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(self.currentButtonStyle) {
                 button.bezelColor = color
                 button.contentTintColor = .white
             } else {
@@ -262,6 +265,8 @@ class CupertinoButtonNSView: NSView {
               case "filled": button.bezelStyle = .rounded
               case "glass": button.bezelStyle = .texturedRounded
               case "prominentGlass": button.bezelStyle = .texturedRounded
+              case "clearGlass": button.bezelStyle = .texturedRounded
+              case "prominentClearGlass": button.bezelStyle = .texturedRounded
               default: button.bezelStyle = .rounded
             }
               if bs != "plain" { button.isBordered = true }

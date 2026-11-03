@@ -116,12 +116,15 @@ class CupertinoPopupMenuButtonNSView: NSView {
     case "filled": button.bezelStyle = .rounded
     case "glass": button.bezelStyle = .texturedRounded
     case "prominentGlass": button.bezelStyle = .texturedRounded
+    // AppKit has no clear glass bezel; the clear styles look like glass.
+    case "clearGlass": button.bezelStyle = .texturedRounded
+    case "prominentClearGlass": button.bezelStyle = .texturedRounded
     default: button.bezelStyle = .rounded
     }
     if makeRound { button.bezelStyle = .circular }
     button.setButtonType(.momentaryPushIn)
     if #available(macOS 10.14, *), let c = tint {
-      if ["filled", "borderedProminent", "prominentGlass"].contains(buttonStyle) {
+      if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(buttonStyle) {
         button.bezelColor = c
         button.contentTintColor = .white
       } else {
@@ -176,7 +179,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
         if let args = call.arguments as? [String: Any] {
           if #available(macOS 10.14, *), let n = args["tint"] as? NSNumber {
             let color = Self.colorFromARGB(n.intValue)
-            if ["filled", "borderedProminent", "prominentGlass"].contains(buttonStyle) {
+            if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(buttonStyle) {
               self.button.bezelColor = color
               self.button.contentTintColor = .white
             } else {
@@ -195,6 +198,8 @@ class CupertinoPopupMenuButtonNSView: NSView {
             case "filled": self.button.bezelStyle = .rounded
             case "glass": self.button.bezelStyle = .texturedRounded
             case "prominentGlass": self.button.bezelStyle = .texturedRounded
+            case "clearGlass": self.button.bezelStyle = .texturedRounded
+            case "prominentClearGlass": self.button.bezelStyle = .texturedRounded
             default: self.button.bezelStyle = .rounded
             }
             if bs != "plain" { self.button.isBordered = true }

@@ -40,6 +40,9 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=symboleffects
 //     (2.0.0: CNIcon symbol effects and replace transitions, on timers)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=clearglass
+//     (2.0.0: CNButton clearGlass / prominentClearGlass over a photo)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -155,6 +158,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'symboleffects') {
       return const SymbolEffectsProbePage();
+    }
+    if (_probe == 'clearglass') {
+      return const ClearGlassProbePage();
     }
     if (_probe == 'pr106') {
       return const Pr106PopupMenuRebuildTestPage(autoCycle: true);

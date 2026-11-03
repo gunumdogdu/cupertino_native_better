@@ -333,11 +333,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   Animation<double>? _secondaryRouteAnim;
 
   bool get _isDark => ThemeHelper.isDark(context);
-  // Regular glass resolves its content foreground from the material's
-  // automatic appearance, so no accent fallback is applied for it.
+  // Regular and clear glass resolve their content foreground from the
+  // material's automatic appearance, so no accent fallback is applied.
   Color? get _effectiveTint {
     final tint = widget.tint;
-    if (tint != null || widget.buttonStyle != CNButtonStyle.glass) {
+    if (tint != null ||
+        (widget.buttonStyle != CNButtonStyle.glass &&
+            widget.buttonStyle != CNButtonStyle.clearGlass)) {
       return tint ?? ThemeHelper.getPrimaryColor(context);
     }
     return null;
