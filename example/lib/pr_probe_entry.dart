@@ -60,6 +60,7 @@ import 'demos/pr100_tabbar_font_runtime_test.dart';
 import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/alert.dart';
 import 'demos/tabbar_overlap_variants_test.dart';
+import 'demos/pr111_runtime_theme_test.dart';
 import 'demos/issue60_tabbar_labels_after_pop_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
 import 'demos/issue70_tabbar_background_test.dart';
@@ -204,6 +205,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'overlap') {
       return const TabBarOverlapVariantsTestPage();
+    }
+    if (_probe == 'pr111') {
+      return const Pr111RuntimeThemeTestPage();
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);
