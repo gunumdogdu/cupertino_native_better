@@ -52,4 +52,28 @@ void main() {
     expect(enables.single['showCloseButton'], isFalse);
     expect(enables.single['asRoot'], isTrue);
   }, skip: !(Platform.isMacOS || Platform.isIOS));
+
+  test(
+    'a prominent tab is marked; the others carry no key',
+    () async {
+      await CNTabBarNative.enable(
+        tabs: [
+          ...tabs,
+          CNTab(
+            title: 'New',
+            sfSymbol: const CNSymbol('plus'),
+            isProminent: true,
+          ),
+        ],
+      );
+      final sent = (enables.single['tabs'] as List).cast<Map>();
+      expect(sent.map((t) => t.containsKey('isProminent')), [
+        false,
+        false,
+        true,
+      ]);
+      expect(sent.last['isProminent'], isTrue);
+    },
+    skip: !(Platform.isMacOS || Platform.isIOS),
+  );
 }
