@@ -1,4 +1,52 @@
-## Unreleased
+## 2.0.0
+
+> Major: four new native controls (`CNDatePicker`, `CNStepper`, `CNColorWell`, `CNPageControl`), SF Symbol effects in `CNIcon`, clear glass buttons, sliders without a thumb and with tick marks, tab bar items that open a menu (#113, thanks @johan-perso), palettes and inline sections in pop-up menus, and the iOS 27 prominent tab. Three APIs deprecated since 1.3.0 and 1.5.0 are removed, and `CNButtonStyle` gains two values; see "Breaking changes".
+
+### Breaking changes
+
+- **`PlatformVersion.initialize()` is removed.** It has been deprecated since 1.3.0: `PlatformVersion` reads the OS version the first time it is used. Delete the call.
+- **`CNTabBarNative.checkIsEnabled()` is removed.** It has been deprecated since 1.5.0. Use the synchronous `CNTabBarNative.isEnabled`.
+- **`CNTabBarNative.enable` no longer takes `onSearchSubmitted`, `onSearchCancelled` or `onSearchActiveChanged`.** They have been deprecated and never called since 1.5.0; the search tab reports through `onSearchChanged`. `CNTabBarSearchItem.onSearchActiveChanged` and `CNSearchScaffold.onSearchActiveChanged` are unchanged.
+- **`CNButtonStyle` has two new values,** `clearGlass` and `prominentClearGlass`. An exhaustive `switch` over it needs two more cases.
+
+The minimum Flutter and Dart versions do not change.
+
+### Docs — four new showcase screens
+
+The README's "What's new" section shows four new **Showcase** screens of the example app, built only from this package's widgets and recorded on the iOS 27 simulator: a New Event form (date pickers, a stepper, a colour well, pop-up menus), Notes (a "+" tab that opens a menu, and a menu with a formatting palette), a Welcome pager (symbol effects and page dots) and a photo Editor (clear glass buttons and a ticked slider). Run them with `flutter run -t lib/showcase/showcase_app.dart --dart-define=SCENE=event|notes|welcome|editor`.
+
+### Added — `CNDatePicker`
+
+A native date and time picker: `UIDatePicker` on iOS 26+, `NSDatePicker` on macOS 26+. It has `date`, `time`, `dateAndTime` and `yearAndMonth` modes in the `compact`, `inline` and `wheels` styles, with `minimumDate`, `maximumDate`, `minuteInterval`, `tint`, `locale` and `semanticLabel`. The native view reports its size, so the compact pill fits in a `Row` and the inline calendar takes its own height. Its popover opens from the pill and follows the app's theme. A UTC `DateTime` is shown and returned in UTC, a local one in the device's time zone. Below 26 it falls back to `CupertinoDatePicker`, with a pill that opens it in a popup for the compact style.
+
+### Added — `CNStepper`
+
+A native − / + stepper: the system stepper on iOS 26+, an `NSStepper` on macOS 26+, and a Flutter stepper shaped like the iOS 18 one below that. It takes `min`, `max`, `step`, `wraps`, `autorepeat`, `enabled` and a `color`, and VoiceOver reads it as one adjustable element with its `semanticLabel` and value. On iOS 26+ `UIStepper` ignores a tint and has no disabled look, so the native stepper is SwiftUI's, which draws the same control, takes the colour, and dims both buttons while disabled.
+
+### Added — `CNColorWell`
+
+A round colour well: `UIColorWell` on iOS 26+, which opens the system colour picker itself (grid, spectrum, sliders, eyedropper), an `NSColorWell` on macOS 26+, and below that a swatch that opens a sheet of system colours with an opacity slider. It takes `supportsAlpha`, `title`, `supportsEyedropper` (iOS 26) and `enabled`. The picker opens in the app's theme, not the phone's. `onChanged` always receives an sRGB colour: a Display P3 pick is converted to sRGB and clipped to its gamut.
+
+### Added — `CNPageControl`
+
+Page dots: `UIPageControl` on iOS 26+, and drawn in Flutter with the same geometry on macOS, which has no native page control, and below iOS 26. Pass a PageView's `PageController` as `controller` and the dots follow the PageView, and a tap on them animates it. It takes `backgroundStyle` (automatic, prominent, minimal), `hidesForSinglePage`, `allowsContinuousInteraction`, `enabled` and dot colours. The colours default to the label colours, since UIKit's white dots vanish on a light background.
+
+### Added — SF Symbol effects in `CNIcon`
+
+- **`CNIcon.effect`** runs a `CNSymbolEffect` while it is set: `pulse`, `variableColor`, `scale`, and from iOS 18 / macOS 15 `bounce`, `wiggle`, `breathe` and `rotate`; switching between `drawOff` and `drawOn` (iOS 26 / macOS 26) draws the symbol out and back in. Set it to null to stop.
+- **`CNIcon.triggeredEffect`** plays once each time **`effectTrigger`** changes (bounce by default): a bell that bounces on each new message.
+- **`CNIcon.replaceTransition`** animates a change of `CNSymbol.name`: `replace`, `downUp`, `upUp`, `offUp`, or `magic` (iOS 18 / macOS 15).
+- Effects take a direction, `byLayer` / `wholeSymbol` scope, speed and repeat (`once`, `periodic`, `continuous`). Each needs the OS version that introduced it (iOS 17 / 18 / 26, macOS 14 / 15 / 26); below it, and on other platforms, the icon stays still. Creation params are unchanged when no effect is used.
+
+### Added — clear glass buttons
+
+- **`CNButtonStyle.clearGlass`** and **`.prominentClearGlass`** use `UIButton.Configuration.clearGlass()` / `.prominentClearGlass()` on iOS 26, for buttons over photos and video. With a `glassEffectUnionId` or `glassEffectId` they use `Glass.clear`, tinted for the prominent style. `CNPopupMenuButton` and `CNGlassButtonGroup` take them too. On macOS without those IDs, and below iOS/macOS 26, they look like `glass` / `prominentGlass`.
+- The label and icon of a `prominentClearGlass` button are white, as on `prominentGlass`. UIKit's own configuration keeps the dark label colour, which is unreadable on a dark tint. An icon colour, or `labelColor`, overrides the white.
+
+### Added — thumbless and ticked `CNSlider`
+
+- **`CNSlider.style: CNSliderStyle.thumbless`** draws a media-style slider without a thumb (iOS 26).
+- **`numberOfTicks`** or **`tickValues`** draw tick marks, **`allowsTickValuesOnly`** (default true, as in UIKit) snaps to them, and **`neutralValue`** fills the track from a middle value, such as 0 on a -100…100 exposure slider (iOS 26 / macOS 26). Below iOS/macOS 26 the Flutter slider snaps to the same ticks but draws no marks.
 
 ### Added — #113 tab bar items that open a menu (thanks @johan-perso)
 
@@ -23,6 +71,12 @@
 ### Fixed
 
 - **Dot badges in right-to-left layouts** were drawn on the mirrored item: the icons are found from left to right, and the first item is the rightmost there.
+
+### Example
+
+- Showcase scenes `SCENE=event|notes|welcome|editor` (see "Docs" above).
+- Date Picker, Stepper, Color Well and Page Control demo pages; symbol effects, clear glass buttons over a photo, and iOS 26 sliders on the icon, button and slider pages.
+- Testing screens: `PROBE=datepicker|stepper|colorwell|pagecontrol|controls|symboleffects|clearglass|slider26|tabmenus|prominent|menulayout`. Add `--dart-define=FALLBACK=true` to `stepper|colorwell|pagecontrol|controls` for the Flutter fallbacks.
 
 ## 1.9.1
 
