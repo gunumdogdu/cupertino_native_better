@@ -41,6 +41,10 @@
 //     (CNStepper; the values and the tint change every 1.5 s. Add
 //     --dart-define=FALLBACK=true to draw the Flutter fallbacks instead.)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=colorwell
+//     (CNColorWell; the colours change every 1.5 s. FALLBACK=true as above;
+//     add --dart-define=SCENARIO=sheet to open the fallback palette sheet.)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -75,6 +79,7 @@ import 'demos/popup_menu_submenus_test.dart';
 import 'demos/tabbar_split_five_items_test.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
 import 'demos/stepper.dart';
+import 'demos/color_well.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -226,6 +231,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'stepper') {
       return const StepperDemoPage(autoCycle: true);
+    }
+    if (_probe == 'colorwell') {
+      return ColorWellDemoPage(
+        autoCycle: _scenario != 'sheet' && _scenario != 'still',
+        openPicker: _scenario == 'sheet',
+      );
     }
     return Pr67IconSupersampleTestPage(
       initialIcon: _icon,

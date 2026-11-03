@@ -28,6 +28,9 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     let stepperFactory = CupertinoStepperViewFactory(messenger: registrar.messenger())
     registrar.register(stepperFactory, withId: "CupertinoNativeStepper")
 
+    let colorWellFactory = CupertinoColorWellViewFactory(messenger: registrar.messenger())
+    registrar.register(colorWellFactory, withId: "CupertinoNativeColorWell")
+
     // Segmented control
     let segmentedFactory = CupertinoSegmentedControlViewFactory(messenger: registrar.messenger())
     registrar.register(segmentedFactory, withId: "CupertinoNativeSegmentedControl")

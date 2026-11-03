@@ -26,6 +26,7 @@
 /// - [CNSlider] - Native slider with controller support
 /// - [CNSwitch] - Native toggle switch
 /// - [CNStepper] - Native − / + stepper
+/// - [CNColorWell] - Native colour well that opens the system colour picker
 /// - [CNPopupMenuButton] - Native popup menu
 /// - [CNSegmentedControl] - Native segmented control
 /// - [CNGlassButtonGroup] - Grouped buttons with unified glass effects
@@ -64,6 +65,7 @@ export 'components/icon.dart';
 export 'components/slider.dart';
 export 'components/switch.dart';
 export 'components/stepper.dart';
+export 'components/color_well.dart';
 export 'components/tab_bar.dart';
 export 'components/tab_rail.dart';
 export 'components/tab_scaffold.dart';
