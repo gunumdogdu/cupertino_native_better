@@ -945,14 +945,23 @@ class _CNTabBarState extends State<CNTabBar> {
           );
 
     final h = widget.height ?? _intrinsicHeight ?? 50.0;
-    if (!widget.split && widget.shrinkCentered) {
-      final w = _intrinsicWidth;
-      return ClipRect(
-        child: SizedBox(height: h, width: w, child: platformView),
+    final w = !widget.split && widget.shrinkCentered ? _intrinsicWidth : null;
+    final own = _intrinsicHeight;
+    if (_keepsNativeHeight && own != null && own > h) {
+      return SizedBox(
+        height: h,
+        child: OverflowBox(
+          alignment: Alignment.bottomCenter,
+          minHeight: own,
+          maxHeight: own,
+          child: ClipRect(
+            child: SizedBox(height: own, width: w, child: platformView),
+          ),
+        ),
       );
     }
     return ClipRect(
-      child: SizedBox(height: h, child: platformView),
+      child: SizedBox(height: h, width: w, child: platformView),
     );
   }
 
@@ -1248,8 +1257,20 @@ class _CNTabBarState extends State<CNTabBar> {
     }
   }
 
+  /// iOS 26 squeezes the native bar when its platform view is shorter than
+  /// the height it measures for itself (about 97 pt on an iPhone 17 Pro, the
+  /// top 14 of them room for the selection pill): with `height: 85` the glass
+  /// capsule came out short and the labels sat on the icons. iOS 27 lays the
+  /// same bar out right. So on iOS 26 a bar given a shorter [CNTabBar.height]
+  /// keeps its own height, aligned to the bottom of the box, and its
+  /// transparent top reaches above it. A taller height is used as it is.
+  bool get _keepsNativeHeight =>
+      widget.height != null &&
+      defaultTargetPlatform == TargetPlatform.iOS &&
+      PlatformVersion.iosVersion == 26;
+
   Future<void> _requestIntrinsicSize() async {
-    if (widget.height != null) return;
+    if (widget.height != null && !_keepsNativeHeight) return;
     final ch = _channel;
     if (ch == null) return;
     try {
@@ -1259,7 +1280,9 @@ class _CNTabBarState extends State<CNTabBar> {
       if (!mounted) return;
       setState(() {
         if (h != null && h > 0) _intrinsicHeight = h;
-        if (w != null && w > 0) _intrinsicWidth = w;
+        // A bar given a height only measures for _keepsNativeHeight and
+        // keeps the width it had.
+        if (w != null && w > 0 && widget.height == null) _intrinsicWidth = w;
       });
     } catch (_) {}
   }

@@ -59,6 +59,10 @@ import 'demos/pr97_98_tabbar_mount_test.dart';
 import 'demos/pr100_tabbar_font_runtime_test.dart';
 import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/alert.dart';
+import 'demos/tabbar_overlap_variants_test.dart';
+import 'demos/issue60_tabbar_labels_after_pop_test.dart';
+import 'demos/bottom_nav_indexed_test.dart';
+import 'demos/issue70_tabbar_background_test.dart';
 import 'demos/prs_109_110_tabbar_test.dart';
 import 'demos/popup_menu_submenus_test.dart';
 import 'demos/tabbar_split_five_items_test.dart';
@@ -188,6 +192,18 @@ class _ProbeApp extends StatelessWidget {
           _ => 'props',
         },
       );
+    }
+    if (_probe == 'issue70') {
+      return const Issue70TabBarBackgroundTestPage();
+    }
+    if (_probe == 'issue60') {
+      return const Issue60TabBarLabelsAfterPopTestPage();
+    }
+    if (_probe == 'issue68') {
+      return const BottomNavIndexedTestPage();
+    }
+    if (_probe == 'overlap') {
+      return const TabBarOverlapVariantsTestPage();
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);
