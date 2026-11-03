@@ -29,9 +29,8 @@ import '../utils/modal_hide_mixin.dart';
 /// ```
 ///
 /// On iOS the well also takes a colour dragged onto it, which is reported
-/// through [onChanged] like a picked one. The picker is presented by the
-/// app's root view controller, so it follows the system appearance rather
-/// than the app's [CupertinoThemeData.brightness].
+/// through [onChanged] like a picked one. The picker opens in the app's
+/// brightness ([CupertinoThemeData.brightness]), not the system appearance.
 ///
 /// ## Colour space
 ///

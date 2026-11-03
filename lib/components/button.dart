@@ -115,11 +115,11 @@ class CNButtonConfig {
 
   /// Optional explicit color for the button label.
   ///
-  /// When null, the label uses the configuration's natural foreground
-  /// (driven by [CNButton.tint] for non-filled styles, or the system
-  /// foreground for filled / borderedProminent / prominentGlass /
-  /// prominentClearGlass).
-  /// Set this to override that decision.
+  /// When null, the label uses the configuration's natural foreground:
+  /// [CNButton.tint] for non-filled styles, white for filled /
+  /// borderedProminent / prominentGlass / prominentClearGlass.
+  /// Set this to override that decision. A button with a
+  /// `glassEffectUnionId` or `glassEffectId` ignores it.
   final Color? labelColor;
 
   /// Optional weight for the button label.

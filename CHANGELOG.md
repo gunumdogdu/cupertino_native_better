@@ -25,7 +25,7 @@ A native − / + stepper: the system stepper on iOS 26+, an `NSStepper` on macOS
 
 ### Added — `CNColorWell`
 
-A round colour well: `UIColorWell` on iOS 26+, which opens the system colour picker itself (grid, spectrum, sliders, eyedropper), an `NSColorWell` on macOS 26+, and below that a swatch that opens a sheet of system colours with an opacity slider. It takes `supportsAlpha`, `title`, `supportsEyedropper` (iOS 26) and `enabled`. The picker opens in the app's theme, not the phone's. `onChanged` always receives an sRGB colour: a Display P3 pick is converted to sRGB and clipped to its gamut.
+A round colour well: `UIColorWell` on iOS 26+, which opens the system colour picker itself (grid, spectrum, sliders, eyedropper), an `NSColorWell` on macOS 26+, and below that a swatch that opens a sheet of system colours with an opacity slider. It takes `supportsAlpha`, `title`, `supportsEyedropper` (iOS 26) and `enabled`. The picker opens in the app's theme, not the phone's, and VoiceOver reads the well's `semanticLabel` and its colour. `onChanged` always receives an sRGB colour: a Display P3 pick is converted to sRGB and clipped to its gamut.
 
 ### Added — `CNPageControl`
 
@@ -41,7 +41,7 @@ Page dots: `UIPageControl` on iOS 26+, and drawn in Flutter with the same geomet
 ### Added — clear glass buttons
 
 - **`CNButtonStyle.clearGlass`** and **`.prominentClearGlass`** use `UIButton.Configuration.clearGlass()` / `.prominentClearGlass()` on iOS 26, for buttons over photos and video. With a `glassEffectUnionId` or `glassEffectId` they use `Glass.clear`, tinted for the prominent style. `CNPopupMenuButton` and `CNGlassButtonGroup` take them too. On macOS without those IDs, and below iOS/macOS 26, they look like `glass` / `prominentGlass`.
-- The label and icon of a `prominentClearGlass` button are white, as on `prominentGlass`. UIKit's own configuration keeps the dark label colour, which is unreadable on a dark tint. An icon colour, or `labelColor`, overrides the white.
+- The label and icon of a `prominentClearGlass` button are white, as on `prominentGlass`. UIKit's own configuration keeps the dark label colour, which is unreadable on a dark tint. An icon colour overrides the white, and so does `labelColor` on a button without a glass ID.
 
 ### Added — thumbless and ticked `CNSlider`
 

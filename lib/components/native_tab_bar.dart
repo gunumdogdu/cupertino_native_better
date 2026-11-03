@@ -296,7 +296,9 @@ class CNTab {
   /// SF Symbol for the tab icon (unselected state).
   final CNSymbol? sfSymbol;
 
-  /// SF Symbol for the tab icon (selected state); falls back to [sfSymbol].
+  /// SF Symbol for the tab icon (selected state).
+  ///
+  /// Not sent to the native tab bar yet: it draws [sfSymbol] in both states.
   final CNSymbol? activeSfSymbol;
 
   /// Whether this tab is the search tab.
