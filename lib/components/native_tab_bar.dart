@@ -121,6 +121,8 @@ class CNTabBarNative {
           {
             'title': t.title,
             'sfSymbol': t.sfSymbol?.name,
+            if (t.activeSfSymbol != null)
+              'activeSfSymbol': t.activeSfSymbol!.name,
             'isSearch': t.isSearchTab,
             if (t.isProminent) 'isProminent': true,
             'badgeCount': t.badgeCount,
@@ -296,9 +298,11 @@ class CNTab {
   /// SF Symbol for the tab icon (unselected state).
   final CNSymbol? sfSymbol;
 
-  /// SF Symbol for the tab icon (selected state).
+  /// SF Symbol for the tab icon while the tab is selected. Defaults to
+  /// [sfSymbol].
   ///
-  /// Not sent to the native tab bar yet: it draws [sfSymbol] in both states.
+  /// The native tab bar already draws symbols filled, so `house.fill` looks
+  /// the same as `house`; use a different symbol to mark the selected tab.
   final CNSymbol? activeSfSymbol;
 
   /// Whether this tab is the search tab.

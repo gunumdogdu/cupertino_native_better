@@ -72,6 +72,7 @@ Page dots: `UIPageControl` on iOS 26+, and drawn in Flutter with the same geomet
 
 - **Dot badges in right-to-left layouts** were drawn on the mirrored item: the icons are found from left to right, and the first item is the rightmost there.
 - **`CNButton` kept its last tint when `tint` was set back to null.** Only non-null tints were sent to the native button, so a button that lost its highlight stayed coloured. It now returns to the colour of a button created without a tint, on iOS and macOS.
+- **`CNTab.activeSfSymbol` was never sent to the native tab bar**, so `CNTabBarNative` drew `sfSymbol` on the selected tab too. The selected tab now shows `activeSfSymbol`. The native bar already draws symbols filled, so pick a different symbol rather than the `.fill` one.
 
 ### Example
 

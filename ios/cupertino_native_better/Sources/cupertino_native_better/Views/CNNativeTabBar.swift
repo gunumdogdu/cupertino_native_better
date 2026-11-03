@@ -271,6 +271,7 @@ struct CNMinTabConfig {
     struct Tab {
         let title: String
         let symbol: String?
+        let activeSymbol: String?
         let isSearch: Bool
         let isProminent: Bool
         var badge: Int?
@@ -306,6 +307,7 @@ struct CNMinTabConfig {
             return Tab(
                 title: d["title"] as? String ?? "",
                 symbol: d["sfSymbol"] as? String,
+                activeSymbol: d["activeSfSymbol"] as? String,
                 isSearch: d["isSearch"] as? Bool ?? false,
                 isProminent: d["isProminent"] as? Bool ?? false,
                 badge: d["badgeCount"] as? Int,
@@ -412,8 +414,9 @@ struct CNMinimizingTabView: View {
             ForEach(store.tabs.indices, id: \.self) { index in
                 let tab = store.tabs[index]
                 let badgeText: Text? = (tab.badge ?? 0) > 0 ? Text("\(tab.badge!)") : nil
+                let symbol = store.selection == index ? tab.activeSymbol ?? tab.symbol : tab.symbol
                 Tab(tab.title.isEmpty ? (tab.isSearch ? "Search" : "Tab \(index + 1)") : tab.title,
-                    systemImage: tab.symbol ?? (tab.isSearch ? "magnifyingglass" : "circle"),
+                    systemImage: symbol ?? (tab.isSearch ? "magnifyingglass" : "circle"),
                     value: index,
                     role: role(of: tab)) {
                     if tab.isSearch {

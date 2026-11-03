@@ -177,6 +177,7 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
         CNTab(
           title: 'Profile',
           sfSymbol: CNSymbol('person'),
+          activeSfSymbol: CNSymbol('person.crop.circle'),
           badgeCount: 3,
           nativeList: CNNativeList(items: _profileItems),
         ),
