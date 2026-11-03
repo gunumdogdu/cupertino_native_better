@@ -39,12 +39,22 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=tabmenus
 //     (CNTabBarItem.menuItems; open the menus by hand)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=datepicker \
+//     --dart-define=SCENARIO=inline --dart-define=AUTO=true --dart-define=BRIGHTNESS=system
+//     (CNDatePicker; SCENARIO: compact | inline | inlineTime | wheels |
+//     limits, or leave it out for every section; AUTO moves the value to a
+//     new month every 4 s; BRIGHTNESS=system follows
+//     `xcrun simctl ui <udid> appearance`; FALLBACK=true draws the Flutter
+//     fallback, which iOS 26+ never shows, by claiming to be Android)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
 
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 
 import 'demos/action_sheet.dart';
@@ -73,6 +83,7 @@ import 'demos/tabbar_item_menus_test.dart';
 import 'demos/native_tab_bar_demo.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
+import 'demos/date_picker.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -94,11 +105,15 @@ const String _scenario = String.fromEnvironment(
 
 const bool _auto = bool.fromEnvironment('AUTO');
 
+/// Takes the widgets' Flutter fallbacks on an iOS 26+ simulator.
+const bool _fallback = bool.fromEnvironment('FALLBACK');
+
 /// Stamped into the nav bar so a before/after screenshot pair can't be mixed up.
 const String _label = String.fromEnvironment('LABEL', defaultValue: '');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (_fallback) debugDefaultTargetPlatformOverride = TargetPlatform.android;
   if (_probe == 'pr67report') {
     WidgetsBinding.instance.addPostFrameCallback((_) => pr67PrintReport());
   }
@@ -119,7 +134,12 @@ class _ProbeApp extends StatelessWidget {
         DefaultWidgetsLocalizations.delegate,
       ],
       theme: CupertinoThemeData(
-        brightness: _brightness == 'dark' ? Brightness.dark : Brightness.light,
+        brightness: switch (_brightness) {
+          'dark' => Brightness.dark,
+          // Follows the device, for light/dark screenshots of one run.
+          'system' => null,
+          _ => Brightness.light,
+        },
         primaryColor: _accent == 'pink'
             ? CupertinoColors.systemPink
             : CupertinoColors.systemBlue,
@@ -226,6 +246,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'pr111') {
       return const Pr111RuntimeThemeTestPage();
+    }
+    if (_probe == 'datepicker') {
+      return const DatePickerDemoPage(
+        section: bool.hasEnvironment('SCENARIO') ? _scenario : null,
+        autoCycle: _auto,
+      );
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);

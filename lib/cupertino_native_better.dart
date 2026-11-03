@@ -25,6 +25,7 @@
 /// - [CNTabBar] - Native tab bar with split mode support
 /// - [CNSlider] - Native slider with controller support
 /// - [CNSwitch] - Native toggle switch
+/// - [CNDatePicker] - Native date and time picker (compact, inline, wheels)
 /// - [CNPopupMenuButton] - Native popup menu
 /// - [CNSegmentedControl] - Native segmented control
 /// - [CNGlassButtonGroup] - Grouped buttons with unified glass effects
@@ -62,6 +63,7 @@ export 'components/button.dart';
 export 'components/icon.dart';
 export 'components/slider.dart';
 export 'components/switch.dart';
+export 'components/date_picker.dart';
 export 'components/tab_bar.dart';
 export 'components/tab_rail.dart';
 export 'components/tab_scaffold.dart';

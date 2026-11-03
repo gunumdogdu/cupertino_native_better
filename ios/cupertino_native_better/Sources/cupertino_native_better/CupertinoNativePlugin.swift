@@ -25,6 +25,9 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     let switchFactory = CupertinoSwitchViewFactory(messenger: registrar.messenger())
     registrar.register(switchFactory, withId: "CupertinoNativeSwitch")
 
+    let datePickerFactory = CupertinoDatePickerViewFactory(messenger: registrar.messenger())
+    registrar.register(datePickerFactory, withId: "CupertinoNativeDatePicker")
+
     // Segmented control
     let segmentedFactory = CupertinoSegmentedControlViewFactory(messenger: registrar.messenger())
     registrar.register(segmentedFactory, withId: "CupertinoNativeSegmentedControl")
