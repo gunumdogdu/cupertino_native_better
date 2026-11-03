@@ -1577,31 +1577,34 @@ class _CNTabBarState extends State<CNTabBar> {
 
   /// Puts [item]'s badge on a fallback [icon] at the size and place
   /// `UITabBarItem` draws it on iOS 18, measured against the icon's glyph.
-  /// Stacked (icon above label): an 18pt badge centred on the icon's top-right
-  /// corner. [inline] (icon beside label, as in landscape): a 14pt badge whose
-  /// right edge is pinned, so a longer count grows over the icon, not the
-  /// label. A dot goes where `CNDotTabBar` puts it. Null and empty badges show
-  /// nothing, as in the native `applyBadge`. VoiceOver reads the count as the
-  /// tab's value; a dot has none.
+  /// Stacked (icon above label): an 18pt badge whose centre sits 4.5pt past
+  /// the icon's trailing edge, top-aligned with it. [inline] (icon beside
+  /// label, as in landscape): a 14pt badge whose trailing edge is pinned, so
+  /// a longer count grows over the icon, not the label. A dot goes where
+  /// `CNDotTabBar` puts it. Null and empty badges show nothing, as in the
+  /// native `applyBadge`. VoiceOver reads the count as the tab's value; a dot
+  /// has none. The icon keeps the same place in the tree whether or not there
+  /// is a badge, so adding or clearing one does not rebuild it.
   Widget _withBadge(CNTabBarItem item, Widget icon, {bool inline = false}) {
     final badge = item.badge;
-    if (badge == null || badge.isEmpty) return icon;
+    final hasBadge = badge != null && badge.isNotEmpty;
     final dot = badge == CNTabBarItem.dotBadge;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
     return Semantics(
-      value: dot ? null : badge,
+      value: hasBadge && !dot ? badge : null,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           icon,
-          if (dot)
-            const Positioned(
-              right: -TabBadgeDot.size * 0.35,
+          if (hasBadge && dot)
+            const PositionedDirectional(
+              end: -TabBadgeDot.size * 0.35,
               top: -TabBadgeDot.size * 0.3,
               child: TabBadgeDot(),
             )
-          else if (inline)
-            Positioned(
-              right: -5.5,
+          else if (hasBadge && inline)
+            PositionedDirectional(
+              end: -5.5,
               top: -2.5,
               child: TabBadge(
                 badge,
@@ -1610,12 +1613,12 @@ class _CNTabBarState extends State<CNTabBar> {
                 fontWeight: FontWeight.w400,
               ),
             )
-          else
-            Positioned(
-              right: -4.5,
+          else if (hasBadge)
+            PositionedDirectional(
+              end: -4.5,
               top: 0,
               child: FractionalTranslation(
-                translation: const Offset(0.5, 0),
+                translation: Offset(rtl ? -0.5 : 0.5, 0),
                 child: TabBadge(
                   badge,
                   height: 18,

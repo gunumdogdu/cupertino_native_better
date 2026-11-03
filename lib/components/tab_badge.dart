@@ -56,7 +56,9 @@ class TabBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(minWidth: height, minHeight: height),
-      padding: EdgeInsets.symmetric(horizontal: text.length > 1 ? padding : 0),
+      padding: EdgeInsets.symmetric(
+        horizontal: text.characters.length > 1 ? padding : 0,
+      ),
       decoration: BoxDecoration(
         color: CupertinoColors.systemRed.resolveFrom(context),
         borderRadius: BorderRadius.all(Radius.circular(height / 2)),
@@ -64,6 +66,8 @@ class TabBadge extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         text,
+        // Native tab badges keep their size at every text size.
+        textScaler: TextScaler.noScaling,
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: fontWeight,

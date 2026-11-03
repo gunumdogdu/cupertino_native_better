@@ -231,6 +231,65 @@ void main() {
         expect(find.text('7'), findsNWidgets(4));
         expect(dots, findsNothing);
       });
+
+      testWidgets('$bar: adding or clearing a badge keeps the icon', (
+        tester,
+      ) async {
+        const plain = [
+          CNTabBarItem(label: 'Home', icon: CNSymbol('house')),
+          CNTabBarItem(label: 'Inbox', icon: CNSymbol('tray')),
+        ];
+        Element homeIcon() => tester.element(find.byType(CNIcon).first);
+        await pumpBar(tester, plain, search: search);
+        final before = homeIcon();
+        await pumpBar(tester, [
+          const CNTabBarItem(
+            label: 'Home',
+            icon: CNSymbol('house'),
+            badge: '1',
+          ),
+          plain[1],
+        ], search: search);
+        expect(badges, findsOneWidget);
+        expect(homeIcon(), same(before));
+        await pumpBar(tester, plain, search: search);
+        expect(badges, findsNothing);
+        expect(homeIcon(), same(before));
+      });
+
+      testWidgets('$bar: right to left puts the badge on the leading side', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          CupertinoApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: CupertinoPageScaffold(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: CNTabBar(
+                    items: const [
+                      CNTabBarItem(
+                        label: 'Home',
+                        icon: CNSymbol('house'),
+                        badge: '3',
+                      ),
+                      CNTabBarItem(label: 'Inbox', icon: CNSymbol('tray')),
+                    ],
+                    currentIndex: 0,
+                    onTap: (_) {},
+                    searchItem: search ? const CNTabBarSearchItem() : null,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 600));
+        final icon = tester.getRect(find.byType(CNIcon).first);
+        final badge = tester.getRect(badges.first);
+        expect(badge.center.dx, lessThan(icon.center.dx));
+      });
     }
   });
 }

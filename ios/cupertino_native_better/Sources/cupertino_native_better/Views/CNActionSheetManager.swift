@@ -155,7 +155,10 @@ final class CNActionSheetManager: NSObject {
     /// nothing, so a centred sheet there shows exactly the actions Dart passed.
     /// The one case that needs a synthetic source is a popover presentation
     /// with no anchor, where UIKit raises `NSInternalInconsistencyException`
-    /// without one: always on iPad, and in any regular-width window.
+    /// without one: always on iPad, and possibly in a regular-width window.
+    /// Below iOS 26 a Plus or Pro Max iPhone in landscape is regular-width yet
+    /// still presents through the alert controller; a source given there is
+    /// simply unused.
     private func applyAnchor(_ anchorRect: CGRect?,
                              to alert: UIAlertController,
                              in window: UIWindow?,
@@ -184,11 +187,13 @@ final class CNActionSheetManager: NSObject {
         // it up from the bottom.
     }
 
-    /// Whether an unanchored sheet will be presented as a popover. Decided on
-    /// the device and the window, not the presenter: a presenter inside an
-    /// iPad form sheet reports compact width while the sheet still pops over
-    /// from the regular-width window, and UIKit would throw on the missing
-    /// source.
+    /// Whether an unanchored sheet may be presented as a popover, and so needs
+    /// a source. Decided on the device and the window, not the presenter: a
+    /// presenter inside an iPad form sheet reports compact width while the
+    /// sheet still pops over from the regular-width window, and UIKit would
+    /// throw on the missing source. It errs towards true; the delegate, which
+    /// UIKit forbids on an alert presentation, is gated separately on the
+    /// actual presentation controller.
     private func needsSyntheticSource(in window: UIWindow?) -> Bool {
         if UIDevice.current.userInterfaceIdiom == .pad { return true }
         return window?.traitCollection.horizontalSizeClass == .regular

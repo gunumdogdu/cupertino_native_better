@@ -175,7 +175,7 @@ class CNActionSheet {
       message: message,
       cancelLabel: cancelLabel,
       anchorRect: anchorRect,
-      isDark: ThemeHelper.isDark(context),
+      isDark: context.mounted ? ThemeHelper.isDark(context) : null,
     );
   }
 
@@ -185,7 +185,7 @@ class CNActionSheet {
     required String? message,
     required String? cancelLabel,
     required Rect? anchorRect,
-    required bool isDark,
+    required bool? isDark,
   }) async {
     final payload = debugBuildActionSheetPayload(
       actions: actions,
@@ -263,13 +263,13 @@ Map<String, Object?> debugBuildActionSheetPayload({
   String? message,
   String? cancelLabel,
   Rect? anchorRect,
-  bool isDark = false,
+  bool? isDark,
 }) {
   return <String, Object?>{
     'title': title,
     'message': message,
     'cancelLabel': cancelLabel,
-    'isDark': isDark,
+    'isDark': ?isDark,
     'actions': [
       for (final action in actions)
         <String, Object?>{

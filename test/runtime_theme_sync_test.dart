@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -108,7 +106,7 @@ void main() {
           expect(brightnessCalls(), [true, false]);
           debugDefaultTargetPlatformOverride = null;
         },
-        skip: !(Platform.isMacOS || Platform.isIOS),
+        skip: !PlatformVersion.shouldUseNativeGlass,
       );
 
       testWidgets(
@@ -129,7 +127,7 @@ void main() {
           expect(brightnessCalls(), [true]);
           debugDefaultTargetPlatformOverride = null;
         },
-        skip: !(Platform.isMacOS || Platform.isIOS),
+        skip: !PlatformVersion.shouldUseNativeGlass,
       );
     });
   }

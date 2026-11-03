@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/theme_helper.dart';
+
 /// Channel owned by `CNAlertManager` on the iOS side. It carries no platform
 /// view — an alert is a modal presentation, so the native implementation
 /// presents a `UIAlertController` on the top view controller instead of
@@ -281,6 +283,9 @@ class CNAlert {
       title: title,
       message: message,
       textFields: textFields,
+      // The app's theme, not the window's: a light app on a dark system gets
+      // a light alert, as CNActionSheet does.
+      isDark: context.mounted ? ThemeHelper.isDark(context) : null,
     );
   }
 
@@ -289,12 +294,14 @@ class CNAlert {
     required String? title,
     required String? message,
     required List<CNAlertTextField> textFields,
+    required bool? isDark,
   }) async {
     final payload = debugBuildAlertPayload(
       actions: actions,
       title: title,
       message: message,
       textFields: textFields,
+      isDark: isDark,
     );
 
     try {
@@ -453,10 +460,12 @@ Map<String, Object?> debugBuildAlertPayload({
   String? title,
   String? message,
   List<CNAlertTextField> textFields = const <CNAlertTextField>[],
+  bool? isDark,
 }) {
   return <String, Object?>{
     'title': title,
     'message': message,
+    'isDark': ?isDark,
     'actions': [
       for (final action in actions)
         <String, Object?>{

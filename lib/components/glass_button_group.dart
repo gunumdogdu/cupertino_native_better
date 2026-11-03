@@ -151,8 +151,13 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
     if (ch == null) return;
     final isDark = ThemeHelper.isDark(context);
     if (_lastIsDark != isDark) {
-      await ch.invokeMethod('setBrightness', {'isDark': isDark});
-      _lastIsDark = isDark;
+      try {
+        await ch.invokeMethod('setBrightness', {'isDark': isDark});
+        _lastIsDark = isDark;
+      } catch (_) {
+        // The native view is gone, e.g. hidden under a sheet; it is created
+        // again with the current brightness.
+      }
     }
   }
 

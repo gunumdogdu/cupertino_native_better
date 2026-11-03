@@ -79,7 +79,7 @@ void main() {
       expect(payload['title'], isNull);
       expect(payload['message'], isNull);
       expect(payload['cancelLabel'], isNull);
-      expect(payload['isDark'], false);
+      expect(payload.containsKey('isDark'), isFalse);
     });
   });
 
