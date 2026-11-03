@@ -955,18 +955,12 @@ channel.setMethodCallHandler { [weak self] call, result in
             }
             // A new appearance does not reach item views that already exist,
             // so re-set the items to make the bar lay them out again.
-            UIView.performWithoutAnimation {
-              for bar in [self.tabBar, self.tabBarLeft, self.tabBarRight].compactMap({ $0 }) {
-                let items = bar.items ?? []
-                let selected = bar.selectedItem
-                for item in items where item.title != nil {
-                  item.image = self.raised(item.image, by: raiseDelta)
-                  item.selectedImage = self.raised(item.selectedImage, by: raiseDelta)
-                }
-                bar.items = nil
-                bar.items = items
-                bar.selectedItem = selected
+            for bar in [self.tabBar, self.tabBarLeft, self.tabBarRight].compactMap({ $0 }) {
+              for item in bar.items ?? [] where item.title != nil {
+                item.image = self.raised(item.image, by: raiseDelta)
+                item.selectedImage = self.raised(item.selectedImage, by: raiseDelta)
               }
+              bar.reloadItemViews()
             }
           }
           result(nil)
