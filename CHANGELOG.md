@@ -6,7 +6,7 @@
 - **`CNTabBar.onMenuSelected(int index, List<int> path)`** gets the item and the path of the chosen entry, as `CNPopupMenuButton.onPathSelected` does.
 - Without the iOS 26 native bar (iOS < 26, Android, web), the menu opens as a `CupertinoActionSheet` with a further sheet for each submenu, as `CNPopupMenuButton`'s fallback does. Both now use the same sheet.
 - Menu entries show SF Symbols and image assets, not `customIcon`. On the iOS 26 bar with a `searchItem` and on the native macOS bar the item is a plain tab, and the bar is not sent its menus.
-- VoiceOver reads each such item once, as a button named by its title, or by its symbol's own description when it has no title.
+- VoiceOver reads each such item once, as the tab it is (the menu button over it is hidden from VoiceOver), and activating it opens the menu.
 - `CNPopupMenuButton` and the tab bar now build their menus with the same code (`PopupMenuBuilder.swift`, and `popup_menu_fallback_sheet.dart` for the sheet); `CNPopupMenuButton` behaves as before.
 
 ### Added — `CNPopupMenuButton`: palettes, inline sections, items that keep the menu open

@@ -30,10 +30,6 @@ final class CNDotTabBar: CNLabelFontTabBar {
   /// gestures also select the item, which the bar's delegate undoes.
   private var menuButtons: [Int: CNTabMenuButton] = [:]
 
-  /// The item views VoiceOver skips because a menu button stands in for
-  /// them, so each item is read once.
-  private let hiddenItemViews = NSHashTable<UIView>.weakObjects()
-
   /// Whether item [i] opens a menu instead of being selected.
   func opensMenu(at i: Int) -> Bool {
     return itemMenus[i] != nil
@@ -65,7 +61,6 @@ final class CNDotTabBar: CNLabelFontTabBar {
       button.removeFromSuperview()
       menuButtons[i] = nil
     }
-    defer { hideCoveredItemsFromVoiceOver() }
     guard !itemMenus.isEmpty, let items else { return }
     let columns = iconColumns()
     let slots = itemSlots(count: items.count, columns: columns)
@@ -75,6 +70,10 @@ final class CNDotTabBar: CNLabelFontTabBar {
         button.showsMenuAsPrimaryAction = true
         // Keep the given order when the menu opens upward from the bar.
         if #available(iOS 16.0, *) { button.preferredMenuElementOrder = .fixed }
+        // VoiceOver reads the item under it, which opens the menu through
+        // the bar's delegate when activated. Hiding the item instead doesn't
+        // hold: UIKit keeps one of its views visible to VoiceOver.
+        button.isAccessibilityElement = false
         // Changes held back while the menu was shown.
         button.onMenuHidden = { [weak self] in self?.setNeedsLayout() }
         addSubview(button)
@@ -86,7 +85,6 @@ final class CNDotTabBar: CNLabelFontTabBar {
       // closes an open submenu.
       if button.isMenuVisible { continue }
       if button.menu !== menu { button.menu = menu }
-      button.accessibilityLabel = Self.accessibilityLabel(of: items[i])
       // Icons not found: no touches, rather than a button over the wrong
       // item. A tap still reaches the bar, and the delegate opens the menu.
       guard columns != nil else {
@@ -136,43 +134,6 @@ final class CNDotTabBar: CNLabelFontTabBar {
       slots[entry.offset] = CGRect(x: c - half, y: 0, width: half * 2, height: bounds.height)
     }
     return slots
-  }
-
-  /// What VoiceOver reads for a menu button: the item's title or, for an
-  /// icon-only item, its symbol's own description.
-  private static func accessibilityLabel(of item: UITabBarItem) -> String? {
-    for label in [item.title, item.accessibilityLabel, item.image?.accessibilityLabel] {
-      if let label, !label.isEmpty { return label }
-    }
-    return nil
-  }
-
-  /// Hides from VoiceOver the item views under a placed menu button, and
-  /// shows again the ones no longer covered.
-  private func hideCoveredItemsFromVoiceOver() {
-    let centres = menuButtons.values.filter { !$0.isHidden }.map { $0.center }
-    var covered: [UIView] = []
-    func walk(_ view: UIView) {
-      for sub in view.subviews where !(sub is CNTabMenuButton) && !dots.contains(sub) {
-        if sub.isAccessibilityElement || hiddenItemViews.contains(sub) {
-          let frame = sub.convert(sub.bounds, to: self)
-          if centres.contains(where: { frame.contains($0) }) {
-            covered.append(sub)
-            continue
-          }
-        }
-        walk(sub)
-      }
-    }
-    if !centres.isEmpty { walk(self) }
-    for view in hiddenItemViews.allObjects where !covered.contains(view) {
-      view.accessibilityElementsHidden = false
-      hiddenItemViews.remove(view)
-    }
-    for view in covered where !hiddenItemViews.contains(view) {
-      view.accessibilityElementsHidden = true
-      hiddenItemViews.add(view)
-    }
   }
 
   private func placeDots() {
