@@ -1,17 +1,43 @@
 import Flutter
 import UIKit
 
+/// The platform view's root view. It reports each touch that reaches it
+/// without taking part in handling it: a tap recognizer on the well kept
+/// iOS 26.2 from opening the picker.
+private final class TouchReportingView: UIView {
+  var onTouch: (() -> Void)?
+
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    let hit = super.hitTest(point, with: event)
+    if hit != nil, event?.type == .touches { onTouch?() }
+    return hit
+  }
+}
+
+/// UIColorWell ignores an assigned accessibilityLabel and always reads
+/// "Color"; this one reads `CNColorWell.semanticLabel` when there is one.
+private final class LabeledColorWell: UIColorWell {
+  private var semanticLabel: String?
+
+  override var accessibilityLabel: String? {
+    get { semanticLabel ?? super.accessibilityLabel }
+    set { semanticLabel = newValue }
+  }
+}
+
 class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
   private let channel: FlutterMethodChannel
-  private let container: UIView
-  private let colorWell: UIColorWell
+  private let container: TouchReportingView
+  private let colorWell: LabeledColorWell
   /// True while Dart sets the colour, so that change is not reported back.
   private var settingFromDart = false
+  /// True while looking for the picker a touch opens.
+  private var matchingPicker = false
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeColorWell_\(viewId)", binaryMessenger: messenger)
-    self.container = UIView(frame: frame)
-    self.colorWell = UIColorWell(frame: .zero)
+    self.container = TouchReportingView(frame: frame)
+    self.colorWell = LabeledColorWell(frame: .zero)
 
     var color: UIColor = .systemBlue
     var supportsAlpha = true
@@ -64,12 +90,9 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
     colorWell.addTarget(self, action: #selector(onColorChanged(_:)), for: .valueChanged)
     // The picker is presented by the FlutterViewController, so it takes the
     // system appearance; it gets the app's, which this view carries. The
-    // well opens it from its own gesture and sends no control event, so a
-    // tap recognizer that leaves the touch to the well tells when.
-    let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
-    tap.cancelsTouchesInView = false
-    tap.delegate = self
-    colorWell.addGestureRecognizer(tap)
+    // well opens it from its own gesture and sends no control event, so the
+    // root view tells when a touch reaches it.
+    container.onTouch = { [weak self] in self?.startMatchingPicker() }
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       let args = call.arguments as? [String: Any]
@@ -138,7 +161,10 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
     }
   }
 
-  @objc private func onTap() {
+  /// Hit-testing can report one touch more than once.
+  private func startMatchingPicker() {
+    guard !matchingPicker else { return }
+    matchingPicker = true
     matchPickerAppearance(tries: 30)
   }
 
@@ -149,12 +175,13 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
     while let presented = controller?.presentedViewController {
       if NSStringFromClass(type(of: presented)).contains("ColorPicker") {
         presented.overrideUserInterfaceStyle = container.overrideUserInterfaceStyle
+        matchingPicker = false
         return
       }
       controller = presented
     }
     // The well presents the picker a moment after the tap ends.
-    guard tries > 1 else { return }
+    guard tries > 1 else { matchingPicker = false; return }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
       self?.matchPickerAppearance(tries: tries - 1)
     }
@@ -181,15 +208,5 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
     }
     func channel(_ v: CGFloat) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
     return (channel(a) << 24) | (channel(r) << 16) | (channel(g) << 8) | channel(b)
-  }
-}
-
-extension CupertinoColorWellPlatformView: UIGestureRecognizerDelegate {
-  /// Recognizes alongside the well's own gesture, which opens the picker.
-  func gestureRecognizer(
-    _ gestureRecognizer: UIGestureRecognizer,
-    shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
-  ) -> Bool {
-    true
   }
 }
