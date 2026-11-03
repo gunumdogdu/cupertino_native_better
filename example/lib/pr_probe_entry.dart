@@ -37,6 +37,9 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=split5
 //     (CNTabBar split with five items; use the buttons by hand)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=symboleffects
+//     (2.0.0: CNIcon symbol effects and replace transitions, on timers)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -68,6 +71,7 @@ import 'demos/prs_109_110_tabbar_test.dart';
 import 'demos/popup_menu_submenus_test.dart';
 import 'demos/tabbar_split_five_items_test.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
+import 'demos/upgrades_2_0_probes.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -148,6 +152,9 @@ class _ProbeApp extends StatelessWidget {
         label: _label,
         autoCycle: true,
       );
+    }
+    if (_probe == 'symboleffects') {
+      return const SymbolEffectsProbePage();
     }
     if (_probe == 'pr106') {
       return const Pr106PopupMenuRebuildTestPage(autoCycle: true);
