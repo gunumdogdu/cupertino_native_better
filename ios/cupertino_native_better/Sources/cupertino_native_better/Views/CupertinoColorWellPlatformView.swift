@@ -62,6 +62,14 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
     // that hosts this platform view. It sends .valueChanged for every
     // colour the user picks, continuously while dragging.
     colorWell.addTarget(self, action: #selector(onColorChanged(_:)), for: .valueChanged)
+    // The picker is presented by the FlutterViewController, so it takes the
+    // system appearance; it gets the app's, which this view carries. The
+    // well opens it from its own gesture and sends no control event, so a
+    // tap recognizer that leaves the touch to the well tells when.
+    let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
+    tap.cancelsTouchesInView = false
+    tap.delegate = self
+    colorWell.addGestureRecognizer(tap)
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       let args = call.arguments as? [String: Any]
@@ -130,6 +138,28 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
     }
   }
 
+  @objc private func onTap() {
+    matchPickerAppearance(tries: 30)
+  }
+
+  /// Gives the colour picker presented above this view the well's
+  /// appearance.
+  private func matchPickerAppearance(tries: Int) {
+    var controller = container.window?.rootViewController
+    while let presented = controller?.presentedViewController {
+      if NSStringFromClass(type(of: presented)).contains("ColorPicker") {
+        presented.overrideUserInterfaceStyle = container.overrideUserInterfaceStyle
+        return
+      }
+      controller = presented
+    }
+    // The well presents the picker a moment after the tap ends.
+    guard tries > 1 else { return }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+      self?.matchPickerAppearance(tries: tries - 1)
+    }
+  }
+
   @objc private func onColorChanged(_ sender: UIColorWell) {
     guard !settingFromDart, let color = sender.selectedColor else { return }
     channel.invokeMethod("colorChanged", arguments: ["color": Self.srgbARGB(color)])
@@ -151,5 +181,15 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
     }
     func channel(_ v: CGFloat) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
     return (channel(a) << 24) | (channel(r) << 16) | (channel(g) << 8) | channel(b)
+  }
+}
+
+extension CupertinoColorWellPlatformView: UIGestureRecognizerDelegate {
+  /// Recognizes alongside the well's own gesture, which opens the picker.
+  func gestureRecognizer(
+    _ gestureRecognizer: UIGestureRecognizer,
+    shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+  ) -> Bool {
+    true
   }
 }

@@ -408,6 +408,8 @@ class _ControlsState extends State<_Controls> {
   @override
   void initState() {
     super.initState();
+    // SCENARIO=still leaves the values to taps.
+    if (_scenario == 'still') return;
     _timer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
       setState(() {
         _size = _size >= 20 ? 12 : _size + 1;
