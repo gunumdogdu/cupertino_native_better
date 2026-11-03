@@ -56,6 +56,21 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=slider26
 //     (2.0.0: CNSlider thumbless style, ticks and neutral value, on a timer)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=stepper
+//     (CNStepper; the values and the tint change every 1.5 s. Add
+//     --dart-define=FALLBACK=true to draw the Flutter fallbacks instead.)
+//
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=colorwell
+//     (CNColorWell; the colours change every 1.5 s. FALLBACK=true as above;
+//     add --dart-define=SCENARIO=sheet to open the fallback palette sheet.)
+//
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=pagecontrol
+//     (CNPageControl; the pages turn every 1.5 s. FALLBACK=true as above.)
+//
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=controls
+//     (CNStepper, CNColorWell and CNPageControl on one screen, changing on
+//     a timer.)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -94,6 +109,9 @@ import 'demos/popup_menu_button.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
 import 'demos/date_picker.dart';
 import 'demos/upgrades_2_0_probes.dart';
+import 'demos/stepper.dart';
+import 'demos/color_well.dart';
+import 'demos/page_control.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -275,6 +293,21 @@ class _ProbeApp extends StatelessWidget {
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);
     }
+    if (_probe == 'stepper') {
+      return const StepperDemoPage(autoCycle: true);
+    }
+    if (_probe == 'pagecontrol') {
+      return const PageControlDemoPage(autoCycle: true);
+    }
+    if (_probe == 'controls') {
+      return const _Controls();
+    }
+    if (_probe == 'colorwell') {
+      return ColorWellDemoPage(
+        autoCycle: _scenario != 'sheet' && _scenario != 'still',
+        openPicker: _scenario == 'sheet',
+      );
+    }
     return Pr67IconSupersampleTestPage(
       initialIcon: _icon,
       initialSize: double.tryParse(_size),
@@ -347,5 +380,97 @@ class _TourState extends State<_Tour> {
   @override
   Widget build(BuildContext context) {
     return KeyedSubtree(key: ValueKey<int>(_stop), child: _stops[_stop].$2());
+  }
+}
+
+/// CNStepper, CNColorWell and CNPageControl together, as they might sit in a
+/// settings screen, changing on a timer.
+class _Controls extends StatefulWidget {
+  const _Controls();
+
+  @override
+  State<_Controls> createState() => _ControlsState();
+}
+
+class _ControlsState extends State<_Controls> {
+  static const List<Color> _colors = <Color>[
+    CupertinoColors.systemIndigo,
+    CupertinoColors.systemPink,
+    CupertinoColors.systemTeal,
+    CupertinoColors.systemOrange,
+  ];
+
+  double _size = 14;
+  int _color = 0;
+  int _page = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      setState(() {
+        _size = _size >= 20 ? 12 : _size + 1;
+        _color = (_color + 1) % _colors.length;
+        _page = (_page + 1) % 4;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colors[_color];
+    return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(middle: Text('Controls')),
+      child: SafeArea(
+        child: CupertinoListSection.insetGrouped(
+          header: const Text('Appearance'),
+          footer: Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: CNPageControl(
+              numberOfPages: 4,
+              currentPage: _page,
+              currentPageIndicatorColor: color,
+              semanticLabel: 'Theme',
+              onChanged: (p) => setState(() => _page = p),
+            ),
+          ),
+          children: [
+            CupertinoListTile(
+              title: const Text('Text Size'),
+              additionalInfo: Text('${_size.toInt()} pt'),
+              trailing: CNStepper(
+                value: _size,
+                min: 10,
+                max: 24,
+                semanticLabel: 'Text size',
+                onChanged: (v) => setState(() => _size = v),
+              ),
+            ),
+            CupertinoListTile(
+              title: const Text('Accent Color'),
+              trailing: CNColorWell(
+                color: color,
+                title: 'Accent Color',
+                semanticLabel: 'Accent color',
+                onChanged: (_) {},
+              ),
+            ),
+            CupertinoListTile(
+              title: Text(
+                'The quick brown fox',
+                style: TextStyle(fontSize: _size, color: color),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
