@@ -16,7 +16,9 @@ class CupertinoSliderNSView: NSView {
     var isDark: Bool = false
     var initialTint: NSColor? = nil
     var initialStep: Double? = nil
+    var trackArgs: [String: Any] = [:]
     if let dict = args as? [String: Any] {
+      trackArgs = dict
       if let v = dict["value"] as? NSNumber { initialValue = v.doubleValue }
       if let v = dict["min"] as? NSNumber { minValue = v.doubleValue }
       if let v = dict["max"] as? NSNumber { maxValue = v.doubleValue }
@@ -52,6 +54,8 @@ class CupertinoSliderNSView: NSView {
 
     if let tint = initialTint { model.tintColor = Color(tint) }
     if let s = initialStep, s > 0 { model.step = s } else { model.step = nil }
+    // Ticks and neutral value; `CNSlider.style` has no macOS counterpart.
+    model.readTrackConfiguration(trackArgs)
 
     channel.setMethodCallHandler { call, result in
       switch call.method {
@@ -92,6 +96,12 @@ class CupertinoSliderNSView: NSView {
           model.step = step > 0 ? step : nil
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing step", details: nil)) }
+      case "setTrackConfiguration":
+        model.readTrackConfiguration(call.arguments as? [String: Any] ?? [:])
+        result(nil)
+      case "setSliderStyle":
+        // NSSlider has no thumbless style; the slider keeps its thumb.
+        result(nil)
       case "setBrightness":
         if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
           self.hostingController.view.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)

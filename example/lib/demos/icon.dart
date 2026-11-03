@@ -581,9 +581,9 @@ class _Caption extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 8),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
-        color: CupertinoColors.secondaryLabel,
+        color: CupertinoColors.secondaryLabel.resolveFrom(context),
       ),
     ),
   );

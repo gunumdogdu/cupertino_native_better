@@ -43,6 +43,9 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=clearglass
 //     (2.0.0: CNButton clearGlass / prominentClearGlass over a photo)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=slider26
+//     (2.0.0: CNSlider thumbless style, ticks and neutral value, on a timer)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -161,6 +164,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'clearglass') {
       return const ClearGlassProbePage();
+    }
+    if (_probe == 'slider26') {
+      return const Slider26ProbePage();
     }
     if (_probe == 'pr106') {
       return const Pr106PopupMenuRebuildTestPage(autoCycle: true);

@@ -8,6 +8,15 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
   private var minValue: Float
   private var maxValue: Float
   private var step: Double = 0 // 0 = no stepping
+  /// `CNSlider.numberOfTicks` / `tickValues` / `allowsTickValuesOnly` /
+  /// `neutralValue`, applied as a `UISlider.TrackConfiguration` on iOS 26+.
+  private var numberOfTicks: Int?
+  private var tickValues: [Float]?
+  private var allowsTickValuesOnly = true
+  private var neutralValue: Float?
+  /// Whether a track configuration was set, so one can be cleared without
+  /// touching sliders that never used it.
+  private var hasTrackConfiguration = false
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeSlider_\(viewId)", binaryMessenger: messenger)
@@ -25,6 +34,8 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
     var trackBgTint: UIColor? = nil
     var step: Double = 0
     var semanticLabel: String? = nil
+    var sliderStyle: String? = nil
+    var trackArgs: [String: Any] = [:]
 
     if let dict = args as? [String: Any] {
       if let v = dict["value"] as? NSNumber { initialValue = v.doubleValue }
@@ -34,6 +45,8 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
       if let v = dict["step"] as? NSNumber { step = v.doubleValue }
       if let v = dict["semanticLabel"] as? String, !v.isEmpty { semanticLabel = v }
+      if let v = dict["sliderStyle"] as? String { sliderStyle = v }
+      trackArgs = dict
       if let style = dict["style"] as? [String: Any] {
         if let n = style["tint"] as? NSNumber { tint = Self.colorFromARGB(n.intValue) }
         if let n = style["thumbTint"] as? NSNumber { thumbTint = Self.colorFromARGB(n.intValue) }
@@ -60,6 +73,10 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
     if let c = trackTint ?? tint { slider.minimumTrackTintColor = c }
     if let c = trackBgTint { slider.maximumTrackTintColor = c }
     if let c = thumbTint ?? tint { slider.thumbTintColor = c }
+
+    if let style = sliderStyle { applySliderStyle(style) }
+    readTrackConfiguration(trackArgs)
+    applyTrackConfiguration()
 
     slider.translatesAutoresizingMaskIntoConstraints = false
     container.addSubview(slider)
@@ -96,6 +113,8 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
           self.slider.maximumValue = self.maxValue
           if self.slider.value < self.minValue { self.slider.value = self.minValue }
           if self.slider.value > self.maxValue { self.slider.value = self.maxValue }
+          // Ticks and the enabled range follow the new range.
+          self.applyTrackConfiguration()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing min/max", details: nil)) }
       case "setEnabled":
@@ -127,6 +146,15 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
           self.step = step
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing step", details: nil)) }
+      case "setSliderStyle":
+        if let style = (call.arguments as? [String: Any])?["sliderStyle"] as? String {
+          self.applySliderStyle(style)
+        }
+        result(nil)
+      case "setTrackConfiguration":
+        self.readTrackConfiguration(call.arguments as? [String: Any] ?? [:])
+        self.applyTrackConfiguration()
+        result(nil)
       case "setInteractive":
         if let args = call.arguments as? [String: Any],
            let interactive = (args["interactive"] as? NSNumber)?.boolValue {
@@ -142,6 +170,68 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  /// Reads the track options from creation params or `setTrackConfiguration`,
+  /// which always sends all of them; a missing key clears that option.
+  private func readTrackConfiguration(_ dict: [String: Any]) {
+    numberOfTicks = (dict["numberOfTicks"] as? NSNumber)?.intValue
+    tickValues = (dict["tickValues"] as? [NSNumber])?.map { $0.floatValue }
+    allowsTickValuesOnly = (dict["allowsTickValuesOnly"] as? NSNumber)?.boolValue ?? true
+    neutralValue = (dict["neutralValue"] as? NSNumber)?.floatValue
+  }
+
+  /// `CNSlider.style`: `thumbless` drops the thumb on iOS 26+.
+  private func applySliderStyle(_ style: String) {
+    if #available(iOS 26.0, *) {
+      slider.sliderStyle = style == "thumbless" ? .thumbless : .default
+    }
+  }
+
+  /// Applies the ticks and neutral value as a `UISlider.TrackConfiguration`
+  /// (iOS 26+). The configuration places ticks and the neutral value as
+  /// fractions of the track (0 at the minimum, 1 at the maximum), so the
+  /// values Flutter sends in the slider's own range are converted.
+  private func applyTrackConfiguration() {
+    guard #available(iOS 26.0, *) else { return }
+    let ticks = tickValues
+    let count = numberOfTicks
+    guard ticks != nil || count != nil || neutralValue != nil else {
+      if hasTrackConfiguration {
+        slider.trackConfiguration = nil
+        hasTrackConfiguration = false
+      }
+      return
+    }
+    let span = maxValue - minValue
+    func fraction(_ value: Float) -> Float {
+      guard span != 0 else { return 0 }
+      return Swift.max(0, Swift.min((value - minValue) / span, 1))
+    }
+    let neutral = fraction(neutralValue ?? minValue)
+    let config: UISlider.TrackConfiguration
+    if let ticks = ticks {
+      config = UISlider.TrackConfiguration(
+        allowsTickValuesOnly: allowsTickValuesOnly,
+        neutralValue: neutral,
+        ticks: ticks.map { UISlider.TrackConfiguration.Tick(position: fraction($0)) }
+      )
+    } else if let count = count {
+      config = UISlider.TrackConfiguration(
+        allowsTickValuesOnly: allowsTickValuesOnly,
+        neutralValue: neutral,
+        numberOfTicks: count
+      )
+    } else {
+      // Only a neutral value: a track without ticks.
+      config = UISlider.TrackConfiguration(
+        allowsTickValuesOnly: false,
+        neutralValue: neutral,
+        ticks: []
+      )
+    }
+    slider.trackConfiguration = config
+    hasTrackConfiguration = true
+  }
 
   @objc private func onSliderChanged(_ sender: UISlider) {
     var value = Double(sender.value)
