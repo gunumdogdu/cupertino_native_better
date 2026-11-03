@@ -1,3 +1,18 @@
+## Unreleased
+
+### Added — #113 tab bar items that open a menu (thanks @johan-perso)
+
+- **`CNTabBarItem.menuItems`** turns an item into a button that opens a native menu instead of selecting itself, for example a "+" that lets the user pick what to create. It takes the same entries as `CNPopupMenuButton`: items, dividers, subtitles and submenus. The menu opens from a clear button over the item's icon, placed the way the dot badges are found, since a `UITabBarItem` can't carry a menu. The item never gets selected nor calls `onTap`, and its glass still reacts under the finger. Sliding a finger along the bar onto it opens the menu too.
+- **`CNTabBar.onMenuSelected(int index, List<int> path)`** gets the item and the path of the chosen entry, as `CNPopupMenuButton.onPathSelected` does.
+- Without the iOS 26 native bar (iOS < 26, Android, web), the menu opens as a `CupertinoActionSheet` with a further sheet for each submenu, as `CNPopupMenuButton`'s fallback does. Both now use the same sheet.
+- Menu entries show SF Symbols and image assets, not `customIcon`. On the iOS 26 bar with a `searchItem` and on the native macOS bar the item is a plain tab, and the bar is not sent its menus.
+- VoiceOver reads each such item once, as a button named by its title, or by its symbol's own description when it has no title.
+- `CNPopupMenuButton` and the tab bar now build their menus with the same code (`PopupMenuBuilder.swift`, and `popup_menu_fallback_sheet.dart` for the sheet); `CNPopupMenuButton` behaves as before.
+
+### Fixed
+
+- **Dot badges in right-to-left layouts** were drawn on the mirrored item: the icons are found from left to right, and the first item is the rightmost there.
+
 ## 1.9.1
 
 > Patch: six fixes contributed by @yagizdo (#108-#111, #114) and @johan-perso (#112), with review follow-ups, and a fix for a squeezed tab bar on iOS 26. #109, #110, #111 and #112 were reproduced on 1.9.0 and verified with the fix on the iOS 26.2 and iOS 27 simulators. #108 and #114 change only what runs below iOS 26 and were verified by code review and widget tests, as no iOS 18 simulator was available. No API changes.

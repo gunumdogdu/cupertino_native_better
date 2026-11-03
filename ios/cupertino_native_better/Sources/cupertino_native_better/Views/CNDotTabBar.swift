@@ -18,9 +18,161 @@ final class CNDotTabBar: CNLabelFontTabBar {
   /// every time would lay itself out on every frame.
   private var dots: [UIView] = []
 
+  /// The menu each item opens instead of selecting itself, by item index.
+  /// Each one is shown by a clear button over the item, as a tab bar item
+  /// can't carry a menu.
+  var itemMenus: [Int: UIMenu] = [:] {
+    didSet { setNeedsLayout() }
+  }
+
+  /// The buttons are inside the bar, so its own gestures still get their
+  /// touches: the glass reacts under the finger as on any item. Those
+  /// gestures also select the item, which the bar's delegate undoes.
+  private var menuButtons: [Int: CNTabMenuButton] = [:]
+
+  /// The item views VoiceOver skips because a menu button stands in for
+  /// them, so each item is read once.
+  private let hiddenItemViews = NSHashTable<UIView>.weakObjects()
+
+  /// Whether item [i] opens a menu instead of being selected.
+  func opensMenu(at i: Int) -> Bool {
+    return itemMenus[i] != nil
+  }
+
+  /// Opens the menu of item [i] unless it's already shown: a finger sliding
+  /// along the bar onto the item selects it without touching its button.
+  /// When the icons can't be found, the button takes no touches; it is put
+  /// where the item should be just to open the menu from there.
+  func showMenu(at i: Int) {
+    guard let button = menuButtons[i], !button.isMenuVisible, let items else { return }
+    if button.isHidden {
+      let slots = itemSlots(count: items.count, columns: nil)
+      guard i < slots.count else { return }
+      button.frame = buttonFrame(in: slots[i])
+      button.isHidden = false
+    }
+    if #available(iOS 17.4, *) { button.performPrimaryAction() }
+  }
+
   override func layoutSubviews() {
     super.layoutSubviews()
     placeDots()
+    placeMenuButtons()
+  }
+
+  private func placeMenuButtons() {
+    for (i, button) in menuButtons where itemMenus[i] == nil {
+      button.removeFromSuperview()
+      menuButtons[i] = nil
+    }
+    defer { hideCoveredItemsFromVoiceOver() }
+    guard !itemMenus.isEmpty, let items else { return }
+    let columns = iconColumns()
+    let slots = itemSlots(count: items.count, columns: columns)
+    for (i, menu) in itemMenus where i < items.count {
+      let button = menuButtons[i] ?? {
+        let button = CNTabMenuButton(type: .custom)
+        button.showsMenuAsPrimaryAction = true
+        // Keep the given order when the menu opens upward from the bar.
+        if #available(iOS 16.0, *) { button.preferredMenuElementOrder = .fixed }
+        // Changes held back while the menu was shown.
+        button.onMenuHidden = { [weak self] in self?.setNeedsLayout() }
+        addSubview(button)
+        menuButtons[i] = button
+        return button
+      }()
+      // The bar lays itself out again as the menu opens. Moving, hiding or
+      // re-menuing the button then makes UIKit show the menu again, which
+      // closes an open submenu.
+      if button.isMenuVisible { continue }
+      if button.menu !== menu { button.menu = menu }
+      button.accessibilityLabel = Self.accessibilityLabel(of: items[i])
+      // Icons not found: no touches, rather than a button over the wrong
+      // item. A tap still reaches the bar, and the delegate opens the menu.
+      guard columns != nil else {
+        button.isHidden = true
+        continue
+      }
+      button.isHidden = false
+      let frame = buttonFrame(in: slots[i])
+      if button.frame != frame { button.frame = frame }
+      // Above the item's own views, which the bar may rebuild. Dots don't
+      // count: they take no touches, and moving them up would move them
+      // back above the buttons on every layout.
+      if let at = subviews.firstIndex(of: button),
+         subviews[(at + 1)...].contains(where: { !($0 is CNTabMenuButton) && !dots.contains($0) }) {
+        bringSubviewToFront(button)
+      }
+    }
+  }
+
+  /// A button as wide as the bar is high, but never wider than its item's
+  /// slot, so it doesn't cover a neighbour.
+  private func buttonFrame(in slot: CGRect) -> CGRect {
+    let width = min(bounds.height, slot.width)
+    return CGRect(x: slot.midX - width / 2, y: 0, width: width, height: bounds.height)
+  }
+
+  /// Each item's share of the bar, in item order: from halfway to the icon
+  /// before it to halfway to the icon after it. Without [columns], the bar's
+  /// width shared evenly.
+  private func itemSlots(count: Int, columns: [[CGRect]]?) -> [CGRect] {
+    guard count > 0 else { return [] }
+    var centres: [CGFloat]
+    if let columns {
+      centres = columns.map { $0.max(by: { $0.width < $1.width })?.midX ?? 0 }
+    } else {
+      let width = bounds.width / CGFloat(count)
+      centres = (0..<count).map { bounds.minX + (CGFloat($0) + 0.5) * width }
+      if effectiveUserInterfaceLayoutDirection == .rightToLeft { centres.reverse() }
+    }
+    let byX = centres.enumerated().sorted { $0.element < $1.element }
+    var slots = [CGRect](repeating: .zero, count: count)
+    for (k, entry) in byX.enumerated() {
+      let c = entry.element
+      let low = k > 0 ? (byX[k - 1].element + c) / 2 : bounds.minX
+      let high = k < count - 1 ? (c + byX[k + 1].element) / 2 : bounds.maxX
+      let half = max(0, min(c - low, high - c))
+      slots[entry.offset] = CGRect(x: c - half, y: 0, width: half * 2, height: bounds.height)
+    }
+    return slots
+  }
+
+  /// What VoiceOver reads for a menu button: the item's title or, for an
+  /// icon-only item, its symbol's own description.
+  private static func accessibilityLabel(of item: UITabBarItem) -> String? {
+    for label in [item.title, item.accessibilityLabel, item.image?.accessibilityLabel] {
+      if let label, !label.isEmpty { return label }
+    }
+    return nil
+  }
+
+  /// Hides from VoiceOver the item views under a placed menu button, and
+  /// shows again the ones no longer covered.
+  private func hideCoveredItemsFromVoiceOver() {
+    let centres = menuButtons.values.filter { !$0.isHidden }.map { $0.center }
+    var covered: [UIView] = []
+    func walk(_ view: UIView) {
+      for sub in view.subviews where !(sub is CNTabMenuButton) && !dots.contains(sub) {
+        if sub.isAccessibilityElement || hiddenItemViews.contains(sub) {
+          let frame = sub.convert(sub.bounds, to: self)
+          if centres.contains(where: { frame.contains($0) }) {
+            covered.append(sub)
+            continue
+          }
+        }
+        walk(sub)
+      }
+    }
+    if !centres.isEmpty { walk(self) }
+    for view in hiddenItemViews.allObjects where !covered.contains(view) {
+      view.accessibilityElementsHidden = false
+      hiddenItemViews.remove(view)
+    }
+    for view in covered where !hiddenItemViews.contains(view) {
+      view.accessibilityElementsHidden = true
+      hiddenItemViews.add(view)
+    }
   }
 
   private func placeDots() {
@@ -43,14 +195,28 @@ final class CNDotTabBar: CNLabelFontTabBar {
     }
     // Keep the dots above anything the bar adds later, such as a rebuilt platter.
     if let first = subviews.firstIndex(where: { dots.contains($0) }),
-       subviews[first...].contains(where: { !dots.contains($0) }) {
+       subviews[first...].contains(where: { !dots.contains($0) && !($0 is CNTabMenuButton) }) {
       dots.forEach(bringSubviewToFront)
     }
   }
 
   /// Where each dot goes: the top-right of its item's icon.
   private func dotFrames() -> [CGRect] {
-    guard let items = items, items.contains(where: { CupertinoTabBarPlatformView.isDot($0) }) else { return [] }
+    guard let items = items, items.contains(where: { CupertinoTabBarPlatformView.isDot($0) }),
+          let columns = iconColumns() else { return [] }
+
+    let d = CNDotTabBar.dotSize
+    return items.enumerated().compactMap { i, item in
+      guard CupertinoTabBarPlatformView.isDot(item),
+            let icon = columns[i].max(by: { $0.width < $1.width }) else { return nil }
+      return CGRect(x: icon.maxX - d * 0.65, y: icon.minY - d * 0.3, width: d, height: d)
+    }
+  }
+
+  /// The icons of each item, one column per item from left to right, or nil
+  /// when they can't be told apart.
+  private func iconColumns() -> [[CGRect]]? {
+    guard let items = items else { return nil }
 
     // Every visible icon-sized image in the bar, in the bar's coordinates.
     var icons: [CGRect] = []
@@ -78,14 +244,35 @@ final class CNDotTabBar: CNLabelFontTabBar {
         columns.append([r])
       }
     }
-    // Not one column per item: draw nothing rather than a dot in the wrong place.
-    guard columns.count == items.count else { return [] }
+    // Not one column per item: nothing rather than something in the wrong place.
+    guard columns.count == items.count else { return nil }
+    // Right to left, the first item is the rightmost.
+    return effectiveUserInterfaceLayoutDirection == .rightToLeft ? columns.reversed() : columns
+  }
+}
 
-    let d = CNDotTabBar.dotSize
-    return items.enumerated().compactMap { i, item in
-      guard CupertinoTabBarPlatformView.isDot(item),
-            let icon = columns[i].max(by: { $0.width < $1.width }) else { return nil }
-      return CGRect(x: icon.maxX - d * 0.65, y: icon.minY - d * 0.3, width: d, height: d)
-    }
+/// The clear button over a tab bar item that opens its menu. It tells when
+/// that menu is shown, so the bar leaves it alone meanwhile.
+final class CNTabMenuButton: UIButton {
+  private(set) var isMenuVisible = false
+  var onMenuHidden: (() -> Void)?
+
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    willDisplayMenuFor configuration: UIContextMenuConfiguration,
+    animator: UIContextMenuInteractionAnimating?
+  ) {
+    super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
+    isMenuVisible = true
+  }
+
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    willEndFor configuration: UIContextMenuConfiguration,
+    animator: UIContextMenuInteractionAnimating?
+  ) {
+    super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
+    isMenuVisible = false
+    onMenuHidden?()
   }
 }

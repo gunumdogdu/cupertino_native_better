@@ -51,6 +51,7 @@ import 'demos/pr82_tabbar_font_first_build_test.dart';
 import 'demos/issue103_tabbar_items_change_test.dart';
 import 'demos/issue105_tabbar_dot_badge_test.dart';
 import 'demos/tabbar_split_five_items_test.dart';
+import 'demos/tabbar_item_menus_test.dart';
 import 'demos/pr96_99_icon_tap_placeholder_test.dart';
 import 'demos/pr97_98_tabbar_mount_test.dart';
 import 'demos/pr100_tabbar_font_runtime_test.dart';
@@ -765,6 +766,20 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const TabBarSplitFiveItemsTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('TabBar item menus'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('plus.circle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const TabBarItemMenusTestPage(),
                       ),
                     );
                   },

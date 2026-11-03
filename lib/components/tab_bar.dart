@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -8,9 +10,12 @@ import '../style/sf_symbol.dart';
 import '../style/tab_bar_search_item.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/platform_view_guard.dart';
+import '../utils/popup_menu_encoder.dart';
+import '../utils/popup_menu_fallback_sheet.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import 'icon.dart';
+import 'popup_menu_button.dart';
 import 'tab_badge.dart';
 
 /// Immutable data describing a single tab bar item.
@@ -25,6 +30,7 @@ class CNTabBarItem {
     this.activeCustomIcon,
     this.imageAsset,
     this.activeImageAsset,
+    this.menuItems,
   });
 
   /// Optional tab item label.
@@ -74,6 +80,21 @@ class CNTabBarItem {
   /// Optional image asset for selected state.
   /// If not provided, [imageAsset] is used for both states.
   final CNImageAsset? activeImageAsset;
+
+  /// A menu the item opens instead of selecting itself, with the same
+  /// entries as [CNPopupMenuButton]: items, dividers and submenus.
+  ///
+  /// Tapping the item, or sliding a finger along the bar onto it, opens the
+  /// menu: the item never gets selected nor calls [CNTabBar.onTap], and a
+  /// chosen entry is reported to [CNTabBar.onMenuSelected]. Custom icons
+  /// ([CNPopupMenuItem.customIcon]) are not shown in these menus.
+  ///
+  /// On the iOS 26+ native bar it is a native menu. On the Flutter fallback
+  /// (iOS < 26, Android, web) it opens as a `CupertinoActionSheet`, with a
+  /// further sheet for each submenu, as [CNPopupMenuButton] does. On the
+  /// iOS 26+ bar with a [CNTabBar.searchItem], and on the native macOS bar,
+  /// the item is a plain tab.
+  final List<CNPopupMenuEntry>? menuItems;
 }
 
 /// A Cupertino-native tab bar. Uses native UITabBar/NSTabView style visuals.
@@ -123,6 +144,7 @@ class CNTabBar extends StatefulWidget {
     this.labelFontSize,
     this.autoHideOnModal = true,
     this.autoHideOnPageTransition = true,
+    this.onMenuSelected,
   }) : assert(items.length >= 2, 'Tab bar must have at least 2 items'),
        assert(
          items.length <= 5,
@@ -283,6 +305,11 @@ class CNTabBar extends StatefulWidget {
   /// the tab bar.
   final bool autoHideOnPageTransition;
 
+  /// Called when an entry is chosen in the menu of an item with
+  /// [CNTabBarItem.menuItems]: [index] is the item, [path] the entry, as in
+  /// [CNPopupMenuButton.onPathSelected].
+  final void Function(int index, List<int> path)? onMenuSelected;
+
   /// Renders the custom icons of [items] ahead of the bar's first mount.
   ///
   /// Pass the same [items] and [iconSize] as the bar, so its first build
@@ -339,6 +366,7 @@ class _CNTabBarState extends State<CNTabBar> {
   int? _lastRightCount;
   double? _lastSplitSpacing;
   double? _lastIconSize;
+  String? _lastMenusKey;
   String? _lastLabelFontFamily;
   double? _lastLabelFontSize;
 
@@ -588,6 +616,11 @@ class _CNTabBarState extends State<CNTabBar> {
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      widget.items.every((e) => e.menuItems?.isEmpty != true),
+      'CNTabBarItem.menuItems needs at least one entry; pass null for a '
+      'plain item.',
+    );
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
@@ -825,6 +858,7 @@ class _CNTabBarState extends State<CNTabBar> {
       'activeImageAssetData': activeImageAssetData,
       'imageAssetFormats': imageAssetFormats,
       'activeImageAssetFormats': activeImageAssetFormats,
+      'menus': ?_encodeMenus(),
       'iconScale': capturedDevicePixelRatio,
       'sfSymbolSizes': sizes,
       'sfSymbolColors': colors,
@@ -990,6 +1024,7 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastSplitSpacing = widget.splitSpacing;
     _lastLabelFontFamily = params['labelFontFamily'] as String?;
     _lastLabelFontSize = params['labelFontSize'] as double?;
+    _lastMenusKey = _menusKey(params['menus'] as List?);
     _syncBrightnessIfNeeded();
     _syncPropsToNativeIfNeeded();
 
@@ -1038,8 +1073,42 @@ class _CNTabBarState extends State<CNTabBar> {
     }
   }
 
+  /// The menu of each item, or null for a plain item; null as a whole when
+  /// no item has one or the bar can't show them.
+  List<Map<String, Object?>?>? _encodeMenus() {
+    // The bar with a search item and the macOS bar keep menu items as plain
+    // tabs and have no `setMenus`.
+    final supported =
+        defaultTargetPlatform == TargetPlatform.iOS && !_hasSearch;
+    if (!supported || !widget.items.any((e) => e.menuItems != null)) {
+      return null;
+    }
+    return [
+      for (final item in widget.items)
+        item.menuItems == null
+            ? null
+            : encodePopupMenuEntries(
+                item.menuItems!,
+                resolveColor: (c) => resolveColorToArgb(c, context),
+                includeCustomIcons: false,
+              ),
+    ];
+  }
+
+  /// Compares encoded menus: entries carry no callback, so their encoding
+  /// tells whether they changed.
+  static String? _menusKey(List? menus) =>
+      menus == null ? null : jsonEncode(menus);
+
   Future<dynamic> _onMethodCall(MethodCall call) async {
-    if (call.method == 'valueChanged') {
+    if (call.method == 'menuSelected') {
+      final args = call.arguments as Map?;
+      final idx = (args?['index'] as num?)?.toInt();
+      final path = (args?['path'] as List?)?.cast<num>().map((e) => e.toInt());
+      if (idx != null && path != null && path.isNotEmpty) {
+        widget.onMenuSelected?.call(idx, List.unmodifiable(path));
+      }
+    } else if (call.method == 'valueChanged') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
       if (idx != null) {
@@ -1075,6 +1144,18 @@ class _CNTabBarState extends State<CNTabBar> {
     final tint = resolveColorToArgb(_effectiveTint, context);
     final bg = resolveColorToArgb(widget.backgroundColor, context);
     final iconScale = MediaQuery.of(context).devicePixelRatio;
+    final menus = _encodeMenus();
+
+    final menusKey = _menusKey(menus);
+    if (_lastMenusKey != menusKey) {
+      _lastMenusKey = menusKey;
+      try {
+        await ch.invokeMethod('setMenus', {'menus': menus ?? const []});
+      } catch (_) {
+        // The bar is gone, e.g. hidden under a sheet; it is created again
+        // with its current menus.
+      }
+    }
 
     try {
       if (_lastIndex != idx) {
@@ -1287,6 +1368,24 @@ class _CNTabBarState extends State<CNTabBar> {
     } catch (_) {}
   }
 
+  /// A tap on the Flutter fallback: an item with [CNTabBarItem.menuItems]
+  /// opens its menu as an action sheet instead of being selected.
+  Future<void> _onFallbackTap(int index) async {
+    final menuItems = widget.items[index].menuItems;
+    if (menuItems == null) {
+      widget.onTap(index);
+      return;
+    }
+    final path = await showPopupMenuFallbackSheet(
+      context,
+      menuItems,
+      title: widget.items[index].label,
+    );
+    if (path != null && mounted) {
+      widget.onMenuSelected?.call(index, List.unmodifiable(path));
+    }
+  }
+
   /// Builds the Flutter fallback for non-iOS 26+ platforms.
   /// Includes search functionality when searchItem is provided.
   Widget _buildFlutterFallback(BuildContext context) {
@@ -1305,7 +1404,7 @@ class _CNTabBarState extends State<CNTabBar> {
             ),
         ],
         currentIndex: widget.currentIndex,
-        onTap: widget.onTap,
+        onTap: _onFallbackTap,
         backgroundColor: widget.backgroundColor,
         inactiveColor: CupertinoColors.inactiveGray,
         activeColor: tintColor,
@@ -1430,7 +1529,7 @@ class _CNTabBarState extends State<CNTabBar> {
           for (int i = 0; i < widget.items.length; i++)
             Flexible(
               child: GestureDetector(
-                onTap: () => widget.onTap(i),
+                onTap: () => _onFallbackTap(i),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
