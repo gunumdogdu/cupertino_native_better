@@ -11,10 +11,49 @@ class PopupMenuButtonDemoPage extends StatefulWidget {
 
 class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
   int? _lastSelected;
+  List<int>? _lastPath;
   bool _useAlternateSvgIcons = false;
 
   @override
   Widget build(BuildContext context) {
+    // A formatting palette, a sort section shown in place, and zoom items
+    // that keep the menu open.
+    const layoutItems = <CNPopupMenuEntry>[
+      CNPopupMenuSubmenu(
+        label: 'Format',
+        style: CNPopupMenuSubmenuStyle.palette,
+        items: [
+          CNPopupMenuItem(label: 'Bold', icon: CNSymbol('bold')),
+          CNPopupMenuItem(label: 'Italic', icon: CNSymbol('italic')),
+          CNPopupMenuItem(label: 'Underline', icon: CNSymbol('underline')),
+          CNPopupMenuItem(
+            label: 'Strikethrough',
+            icon: CNSymbol('strikethrough'),
+          ),
+        ],
+      ),
+      CNPopupMenuSubmenu(
+        label: 'Sort by',
+        style: CNPopupMenuSubmenuStyle.inline,
+        elementSize: CNPopupMenuElementSize.medium,
+        items: [
+          CNPopupMenuItem(label: 'Name', icon: CNSymbol('textformat.abc')),
+          CNPopupMenuItem(label: 'Date', icon: CNSymbol('calendar')),
+          CNPopupMenuItem(label: 'Size', icon: CNSymbol('internaldrive')),
+        ],
+      ),
+      CNPopupMenuDivider(),
+      CNPopupMenuItem(
+        label: 'Zoom in',
+        icon: CNSymbol('plus.magnifyingglass'),
+        keepsMenuPresented: true,
+      ),
+      CNPopupMenuItem(
+        label: 'Zoom out',
+        icon: CNSymbol('minus.magnifyingglass'),
+        keepsMenuPresented: true,
+      ),
+    ];
     final items = [
       CNPopupMenuItem(label: 'New File', icon: const CNSymbol('doc', size: 18)),
       CNPopupMenuItem(
@@ -543,6 +582,26 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
               ],
             ),
             const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Expanded(
+                  child: Text('Palette, inline section, kept open (2.0)'),
+                ),
+                CNPopupMenuButton.icon(
+                  buttonIcon: const CNSymbol('textformat', size: 18),
+                  size: 44,
+                  items: layoutItems,
+                  onPathSelected: (path) {
+                    setState(() => _lastPath = path);
+                  },
+                  buttonStyle: CNButtonStyle.glass,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            if (_lastPath != null)
+              Center(child: Text('Selected path: $_lastPath')),
             if (_lastSelected != null)
               Center(child: Text('Selected index: $_lastSelected')),
           ],

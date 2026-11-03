@@ -34,12 +34,19 @@ enum PopupMenuBuilder {
         if i < level.isSubmenu.count, level.isSubmenu[i], isEnabled {
           let childLevel = (i < level.submenus.count ? level.submenus[i] : nil)
             .map { PopupMenuLevel(dict: $0) } ?? PopupMenuLevel()
-          current.append(UIMenu(
+          let style = i < level.submenuStyles.count ? level.submenuStyles[i] : nil
+          let menu = UIMenu(
             title: title,
             subtitle: subtitle,
             image: image,
+            options: Self.options(style: style),
             children: elements(level: childLevel, path: itemPath, iconScale: iconScale, onSelect: onSelect)
-          ))
+          )
+          if #available(iOS 16.0, *), i < level.elementSizes.count,
+             let size = Self.elementSize(level.elementSizes[i]) {
+            menu.preferredElementSize = size
+          }
+          current.append(menu)
           continue
         }
         // Compose menu attributes: .destructive paints the label red
@@ -47,6 +54,9 @@ enum PopupMenuBuilder {
         var attrs: UIMenuElement.Attributes = []
         if !isEnabled { attrs.insert(.disabled) }
         if destructive { attrs.insert(.destructive) }
+        if #available(iOS 16.0, *), i < level.keepsMenuPresented.count, level.keepsMenuPresented[i] {
+          attrs.insert(.keepsMenuPresented)
+        }
         // The subtitle goes through the initializer: `action.subtitle` is
         // UIMenuLeaf's setter, which needs iOS 16.
         let action = UIAction(title: title, subtitle: subtitle, image: image, attributes: attrs) { _ in
@@ -60,6 +70,30 @@ enum PopupMenuBuilder {
       UIMenu(title: "", options: .displayInline, children: group)
     }
     return children
+  }
+
+  /// A submenu shown in place: a section for `inline`, a row of icons for
+  /// `palette` (iOS 17; a section before).
+  private static func options(style: String?) -> UIMenu.Options {
+    switch style {
+    case "inline":
+      return .displayInline
+    case "palette":
+      if #available(iOS 17.0, *) { return [.displayInline, .displayAsPalette] }
+      return .displayInline
+    default:
+      return []
+    }
+  }
+
+  @available(iOS 16.0, *)
+  private static func elementSize(_ name: String?) -> UIMenu.ElementSize? {
+    switch name {
+    case "small": return .small
+    case "medium": return .medium
+    case "large": return .large
+    default: return nil
+    }
   }
 
   /// The icon of entry [i] of [level].
@@ -229,6 +263,9 @@ struct PopupMenuLevel {
   var subtitles: [String] = []
   var isSubmenu: [Bool] = []
   var submenus: [[String: Any]?] = []
+  var keepsMenuPresented: [Bool] = []
+  var submenuStyles: [String?] = []
+  var elementSizes: [String?] = []
 
   init() {}
 
@@ -257,5 +294,8 @@ struct PopupMenuLevel {
     subtitles = (dict["subtitles"] as? [String]) ?? []
     isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
     submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
+    keepsMenuPresented = ((dict["keepsMenuPresented"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    submenuStyles = ((dict["submenuStyles"] as? [Any]) ?? []).map { $0 as? String }
+    elementSizes = ((dict["elementSizes"] as? [Any]) ?? []).map { $0 as? String }
   }
 }

@@ -122,8 +122,13 @@ Map<String, Object?> encodePopupMenuEntries(
   final subtitles = <String>[];
   final isSubmenu = <bool>[];
   final submenus = <Map<String, Object?>?>[];
+  final keepsPresented = <bool>[];
+  final submenuStyles = <String?>[];
+  final elementSizes = <String?>[];
   var usesSubtitles = false;
   var usesSubmenus = false;
+  var usesKeepsPresented = false;
+  var usesSubmenuLayout = false;
 
   for (final e in entries) {
     final visual = popupMenuEntryVisual(e);
@@ -150,6 +155,9 @@ Map<String, Object?> encodePopupMenuEntries(
       subtitles.add('');
       isSubmenu.add(false);
       submenus.add(null);
+      keepsPresented.add(false);
+      submenuStyles.add(null);
+      elementSizes.add(null);
       continue;
     }
 
@@ -184,6 +192,20 @@ Map<String, Object?> encodePopupMenuEntries(
     final subtitle = visual.subtitle;
     if (subtitle != null && subtitle.isNotEmpty) usesSubtitles = true;
     subtitles.add(subtitle ?? '');
+    final keeps = e is CNPopupMenuItem && e.keepsMenuPresented;
+    if (keeps) usesKeepsPresented = true;
+    keepsPresented.add(keeps);
+    final style = e is CNPopupMenuSubmenu ? e.style : null;
+    final size = e is CNPopupMenuSubmenu ? e.elementSize : null;
+    final styleName = style == null || style == CNPopupMenuSubmenuStyle.nested
+        ? null
+        : style.name;
+    final sizeName = size == null || size == CNPopupMenuElementSize.automatic
+        ? null
+        : size.name;
+    if (styleName != null || sizeName != null) usesSubmenuLayout = true;
+    submenuStyles.add(styleName);
+    elementSizes.add(sizeName);
     if (e is CNPopupMenuSubmenu) {
       usesSubmenus = true;
       isSubmenu.add(true);
@@ -222,5 +244,10 @@ Map<String, Object?> encodePopupMenuEntries(
     'sfSymbolGradientEnabled': gradients,
     if (usesSubtitles || usesSubmenus) 'subtitles': subtitles,
     if (usesSubmenus) ...{'isSubmenu': isSubmenu, 'submenus': submenus},
+    if (usesKeepsPresented) 'keepsMenuPresented': keepsPresented,
+    if (usesSubmenuLayout) ...{
+      'submenuStyles': submenuStyles,
+      'elementSizes': elementSizes,
+    },
   };
 }

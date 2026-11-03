@@ -33,6 +33,7 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
     this.enabled = true,
     this.checked = false,
     this.isDestructive = false,
+    this.keepsMenuPresented = false,
   });
 
   /// Display label for the item.
@@ -74,6 +75,12 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
   /// `isDestructiveAction: true`. On iOS 13 legacy UIAlertController fallback
   /// the action uses `.destructive` style.
   final bool isDestructive;
+
+  /// Whether the menu stays open after this item is chosen, for an action
+  /// the user repeats, such as zooming in (iOS 16+). The item's callback runs
+  /// each time; the menu shows the items it opened with until it closes.
+  /// Ignored on macOS and in the action sheet fallback.
+  final bool keepsMenuPresented;
 }
 
 /// A visual divider between popup menu items.
@@ -82,7 +89,39 @@ class CNPopupMenuDivider extends CNPopupMenuEntry {
   const CNPopupMenuDivider();
 }
 
-/// An entry that opens a nested menu of [items].
+/// How a [CNPopupMenuSubmenu] shows its items.
+enum CNPopupMenuSubmenuStyle {
+  /// A row that opens a nested menu. The default.
+  nested,
+
+  /// The items in the parent menu, as a section under the submenu's label.
+  inline,
+
+  /// The items in the parent menu, as one row of icons (iOS 17+), as the
+  /// formatting row at the top of a text menu. Give each item an icon. On
+  /// iOS 16 and macOS it is shown as [inline].
+  palette,
+}
+
+/// The size of the items of a [CNPopupMenuSubmenu] (iOS 16+). Smaller sizes
+/// fit several items on one row; [CNPopupMenuElementSize.small] shows their
+/// icons only.
+enum CNPopupMenuElementSize {
+  /// The size the system picks. The default.
+  automatic,
+
+  /// Icons only, several to a row.
+  small,
+
+  /// Icon over label, several to a row.
+  medium,
+
+  /// A full row per item.
+  large,
+}
+
+/// An entry that opens a nested menu of [items], or shows them in place
+/// (see [style]).
 ///
 /// On iOS it is a `UIMenu` nested in the button's menu, on macOS an
 /// `NSMenuItem` with a submenu, and in the `CupertinoActionSheet` fallback a
@@ -102,6 +141,8 @@ class CNPopupMenuSubmenu extends CNPopupMenuEntry {
     this.imageAsset,
     this.iconColor,
     this.enabled = true,
+    this.style = CNPopupMenuSubmenuStyle.nested,
+    this.elementSize = CNPopupMenuElementSize.automatic,
   });
 
   /// Display label for the submenu entry, also used as the nested menu's
@@ -136,6 +177,16 @@ class CNPopupMenuSubmenu extends CNPopupMenuEntry {
   /// Whether the nested menu can be opened. A disabled submenu is shown
   /// greyed out, like a disabled item.
   final bool enabled;
+
+  /// Whether the items open as a nested menu, or show in the parent menu as
+  /// a section or a row of icons. Inline and palette items report the same
+  /// paths as nested ones. In the action sheet fallback they are listed in
+  /// place under the label.
+  final CNPopupMenuSubmenuStyle style;
+
+  /// The size of the items (iOS 16+), mostly for [CNPopupMenuSubmenuStyle.inline]
+  /// sections. Ignored on macOS and in the action sheet fallback.
+  final CNPopupMenuElementSize elementSize;
 }
 
 // Reusable style enum for buttons across widgets (popup menu, future CNButton, ...)

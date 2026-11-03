@@ -32,6 +32,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var subtitles: [String] = []
   private var isSubmenu: [Bool] = []
   private var submenus: [[String: Any]?] = []
+  // Items that keep the menu open, and submenus shown in place. Also only
+  // sent when used.
+  private var keepsMenuPresented: [Bool] = []
+  private var submenuStyles: [String?] = []
+  private var elementSizes: [String?] = []
   private var iconScale: CGFloat = UIScreen.main.scale
   private var preserveTopToBottomOrder: Bool = false
   // Track current button icon configuration to keep image across state updates
@@ -117,6 +122,10 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       self.subtitles = (dict["subtitles"] as? [String]) ?? []
       self.isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
       self.submenus = Self.parseSubmenus(dict["submenus"])
+      let layout = PopupMenuLevel(dict: dict)
+      self.keepsMenuPresented = layout.keepsMenuPresented
+      self.submenuStyles = layout.submenuStyles
+      self.elementSizes = layout.elementSizes
       if let preserve = dict["preserveTopToBottomOrder"] as? NSNumber {
         self.preserveTopToBottomOrder = preserve.boolValue
       }
@@ -251,6 +260,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
           self.subtitles = (args["subtitles"] as? [String]) ?? []
           self.isSubmenu = ((args["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
           self.submenus = Self.parseSubmenus(args["submenus"])
+          self.readLayout(args)
           self.rebuildMenu()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing items", details: nil)) }
@@ -367,7 +377,17 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     level.subtitles = subtitles
     level.isSubmenu = isSubmenu
     level.submenus = submenus
+    level.keepsMenuPresented = keepsMenuPresented
+    level.submenuStyles = submenuStyles
+    level.elementSizes = elementSizes
     return level
+  }
+
+  private func readLayout(_ dict: [String: Any]) {
+    let level = PopupMenuLevel(dict: dict)
+    keepsMenuPresented = level.keepsMenuPresented
+    submenuStyles = level.submenuStyles
+    elementSizes = level.elementSizes
   }
 
   private static func parseSubmenus(_ value: Any?) -> [[String: Any]?] {

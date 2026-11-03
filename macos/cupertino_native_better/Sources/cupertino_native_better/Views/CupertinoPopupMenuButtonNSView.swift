@@ -19,6 +19,8 @@ class CupertinoPopupMenuButtonNSView: NSView {
   private var subtitles: [String] = []
   private var isSubmenu: [Bool] = []
   private var submenus: [[String: Any]?] = []
+  // Submenus shown in place; only sent when used.
+  private var submenuStyles: [String?] = []
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativePopupMenuButton_\(viewId)", binaryMessenger: messenger)
@@ -61,6 +63,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
       self.subtitles = (dict["subtitles"] as? [String]) ?? []
       self.isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
       self.submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
+      self.submenuStyles = PopupMenuLevel(dict: dict).submenuStyles
       if let m = dict["buttonIconRenderingMode"] as? String { buttonIconMode = m }
       if let pal = dict["buttonIconPaletteColors"] as? [NSNumber] { buttonIconPalette = pal }
       sizes = (dict["sfSymbolSizes"] as? [NSNumber]) ?? []
@@ -169,6 +172,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
           self.subtitles = (args["subtitles"] as? [String]) ?? []
           self.isSubmenu = ((args["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
           self.submenus = ((args["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
+          self.submenuStyles = PopupMenuLevel(dict: args).submenuStyles
           self.rebuildMenu()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing items", details: nil)) }
@@ -281,6 +285,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
     level.subtitles = subtitles
     level.isSubmenu = isSubmenu
     level.submenus = submenus
+    level.submenuStyles = submenuStyles
     return level
   }
 
@@ -310,6 +315,22 @@ class CupertinoPopupMenuButtonNSView: NSView {
           let childLevel = (i < level.submenus.count ? level.submenus[i] : nil)
             .map { PopupMenuLevel(dict: $0) } ?? PopupMenuLevel()
           let submenu = buildMenu(level: childLevel, path: itemPath)
+          // Inline and palette submenus show their items in place, under a
+          // section header (macOS 14+). NSMenu has no palette of this kind.
+          if i < level.submenuStyles.count, level.submenuStyles[i] != nil {
+            if #available(macOS 14.0, *) {
+              menu.addItem(.sectionHeader(title: title))
+            } else {
+              let header = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+              header.isEnabled = false
+              menu.addItem(header)
+            }
+            for item in submenu.items {
+              submenu.removeItem(item)
+              menu.addItem(item)
+            }
+            continue
+          }
           submenu.title = title
           mi.submenu = submenu
         }
@@ -413,6 +434,7 @@ private struct PopupMenuLevel {
   var subtitles: [String] = []
   var isSubmenu: [Bool] = []
   var submenus: [[String: Any]?] = []
+  var submenuStyles: [String?] = []
 
   init() {}
 
@@ -430,5 +452,6 @@ private struct PopupMenuLevel {
     subtitles = (dict["subtitles"] as? [String]) ?? []
     isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
     submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
+    submenuStyles = ((dict["submenuStyles"] as? [Any]) ?? []).map { $0 as? String }
   }
 }
