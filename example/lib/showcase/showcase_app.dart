@@ -5,9 +5,13 @@ import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 import 'scenes/account_scene.dart';
 import 'scenes/display_scene.dart';
 import 'scenes/duo_scene.dart';
+import 'scenes/editor_scene.dart';
+import 'scenes/event_scene.dart';
 import 'scenes/files_scene.dart';
 import 'scenes/music_scene.dart';
+import 'scenes/notes_scene.dart';
 import 'scenes/photos_scene.dart';
+import 'scenes/welcome_scene.dart';
 
 /// Opens one showcase scene full screen, for recording the pub.dev media:
 ///
@@ -71,6 +75,10 @@ Widget buildShowcaseScene(
     'account' => const AccountScene(),
     'music' => MusicScene(rootMode: !inApp),
     'duo' => const DuoScene(),
+    'event' => const EventScene(),
+    'welcome' => const WelcomeScene(),
+    'editor' => const EditorScene(),
+    'notes' => const NotesScene(),
     _ when inApp => const _LocalBrightness(),
     _ => DisplayScene(onBrightnessChanged: onBrightnessChanged),
   };
