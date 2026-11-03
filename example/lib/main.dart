@@ -6,6 +6,7 @@ import 'showcase/showcase_app.dart' show buildShowcaseScene;
 import 'demos/switch.dart';
 import 'demos/stepper.dart';
 import 'demos/color_well.dart';
+import 'demos/page_control.dart';
 import 'demos/segmented_control.dart';
 import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
@@ -368,6 +369,20 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const ColorWellDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Page Control'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('ellipsis', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const PageControlDemoPage(),
                       ),
                     );
                   },

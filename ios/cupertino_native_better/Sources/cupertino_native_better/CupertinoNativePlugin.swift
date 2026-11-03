@@ -31,6 +31,10 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     let colorWellFactory = CupertinoColorWellViewFactory(messenger: registrar.messenger())
     registrar.register(colorWellFactory, withId: "CupertinoNativeColorWell")
 
+    // Page control (iOS only: macOS has no native one, it is drawn in Flutter)
+    let pageControlFactory = CupertinoPageControlViewFactory(messenger: registrar.messenger())
+    registrar.register(pageControlFactory, withId: "CupertinoNativePageControl")
+
     // Segmented control
     let segmentedFactory = CupertinoSegmentedControlViewFactory(messenger: registrar.messenger())
     registrar.register(segmentedFactory, withId: "CupertinoNativeSegmentedControl")
