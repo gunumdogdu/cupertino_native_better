@@ -41,6 +41,7 @@
 
 import 'dart:async';
 
+import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 
@@ -58,11 +59,13 @@ import 'demos/pr97_98_tabbar_mount_test.dart';
 import 'demos/pr100_tabbar_font_runtime_test.dart';
 import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/alert.dart';
+import 'demos/prs_109_110_tabbar_test.dart';
 import 'demos/popup_menu_submenus_test.dart';
 import 'demos/tabbar_split_five_items_test.dart';
 import 'demos/pr106_popup_menu_rebuild_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
+const bool _observer = bool.fromEnvironment('OBSERVER');
 const String _backdrop = String.fromEnvironment(
   'BACKDROP',
   defaultValue: 'split',
@@ -98,6 +101,7 @@ class _ProbeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoApp(
+      navigatorObservers: [if (_observer) CNTabBarRouteObserver()],
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
         DefaultMaterialLocalizations.delegate,
@@ -175,6 +179,15 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue105') {
       return const Issue105TabBarDotBadgeTestPage(autoCycle: _auto);
+    }
+    if (_probe.startsWith('pr109') || _probe == 'pr110') {
+      return Prs109110TabBarTestPage(
+        mode: switch (_probe) {
+          'pr109fade' => 'fade',
+          'pr109narrow' => 'narrow',
+          _ => 'props',
+        },
+      );
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);
