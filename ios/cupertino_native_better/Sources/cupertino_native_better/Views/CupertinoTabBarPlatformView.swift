@@ -13,6 +13,24 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     (objc_getAssociatedObject(item, &dotKey) as? Bool) == true
   }
 
+  /// The empty bar iOS 26 leaves on each side of a bar's glass capsule: the capsule is drawn at
+  /// its content's size and centred in the bar. Measured on the iOS 26 simulator; UIKit doesn't
+  /// expose it. A split bar takes it off the gap twice, so `splitSpacing` is the gap between the
+  /// two capsules rather than between two bars around them.
+  static var splitCapsuleMargin: CGFloat {
+    if #available(iOS 26.0, *) { return 22 }
+    return 0
+  }
+
+  /// The narrowest right bar, in a split bar laid out by proportion. Below it, iOS 26 draws a
+  /// single item as a narrow pill with its icon and label shrunk, as with five items on a 402 pt
+  /// wide phone, where the right bar got 1/5 of the width; at 1/4 it is a circle. Two items or
+  /// more already get enough.
+  static var minSplitRightWidth: CGFloat {
+    if #available(iOS 26.0, *) { return 100 }
+    return 0
+  }
+
   static func applyBadge(_ value: String?, to item: UITabBarItem) {
     let dot = value == dotBadge
     objc_setAssociatedObject(item, &dotKey, dot, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
@@ -270,6 +288,10 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       // If total exceeds container, fall back to proportional widths
       if adjustedTotal > container.bounds.width {
         let rightFraction = CGFloat(rightCount) / CGFloat(count)
+        let rightWidth = right.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: rightFraction)
+        rightWidth.priority = .defaultHigh
+        let rightMinWidth = right.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.minSplitRightWidth)
+        rightMinWidth.priority = .init(999)
         let rTop = right.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
         let rBottom = right.bottomAnchor.constraint(equalTo: container.bottomAnchor)
         let lTop = left.topAnchor.constraint(equalTo: container.topAnchor, constant: 14)
@@ -284,9 +306,10 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
           right.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -rightInset),
           rTop,
           rBottom,
-          right.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: rightFraction),
+          rightWidth,
+          rightMinWidth,
           left.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: leftInset),
-          left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing),
+          left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing + 2 * Self.splitCapsuleMargin),
           lTop,
           lBottom,
         ])
@@ -715,6 +738,10 @@ channel.setMethodCallHandler { [weak self] call, result in
             
             if adjustedTotal > self.container.bounds.width {
               let rightFraction = CGFloat(rightCount) / CGFloat(count)
+              let rightWidth = right.widthAnchor.constraint(equalTo: self.container.widthAnchor, multiplier: rightFraction)
+              rightWidth.priority = .defaultHigh
+              let rightMinWidth = right.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.minSplitRightWidth)
+              rightMinWidth.priority = .init(999)
               let rTop = right.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14)
               let rBottom = right.bottomAnchor.constraint(equalTo: self.container.bottomAnchor)
               let lTop = left.topAnchor.constraint(equalTo: self.container.topAnchor, constant: 14)
@@ -727,9 +754,10 @@ channel.setMethodCallHandler { [weak self] call, result in
                 right.trailingAnchor.constraint(equalTo: self.container.trailingAnchor, constant: -rightInset),
                 rTop,
                 rBottom,
-                right.widthAnchor.constraint(equalTo: self.container.widthAnchor, multiplier: rightFraction),
+                rightWidth,
+                rightMinWidth,
                 left.leadingAnchor.constraint(equalTo: self.container.leadingAnchor, constant: leftInset),
-                left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing),
+                left.trailingAnchor.constraint(equalTo: right.leadingAnchor, constant: -spacing + 2 * Self.splitCapsuleMargin),
                 lTop,
                 lBottom,
               ])

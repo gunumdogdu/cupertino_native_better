@@ -171,6 +171,9 @@ class CNTabBar extends StatefulWidget {
   /// Must be less than the total number of items. Follows Apple's HIG
   /// recommendation for maintaining balanced visual hierarchy.
   ///
+  /// On iOS 26+, the right group gets at least 100 pt, so a single item stays
+  /// a circle with its label instead of a narrow pill.
+  ///
   /// Note: When [searchItem] is provided, this value is ignored as the
   /// search tab automatically becomes the right-side floating element.
   final int rightCount; // how many trailing items to pin right when split
@@ -181,6 +184,7 @@ class CNTabBar extends StatefulWidget {
   /// Gap between left/right halves when split.
   ///
   /// Defaults to 12pt following Apple's HIG recommendations for visual separation.
+  /// On iOS 26+, it is the gap between the two glass capsules.
   final double splitSpacing; // gap between left/right halves when split
 
   /// Optional search tab configuration.
