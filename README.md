@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>The real iOS&nbsp;26 and iOS&nbsp;27 controls, in Flutter.</strong><br>
-  Liquid Glass tab bars, buttons, menus, sliders, switches, alerts and sheets, drawn by UIKit and SwiftUI themselves.
+  Liquid Glass tab bars, buttons, menus, date pickers, sliders, switches, alerts and sheets, drawn by UIKit and SwiftUI themselves.
 </p>
 
 <p align="center">
@@ -40,21 +40,29 @@
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/light_dark.png" width="520" alt="The Display and Brightness page in light and in dark mode">
 </p>
 
-## What's new in 1.9
+## What's new in 2.0
 
-- **1.9.1 fixes `CNTabBar`** after a sheet (badges, labels and tint no longer revert), after a width change (no more cut labels), with five items in split mode, and with a custom `height` on iOS&nbsp;26. Native widgets, action sheets and alerts follow the app theme, the pre-iOS&nbsp;26 tab bar shows badges, and `CNActionSheet` no longer crashes on a large iPhone in landscape below iOS&nbsp;26. Thanks [@yagizdo](https://github.com/yagizdo) and [@johan-perso](https://github.com/johan-perso).
-- **Subtitles and submenus in `CNPopupMenuButton`**, nested as deep as you like, with `onPathSelected` reporting the full path. Thanks [@johan-perso](https://github.com/johan-perso).
-- **`CNTabBarNative` no longer shows an empty accessory pill on iOS&nbsp;26.1+** when `bottomAccessory` is null. Thanks [@tgrushka](https://github.com/tgrushka).
-- **`CNTabBarNative.enable(showCloseButton: false)`** for root-mode apps whose tab bar is the whole app.
-- **`CNTabBar` no longer rebuilds its items on the first rebuild** when `iconSize` is set. Thanks [@Honahec](https://github.com/Honahec).
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_event.gif" width="190" alt="A New Event form: native compact date pickers, a stepper for invitees, a colour well for the calendar colour and pop-up menus">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_notes.gif" width="190" alt="Notes on the native tab bar: the + tab opens a menu that adds a note, and a menu with a formatting palette and items that keep it open">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_welcome.gif" width="190" alt="A welcome pager: each page's SF Symbol plays an effect, and native page dots follow the pages">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/scene_editor.gif" width="190" alt="A photo editor: clear glass buttons over a photo and an exposure slider with tick marks that fills from zero">
+</p>
 
-The full list is in the [changelog](https://pub.dev/packages/cupertino_native_better/changelog).
+- **Four new native controls:** `CNDatePicker` (compact, inline and wheels), `CNStepper`, `CNColorWell`, which opens the system colour picker, and `CNPageControl`, which follows a `PageView`.
+- **SF Symbol effects on `CNIcon`:** bounce, pulse, variable colour, wiggle, breathe, rotate, draw on and off, and animated symbol replacement.
+- **Clear glass buttons** for controls over photos and video, and **`CNSlider` without a thumb, with tick marks**, or filling from a middle value.
+- **Tab bar items that open a menu**, such as a "+" that asks what to create. Thanks [@johan-perso](https://github.com/johan-perso).
+- **Palettes, inline sections and items that keep the menu open** in `CNPopupMenuButton` and in tab menus.
+- **The iOS&nbsp;27 prominent tab** in `CNTabBarNative`.
+
+2.0 removes three APIs deprecated since 1.3 and 1.5, and adds two `CNButtonStyle` values. If you used `PlatformVersion.initialize()`, `CNTabBarNative.checkIsEnabled()` or the old `CNTabBarNative` search callbacks, or `switch` over `CNButtonStyle`, see [Breaking changes](https://pub.dev/packages/cupertino_native_better/changelog#200). The full list is in the [changelog](https://pub.dev/packages/cupertino_native_better/changelog).
 
 ## Installation
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^1.9.1
+  cupertino_native_better: ^2.0.0
 ```
 
 Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26; earlier versions get the Cupertino fallbacks. The iOS deployment target is 15.0.
@@ -185,8 +193,20 @@ The system's own controls, so the slider thumb turns to glass while you drag it 
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/segmented_control.gif" width="420" alt="A native segmented control selecting Dark, which switches the page to dark mode">
 </p>
 
+On iOS&nbsp;26 the slider can also drop its thumb, draw tick marks and fill from a middle value.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/slider_ticks.gif" width="420" alt="A native slider with tick marks that fills from zero in both directions">
+</p>
+
 ```dart
 CNSlider(value: _brightness, onChanged: (v) => setState(() => _brightness = v))
+
+CNSlider(
+  value: _exposure, min: -100, max: 100,
+  numberOfTicks: 21, neutralValue: 0, // fills from 0 in both directions
+  onChanged: (v) => setState(() => _exposure = v),
+)
 
 CNSwitch(value: _trueTone, onChanged: (v) => setState(() => _trueTone = v))
 
@@ -195,6 +215,47 @@ CNSegmentedControl(
   selectedIndex: _appearance,
   onValueChanged: (i) => setState(() => _appearance = i),
 )
+```
+
+### Date picker, stepper and colour well
+
+`UIDatePicker`, the system stepper and `UIColorWell`. The compact date picker opens its calendar from the pill, and the colour well opens the system colour picker with its grid, spectrum and eyedropper.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/date_picker.gif" width="360" alt="A native compact date picker opening its calendar popover and picking a new day">
+</p>
+
+```dart
+CNDatePicker(
+  value: _start,
+  mode: CNDatePickerMode.dateAndTime,
+  style: CNDatePickerStyle.compact,
+  onChanged: (d) => setState(() => _start = d),
+)
+
+CNStepper(value: _guests, min: 1, max: 20, onChanged: (v) => setState(() => _guests = v))
+
+CNColorWell(color: _color, supportsAlpha: false, onChanged: (c) => setState(() => _color = c))
+```
+
+### Symbol effects and page dots
+
+`CNIcon` plays SF Symbol effects: while it is set, once per trigger, or when the symbol changes. `CNPageControl` is `UIPageControl`, kept in step with a `PageView`.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/symbol_effects.gif" width="360" alt="SF Symbols playing effects: a waveform with variable colour, a wiggling bell and breathing sparkles">
+</p>
+
+```dart
+CNIcon(symbol: const CNSymbol('waveform'), effect: const CNSymbolEffect.variableColor())
+
+CNIcon(
+  symbol: const CNSymbol('bell.fill'),
+  triggeredEffect: const CNSymbolEffect.wiggle(),
+  effectTrigger: _unread, // plays each time it changes
+)
+
+CNPageControl(numberOfPages: 3, controller: _pageController)
 ```
 
 ### Pop-up menus with subtitles and submenus
@@ -225,6 +286,24 @@ CNPopupMenuButton.icon(
 )
 ```
 
+A submenu can also show its items in the parent menu, as a row of icons or as a section, and an item can keep the menu open.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/popup_menu_palette.gif" width="300" alt="A native menu with a row of formatting icons, a Sort By section and Larger Text, which keeps the menu open">
+</p>
+
+```dart
+CNPopupMenuSubmenu(
+  label: 'Format',
+  style: CNPopupMenuSubmenuStyle.palette, // or .inline
+  items: const [
+    CNPopupMenuItem(label: 'Bold', icon: CNSymbol('bold')),
+    CNPopupMenuItem(label: 'Italic', icon: CNSymbol('italic')),
+  ],
+),
+const CNPopupMenuItem(label: 'Larger Text', icon: CNSymbol('textformat.size.larger'), keepsMenuPresented: true),
+```
+
 ### Tab bar
 
 `CNTabBar` is a native `UITabBar` for your own layout, with badges, image assets, a split mode and a separate search tab.
@@ -244,6 +323,23 @@ CNTabBar(
   onTap: (i) => setState(() => _tab = i),
   searchItem: const CNTabBarSearchItem(placeholder: 'Search'),
 )
+```
+
+An item with `menuItems` opens a native menu instead of becoming the selected tab.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/tab_bar_menu.gif" width="320" alt="The + item of a split tab bar opening a native menu with New Note, New Checklist and an Import submenu">
+</p>
+
+```dart
+CNTabBarItem(
+  icon: const CNSymbol('plus'),
+  menuItems: const [
+    CNPopupMenuItem(label: 'New Note', icon: CNSymbol('square.and.pencil')),
+    CNPopupMenuItem(label: 'New Checklist', icon: CNSymbol('checklist')),
+  ],
+),
+// CNTabBar(onMenuSelected: (index, path) Ellipsis)
 ```
 
 ### Native tab bar with minimize on scroll
@@ -267,9 +363,15 @@ await CNTabBarNative.enable(
 );
 ```
 
+On iOS&nbsp;27, `CNTab(isProminent: true)` sets one tab apart at the end of the bar, as a glass circle.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/prominent_tab.png" width="300" alt="The iOS 27 tab bar with a prominent Add tab drawn as a separate glass circle at the trailing end">
+</p>
+
 ### Buttons and Liquid Glass
 
-Glass and prominent glass buttons, icon buttons with badges, and `CNGlassButtonGroup`, whose buttons share one piece of glass. The glass picks up the colour of whatever is behind it.
+Glass, prominent glass and clear glass buttons, icon buttons with badges, and `CNGlassButtonGroup`, whose buttons share one piece of glass. The glass picks up the colour of whatever is behind it; clear glass, made for photos and video, lets even more of it through.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/glass_buttons.gif" width="420" alt="Liquid Glass buttons and a glass button group over a photo, tinting themselves as the photo changes">
@@ -277,6 +379,13 @@ Glass and prominent glass buttons, icon buttons with badges, and `CNGlassButtonG
 
 ```dart
 CNButton.icon(icon: const CNSymbol('square.and.arrow.up'), onPressed: share)
+
+CNButton(
+  label: 'Done',
+  tint: CupertinoColors.systemYellow,
+  config: const CNButtonConfig(style: CNButtonStyle.prominentClearGlass),
+  onPressed: done,
+)
 
 CNGlassButtonGroup(
   buttons: [
@@ -332,7 +441,7 @@ CNFoldableScope(
 
 | Widget | What it is |
 |---|---|
-| `CNIcon` | SF Symbols drawn by the system, in every rendering mode, plus your own image assets and `IconData` |
+| `CNIcon` | SF Symbols drawn by the system, in every rendering mode and with symbol effects, plus your own image assets and `IconData` |
 | `CNSearchBar` | An expanding native search field |
 | `CNToast` | Toasts on Liquid Glass, with success, error, warning, info and loading styles |
 | `CNFloatingIsland` | A glass island that expands into more content |
@@ -351,14 +460,18 @@ Open the example app's **Showcase** section to try every screen above on your ow
 |--------|-------------|:----------:|
 | `CNButton` | Native push button with Liquid Glass effects, SF Symbols, and image assets | - |
 | `CNButton.icon` | Circular icon-only button variant | - |
-| `CNIcon` | Platform-rendered SF Symbols, custom IconData, or image assets | - |
+| `CNIcon` | Platform-rendered SF Symbols with symbol effects, custom IconData, or image assets | - |
 | `CNTabBar` | Native tab bar with split mode for scroll-aware layouts | - |
 | `CNTabRail` | Vertical tab bar (glass rail or sidebar) for the side of the screen | - |
 | `CNTabScaffold` | Tab layout that moves the tabs to the side on iPhone Duo, like the system | - |
 | `CNFoldable` | iPhone Duo hinge (status + angle), vertical-bar side, fold and camera regions | - |
 | `CNSlider` | Native slider with min/max range and step support | `CNSliderController` |
 | `CNSwitch` | Native toggle switch with animated state changes | `CNSwitchController` |
-| `CNPopupMenuButton` | Native popup menu with dividers, icons, image assets, subtitles and submenus | - |
+| `CNDatePicker` | Native date and time picker: compact, inline or wheels | - |
+| `CNStepper` | Native − / + stepper | - |
+| `CNColorWell` | Native colour well that opens the system colour picker | - |
+| `CNPageControl` | Native page dots that can follow a `PageView` | `PageController` |
+| `CNPopupMenuButton` | Native popup menu with dividers, icons, image assets, subtitles, submenus, palettes and inline sections | - |
 | `CNPopupMenuButton.icon` | Circular icon-only popup menu variant | - |
 | `CNActionSheet` | Native `UIAlertController` action sheet with destructive styling | - |
 | `CNAlert` | Native `UIAlertController` alert with text fields and destructive styling | - |
@@ -829,6 +942,8 @@ CNButtonStyle.borderedProminent // Accent-colored border
 CNButtonStyle.filled          // Solid filled background
 CNButtonStyle.glass           // Liquid Glass effect (iOS 26+)
 CNButtonStyle.prominentGlass  // Prominent glass effect (iOS 26+)
+CNButtonStyle.clearGlass      // Clear glass, for buttons over media (iOS 26+)
+CNButtonStyle.prominentClearGlass // Clear glass tinted with the button's tint (iOS 26+)
 ```
 
 ### Glass Effect Unioning
@@ -1269,7 +1384,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^1.9.1
+   cupertino_native_better: ^2.0.0
    ```
 
 2. Update imports:
