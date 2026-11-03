@@ -98,6 +98,11 @@ final class CNActionSheetManager: NSObject {
         let alert = UIAlertController(title: config.title,
                                       message: config.message,
                                       preferredStyle: .actionSheet)
+        // The sheet takes the window's traits, which follow the system
+        // appearance, not the Flutter theme. Pin it to the app's theme.
+        if let isDark = config.isDark {
+            alert.overrideUserInterfaceStyle = isDark ? .dark : .light
+        }
 
         for (index, entry) in config.actions.enumerated() {
             let action = UIAlertAction(
@@ -259,11 +264,13 @@ final class CNActionSheetManager: NSObject {
         let cancelLabel: String?
         let actions: [Action]
         let anchorRect: CGRect?
+        let isDark: Bool?
 
         init(args: [String: Any]) {
             title = args["title"] as? String
             message = args["message"] as? String
             cancelLabel = args["cancelLabel"] as? String
+            isDark = args["isDark"] as? Bool
 
             let raw = args["actions"] as? [[String: Any]] ?? []
             actions = raw.map { entry in
