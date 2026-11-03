@@ -11,6 +11,7 @@ import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import 'icon.dart';
+import 'tab_badge.dart';
 
 /// Immutable data describing a single tab bar item.
 class CNTabBarItem {
@@ -1265,8 +1266,8 @@ class _CNTabBarState extends State<CNTabBar> {
         items: [
           for (final item in widget.items)
             BottomNavigationBarItem(
-              icon: _buildTabIcon(item, isActive: false),
-              activeIcon: _buildTabIcon(item, isActive: true),
+              icon: _withBadge(item, _buildTabIcon(item, isActive: false)),
+              activeIcon: _withBadge(item, _buildTabIcon(item, isActive: true)),
               label: item.label,
             ),
         ],
@@ -1405,15 +1406,19 @@ class _CNTabBarState extends State<CNTabBar> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: FittedBox(
-                          child: _buildTabIcon(
-                            widget.items[i],
-                            isActive: widget.currentIndex == i,
+                      _withBadge(
+                        widget.items[i],
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: FittedBox(
+                            child: _buildTabIcon(
+                              widget.items[i],
+                              isActive: widget.currentIndex == i,
+                            ),
                           ),
                         ),
+                        inline: true,
                       ),
                       if (widget.items[i].label != null &&
                           widget.items[i].label!.isNotEmpty) ...[
@@ -1556,6 +1561,61 @@ class _CNTabBarState extends State<CNTabBar> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Puts [item]'s badge on a fallback [icon] at the size and place
+  /// `UITabBarItem` draws it on iOS 18, measured against the icon's glyph.
+  /// Stacked (icon above label): an 18pt badge centred on the icon's top-right
+  /// corner. [inline] (icon beside label, as in landscape): a 14pt badge whose
+  /// right edge is pinned, so a longer count grows over the icon, not the
+  /// label. A dot goes where `CNDotTabBar` puts it. Null and empty badges show
+  /// nothing, as in the native `applyBadge`. VoiceOver reads the count as the
+  /// tab's value; a dot has none.
+  Widget _withBadge(CNTabBarItem item, Widget icon, {bool inline = false}) {
+    final badge = item.badge;
+    if (badge == null || badge.isEmpty) return icon;
+    final dot = badge == CNTabBarItem.dotBadge;
+    return Semantics(
+      value: dot ? null : badge,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          icon,
+          if (dot)
+            const Positioned(
+              right: -TabBadgeDot.size * 0.35,
+              top: -TabBadgeDot.size * 0.3,
+              child: TabBadgeDot(),
+            )
+          else if (inline)
+            Positioned(
+              right: -5.5,
+              top: -2.5,
+              child: TabBadge(
+                badge,
+                height: 14,
+                fontSize: 10,
+                fontWeight: FontWeight.w400,
+              ),
+            )
+          else
+            Positioned(
+              right: -4.5,
+              top: 0,
+              child: FractionalTranslation(
+                translation: const Offset(0.5, 0),
+                child: TabBadge(
+                  badge,
+                  height: 18,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  padding: 5.5,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
