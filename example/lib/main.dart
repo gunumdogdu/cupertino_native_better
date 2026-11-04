@@ -12,6 +12,7 @@ import 'demos/segmented_control.dart';
 import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/action_sheet.dart';
+import 'demos/context_menu.dart';
 import 'demos/button.dart';
 import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
@@ -451,6 +452,20 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const ActionSheetDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Context Menu'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('contextualmenu.and.cursorarrow', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const ContextMenuDemoPage(),
                       ),
                     );
                   },
