@@ -6,6 +6,11 @@ class CupertinoIconNSView: NSView {
   private let imageView: NSImageView
 
   private var name: String = ""
+  /// An image asset, raw image bytes (PNG, JPG, SVG) or a custom icon
+  /// rendered by Flutter, shown instead of the SF Symbol.
+  private var assetPath: String?
+  private var imageData: Data?
+  private var imageFormat: String?
   private var isDark: Bool = false
   private var size: CGFloat?
   private var color: NSColor?
@@ -31,6 +36,12 @@ class CupertinoIconNSView: NSView {
 
     if let dict = args as? [String: Any] {
       if let s = dict["name"] as? String { self.name = s }
+      if let path = dict["assetPath"] as? String, !path.isEmpty { self.assetPath = path }
+      if let data = dict["imageData"] as? FlutterStandardTypedData { self.imageData = data.data }
+      if let data = dict["customIconBytes"] as? FlutterStandardTypedData, self.imageData == nil {
+        self.imageData = data.data
+      }
+      if let format = dict["imageFormat"] as? String { self.imageFormat = format }
       if let b = dict["isDark"] as? NSNumber { self.isDark = b.boolValue }
       if let style = dict["style"] as? [String: Any] {
         if let v = style["iconSize"] as? NSNumber { self.size = CGFloat(truncating: v) }
@@ -73,11 +84,18 @@ class CupertinoIconNSView: NSView {
           result(["width": 0.0, "height": 0.0])
         }
       case "setSymbol":
-        if let args = call.arguments as? [String: Any], let n = args["name"] as? String {
+        guard let args = call.arguments as? [String: Any] else {
+          result(FlutterError(code: "bad_args", message: "Missing name", details: nil)); return
+        }
+        if !self.readImageSource(args) {
+          guard let n = args["name"] as? String else {
+            result(FlutterError(code: "bad_args", message: "Missing name", details: nil)); return
+          }
           self.name = n
-          self.rebuild()
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing name", details: nil)) }
+          self.clearImageSource()
+        }
+        self.rebuild()
+        result(nil)
       case "setStyle":
         if let args = call.arguments as? [String: Any] {
           if let v = args["iconSize"] as? NSNumber { self.size = CGFloat(truncating: v) }
@@ -85,8 +103,11 @@ class CupertinoIconNSView: NSView {
           if let arr = args["iconPaletteColors"] as? [NSNumber] { self.palette = arr.map { Self.colorFromARGB($0.intValue) } }
           if let mode = args["iconRenderingMode"] as? String { self.renderingMode = mode }
           if let g = args["iconGradientEnabled"] as? NSNumber { self.gradientEnabled = g.boolValue }
-          // Handle SF Symbol name in style update to prevent disappearing icons
-          if let n = args["name"] as? String { self.name = n }
+          // The source comes along so a style change keeps the icon.
+          if !self.readImageSource(args), let n = args["name"] as? String {
+            self.name = n
+            self.clearImageSource()
+          }
           self.rebuild()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
@@ -131,7 +152,54 @@ class CupertinoIconNSView: NSView {
     rebuild()
   }
 
+  /// Takes an image asset or image bytes from `args`, as iOS does: an asset
+  /// path first, then bytes. Returns whether there was one.
+  private func readImageSource(_ args: [String: Any]) -> Bool {
+    if let path = args["assetPath"] as? String, !path.isEmpty {
+      assetPath = path
+      imageData = nil
+      imageFormat = args["imageFormat"] as? String
+      return true
+    }
+    if let data = args["imageData"] as? FlutterStandardTypedData {
+      imageData = data.data
+      imageFormat = args["imageFormat"] as? String
+      assetPath = nil
+      return true
+    }
+    return false
+  }
+
+  private func clearImageSource() {
+    assetPath = nil
+    imageData = nil
+    imageFormat = nil
+  }
+
+  /// An image asset or image bytes at the icon's size. Single-colour artwork
+  /// takes the icon's colour (the label colour by default, so it follows the
+  /// theme); multi-colour artwork keeps its own colours.
+  private func showImageSource() -> Bool {
+    guard assetPath != nil || imageData != nil else { return false }
+    var image = ImageUtils.image(
+      assetPath: imageData == nil ? assetPath : nil,
+      imageData: imageData,
+      format: imageFormat,
+      customIconBytes: nil,
+      size: size ?? 24,
+      color: nil
+    )
+    if let img = image, img.isTemplate {
+      image = ImageUtils.tinted(img, with: color ?? .labelColor)
+    }
+    imageView.contentTintColor = nil
+    imageView.image = image
+    shownSymbolName = nil
+    return true
+  }
+
   private func rebuild() {
+    if showImageSource() { return }
     guard var image = NSImage(systemSymbolName: name, accessibilityDescription: nil) else {
       imageView.image = nil
       shownSymbolName = nil
