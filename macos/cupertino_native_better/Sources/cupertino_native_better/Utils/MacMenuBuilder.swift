@@ -6,7 +6,7 @@ import FlutterMacOS
 /// nested and inline submenus, SF Symbol / rendered / image-asset icons,
 /// destructive, disabled and checked items.
 ///
-/// Shared by every macOS menu the plugin shows outside a platform view:
+/// Shared by every macOS menu the plugin shows: `CNPopupMenuButton`,
 /// `CNContextMenu`, `CNPopupGesture`'s secondary click and the anchored
 /// `CNActionSheet`. A selection reports the item's path from the top, one
 /// index per level, dividers included, as `onPathSelected` does on iOS.
@@ -72,6 +72,11 @@ enum MacMenuBuilder {
             section.removeItem(item)
             menu.addItem(item)
           }
+          // The section ends at a separator, as an inline menu does on iOS;
+          // a divider right after it, or the end of the menu, drops it.
+          if let last = menu.items.last, !last.isSeparatorItem {
+            menu.addItem(.separator())
+          }
           continue
         }
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
@@ -116,7 +121,11 @@ enum MacMenuBuilder {
         action.redTitle = red
         item.attributedTitle = red
         if let image = item.image, image.isTemplate, level.color(i) == nil {
-          let redImage = image.withSymbolConfiguration(.init(paletteColors: [.systemRed])) ?? image
+          // An icon without a colour of its own: an SF Symbol in the red
+          // palette, any other image (asset, custom icon) tinted red.
+          let symbol = image.withSymbolConfiguration(.init(paletteColors: [.systemRed]))
+          let redImage = symbol.flatMap { $0 === image ? nil : $0 }
+            ?? ImageUtils.tinted(image, with: .systemRed)
           action.redImage = redImage
           item.image = redImage
         } else {
@@ -149,6 +158,12 @@ enum MacMenuBuilder {
     if #available(macOS 27.0, *) {
       item.preferredImageVisibility = .visible
     }
+    #else
+    // Built with an SDK older than macOS 27's: the property exists at run
+    // time on macOS 27 even though this SDK does not declare it
+    // (1 is `NSMenuItemImageVisibilityVisible`).
+    let selector = NSSelectorFromString("setPreferredImageVisibility:")
+    if item.responds(to: selector) { item.setValue(1, forKey: "preferredImageVisibility") }
     #endif
   }
 
@@ -163,97 +178,45 @@ enum MacMenuBuilder {
 
   // MARK: - Icons
 
-  /// The icon of entry [i]: image asset, then rendered custom icon, then SF
-  /// Symbol, as on iOS.
+  /// Menu icons larger than the menu's text would stretch the row; the
+  /// system's own menu icons are about this size.
+  static let maxImageSize: CGFloat = 16
+
+  /// The icon of entry [i]: image asset (path or bytes, PNG, JPG, GIF or
+  /// SVG), then rendered custom icon, then SF Symbol, as on iOS. Loaded by
+  /// `ImageUtils`, as the plugin's other macOS views load theirs: an image
+  /// without a colour that is a single colour becomes a template, so AppKit
+  /// draws it in the menu's text colour (white in a dark menu and on the
+  /// highlight), as it draws a symbol.
   static func image(level: MacMenuLevel, at i: Int) -> NSImage? {
     let size = level.size(i)
+    let imageSize = min(size ?? maxImageSize, maxImageSize)
     let color = level.color(i)
-    if let path = level.imageAssetPath(i), let img = loadAsset(path) {
-      return sized(tinted(img, color), size ?? 16)
-    }
-    if let data = level.imageAssetData(i), let img = NSImage(data: data) {
-      return sized(tinted(img, color), size ?? 16)
-    }
-    if let data = level.customIconBytes(i), let img = NSImage(data: data) {
-      // Rendered by Flutter at the screen scale. Without an `iconColor` it
-      // is a template, as on iOS, so it takes the menu's text colour (white
-      // in a dark menu, white when highlighted); with one it keeps it.
-      let scale = NSScreen.main?.backingScaleFactor ?? 2
-      img.size = NSSize(width: img.size.width / scale, height: img.size.height / scale)
-      img.isTemplate = level.customIconColor(i) == nil
-      return img
-    }
-    guard let name = level.symbol(i),
-          var img = NSImage(systemSymbolName: name, accessibilityDescription: nil)
-    else { return nil }
-    if let s = size, s > 0 {
-      img = img.withSymbolConfiguration(.init(pointSize: s, weight: .regular)) ?? img
-    }
-    switch level.mode(i) {
-    case "hierarchical":
-      if let c = color {
-        img = img.withSymbolConfiguration(.init(hierarchicalColor: c)) ?? img
-      }
-    case "palette":
-      let colors = level.palette(i)
-      if !colors.isEmpty {
-        img = img.withSymbolConfiguration(.init(paletteColors: colors)) ?? img
-      }
-    case "multicolor":
-      img = img.withSymbolConfiguration(.preferringMulticolor()) ?? img
-    default:
-      // Monochrome or no mode: a colour paints the whole symbol; without one
-      // it stays a template and follows the menu's own text colour.
-      if let c = color {
-        img = img.withSymbolConfiguration(.init(paletteColors: [c])) ?? img
-      }
-    }
-    return img
-  }
-
-  /// A Flutter asset by its (resolved) asset path.
-  private static func loadAsset(_ path: String) -> NSImage? {
-    let key = FlutterDartProject.lookupKey(forAsset: path)
-    let candidates = [
-      Bundle.main.bundleURL.appendingPathComponent(key),
-      Bundle.main.bundleURL
-        .appendingPathComponent("Contents/Frameworks/App.framework/Resources/flutter_assets")
-        .appendingPathComponent(path),
-    ]
-    for url in candidates where FileManager.default.fileExists(atPath: url.path) {
-      if let img = NSImage(contentsOf: url) { return img }
-    }
-    return nil
-  }
-
-  private static func sized(_ image: NSImage, _ side: CGFloat) -> NSImage {
-    let w = image.size.width, h = image.size.height
-    guard w > 0, h > 0 else { return image }
-    let scale = side / max(w, h)
-    image.size = NSSize(width: w * scale, height: h * scale)
-    return image
-  }
-
-  private static func tinted(_ image: NSImage, _ color: NSColor?) -> NSImage {
-    guard let color else {
-      // Single-colour artwork follows the menu's colouring like a symbol.
+    let path = level.imageAssetPath(i)
+    let data = level.imageAssetData(i)
+    if path != nil || data != nil,
+       let image = ImageUtils.image(
+         assetPath: path, imageData: data, format: level.imageAssetFormat(i),
+         customIconBytes: nil, size: imageSize, color: color) {
       return image
     }
-    let out = NSImage(size: image.size, flipped: false) { rect in
-      image.draw(in: rect)
-      color.set()
-      rect.fill(using: .sourceAtop)
-      return true
+    // Rendered by Flutter in its `iconColor`, or black without one; as on
+    // iOS it is a template, so an uncoloured icon takes the menu's text
+    // colour, and a coloured one is painted in its colour again.
+    if let bytes = level.customIconBytes(i),
+       let image = ImageUtils.image(
+         assetPath: nil, imageData: nil, format: nil,
+         customIconBytes: bytes, size: imageSize, color: level.customIconColor(i)) {
+      return image
     }
-    return out
-  }
-
-  static func color(argb: Int) -> NSColor {
-    let a = CGFloat((argb >> 24) & 0xFF) / 255.0
-    let r = CGFloat((argb >> 16) & 0xFF) / 255.0
-    let g = CGFloat((argb >> 8) & 0xFF) / 255.0
-    let b = CGFloat(argb & 0xFF) / 255.0
-    return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    guard let name = level.symbol(i) else { return nil }
+    // Without a size a symbol keeps the size AppKit gives menu symbols.
+    return ImageUtils.symbolImage(
+      name: name,
+      size: size.map { min($0, maxImageSize) },
+      color: color,
+      mode: level.mode(i),
+      palette: level.palette(i))
   }
 }
 
@@ -362,6 +325,7 @@ struct MacMenuLevel {
   func submenuStyle(_ i: Int) -> String? { string("submenuStyles", i) }
   func imageAssetPath(_ i: Int) -> String? { string("imageAssetPaths", i) }
   func imageAssetData(_ i: Int) -> Data? { data("imageAssetData", i) }
+  func imageAssetFormat(_ i: Int) -> String? { string("imageAssetFormats", i) }
   func customIconBytes(_ i: Int) -> Data? { data("customIconBytes", i) }
 
   func size(_ i: Int) -> CGFloat? {
@@ -369,17 +333,17 @@ struct MacMenuLevel {
   }
 
   func customIconColor(_ i: Int) -> NSColor? {
-    (slot("customIconColors", i) as? NSNumber).map { MacMenuBuilder.color(argb: $0.intValue) }
+    (slot("customIconColors", i) as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
   }
 
   func color(_ i: Int) -> NSColor? {
-    (slot("sfSymbolColors", i) as? NSNumber).map { MacMenuBuilder.color(argb: $0.intValue) }
+    (slot("sfSymbolColors", i) as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
   }
 
   func palette(_ i: Int) -> [NSColor] {
     ((slot("sfSymbolPaletteColors", i) as? [Any]) ?? [])
       .compactMap { $0 as? NSNumber }
-      .map { MacMenuBuilder.color(argb: $0.intValue) }
+      .map { ImageUtils.colorFromARGB($0.intValue) }
   }
 
   func submenu(_ i: Int) -> MacMenuLevel {
