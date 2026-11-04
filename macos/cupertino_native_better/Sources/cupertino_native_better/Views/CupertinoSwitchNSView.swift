@@ -13,7 +13,9 @@ class CupertinoSwitchNSView: NSView {
     var enabled: Bool = true
     var isDark: Bool = false
     var initialTint: NSColor? = nil
+    var semanticLabel = ""
     if let dict = args as? [String: Any] {
+      if let v = dict["semanticLabel"] as? String { semanticLabel = v }
       if let v = dict["value"] as? NSNumber { initialValue = v.boolValue }
       if let v = dict["enabled"] as? NSNumber { enabled = v.boolValue }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
@@ -37,6 +39,8 @@ class CupertinoSwitchNSView: NSView {
     if let tint = initialTint {
       model.tintColor = Color(tint)
     }
+    // What VoiceOver reads (`CNSwitch.semanticLabel`).
+    model.label = semanticLabel
 
     addSubview(hostingController.view)
     hostingController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -48,6 +52,7 @@ class CupertinoSwitchNSView: NSView {
     ])
 
     channel.setMethodCallHandler { call, result in
+      let args = call.arguments as? [String: Any]
       switch call.method {
       case "setValue":
         if let args = call.arguments as? [String: Any], let value = (args["value"] as? NSNumber)?.boolValue {
@@ -67,6 +72,11 @@ class CupertinoSwitchNSView: NSView {
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
+      case "setSemanticLabel":
+        model.label = (args?["label"] as? String) ?? ""
+        result(nil)
+      case "setInteractive":
+        result(nil)
       case "setBrightness":
         if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
           self.hostingController.view.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
