@@ -1,3 +1,53 @@
+## 2.2.0 (unreleased)
+
+> macOS goes native. Every control that has an AppKit counterpart now uses it on every supported macOS (12 and later), not only on macOS 26: buttons, pop-up buttons, sliders, switches, steppers, date pickers, colour wells, segmented controls and the tab bar. Alerts are window sheets, action sheets are menus, search bars are search fields, and image assets and SVGs draw on macOS. New: `CNContextMenu` (right-click on macOS, long press on iOS) and `CNProgressIndicator`. Fixes the macOS hang in #47. Checked on macOS 27.2 and on the iOS 27 and 26.2 simulators; code that only runs on macOS 12–26 was reviewed and forced on macOS 27, not run on those versions.
+
+### Fixed — #47 the example hung on macOS with a debugger attached
+
+Some widgets sent the macOS view a method it did not implement (`setSemanticLabel`, `setInteraction`, `setLabelStyle`, the tab bar's search calls) without awaiting the call. The resulting `MissingPluginException` was uncaught, and a debugger that breaks on uncaught exceptions (the IDE default) paused the UI isolate. On macOS the UI isolate runs on the main thread (merged platform and UI threads), so the whole window stopped with a spinning cursor and no error. With `FLTEnableMergedPlatformUIThread` off the window kept answering but the Flutter content froze, which is why the workaround looked broken. Calls a platform may not implement now treat a missing implementation as "not supported here", and the macOS views implement the missing methods.
+
+### macOS — native controls on every macOS
+
+- **`CNButton` and `CNPopupMenuButton`** are AppKit buttons on every macOS. An icon-only button is a circle and a button with a title a capsule; before, every button was drawn as a 44 pt circle with its title spilling out. On macOS 26 the glass styles use the glass bezel, prominent styles `bezelColor` with `tintProminence`, and every style `borderShape` and a `controlSize` that follows the height; `clearGlass` is a borderless button in clear `NSGlassEffectView`. Before macOS 26 they use the push and circular bezels. `labelColor`, font size, family and weight apply. AppKit glass takes its look from the window's appearance, not from what is behind it: over a photo, set `labelColor` and icon colours.
+- **`CNSlider`** is an `NSSlider`: tick marks for `numberOfTicks`, `tickValues` and `step`, `neutralValue` on macOS 26, and its colour from the first frame.
+- **`CNSwitch`, `CNStepper`, `CNDatePicker`, `CNColorWell`, `CNSegmentedControl`** use their AppKit controls on every macOS. `CNSegmentedControl.color` tints the selection and symbol colours apply; `CNDatePicker` compact is the date field with a calendar overlay and wheels the field with a stepper; `CNColorWell` follows `size`.
+- **`CNTabBar`** shows each tab's symbol and label, keeps the selected tab readable (it was blue on blue), is no longer clipped at the window's bottom, uses the macOS 27 tabs role, draws badges, follows item, badge, font and selection changes, and turns a search item into a search tab.
+- **`LiquidGlassContainer`** uses `NSGlassEffectView` on macOS 26, with its outline visible (it was clipped), and an `NSVisualEffectView` before 26.
+- **Image assets, image bytes, SVGs and custom icons** draw on macOS in `CNIcon`, `CNButton`, `CNPopupMenuButton` (button and items) and `CNTabBar`. SVGs are read by `NSImage` (checked on macOS 27.2).
+- **Menu item icons stay visible on macOS 27**, which hides them by default, and checked items show a checkmark.
+- **VoiceOver:** `semanticLabel` reaches VoiceOver on macOS for `CNButton`, `CNPopupMenuButton`, `CNSlider`, `CNSwitch`, `CNSegmentedControl`, `CNStepper`, `CNDatePicker` and `CNColorWell`.
+
+### macOS — dialogs, menus and search
+
+- **`CNAlert`** is a native `NSAlert` shown as a sheet on the window: the default action takes Return, cancel takes Escape, destructive actions are marked, and text fields (secure ones too) sit in the alert. Same API as on iOS.
+- **`CNActionSheet`** is an `NSMenu` dropping down from `anchorRect`, or an `NSAlert` sheet without an anchor. Closing it resolves to null.
+- **`CNSearchBar`** is a native `NSSearchField` on every macOS (it was a blank area). Escape clears the text, then ends the search and hands the keyboard back to Flutter; an expandable bar behaves like a toolbar search item. New `recentsAutosaveName` keeps recent searches.
+- **`CNGlassButtonGroup`** is native Liquid Glass on macOS 26, with badges and menus (it was a blank area). Before 26 it stays a row of native buttons.
+- **`CNPopupGesture`** also opens a native menu on a secondary click.
+- `CNFloatingIsland` and the experimental `CNGlassCard` spotlight no longer create native views macOS does not have; they draw in Flutter there.
+
+### Added
+
+- **`CNContextMenu`**, a native context menu for any widget. On macOS a right, two-finger or Control-click opens an `NSMenu` at the pointer, also over a background window. On iOS 17.4 and later a long press opens the system menu at the pressed point. Elsewhere it uses the action sheet fallback. It takes the same entries as `CNPopupMenuButton` and reports the chosen path.
+- **`CNProgressIndicator`**, a native progress bar or spinner, determinate or indeterminate, with tint and size: `NSProgressIndicator` on macOS, `UIProgressView` / `UIActivityIndicatorView` on iOS 26 and later, Cupertino and Material fallbacks elsewhere. New enum `CNControlSize`.
+- **`CNSegmentedControl.semanticLabel`**, on iOS too.
+
+### Fixed
+
+- iOS: `CNButtonConfig.labelFontWeight` was ignored.
+- iOS 26/27: a stray outline above the context menu.
+
+### Changed
+
+- The plugin's macOS minimum is 12.0 (it was 11.0; Xcode 27.1 rejects lower deployment targets).
+- `PlatformVersion.shouldUseNativeControls`: true on every macOS and on iOS 26 and later, for widgets whose native view is a standard control.
+
+### Example
+
+- Back buttons on macOS for the full-screen pages (Music, iPhone Duo, Native Sheet).
+- New pages: Tab Bar, Search Bar, Glass Button Group, Progress Indicator, Context Menu.
+- `lib/mac_page_entry.dart` opens any demo page by name on macOS, for screenshots and checks.
+
 ## 2.1.2
 
 > Patch: `CNNativeSheet` failed to compile with some Xcode versions (#119). No API changes.
