@@ -60,20 +60,25 @@ struct MacGlassGroupButtonData {
     )
   }
 
-  /// A custom icon Flutter rendered (`iconBytes`) or raster image data
-  /// (`imageBytes`). Asset paths and SVG data need the macOS image utility
-  /// and draw no image yet.
+  /// The button's image, by the iOS group's priority: the image asset
+  /// (`assetPath`, a Flutter asset in PNG, JPG, GIF or SVG), then its bytes
+  /// (`imageBytes`), then a custom icon Flutter rendered (`iconBytes`). The
+  /// view draws it as a template in the icon colour, as on iOS.
   private static func image(from dict: [String: Any], size: CGFloat) -> NSImage? {
-    let format = (dict["imageFormat"] as? String)?.lowercased()
-    var data: Data? = nil
-    if format != "svg", let bytes = dict["imageBytes"] as? FlutterStandardTypedData {
-      data = bytes.data
-    } else if let bytes = dict["iconBytes"] as? FlutterStandardTypedData {
-      data = bytes.data
+    let format = dict["imageFormat"] as? String
+    let box = CGSize(width: size, height: size)
+    if let path = dict["assetPath"] as? String, !path.isEmpty,
+       let image = ImageUtils.loadFlutterAsset(path, size: box, format: format) {
+      return image
     }
-    guard let data = data, let image = NSImage(data: data) else { return nil }
-    image.size = NSSize(width: size, height: size)
-    return image
+    if let bytes = dict["imageBytes"] as? FlutterStandardTypedData,
+       let image = ImageUtils.createImageFromData(bytes.data, format: format, size: box) {
+      return image
+    }
+    if let bytes = dict["iconBytes"] as? FlutterStandardTypedData {
+      return ImageUtils.customIconImage(bytes.data, pointSize: size)
+    }
+    return nil
   }
 }
 
