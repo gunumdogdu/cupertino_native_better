@@ -5,10 +5,11 @@ import 'package:flutter/services.dart';
 import '../utils/theme_helper.dart';
 import 'bottom_sheet.dart';
 
-/// Channel owned by `CNActionSheetManager` on the iOS side. It carries no
-/// platform view — an action sheet is a modal presentation, so the native
-/// implementation presents a `UIAlertController` on the top view controller
-/// instead of embedding anything in the Flutter view hierarchy.
+/// Channel owned by `CNActionSheetManager` on the iOS and macOS sides. It
+/// carries no platform view — an action sheet is a modal presentation, so the
+/// native implementation presents a `UIAlertController` on the top view
+/// controller (iOS), or an `NSMenu` / `NSAlert` sheet (macOS), instead of
+/// embedding anything in the Flutter view hierarchy.
 const MethodChannel _channel = MethodChannel('cn_action_sheet');
 
 /// A single choice in a [CNActionSheet].
@@ -45,8 +46,10 @@ class CNActionSheetAction<T> {
   /// Marks the action as destructive (e.g. "Delete", "Log out").
   ///
   /// On iOS this maps to `UIAlertAction.Style.destructive`, which renders the
-  /// label in the system destructive red. On the Flutter fallback it maps to
-  /// `CupertinoActionSheetAction.isDestructiveAction`.
+  /// label in the system destructive red. On macOS the menu item's label is
+  /// drawn in the system red (anchored sheet), or the button sets
+  /// `NSButton.hasDestructiveAction` (alert sheet). On the Flutter fallback it
+  /// maps to `CupertinoActionSheetAction.isDestructiveAction`.
   ///
   /// Apple's Human Interface Guidelines place destructive choices at the top of
   /// the sheet. This API preserves the order you pass — reordering the list
@@ -59,7 +62,8 @@ class CNActionSheetAction<T> {
   final bool enabled;
 }
 
-/// A native iOS action sheet.
+/// A native action sheet: `UIAlertController` on iOS; on macOS, which has no
+/// action sheet, an `NSMenu` at the anchor or an `NSAlert` sheet.
 ///
 /// On iOS this presents a real `UIAlertController` in
 /// `UIAlertController.Style.actionSheet`, so the sheet is the system control:
@@ -67,6 +71,19 @@ class CNActionSheetAction<T> {
 /// and — on iOS 26 — the Liquid Glass appearance, which the system applies with
 /// no opt-in. Because the appearance comes from the OS, the native path is used
 /// on every supported iOS version rather than being gated on iOS 26.
+///
+/// On macOS the sheet takes the form of the system control that does its job
+/// there:
+///
+/// - With [anchorRect] (see "Anchoring" below), an `NSMenu` that drops down
+///   from the anchor, as a pull-down button's menu does: [title] as a section
+///   header, [message] under it, one item per action, destructive ones in the
+///   system red. Closing the menu — Escape or a click outside — is the
+///   cancel and resolves to null, so `cancelLabel` adds no item.
+/// - Without an anchor, an `NSAlert` sheet on the window with one button per
+///   action and, when `cancelLabel` is set, a cancel button answering
+///   Escape. No button answers Return: an action sheet has no preferred
+///   action.
 ///
 /// On every other platform the sheet falls back to a [CupertinoActionSheet]
 /// presented through [CNBottomSheet.showModalPopup], which keeps the geometry
@@ -159,7 +176,8 @@ class CNActionSheet {
       return Future<T?>.value(null);
     }
 
-    if (defaultTargetPlatform != TargetPlatform.iOS) {
+    if (defaultTargetPlatform != TargetPlatform.iOS &&
+        defaultTargetPlatform != TargetPlatform.macOS) {
       return _showFallback<T>(
         context: context,
         actions: actions,
@@ -207,9 +225,9 @@ class CNActionSheet {
       );
       return null;
     } on MissingPluginException {
-      // The iOS side is not registered (unit tests without a mock handler, or
-      // a host app on an older plugin build). Treat it as a dismissal rather
-      // than throwing into the caller's await.
+      // The native side is not registered (unit tests without a mock
+      // handler, or a host app on an older plugin build). Treat it as a
+      // dismissal rather than throwing into the caller's await.
       return null;
     }
   }

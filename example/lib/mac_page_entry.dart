@@ -12,7 +12,9 @@
 //     the page by that much once it is open, or to its end with -1;
 //     OPEN_MENU=<n> then clicks the n-th CNPopupMenuButton of the page and
 //     prints `MACPAGE_MENU <name>` while its menu is open; BACK=true clicks
-//     the page's back button and prints `MACPAGE_BACK <name> home|stayed`)
+//     the page's back button and prints `MACPAGE_BACK <name> home|stayed`;
+//     SCENARIO=<name> for the alert, action_sheet and context_menu pages'
+//     autoScenario)
 //
 // It prints `MACPAGE_PUSH <name>` before each push and `MACPAGE_READY <name>`
 // once the page has settled, so a script can screenshot each page. A page
@@ -38,6 +40,7 @@ import 'demos/segmented_control.dart';
 import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/action_sheet.dart';
+import 'demos/context_menu.dart';
 import 'demos/button.dart';
 import 'demos/search_bar.dart';
 import 'demos/glass_button_group.dart';
@@ -129,6 +132,10 @@ const MethodChannel _auditChannel = MethodChannel('cnb_mac_audit');
 
 /// `<width>x<height>` of the window content, e.g. 820x900.
 const String _window = String.fromEnvironment('WIN');
+
+/// Passed as `autoScenario` to the pages that take one (alert, action_sheet,
+/// context_menu).
+const String _scenario = String.fromEnvironment('SCENARIO');
 const String _brightness = String.fromEnvironment(
   'BRIGHTNESS',
   defaultValue: 'light',
@@ -167,7 +174,13 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   // Popup Menu Button
   'popup_menu_button': (_) => const PopupMenuButtonDemoPage(),
   // Action Sheet
-  'action_sheet': (_) => const ActionSheetDemoPage(),
+  'action_sheet': (_) => const ActionSheetDemoPage(
+    autoScenario: _scenario == '' ? null : _scenario,
+  ),
+  // Context Menu
+  'context_menu': (_) => const ContextMenuDemoPage(
+    autoScenario: _scenario == '' ? null : _scenario,
+  ),
   // Button
   'button': (_) => const ButtonDemoPage(),
   // Glass Button Group
@@ -310,7 +323,8 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   // Bottom Nav Test (Custom Icons)
   'bottom_nav_custom_icons': (_) => const BottomNavCustomIconsTestPage(),
   // Alert
-  'alert': (_) => const AlertDemoPage(),
+  'alert': (_) =>
+      const AlertDemoPage(autoScenario: _scenario == '' ? null : _scenario),
 };
 
 /// The Showcase, Components and Navigation sections, plus Alert.
@@ -331,6 +345,7 @@ const List<String> macMainPages = <String>[
   'icon',
   'popup_menu_button',
   'action_sheet',
+  'context_menu',
   'button',
   'glass_button_group',
   'search_bar',
@@ -361,6 +376,7 @@ const Map<String, (String, int)> macPageTitles = <String, (String, int)>{
   'icon': ('Icon', 0),
   'popup_menu_button': ('Popup Menu Button', 0),
   'action_sheet': ('Action Sheet', 0),
+  'context_menu': ('Context Menu', 0),
   'button': ('Button', 0),
   'glass_button_group': ('Glass Button Group', 0),
   'search_bar': ('Search Bar', 0),

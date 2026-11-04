@@ -4,10 +4,11 @@ import 'package:flutter/services.dart';
 
 import '../utils/theme_helper.dart';
 
-/// Channel owned by `CNAlertManager` on the iOS side. It carries no platform
-/// view — an alert is a modal presentation, so the native implementation
-/// presents a `UIAlertController` on the top view controller instead of
-/// embedding anything in the Flutter view hierarchy.
+/// Channel owned by `CNAlertManager` on the iOS and macOS sides. It carries no
+/// platform view — an alert is a modal presentation, so the native
+/// implementation presents a `UIAlertController` on the top view controller
+/// (iOS) or an `NSAlert` sheet on the window (macOS) instead of embedding
+/// anything in the Flutter view hierarchy.
 const MethodChannel _channel = MethodChannel('cn_alert');
 
 /// A single button in a [CNAlert].
@@ -44,8 +45,9 @@ class CNAlertAction<T> {
   /// Marks the action as the preferred one.
   ///
   /// On iOS this becomes `UIAlertController.preferredAction`, which renders the
-  /// label in a heavier weight. On the Flutter fallback it maps to
-  /// [CupertinoDialogAction.isDefaultAction].
+  /// label in a heavier weight. On macOS it is the alert's default button:
+  /// at the trailing edge, answering Return. On the Flutter fallback it maps
+  /// to [CupertinoDialogAction.isDefaultAction].
   ///
   /// At most one action in a call may set this — `preferredAction` holds a
   /// single reference, so a second one would silently win.
@@ -54,7 +56,8 @@ class CNAlertAction<T> {
   /// Marks the action as the cancel button.
   ///
   /// Maps to `UIAlertAction.Style.cancel`, which UIKit positions itself
-  /// regardless of where the action sits in the list.
+  /// regardless of where the action sits in the list. On macOS it is the
+  /// button next to the default one, answering Escape.
   ///
   /// At most one action in a call may set this: UIKit raises
   /// `NSInternalInconsistencyException` when a second `.cancel` action is added,
@@ -68,8 +71,9 @@ class CNAlertAction<T> {
   /// Marks the action as destructive (e.g. "Delete", "Log out").
   ///
   /// Maps to `UIAlertAction.Style.destructive`, which renders the label in the
-  /// system destructive red, and to
-  /// [CupertinoDialogAction.isDestructiveAction] on the fallback.
+  /// system destructive red, to `NSButton.hasDestructiveAction` on macOS
+  /// (which also keeps Return from pressing it unless it is [isDefault]), and
+  /// to [CupertinoDialogAction.isDestructiveAction] on the fallback.
   ///
   /// Cannot be combined with [isCancel] — `UIAlertAction.Style` is a single
   /// value, so one of the two would be dropped.
@@ -92,7 +96,9 @@ class CNAlertAction<T> {
 /// One text input row inside a [CNAlert].
 ///
 /// Maps to a `UITextField` added with `UIAlertController.addTextField` on iOS,
-/// and to a [CupertinoTextField] inside the dialog body on the fallback.
+/// to an `NSTextField` (`NSSecureTextField` when [obscureText]) in the
+/// `NSAlert` accessory view on macOS, and to a [CupertinoTextField] inside the
+/// dialog body on the fallback.
 ///
 /// Only the three fields that map cleanly onto both sides are exposed.
 /// `keyboardType`, autocorrection and autocapitalization are deliberately
@@ -138,7 +144,7 @@ class CNAlertResult<T> {
   final List<String> textFields;
 }
 
-/// A native iOS alert dialog.
+/// A native alert dialog: `UIAlertController` on iOS, `NSAlert` on macOS.
 ///
 /// On iOS this presents a real `UIAlertController` in
 /// `UIAlertController.Style.alert`, so the dialog is the system control: system
@@ -146,6 +152,20 @@ class CNAlertResult<T> {
 /// Type, and — on iOS 26 — the Liquid Glass appearance. Because that appearance
 /// comes from the OS with no opt-in, the native path is used on every supported
 /// iOS version rather than being gated on iOS 26.
+///
+/// On macOS this presents a real `NSAlert` as a sheet on the app's window
+/// (`beginSheetModal`, never a blocking modal loop), on every supported macOS
+/// version:
+///
+/// - Buttons follow AppKit's order: the [CNAlertAction.isDefault] action at
+///   the trailing edge, answering Return, the [CNAlertAction.isCancel] action
+///   next to it, answering Escape, then the others. Without an `isDefault`
+///   action the first action that is not cancel takes Return, unless it is
+///   destructive.
+/// - [CNAlertAction.isDestructive] sets `NSButton.hasDestructiveAction`.
+/// - [CNAlertTextField]s are `NSTextField`s (`NSSecureTextField` when
+///   obscured) in the alert's accessory view; the first one has the focus.
+/// - The alert shows the app icon, as every `NSAlert` does.
 ///
 /// On every other platform the alert falls back to a [CupertinoAlertDialog]
 /// presented through [showCupertinoDialog] with `barrierDismissible: false`,
@@ -200,10 +220,10 @@ class CNAlert {
   /// Presents the alert and resolves to what the user answered.
   ///
   /// Resolves to null when no answer was produced: the plugin is not
-  /// registered, the native presentation failed, the fallback route was popped
-  /// without a button press, or — on iOS only — a second [CNAlert.show]
-  /// superseded this one, taking its alert down and resolving this call to
-  /// null. The Flutter fallback stacks instead: the earlier dialog stays up and
+  /// registered, the native presentation failed (on macOS: no window to attach
+  /// the sheet to), the fallback route was popped without a button press, or —
+  /// on iOS and macOS — a second [CNAlert.show] superseded this one, taking its
+  /// alert down and resolving this call to null. The Flutter fallback stacks instead: the earlier dialog stays up and
   /// resolves on its own button press. A pressed button — including a cancel
   /// button — always resolves to a [CNAlertResult].
   ///
@@ -268,7 +288,8 @@ class CNAlert {
       return Future<CNAlertResult<T>?>.value(null);
     }
 
-    if (defaultTargetPlatform != TargetPlatform.iOS) {
+    if (defaultTargetPlatform != TargetPlatform.iOS &&
+        defaultTargetPlatform != TargetPlatform.macOS) {
       return _showFallback<T>(
         context: context,
         actions: actions,
@@ -284,7 +305,8 @@ class CNAlert {
       message: message,
       textFields: textFields,
       // The app's theme, not the window's: a light app on a dark system gets
-      // a light alert, as CNActionSheet does.
+      // a light alert, as CNActionSheet does. Null when the theme follows the
+      // system, so the native alert does too (#118).
       isDark: context.mounted ? ThemeHelper.themeIsDark(context) : null,
     );
   }
@@ -325,13 +347,13 @@ class CNAlert {
       );
       return null;
     } on MissingPluginException {
-      // The iOS side is not registered (unit tests without a mock handler, or a
-      // host app on an older plugin build). Treat it as a dismissal rather than
-      // throwing into the caller's await -- but say so, because a silent null
-      // here is indistinguishable from the user pressing cancel.
+      // The native side is not registered (unit tests without a mock handler,
+      // or a host app on an older plugin build). Treat it as a dismissal rather
+      // than throwing into the caller's await -- but say so, because a silent
+      // null here is indistinguishable from the user pressing cancel.
       debugPrint(
         '⚠️ [cupertino_native_better] CNAlert: the cn_alert channel is not '
-        'registered. The iOS plugin build is older than this Dart API, or '
+        'registered. The native plugin build is older than this Dart API, or '
         'this is a test without a mock handler. Returning null.',
       );
       return null;
@@ -364,7 +386,7 @@ class CNAlert {
   }
 }
 
-/// The Flutter-rendered stand-in used off iOS.
+/// The Flutter-rendered stand-in used off iOS and macOS.
 ///
 /// Stateful because each [CNAlertTextField] needs a [TextEditingController] that
 /// outlives a rebuild and is disposed with the dialog.

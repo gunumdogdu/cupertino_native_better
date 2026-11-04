@@ -678,6 +678,134 @@ void main() {
       });
     });
   });
+
+  group('CNAlert.show on macOS', () {
+    testWidgets('presents the native NSAlert, not the Flutter fallback', (
+      tester,
+    ) async {
+      MethodCall? received;
+      mockChannel((call) async {
+        received = call;
+        return <String, Object?>{
+          'index': 1,
+          'textFields': <String>['Holiday'],
+        };
+      });
+
+      await _withPlatform(TargetPlatform.macOS, () async {
+        final context = await _pumpContext(tester);
+        final result = await CNAlert.show<String>(
+          context: context,
+          title: 'Rename',
+          actions: const [
+            CNAlertAction<String>(label: 'Cancel', isCancel: true),
+            CNAlertAction<String>(
+              label: 'Save',
+              value: 'save',
+              isDefault: true,
+            ),
+          ],
+          textFields: const [
+            CNAlertTextField(placeholder: 'Name', initialText: 'Untitled'),
+          ],
+        );
+        await tester.pump();
+
+        expect(result?.value, 'save');
+        expect(result?.textFields, <String>['Holiday']);
+        expect(find.byType(CupertinoAlertDialog), findsNothing);
+      });
+
+      // The iOS payload, unchanged: one Dart API for both platforms.
+      expect(received?.method, 'show');
+      expect(
+        received?.arguments,
+        debugBuildAlertPayload(
+          title: 'Rename',
+          actions: const [
+            CNAlertAction<String>(label: 'Cancel', isCancel: true),
+            CNAlertAction<String>(
+              label: 'Save',
+              value: 'save',
+              isDefault: true,
+            ),
+          ],
+          textFields: const [
+            CNAlertTextField(placeholder: 'Name', initialText: 'Untitled'),
+          ],
+        ),
+      );
+    });
+
+    testWidgets('sends isDark only when the theme sets a brightness (#118)', (
+      tester,
+    ) async {
+      final sent = <Object?>[];
+      mockChannel((call) async {
+        final args = call.arguments as Map<Object?, Object?>;
+        sent.add(args.containsKey('isDark') ? args['isDark'] : 'absent');
+        return null;
+      });
+
+      await _withPlatform(TargetPlatform.macOS, () async {
+        for (final theme in [Brightness.dark, Brightness.light, null]) {
+          final context = await _pumpContext(tester, brightness: theme);
+          await CNAlert.show<String>(
+            context: context,
+            actions: const [CNAlertAction<String>(label: 'OK')],
+          );
+        }
+      });
+
+      expect(sent, <Object?>[true, false, 'absent']);
+    });
+
+    testWidgets('a cancel answer still reports its value', (tester) async {
+      mockChannel(
+        (call) async => <String, Object?>{
+          'index': 0,
+          'textFields': <String>[],
+        },
+      );
+
+      await _withPlatform(TargetPlatform.macOS, () async {
+        final context = await _pumpContext(tester);
+        final result = await CNAlert.show<String>(
+          context: context,
+          actions: const [
+            CNAlertAction<String>(
+              label: 'Cancel',
+              value: 'cancel',
+              isCancel: true,
+            ),
+            CNAlertAction<String>(
+              label: 'Delete',
+              value: 'delete',
+              isDestructive: true,
+            ),
+          ],
+        );
+        expect(result?.value, 'cancel');
+      });
+    });
+
+    testWidgets('no window to attach the sheet to resolves to null', (
+      tester,
+    ) async {
+      mockChannel(
+        (call) async => throw PlatformException(code: 'no_window'),
+      );
+
+      await _withPlatform(TargetPlatform.macOS, () async {
+        final context = await _pumpContext(tester);
+        final result = await CNAlert.show<String>(
+          context: context,
+          actions: const [CNAlertAction<String>(label: 'OK', value: 'ok')],
+        );
+        expect(result, isNull);
+      });
+    });
+  });
 }
 
 /// Runs [body] with [debugDefaultTargetPlatformOverride] set, clearing it even

@@ -64,6 +64,10 @@ class _AlertDemoPageState extends State<AlertDemoPage> {
     // Every caller awaits `CNAlert.show` first, and a superseded alert resolves
     // its caller as soon as the next one is requested, so the page can be gone
     // by the time the result lands.
+    debugPrint(
+      'CNB_RESULT alert ${result == null ? 'null' : 'value=${result.value} '
+                'text=${result.textFields}'}',
+    );
     if (!mounted) return;
     setState(() {
       _lastResult = result == null
