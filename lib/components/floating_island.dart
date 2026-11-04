@@ -75,6 +75,10 @@ class CNFloatingIslandController {
 /// smooth spring animations. It's perfect for notifications, music controls,
 /// or any floating UI element.
 ///
+/// On iOS 26+ the pill is a native Liquid Glass view. macOS has no
+/// counterpart, so there, as on older iOS and other platforms, it is drawn
+/// in Flutter.
+///
 /// Example:
 /// ```dart
 /// CNFloatingIsland(
@@ -354,11 +358,11 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
 
   @override
   Widget build(BuildContext context) {
-    final isIOSOrMacOS =
-        defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
+    // The native island is an iOS 26 view. macOS has no counterpart, so it
+    // gets the Flutter island.
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        defaultTargetPlatform == TargetPlatform.iOS &&
+        PlatformVersion.shouldUseNativeGlass;
 
     if (shouldUseNative) {
       return _buildNativeFloatingIsland(context);
@@ -398,19 +402,12 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
       'isDark': ThemeHelper.isDark(context),
     };
 
-    final platformView = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPlatformViewCreated,
-          )
-        : AppKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPlatformViewCreated,
-          );
+    final platformView = UiKitView(
+      viewType: viewType,
+      creationParams: creationParams,
+      creationParamsCodec: const StandardMessageCodec(),
+      onPlatformViewCreated: _onPlatformViewCreated,
+    );
 
     return wrapWithModalInteractionGuard(
       _buildPositionedContainer(
