@@ -30,11 +30,13 @@
 /// - [CNColorWell] - Native colour well that opens the system colour picker
 /// - [CNPageControl] - Native page dots that can drive a PageView
 /// - [CNPopupMenuButton] - Native popup menu
+/// - [CNContextMenu] - Native context menu on secondary click (macOS) or long press (iOS)
 /// - [CNSegmentedControl] - Native segmented control
 /// - [CNGlassButtonGroup] - Grouped buttons with unified glass effects
 /// - [CNSearchBar] - Expandable search bar with animations
 /// - [CNToast] - Toast notifications with glass effects
 /// - [CNAlert] - Native alert dialog with actions and text fields
+/// - [CNActionSheet] - Native action sheet (a menu or an alert sheet on macOS)
 /// - [CNTabRail] - Vertical tab bar (rail or sidebar) for the side of the screen
 /// - [CNTabScaffold] - Tab layout that moves the tabs to the side on iPhone Duo
 /// - [CNFoldable] - iPhone Duo hinge, vertical bar and fold regions
@@ -80,6 +82,7 @@ export 'components/action_sheet.dart';
 export 'components/bottom_sheet.dart' show CNBottomSheet, CNSheetGeometryProbe;
 export 'components/popup_menu_button.dart';
 export 'components/popup_gesture.dart';
+export 'components/context_menu.dart' show CNContextMenu, CNContextMenuState;
 export 'components/segmented_control.dart';
 export 'components/glass_button_group.dart';
 export 'components/liquid_glass_container.dart';
