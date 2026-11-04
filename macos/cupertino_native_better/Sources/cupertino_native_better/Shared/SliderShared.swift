@@ -1,15 +1,19 @@
 import SwiftUI
 
+/// The SwiftUI slider `CupertinoSliderNSView` shows for tick values that
+/// NSSlider cannot draw (unevenly spaced ones, macOS 26+). Changes made by
+/// the user reach `model.onChange`; values set in code do not.
 struct CupertinoSliderView: View {
   @ObservedObject var model: SliderModel
 
   var body: some View {
     Group {
+      #if compiler(>=6.2)
       if #available(macOS 26.0, *), model.usesTrackOptions {
         // macOS 26 slider ticks and neutral value (`CNSlider.numberOfTicks`,
         // `tickValues`, `allowsTickValuesOnly`, `neutralValue`).
         Slider(
-          value: model.tickSnappingValue,
+          value: model.userValue(snappingToTicks: true),
           in: model.min...model.max,
           neutralValue: model.clampedNeutralValue,
           label: { EmptyView() },
@@ -19,17 +23,24 @@ struct CupertinoSliderView: View {
             }
           }
         )
-      } else if let s = model.step, s > 0 {
-        Slider(value: $model.value, in: model.min...model.max, step: s)
       } else {
-        Slider(value: $model.value, in: model.min...model.max)
+        plainSlider
       }
+      #else
+      plainSlider
+      #endif
     }
     .disabled(!model.enabled)
-    .onChange(of: model.value) { newValue in
-      model.onChange(newValue)
-    }
     .accentColor(model.tintColor)
+    .accessibilityLabel(Text(model.label))
+  }
+
+  @ViewBuilder private var plainSlider: some View {
+    if let s = model.step, s > 0 {
+      Slider(value: model.userValue(snappingToTicks: false), in: model.min...model.max, step: s)
+    } else {
+      Slider(value: model.userValue(snappingToTicks: false), in: model.min...model.max)
+    }
   }
 }
 
@@ -44,6 +55,9 @@ class SliderModel: ObservableObject {
   @Published var tickValues: [Double]? = nil
   @Published var allowsTickValuesOnly: Bool = true
   @Published var neutralValue: Double? = nil
+  /// What VoiceOver reads (`CNSlider.semanticLabel`); empty for none.
+  @Published var label: String = ""
+  /// Called with each value the user picks.
   var onChange: (Double) -> Void
 
   init(value: Double, min: Double, max: Double, enabled: Bool, onChange: @escaping (Double) -> Void) {
@@ -72,18 +86,21 @@ class SliderModel: ObservableObject {
     return Swift.max(min, Swift.min(v, max))
   }
 
-  /// Binds the slider to `value`, moving it to the nearest tick when
-  /// `allowsTickValuesOnly` is set and there are ticks.
-  var tickSnappingValue: Binding<Double> {
+  /// Binds a slider to `value`. Only the user sets it, so the setter
+  /// reports the change; with `snappingToTicks` and `allowsTickValuesOnly`
+  /// the value moves to the nearest tick first.
+  func userValue(snappingToTicks: Bool) -> Binding<Double> {
     Binding(
       get: { self.value },
       set: { newValue in
+        var v = newValue
         let ticks = self.resolvedTickValues
-        guard self.allowsTickValuesOnly, !ticks.isEmpty else {
-          self.value = newValue
-          return
+        if snappingToTicks, self.allowsTickValuesOnly, !ticks.isEmpty {
+          v = ticks.min { abs($0 - newValue) < abs($1 - newValue) } ?? newValue
         }
-        self.value = ticks.min { abs($0 - newValue) < abs($1 - newValue) } ?? newValue
+        guard v != self.value else { return }
+        self.value = v
+        self.onChange(v)
       }
     )
   }
