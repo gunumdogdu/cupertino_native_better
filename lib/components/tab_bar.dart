@@ -1190,22 +1190,18 @@ class _CNTabBarState extends State<CNTabBar> {
       final symbolsChanged = _lastSymbols?.join('|') != symbols.join('|');
       final activeSymbolsChanged =
           _lastActiveSymbols?.join('|') != activeSymbols.join('|');
+      final iconSizeChanged = _lastIconSize != widget.iconSize;
 
       if (badgesChanged &&
           !labelsChanged &&
           !symbolsChanged &&
-          !activeSymbolsChanged) {
-        // Only badges changed - use lightweight update
+          !activeSymbolsChanged &&
+          !iconSizeChanged) {
+        // Only badges changed - use lightweight update. No return: a font or
+        // layout change in the same rebuild still has to go out below.
         await ch.invokeMethod('setBadges', {'badges': badges});
         _lastBadges = badges;
-        return;
-      }
-
-      // Check if iconSize changed
-      final iconSizeChanged = _lastIconSize != widget.iconSize;
-
-      // Check if basic properties changed
-      if (labelsChanged ||
+      } else if (labelsChanged ||
           symbolsChanged ||
           activeSymbolsChanged ||
           badgesChanged ||
