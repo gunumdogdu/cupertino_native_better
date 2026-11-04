@@ -57,6 +57,12 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     case "getMajorOSVersion":
       let version = ProcessInfo.processInfo.operatingSystemVersion
       result(Int(version.majorVersion))
+    case "beginTransition", "endTransition":
+      // CNTransitionObserver sends these on every route change, unawaited.
+      // On iOS they switch Liquid Glass off during the transition; no macOS
+      // view reacts to them, but an unanswered call would be an uncaught
+      // MissingPluginException on each navigation (#47).
+      result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }
