@@ -38,6 +38,9 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     
     let liquidGlassContainerFactory = LiquidGlassContainerFactory(messenger: registrar.messenger)
     registrar.register(liquidGlassContainerFactory, withId: "CupertinoNativeLiquidGlassContainer")
+
+    let searchBarFactory = CupertinoSearchBarViewFactory(messenger: registrar.messenger)
+    registrar.register(searchBarFactory, withId: "CNSearchBar")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
