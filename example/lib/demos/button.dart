@@ -352,11 +352,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             const SizedBox(height: 48),
             const Text('Icon buttons (PNG Assets)'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'PNG icons with automatic format detection - no need to specify imageFormat!',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -426,11 +426,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             const SizedBox(height: 48),
             const Text('Icon Buttons - Different Sizes'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Icon buttons with various sizes to demonstrate flexibility',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -530,11 +530,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             const SizedBox(height: 48),
             const Text('Adaptive Appearance - Glass Buttons'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Same glass button adapts its appearance based on content behind it (like UITabBar)',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -872,11 +872,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             const SizedBox(height: 48),
             const Text('Clear glass (iOS 26+)'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'clearGlass and prominentClearGlass next to glass and prominentGlass, over a photo',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -887,21 +887,21 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             const SizedBox(height: 48),
             const Text('Liquid Glass Effects (iOS 26+)'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'These examples demonstrate Liquid Glass blending and morphing effects.',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
             const Text('CNGlassButtonGroup - Horizontal Buttons'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Using CNGlassButtonGroup for proper blending effects',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -948,11 +948,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             const SizedBox(height: 24),
             const Text('CNGlassButtonGroup - PNG Icons with Colors'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'PNG icons with custom colors in grouped buttons',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -1006,11 +1006,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             // Glass Effect Container with column of buttons - Using CNGlassButtonGroup
             const Text('Glass Effect Container - Column of Buttons'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Vertical layout with proper blending',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -1055,11 +1055,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             // Buttons with glassEffectId for morphing - Using CNGlassButtonGroup
             const Text('Glass Effect ID - Morphing Transitions'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Buttons with glassEffectId can morph into each other during transitions.',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -1101,11 +1101,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             // Interactive glass effects
             const Text('Interactive Glass Effects'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Interactive glass effects respond to touch and pointer interactions in real time.',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -1145,11 +1145,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             // Combined example: Union + ID + Interactive - Using CNGlassButtonGroup
             const Text('Combined Effects'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Buttons can combine union, ID, and interactive effects.',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -1193,11 +1193,11 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
             const SizedBox(height: 48),
             const Text('Parameter Change Test'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Test that buttons properly update when parameters change (e.g., favorite button that changes icon and color).',
               style: TextStyle(
                 fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -1301,11 +1301,11 @@ class _ParameterChangeTestState extends State<_ParameterChangeTest> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Click the button to toggle favorite state. Icon should change from heart to heart.fill and color should change from gray to red.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1368,11 +1368,11 @@ class _ParameterChangeTestState extends State<_ParameterChangeTest> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Tap to cycle through different SVG assets. The button should update smoothly.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1414,11 +1414,11 @@ class _ParameterChangeTestState extends State<_ParameterChangeTest> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Tap to cycle through different PNG assets. The button should update smoothly.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1470,11 +1470,11 @@ class _ParameterChangeTestState extends State<_ParameterChangeTest> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Tap to cycle through different SF Symbols. The button should update smoothly.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1513,11 +1513,11 @@ class _ParameterChangeTestState extends State<_ParameterChangeTest> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Tap to cycle through different custom icons. The button should update smoothly.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1556,11 +1556,11 @@ class _ParameterChangeTestState extends State<_ParameterChangeTest> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Test that button groups properly update when button parameters change. Tap buttons to toggle favorite state.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1724,9 +1724,9 @@ class _ButtonGroupTestState extends State<_ButtonGroupTest> {
         // Favorite states indicator
         Text(
           'Favorites: ${_homeFavorited ? "Home " : ""}${_searchFavorited ? "Search " : ""}${_profileFavorited ? "Profile" : ""}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: CupertinoColors.secondaryLabel,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
           ),
         ),
       ],

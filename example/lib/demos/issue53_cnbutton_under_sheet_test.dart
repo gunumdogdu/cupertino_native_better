@@ -491,14 +491,14 @@ class _FilterBottomSheetContentState extends State<FilterBottomSheetContent> {
             ),
             const SizedBox(height: 24),
             // AREAS label + pills.
-            const Padding(
-              padding: EdgeInsets.only(left: 4, bottom: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 8),
               child: Text(
                 'AREAS',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: CupertinoColors.secondaryLabel,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
             ),

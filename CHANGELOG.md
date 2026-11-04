@@ -4,7 +4,7 @@
 
 ### Fixed — #47 the example hung on macOS with a debugger attached
 
-Some widgets sent the macOS view a method it did not implement (`setSemanticLabel`, `setInteraction`, `setLabelStyle`, the tab bar's search calls) without awaiting the call. The resulting `MissingPluginException` was uncaught, and a debugger that breaks on uncaught exceptions (the IDE default) paused the UI isolate. On macOS the UI isolate runs on the main thread (merged platform and UI threads), so the whole window stopped with a spinning cursor and no error. With `FLTEnableMergedPlatformUIThread` off the window kept answering but the Flutter content froze, which is why the workaround looked broken. Calls a platform may not implement now treat a missing implementation as "not supported here", and the macOS views implement the missing methods.
+Some widgets sent the macOS view a method it did not implement (`setSemanticLabel`, `setInteraction`, `setLabelStyle`, the tab bar's search calls) without awaiting the call. The resulting `MissingPluginException` was uncaught, and a debugger that breaks on uncaught exceptions (the IDE default) paused the UI isolate. On macOS the UI isolate runs on the main thread (merged platform and UI threads), so the whole window stopped with a spinning cursor and no error. With `FLTEnableMergedPlatformUIThread` off the window kept answering but the Flutter content froze, which is why the workaround looked broken. Calls a platform may not implement now treat a missing implementation as "not supported here", the macOS views implement the missing methods, and macOS answers the `beginTransition` / `endTransition` calls `CNTransitionObserver` sends on every route change. A test now checks that every call a widget sends has an answer on macOS.
 
 ### macOS — native controls on every macOS
 
@@ -13,7 +13,7 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 - **`CNSwitch`, `CNStepper`, `CNDatePicker`, `CNColorWell`, `CNSegmentedControl`** use their AppKit controls on every macOS. `CNSegmentedControl.color` tints the selection and symbol colours apply; `CNDatePicker` compact is the date field with a calendar overlay and wheels the field with a stepper; `CNColorWell` follows `size`.
 - **`CNTabBar`** shows each tab's symbol and label, keeps the selected tab readable (it was blue on blue), is no longer clipped at the window's bottom, uses the macOS 27 tabs role, draws badges, follows item, badge, font and selection changes, and turns a search item into a search tab.
 - **`LiquidGlassContainer`** uses `NSGlassEffectView` on macOS 26, with its outline visible (it was clipped), and an `NSVisualEffectView` before 26.
-- **Image assets, image bytes, SVGs and custom icons** draw on macOS in `CNIcon`, `CNButton`, `CNPopupMenuButton` (button and items) and `CNTabBar`. SVGs are read by `NSImage` (checked on macOS 27.2).
+- **Image assets, image bytes, SVGs and custom icons** draw on macOS in `CNIcon`, `CNButton`, `CNPopupMenuButton` (button and items), `CNTabBar` (`imageAsset`, `activeImageAsset`) and `CNGlassButtonGroup`. SVGs are read by `NSImage` (checked on macOS 27.2).
 - **Menu item icons stay visible on macOS 27**, which hides them by default, and checked items show a checkmark.
 - **VoiceOver:** `semanticLabel` reaches VoiceOver on macOS for `CNButton`, `CNPopupMenuButton`, `CNSlider`, `CNSwitch`, `CNSegmentedControl`, `CNStepper`, `CNDatePicker` and `CNColorWell`.
 
@@ -34,6 +34,10 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 
 ### Fixed
 
+- `CNTabBar` did not send a change of an item's `imageAsset`, `activeImageAsset`, image bytes or `customIcon` to the native bar once it was created, and after `setItems` an asset could be swapped for its blurry 1x file. Both are fixed, on iOS and macOS.
+- iOS: a raster `imageAsset` in `CNTabBar` was drawn at its pixel size, far larger than the tab; it now fits the item.
+- iOS: in debug builds the first SVG an app showed could be missing. SVGKit's device check threw on the first parse, which a warm-up parse raced; the warm-up now runs before any real SVG.
+- iOS (#66): uncoloured single-colour image assets on `CNButton` and `CNPopupMenuButton` are now drawn as templates that take the tint or adapt to the glass, as 1.6.0 intended. The check that decides it never ran: Core Graphics rejected the bitmap context it used.
 - iOS: `CNButtonConfig.labelFontWeight` was ignored.
 - iOS 26/27: a stray outline above the context menu.
 
@@ -44,7 +48,8 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 
 ### Example
 
-- Back buttons on macOS for the full-screen pages (Music, iPhone Duo, Native Sheet).
+- Back buttons on macOS for the full-screen pages (Music, Files, iPhone Duo, Native Sheet).
+- Captions on the Button page are readable in dark mode.
 - New pages: Tab Bar, Search Bar, Glass Button Group, Progress Indicator, Context Menu.
 - `lib/mac_page_entry.dart` opens any demo page by name on macOS, for screenshots and checks.
 
