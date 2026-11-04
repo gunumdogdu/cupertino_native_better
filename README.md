@@ -1079,7 +1079,7 @@ Since 2.2 a widget whose control exists in AppKit uses it on every supported mac
 
 ### Accessibility
 
-The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOver, Voice Control and Switch Control see the system's own controls rather than an imitation. Checked through the iOS accessibility tree (iPhone Duo simulator, iOS 27.1):
+The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOver, Voice Control and Switch Control see the system's own controls rather than an imitation. Checked through the iOS accessibility tree (iPhone Duo simulator, iOS 27.1), and for the macOS controls of 2.2.0 through the macOS accessibility tree (macOS 27.2). The `CNContextMenu` row follows from its implementation:
 
 | Widget | What VoiceOver gets |
 |--------|---------------------|

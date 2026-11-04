@@ -50,8 +50,11 @@ import 'popup_menu_button.dart';
 /// ```
 ///
 /// The child keeps its own gestures: a tap still reaches a button inside it.
-/// Screen readers get the menu as the child's long-press action
-/// (VoiceOver: double-tap and hold), opened at the child's centre.
+/// On iOS, screen readers get the menu as the child's long-press action
+/// (VoiceOver: double-tap and hold), opened at the child's centre. On macOS
+/// VoiceOver cannot open it: Flutter's macOS embedder exposes no "show menu"
+/// action. Offer the same commands another way, such as a
+/// [CNPopupMenuButton], where VoiceOver users need them.
 class CNContextMenu extends StatefulWidget {
   /// Creates a native context menu region around [child].
   const CNContextMenu({

@@ -10,8 +10,8 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 
 - **`CNButton` and `CNPopupMenuButton`** are AppKit buttons on every macOS. An icon-only button is a circle and a button with a title a capsule; before, every button was drawn as a 44 pt circle with its title spilling out. On macOS 26 the glass styles use the glass bezel, prominent styles `bezelColor` with `tintProminence`, and every style `borderShape` and a `controlSize` that follows the height; `clearGlass` is a borderless button in clear `NSGlassEffectView`. Before macOS 26 they use the push and circular bezels. `labelColor`, font size, family and weight apply. AppKit glass takes its look from the window's appearance, not from what is behind it: over a photo, set `labelColor` and icon colours.
 - **`CNSlider`** is an `NSSlider`: tick marks for `numberOfTicks`, `tickValues` and `step`, `neutralValue` on macOS 26, and its colour from the first frame.
-- **`CNSwitch`, `CNStepper`, `CNDatePicker`, `CNColorWell`, `CNSegmentedControl`** use their AppKit controls on every macOS. `CNSegmentedControl.color` tints the selection and symbol colours apply; `CNDatePicker` compact is the date field with a calendar overlay and wheels the field with a stepper; `CNColorWell` follows `size`.
-- **`CNTabBar`** shows each tab's symbol and label, keeps the selected tab readable (it was blue on blue), is no longer clipped at the window's bottom, uses the macOS 27 tabs role, draws badges, follows item, badge, font and selection changes, and turns a search item into a search tab.
+- **`CNStepper`, `CNDatePicker`, `CNColorWell`, `CNSegmentedControl`** use their AppKit controls on every macOS, and **`CNSwitch`** a SwiftUI toggle that draws the AppKit switch. `CNSegmentedControl.color` tints the selection and symbol colours apply; `CNDatePicker` compact is the date field with a calendar overlay and wheels the field with a stepper; `CNColorWell` follows `size`.
+- **`CNTabBar`** shows each tab's symbol and label, keeps the selected tab readable (it was blue on blue), is no longer clipped at the window's bottom, uses the macOS 27 tabs role (in apps built with the macOS 27 SDK), draws badges, follows item, badge, font and selection changes, and turns a search item into a search tab.
 - **`LiquidGlassContainer`** uses `NSGlassEffectView` on macOS 26, with its outline visible (it was clipped), and an `NSVisualEffectView` before 26.
 - **Image assets, image bytes, SVGs and custom icons** draw on macOS in `CNIcon`, `CNButton`, `CNPopupMenuButton` (button and items), `CNTabBar` (`imageAsset`, `activeImageAsset`) and `CNGlassButtonGroup`. SVGs are read by `NSImage` (checked on macOS 27.2).
 - **Native menus on macOS** (`CNPopupMenuButton`, `CNContextMenu`, `CNActionSheet`) are built the same way: disabled items are greyed out and can no longer be chosen, also inside submenus; destructive items are red; checked items show a checkmark; inline and palette sections end at a separator. Item icons stay visible on macOS 27, which hides them by default, and a single-colour icon with no colour follows the menu's text colour in light and dark. `keepsMenuPresented` has no AppKit equivalent and is ignored on macOS.
@@ -29,7 +29,8 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 ### Added
 
 - **`CNContextMenu`**, a native context menu for any widget. On macOS a right, two-finger or Control-click opens an `NSMenu` at the pointer, also over a background window. On iOS 17.4 and later a long press opens the system menu at the pressed point. Elsewhere it uses the action sheet fallback. It takes the same entries as `CNPopupMenuButton` and reports the chosen path.
-- **`CNProgressIndicator`**, a native progress bar or spinner, determinate or indeterminate, with tint and size: `NSProgressIndicator` on macOS, `UIProgressView` / `UIActivityIndicatorView` on iOS 26 and later, Cupertino and Material fallbacks elsewhere. New enum `CNControlSize`.
+- **`CNProgressIndicator`**, a native progress bar or spinner, determinate or indeterminate, with tint and size: SwiftUI's `ProgressView`, which draws `NSProgressIndicator`, on macOS; `UIProgressView` / `UIActivityIndicatorView` on iOS 26 and later; Cupertino and Material fallbacks elsewhere. New enums `CNProgressStyle` and `CNControlSize`.
+- **`PlatformVersion.shouldUseNativeControls`**: true on every macOS and on iOS 26 and later, for widgets whose native view is a standard control.
 - **`CNSegmentedControl.semanticLabel`**, on iOS too.
 
 ### Fixed
@@ -45,7 +46,6 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 ### Changed
 
 - The plugin's macOS minimum is 12.0 (it was 11.0; Xcode 27.1 rejects lower deployment targets).
-- `PlatformVersion.shouldUseNativeControls`: true on every macOS and on iOS 26 and later, for widgets whose native view is a standard control.
 
 ### Example
 
