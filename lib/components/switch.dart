@@ -7,6 +7,7 @@ import '../channel/params.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/optional_method_call.dart';
 
 /// Controller for a [CNSwitch] that allows imperative updates from Dart
 /// to the underlying native UISwitch/NSSwitch instance.
@@ -301,7 +302,7 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
     }
 
     if (_lastSemanticLabel != widget.semanticLabel) {
-      await channel.invokeMethod('setSemanticLabel', {
+      await channel.invokeOptionalMethod('setSemanticLabel', {
         'label': widget.semanticLabel,
       });
       _lastSemanticLabel = widget.semanticLabel;

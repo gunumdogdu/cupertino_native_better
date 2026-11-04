@@ -12,6 +12,7 @@ import '../utils/popup_menu_encoder.dart';
 import '../utils/popup_menu_fallback_sheet.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
+import '../utils/optional_method_call.dart';
 import 'icon.dart';
 
 /// Base type for entries in a [CNPopupMenuButton] menu.
@@ -960,7 +961,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
     if (_lastSemanticLabel != widget.semanticLabel) {
       _lastSemanticLabel = widget.semanticLabel;
-      await ch.invokeMethod('setSemanticLabel', {
+      await ch.invokeOptionalMethod('setSemanticLabel', {
         'label': widget.semanticLabel,
       });
     }

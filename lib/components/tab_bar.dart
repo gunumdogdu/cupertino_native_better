@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
@@ -14,6 +15,7 @@ import '../utils/popup_menu_encoder.dart';
 import '../utils/popup_menu_fallback_sheet.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
+import '../utils/optional_method_call.dart';
 import 'icon.dart';
 import 'popup_menu_button.dart';
 import 'tab_badge.dart';
@@ -598,15 +600,17 @@ class _CNTabBarState extends State<CNTabBar> {
     try {
       if (controller.isActive != _isSearchActive) {
         if (controller.isActive) {
-          ch.invokeMethod('activateSearch');
+          unawaited(ch.invokeOptionalMethod('activateSearch'));
         } else {
-          ch.invokeMethod('deactivateSearch');
+          unawaited(ch.invokeOptionalMethod('deactivateSearch'));
         }
         _isSearchActive = controller.isActive;
       }
 
       if (controller.text != _searchText) {
-        ch.invokeMethod('setSearchText', {'text': controller.text});
+        unawaited(
+          ch.invokeOptionalMethod('setSearchText', {'text': controller.text}),
+        );
         _searchText = controller.text;
       }
     } catch (e) {
@@ -1495,7 +1499,10 @@ class _CNTabBarState extends State<CNTabBar> {
         widget.searchItem?.onSearchActiveChanged?.call(false);
         widget.searchController?.updateFromNative(isActive: false);
         // Notify native iOS to deactivate search
-        _channel?.invokeMethod('deactivateSearch');
+        final channel = _channel;
+        if (channel != null) {
+          unawaited(channel.invokeOptionalMethod('deactivateSearch'));
+        }
       },
       child: Container(
         width: buttonSize,

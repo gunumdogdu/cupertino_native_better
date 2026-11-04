@@ -20,6 +20,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
+import '../utils/optional_method_call.dart';
 import 'icon.dart';
 
 /// Configuration for CNButton with default values.
@@ -878,7 +879,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
         _lastLabelFontSize != widget.config.labelFontSize ||
         _lastLabelColor != labelColorArgb ||
         _lastLabelFontWeight != labelWeight) {
-      await ch.invokeMethod('setLabelStyle', {
+      await ch.invokeOptionalMethod('setLabelStyle', {
         if (widget.config.labelFontFamily != null)
           'labelFontFamily': widget.config.labelFontFamily,
         if (widget.config.labelFontSize != null)
@@ -1093,7 +1094,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
     // Sync interaction state
     if (_lastInteraction != widget.config.interaction) {
-      await ch.invokeMethod('setInteraction', {
+      await ch.invokeOptionalMethod('setInteraction', {
         'interaction': widget.config.interaction,
       });
       _lastInteraction = widget.config.interaction;
@@ -1101,7 +1102,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
     // Sync the VoiceOver label
     if (_lastSemanticLabel != widget.semanticLabel) {
-      await ch.invokeMethod('setSemanticLabel', {
+      await ch.invokeOptionalMethod('setSemanticLabel', {
         'label': widget.semanticLabel,
       });
       _lastSemanticLabel = widget.semanticLabel;

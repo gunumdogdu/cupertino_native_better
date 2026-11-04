@@ -7,6 +7,7 @@ import '../channel/params.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/optional_method_call.dart';
 
 /// Controller for a [CNSlider] allowing imperative changes to the native
 /// NSSlider/UISlider instance.
@@ -512,7 +513,7 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
     }
 
     if (_lastSemanticLabel != widget.semanticLabel) {
-      await channel.invokeMethod('setSemanticLabel', {
+      await channel.invokeOptionalMethod('setSemanticLabel', {
         'label': widget.semanticLabel,
       });
       _lastSemanticLabel = widget.semanticLabel;
