@@ -45,6 +45,9 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
 
     let searchBarFactory = CupertinoSearchBarViewFactory(messenger: registrar.messenger)
     registrar.register(searchBarFactory, withId: "CNSearchBar")
+
+    let progressFactory = CupertinoProgressIndicatorViewFactory(messenger: registrar.messenger)
+    registrar.register(progressFactory, withId: "CupertinoNativeProgressIndicator")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

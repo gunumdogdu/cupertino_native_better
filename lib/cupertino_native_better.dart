@@ -33,6 +33,7 @@
 /// - [CNSegmentedControl] - Native segmented control
 /// - [CNGlassButtonGroup] - Grouped buttons with unified glass effects
 /// - [CNSearchBar] - Expandable search bar with animations
+/// - [CNProgressIndicator] - Native progress bar or spinner
 /// - [CNToast] - Toast notifications with glass effects
 /// - [CNAlert] - Native alert dialog with actions and text fields
 /// - [CNTabRail] - Vertical tab bar (rail or sidebar) for the side of the screen
@@ -84,6 +85,7 @@ export 'components/segmented_control.dart';
 export 'components/glass_button_group.dart';
 export 'components/liquid_glass_container.dart';
 export 'components/search_bar.dart';
+export 'components/progress_indicator.dart';
 export 'components/toast.dart';
 export 'components/floating_island.dart';
 export 'components/search_scaffold.dart';
@@ -97,6 +99,7 @@ export 'style/sf_symbol.dart';
 export 'style/symbol_effect.dart';
 export 'style/native_list.dart';
 export 'style/image_placement.dart';
+export 'style/control_size.dart';
 export 'style/glass_effect.dart';
 export 'style/spotlight_mode.dart';
 export 'style/tab_bar_search_item.dart';
