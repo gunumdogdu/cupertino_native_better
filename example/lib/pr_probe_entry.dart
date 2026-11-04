@@ -64,6 +64,13 @@
 //     (CNColorWell; the colours change every 1.5 s. FALLBACK=true as above;
 //     add --dart-define=SCENARIO=sheet to open the fallback palette sheet.)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=pr115
+//     (PRs #115-#118, demos/prs_115_118_test.dart: pr115 tab bar badge with
+//     split/font/icon size, pr116 search bar fallback width (FALLBACK=true
+//     on iOS 26+), pr117 uncoloured CNIcon on a dark theme, pr118 modals and
+//     pickers following the system (BRIGHTNESS=system, SCENARIO=alert opens
+//     the alert) and the segmented fallback (FALLBACK=true BRIGHTNESS=dark))
+//
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=sheet
 //     (2.1.0: CNNativeSheet over a map-style screen; BG=<image file> and
 //     AVATARS=<png>,<png> draw local files for screenshot comparisons;
@@ -104,6 +111,7 @@ import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/alert.dart';
 import 'demos/tabbar_overlap_variants_test.dart';
 import 'demos/pr111_runtime_theme_test.dart';
+import 'demos/prs_115_118_test.dart';
 import 'demos/issue60_tabbar_labels_after_pop_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
 import 'demos/issue70_tabbar_background_test.dart';
@@ -288,6 +296,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'overlap') {
       return const TabBarOverlapVariantsTestPage();
+    }
+    if (_probe == 'pr115') return const Pr115TabBarBadgeSyncPage();
+    if (_probe == 'pr116') return const Pr116SearchBarWidthPage();
+    if (_probe == 'pr117') return const Pr117IconDefaultColorPage();
+    if (_probe == 'pr118') {
+      return Pr118ThemeFollowPage(openAlert: _scenario == 'alert');
     }
     if (_probe == 'pr111') {
       return const Pr111RuntimeThemeTestPage();
