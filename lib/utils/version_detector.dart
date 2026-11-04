@@ -123,6 +123,13 @@ class PlatformVersion {
   /// Auto-initializes on first access.
   static bool get shouldUseNativeGlass => isIOS26OrLater || isMacOS26OrLater;
 
+  /// Returns true if a widget whose native view is a standard AppKit or UIKit
+  /// control should use it: on every supported macOS, where those controls
+  /// predate Liquid Glass, and on iOS 26 or later. Styling that needs Liquid
+  /// Glass keeps checking [isMacOS26OrLater] / [isIOS26OrLater].
+  static bool get shouldUseNativeControls =>
+      isIOS26OrLater || Platform.isMacOS;
+
   /// Alias for [shouldUseNativeGlass].
   static bool get supportsLiquidGlass => shouldUseNativeGlass;
 

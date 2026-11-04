@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "cupertino_native_better",
     platforms: [
-        .macOS("11.0")
+        .macOS("12.0")
     ],
     products: [
         .library(name: "cupertino-native-better", targets: ["cupertino_native_better"])
