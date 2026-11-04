@@ -379,6 +379,11 @@ class _CNTabBarState extends State<CNTabBar> {
   double? _lastSplitSpacing;
   double? _lastIconSize;
   String? _lastMenusKey;
+
+  /// [_imagesKey] of the items the creation params were prepared from, and
+  /// of the items last sent to the native bar.
+  String? _paramsImagesKey;
+  String? _lastImagesKey;
   String? _lastLabelFontFamily;
   double? _lastLabelFontSize;
 
@@ -532,6 +537,18 @@ class _CNTabBarState extends State<CNTabBar> {
       )
       .join('||');
 
+  /// The items' images other than SF Symbols: a change of an image asset or
+  /// a custom icon alone must reach the native bar too.
+  static String _imagesKey(List<CNTabBarItem> items) => items
+      .map(
+        (e) =>
+            '${e.imageAsset?.assetPath}|${e.imageAsset?.imageData?.length}|'
+            '${e.activeImageAsset?.assetPath}|'
+            '${e.activeImageAsset?.imageData?.length}|'
+            '${e.customIcon?.codePoint}|${e.activeCustomIcon?.codePoint}',
+      )
+      .join('||');
+
   @override
   void dispose() {
     _prepGeneration++;
@@ -571,12 +588,15 @@ class _CNTabBarState extends State<CNTabBar> {
 
     _preparing = true;
     final gen = ++_prepGeneration;
+    // The preparation reads widget.items before its first await.
+    final imagesKey = _imagesKey(widget.items);
 
     _prepareCreationParams()
         .then((params) {
           if (!mounted || gen != _prepGeneration) return;
           setState(() {
             _creationParams = params;
+            _paramsImagesKey = imagesKey;
             _preparing = false;
           });
         })
@@ -1033,6 +1053,7 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastActiveSymbols = params['activeSfSymbols'] as List<String>;
     _lastBadges = params['badges'] as List<String>;
     _lastIconSize = widget.iconSize;
+    _lastImagesKey = _paramsImagesKey;
     _lastSplit = widget.split;
     _lastRightCount = widget.rightCount;
     _lastSplitSpacing = widget.splitSpacing;
@@ -1205,12 +1226,15 @@ class _CNTabBarState extends State<CNTabBar> {
       final activeSymbolsChanged =
           _lastActiveSymbols?.join('|') != activeSymbols.join('|');
       final iconSizeChanged = _lastIconSize != widget.iconSize;
+      final imagesKey = _imagesKey(widget.items);
+      final imagesChanged = _lastImagesKey != imagesKey;
 
       if (badgesChanged &&
           !labelsChanged &&
           !symbolsChanged &&
           !activeSymbolsChanged &&
-          !iconSizeChanged) {
+          !iconSizeChanged &&
+          !imagesChanged) {
         // Only badges changed - use lightweight update. No return: a font or
         // layout change in the same rebuild still has to go out below.
         await ch.invokeMethod('setBadges', {'badges': badges});
@@ -1219,7 +1243,8 @@ class _CNTabBarState extends State<CNTabBar> {
           symbolsChanged ||
           activeSymbolsChanged ||
           badgesChanged ||
-          iconSizeChanged) {
+          iconSizeChanged ||
+          imagesChanged) {
         // Re-render custom icons if items changed
         final iconBytes = await _renderCustomIcons();
         final customIconBytes = iconBytes[0];
@@ -1289,6 +1314,7 @@ class _CNTabBarState extends State<CNTabBar> {
         _lastActiveSymbols = activeSymbols;
         _lastBadges = badges;
         _lastIconSize = widget.iconSize;
+        _lastImagesKey = imagesKey;
         // Re-measure width in case content changed
         _requestIntrinsicSize();
       }
