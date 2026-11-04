@@ -110,6 +110,7 @@ void main() {
     await CNNativeSheet.show(pages: pages);
     final args = calls.single.arguments as Map<Object?, Object?>;
     expect(args.containsKey('undimmedDetent'), isFalse);
+    expect(args.containsKey('isDark'), isFalse);
     expect(args['initialDetent'], 0);
     expect(args['dismissible'], isTrue);
   });

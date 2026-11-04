@@ -156,7 +156,8 @@ class CNNativeSheet {
   /// one it opens at (the first by default). Up to and including
   /// [undimmedDetent], the app behind the sheet is not dimmed and stays
   /// interactive; null dims it at every height. [dismissible] false keeps
-  /// the sheet from being dragged closed.
+  /// the sheet from being dragged closed. [isDark] sets the sheet's
+  /// appearance; null follows the system.
   ///
   /// Returns whether the sheet was shown.
   static Future<bool> show({
@@ -203,7 +204,7 @@ class CNNativeSheet {
       'showGrabber': showGrabber,
       'selectedPage': selectedPage,
       if (tintColor != null) 'tint': tintColor.toARGB32(),
-      'isDark': isDark ?? false,
+      if (isDark != null) 'isDark': isDark,
     });
     _shown = shown ?? false;
     if (!_shown) _reset();

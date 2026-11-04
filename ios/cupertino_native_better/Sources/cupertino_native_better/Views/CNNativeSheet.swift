@@ -119,7 +119,9 @@ final class CNNativeSheetManager: NSObject, UISheetPresentationControllerDelegat
         } else {
             host = CNSheetPageView.controller(store: store, index: 0, onEvent: onEvent)
         }
-        host.overrideUserInterfaceStyle = config.isDark ? .dark : .light
+        // Without an appearance from Dart the sheet follows the system.
+        let style: UIUserInterfaceStyle = config.isDark.map { $0 ? .dark : .light } ?? .unspecified
+        host.overrideUserInterfaceStyle = style
         host.modalPresentationStyle = .pageSheet
         host.isModalInPresentation = !config.dismissible
 
@@ -127,7 +129,7 @@ final class CNNativeSheetManager: NSObject, UISheetPresentationControllerDelegat
         if let sheet = host.sheetPresentationController {
             // The sheet's glass belongs to the presentation, not to the
             // content, so it needs the appearance too.
-            sheet.traitOverrides.userInterfaceStyle = config.isDark ? .dark : .light
+            if style != .unspecified { sheet.traitOverrides.userInterfaceStyle = style }
             sheet.delegate = self  // also reports a sheet dragged closed
             sheet.detents = config.detents.enumerated().map { makeDetent($0.element, index: $0.offset) }
             sheet.prefersGrabberVisible = config.showGrabber
@@ -245,7 +247,7 @@ struct CNSheetConfig {
     let dismissible: Bool
     let showGrabber: Bool
     let tint: UIColor?
-    let isDark: Bool
+    let isDark: Bool?
     let selectedPage: Int
 
     init(args: [String: Any]) {
@@ -272,7 +274,7 @@ struct CNSheetConfig {
         dismissible = args["dismissible"] as? Bool ?? true
         showGrabber = args["showGrabber"] as? Bool ?? true
         if let argb = args["tint"] as? Int { tint = ImageUtils.colorFromARGB(argb) } else { tint = nil }
-        isDark = args["isDark"] as? Bool ?? false
+        isDark = args["isDark"] as? Bool
         selectedPage = args["selectedPage"] as? Int ?? 0
     }
 
