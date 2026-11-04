@@ -2,6 +2,7 @@ import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
 
+import '../mac_back_bar.dart';
 import 'scenes/account_scene.dart';
 import 'scenes/display_scene.dart';
 import 'scenes/duo_scene.dart';
@@ -82,7 +83,16 @@ Widget buildShowcaseScene(
     _ when inApp => const _LocalBrightness(),
     _ => DisplayScene(onBrightnessChanged: onBrightnessChanged),
   };
-  return CupertinoPageScaffold(child: scene);
+  final page = CupertinoPageScaffold(child: scene);
+  // The Music and iPhone Duo scenes have no bar of their own; on a Mac,
+  // which has no edge swipe, they get one with a back button.
+  if (inApp && (id == 'music' || id == 'duo')) {
+    return MacBackBar(
+      title: id == 'music' ? 'Music' : 'iPhone Duo',
+      child: page,
+    );
+  }
+  return page;
 }
 
 /// The Display scene with its Appearance control driving its own page.

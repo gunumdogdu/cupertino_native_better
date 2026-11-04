@@ -104,6 +104,22 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
                   ),
                 ),
                 CNButton(
+                  label: 'ClearGlass',
+                  onPressed: () => _set('ClearGlass'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.clearGlass,
+                    shrinkWrap: true,
+                  ),
+                ),
+                CNButton(
+                  label: 'ProminentClearGlass',
+                  onPressed: () => _set('ProminentClearGlass'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.prominentClearGlass,
+                    shrinkWrap: true,
+                  ),
+                ),
+                CNButton(
                   label: 'Disabled',
                   onPressed: null,
                   config: const CNButtonConfig(
@@ -165,6 +181,18 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
                     style: CNButtonStyle.prominentGlass,
                   ),
                 ),
+                CNButton.icon(
+                  icon: const CNSymbol('heart.fill', size: 18),
+                  onPressed: () => _set('Icon ClearGlass'),
+                  config: const CNButtonConfig(style: CNButtonStyle.clearGlass),
+                ),
+                CNButton.icon(
+                  icon: const CNSymbol('heart.fill', size: 18),
+                  onPressed: () => _set('Icon ProminentClearGlass'),
+                  config: const CNButtonConfig(
+                    style: CNButtonStyle.prominentClearGlass,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 48),
@@ -224,10 +252,12 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBlue.withOpacity(0.1),
+                      color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: CupertinoColors.systemBlue.withOpacity(0.3),
+                        color: CupertinoColors.systemBlue.withValues(
+                          alpha: 0.3,
+                        ),
                       ),
                     ),
                     child: Text(
@@ -310,7 +340,7 @@ class _ButtonDemoPageState extends State<ButtonDemoPage> {
                         ? 'assets/icons/profile.svg'
                         : 'assets/icons/search.svg',
                     size: 18,
-                    color: CupertinoColors.systemBlue,
+                    color: CupertinoColors.white,
                   ),
                   onPressed: () => _set('SVG ProminentGlass'),
                   config: const CNButtonConfig(

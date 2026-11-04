@@ -313,10 +313,12 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBlue.withOpacity(0.1),
+                      color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: CupertinoColors.systemBlue.withOpacity(0.3),
+                        color: CupertinoColors.systemBlue.withValues(
+                          alpha: 0.3,
+                        ),
                       ),
                     ),
                     child: Text(
@@ -364,7 +366,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                         ? 'assets/icons/chat.svg'
                         : 'assets/icons/search.svg',
                     size: 18,
-                    color: CupertinoColors.systemBlue,
+                    color: CupertinoColors.white,
                   ),
                   size: 44,
                   items: coloredSvgItems,
@@ -443,7 +445,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                   buttonImageAsset: CNImageAsset(
                     'assets/icons/checkcircle.png',
                     size: 18,
-                    color: CupertinoColors.systemBlue,
+                    color: CupertinoColors.white,
                   ),
                   size: 44,
                   items: [

@@ -1,13 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../style/glass_effect.dart';
 import '../../style/spotlight_mode.dart';
-import '../../channel/params.dart';
-import '../../utils/theme_helper.dart';
-import '../../utils/version_detector.dart';
 import '../liquid_glass_container.dart';
 
 /// EXPERIMENTAL: A card widget with Liquid Glass effects, breathing animation,
@@ -76,9 +71,11 @@ class _CNGlassCardState extends State<CNGlassCard>
 
   // Spotlight state
   Offset? _touchPosition;
-  Offset _gyroOffset = Offset.zero;
   Size _cardSize = Size.zero;
-  MethodChannel? _channel;
+
+  /// Device tilt for [CNSpotlightMode.gyroscope]. No platform reports it
+  /// yet, so the spotlight stays centred in that mode.
+  static const Offset _gyroOffset = Offset.zero;
 
   @override
   void initState() {
@@ -108,38 +105,6 @@ class _CNGlassCardState extends State<CNGlassCard>
         _controller.reset();
       }
     }
-
-    // Update spotlight mode on native side if changed
-    if (widget.spotlight != oldWidget.spotlight) {
-      _updateSpotlightMode();
-    }
-  }
-
-  void _onPlatformViewCreated(int id) {
-    final ch = MethodChannel('CNGlassCard_$id');
-    _channel = ch;
-    ch.setMethodCallHandler(_onMethodCall);
-  }
-
-  Future<dynamic> _onMethodCall(MethodCall call) async {
-    switch (call.method) {
-      case 'gyroUpdate':
-        // Receive gyroscope updates from native side
-        final args = call.arguments as Map<dynamic, dynamic>;
-        final x = (args['x'] as num?)?.toDouble() ?? 0.0;
-        final y = (args['y'] as num?)?.toDouble() ?? 0.0;
-        if (mounted) {
-          setState(() {
-            _gyroOffset = Offset(x, y);
-          });
-        }
-        break;
-    }
-    return null;
-  }
-
-  void _updateSpotlightMode() {
-    _channel?.invokeMethod('setSpotlightMode', {'mode': widget.spotlight.name});
   }
 
   void _updateTouchPosition(Offset localPosition) {
@@ -147,12 +112,6 @@ class _CNGlassCardState extends State<CNGlassCard>
         widget.spotlight == CNSpotlightMode.both) {
       setState(() {
         _touchPosition = localPosition;
-      });
-
-      // Send to native for iOS 26+ glass effect integration
-      _channel?.invokeMethod('updateSpotlight', {
-        'x': localPosition.dx / _cardSize.width,
-        'y': localPosition.dy / _cardSize.height,
       });
     }
   }
@@ -162,7 +121,6 @@ class _CNGlassCardState extends State<CNGlassCard>
       setState(() {
         _touchPosition = null;
       });
-      _channel?.invokeMethod('clearSpotlight', null);
     }
   }
 
@@ -206,98 +164,10 @@ class _CNGlassCardState extends State<CNGlassCard>
 
   @override
   Widget build(BuildContext context) {
-    final isIOSOrMacOS =
-        defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
-    final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
-
-    // Use native implementation for iOS 26+ with spotlight support
-    if (shouldUseNative && widget.spotlight != CNSpotlightMode.none) {
-      return _buildNativeGlassCard(context);
-    }
-
-    // Use Flutter implementation
+    // The card's glass is a native LiquidGlassContainer; the spotlight and
+    // the breathing glow are drawn in Flutter over it. No platform registers
+    // a native spotlight card, so this is the path on iOS and macOS too.
     return _buildFlutterGlassCard(context);
-  }
-
-  Widget _buildNativeGlassCard(BuildContext context) {
-    final effectiveSpotlightColor =
-        widget.spotlightColor ?? widget.tint ?? Colors.white;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onPanStart: (details) => _updateTouchPosition(details.localPosition),
-          onPanUpdate: (details) => _updateTouchPosition(details.localPosition),
-          onPanEnd: (_) => _clearTouchPosition(),
-          child: MouseRegion(
-            onHover: (event) => _updateTouchPosition(event.localPosition),
-            onExit: (_) => _clearTouchPosition(),
-            child: _buildCardWithMeasurement(
-              child: _buildNativePlatformView(context, effectiveSpotlightColor),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildNativePlatformView(BuildContext context, Color spotlightColor) {
-    const viewType = 'CNGlassCardWithSpotlight';
-    final creationParams = <String, dynamic>{
-      'cornerRadius': widget.cornerRadius,
-      'tint': resolveColorToArgb(widget.tint, context),
-      'interactive': widget.interactive,
-      'breathing': widget.breathing,
-      'spotlightMode': widget.spotlight.name,
-      'spotlightColor': resolveColorToArgb(spotlightColor, context),
-      'spotlightIntensity': widget.spotlightIntensity,
-      'spotlightRadius': widget.spotlightRadius,
-      'isDark': ThemeHelper.isDark(context),
-    };
-
-    final platformView = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPlatformViewCreated,
-          )
-        : AppKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPlatformViewCreated,
-          );
-
-    // Use StackFit.passthrough so the Stack sizes to the child content
-    // This allows parent widgets to control alignment via Center, Align, etc.
-    return Stack(
-      fit: StackFit.passthrough,
-      children: [
-        Positioned.fill(child: IgnorePointer(child: platformView)),
-        Padding(padding: widget.padding, child: widget.child),
-      ],
-    );
-  }
-
-  Widget _buildCardWithMeasurement({required Widget child}) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            final newSize = Size(constraints.maxWidth, constraints.maxHeight);
-            if (_cardSize != newSize) {
-              setState(() {
-                _cardSize = newSize;
-              });
-            }
-          }
-        });
-        return child;
-      },
-    );
   }
 
   Widget _buildFlutterGlassCard(BuildContext context) {

@@ -4,6 +4,8 @@ import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 
+import '../mac_back_bar.dart';
+
 /// iPhone Duo showcase (issue #102).
 ///
 /// Issue: https://github.com/gunumdogdu/cupertino_native_better/issues/102
@@ -40,10 +42,13 @@ class IPhoneDuoDemoPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CNFoldableScope(
-      child: _DuoShowcase(
-        initialTab: initialTab,
-        initialSidebar: initialSidebar,
+    return MacBackBar(
+      title: 'iPhone Duo',
+      child: CNFoldableScope(
+        child: _DuoShowcase(
+          initialTab: initialTab,
+          initialSidebar: initialSidebar,
+        ),
       ),
     );
   }

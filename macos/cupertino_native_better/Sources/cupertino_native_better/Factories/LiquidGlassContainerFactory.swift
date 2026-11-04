@@ -14,10 +14,7 @@ class LiquidGlassContainerFactory: NSObject, FlutterPlatformViewFactory {
   }
 
   func create(withViewIdentifier viewId: Int64, arguments args: Any?) -> NSView {
-    if #available(macOS 26.0, *) {
-      return LiquidGlassContainerNSView(viewId: viewId, args: args, messenger: messenger)
-    } else {
-      return FallbackLiquidGlassContainerNSView(viewId: viewId, args: args, messenger: messenger)
-    }
+    // Liquid Glass on macOS 26+, the translucent material before.
+    return LiquidGlassContainerNSView(viewId: viewId, args: args, messenger: messenger)
   }
 }

@@ -513,12 +513,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
+    // An NSButton and NSMenu on every macOS, a UIButton menu on iOS 26+.
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
-    // Fallback to Flutter widgets for non-iOS/macOS or iOS/macOS < 26
+    // Fallback to Flutter widgets for non-iOS/macOS or iOS < 26
     if (!shouldUseNative) {
-      // For both non-iOS/macOS and iOS/macOS < 26, use CupertinoActionSheet
+      // For both non-iOS/macOS and iOS < 26, use CupertinoActionSheet
       return _buildCupertinoFallback(context);
     }
 
@@ -707,6 +708,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       if (capturedButtonIconColor != null)
         'buttonIconColor': capturedButtonIconColor,
       if (widget.isIconButton) 'round': true,
+      'height': widget.height,
       'buttonStyle': widget.buttonStyle.name,
       ...menu,
       'isDark': capturedIsDark,
@@ -994,7 +996,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   }
 
   Widget _buildCupertinoFallback(BuildContext context) {
-    // For iOS/macOS < 26 and non-iOS/macOS, use CupertinoActionSheet
+    // For iOS < 26 and non-iOS/macOS, use CupertinoActionSheet
     final label = widget.semanticLabel;
     if (label != null) {
       return Semantics(

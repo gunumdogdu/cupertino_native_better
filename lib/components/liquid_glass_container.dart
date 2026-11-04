@@ -11,9 +11,14 @@ import '../utils/version_detector.dart';
 
 /// A container that applies Liquid Glass effects to its child widget.
 ///
-/// On iOS 26+ and macOS 26+, this uses native SwiftUI rendering to apply
-/// the glass effect. On older versions or other platforms, the child is
-/// returned unchanged.
+/// On iOS 26+ this uses native SwiftUI rendering to apply the glass effect,
+/// on macOS 26+ AppKit's `NSGlassEffectView`, and on macOS 12–15 an
+/// `NSVisualEffectView`, the translucent material that preceded Liquid
+/// Glass. On older iOS and other platforms, the child is returned unchanged.
+///
+/// The glass takes the size of [child]: in a parent that stretches its
+/// children, such as a [ListView], wrap it in an [Align] to keep it to the
+/// child's own width.
 class LiquidGlassContainer extends StatefulWidget {
   /// Creates a Liquid Glass container.
   ///
@@ -47,6 +52,8 @@ class LiquidGlassContainer extends StatefulWidget {
 
 class _LiquidGlassContainerState extends State<LiquidGlassContainer>
     with ModalHideMixin<LiquidGlassContainer> {
+  static const double _macShadowOutset = 12;
+
   @override
   bool get autoHideOnModal => widget.autoHideOnModal;
 
@@ -129,7 +136,10 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
-    final shouldUseNative = isIOSOrMacOS && PlatformVersion.supportsLiquidGlass;
+    // Liquid Glass on iOS 26+ and macOS 26+; before macOS 26 the macOS view
+    // is the translucent material that preceded it.
+    final shouldUseNative =
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
     if (!shouldUseNative) {
       return widget.child;
@@ -162,8 +172,17 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
       );
     }
 
+    // AppKit draws the glass's shadow outside its shape, and a platform view
+    // is clipped to its bounds. On macOS the view is larger than the child by
+    // this much on each side, and the glass inset by as much, so the shadow
+    // that outlines light glass on a light background stays visible.
+    final outset = defaultTargetPlatform == TargetPlatform.macOS
+        ? _macShadowOutset
+        : 0.0;
+
     // Convert config to creation params
     final creationParams = <String, dynamic>{
+      if (outset > 0) 'inset': outset,
       'effect': widget.config.effect.name,
       'shape': widget.config.shape.name,
       if (widget.config.cornerRadius != null)
@@ -199,7 +218,13 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
         children: [
           // Glass effect background from native view - sized to match child
           // Wrap in IgnorePointer so the platform view never intercepts touches
-          Positioned.fill(child: IgnorePointer(child: platformView)),
+          Positioned(
+            left: -outset,
+            top: -outset,
+            right: -outset,
+            bottom: -outset,
+            child: IgnorePointer(child: platformView),
+          ),
           // Child content rendered on top - determines the size
           // This will size the Stack, and Positioned.fill will match it
           widget.child,
@@ -224,6 +249,8 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
 
     try {
       await channel.invokeMethod('updateConfig', {
+        if (defaultTargetPlatform == TargetPlatform.macOS)
+          'inset': _macShadowOutset,
         'effect': widget.config.effect.name,
         'shape': widget.config.shape.name,
         if (widget.config.cornerRadius != null)
