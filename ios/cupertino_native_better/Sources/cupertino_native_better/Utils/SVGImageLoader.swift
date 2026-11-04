@@ -11,7 +11,6 @@ final class SVGImageLoader {
     // MARK: - Properties
     private let cache = NSCache<NSString, UIImage>()
     private let preloadQueue = DispatchQueue(label: "svg.preload", qos: .userInitiated)
-    private var isInitialized = false
     /// SVGKit's parser is not thread-safe, and parsing happens both on the
     /// preload queue and on the main thread. Without this the first SVG the
     /// app loaded could come back nil while the warm-up parse was running.
@@ -22,7 +21,7 @@ final class SVGImageLoader {
     // MARK: - Initialization
     private init() {
         setupCache()
-        preloadSVGKit()
+        warmUpSVGKit()
     }
     
     // MARK: - Public API
@@ -102,21 +101,26 @@ final class SVGImageLoader {
         cache.totalCostLimit = 50 * 1024 * 1024 // 50MB
     }
     
-    private func preloadSVGKit() {
-        guard !isInitialized else { return }
-        
-        preloadQueue.async { [weak self] in
-            // Create a dummy SVG to initialize SVGKit
-            let dummySVG = """
-            <svg width="1" height="1" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg">
-                <rect width="1" height="1" fill="transparent"/>
-            </svg>
-            """
-            
-            if let data = dummySVG.data(using: .utf8) {
-                _ = self?.parse { SVGKImage(data: data) }
-                self?.isInitialized = true
-            }
+    /// Parses a one-pixel SVG before any real one, synchronously.
+    ///
+    /// SVGKit's `SVGLength +initialize` works out the screen's pixels per
+    /// inch from the device model and, in a build with assertions on (any
+    /// debug build), throws for a model it does not know: every iPhone
+    /// newer than the iPhone 7 and every Apple silicon simulator. The parse
+    /// that first touches `SVGLength` catches that exception as a fatal
+    /// error and returns nil; later parses work. That first parse used to
+    /// be a warm-up on a background queue racing the first real SVG, so the
+    /// first SVG an app showed was missing whenever the real one won (the
+    /// Button page's "Glass Chat" icon on the iOS 26.2 simulator). Doing it
+    /// here, before `shared` returns, makes the warm-up always come first.
+    private func warmUpSVGKit() {
+        let dummySVG = """
+        <svg width="1" height="1" viewBox="0 0 1 1" xmlns="http://www.w3.org/2000/svg">
+            <rect width="1" height="1" fill="transparent"/>
+        </svg>
+        """
+        if let data = dummySVG.data(using: .utf8) {
+            _ = parse { SVGKImage(data: data) }
         }
     }
 
