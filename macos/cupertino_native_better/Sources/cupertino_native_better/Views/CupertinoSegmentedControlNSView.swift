@@ -157,33 +157,30 @@ class CupertinoSegmentedControlNSView: NSView {
   /// image, which AppKit colours to read on the selection: a coloured
   /// symbol would vanish on a bezel of the same accent colour.
   private func symbolImage(_ i: Int, description: String, selected: Bool) -> NSImage? {
-    guard var image = NSImage(systemSymbolName: symbols[i], accessibilityDescription: description) else { return nil }
+    guard let image = NSImage(systemSymbolName: symbols[i], accessibilityDescription: description) else { return nil }
     let requested = (i < perSymbolSizes.count ? perSymbolSizes[i] : nil) ?? defaultIconSize ?? 24
-    let pointSize = max(8, 13 * requested / 24)
-    image = image.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular, scale: .large)) ?? image
-    if selected { return image }
+    let size = NSImage.SymbolConfiguration(pointSize: max(8, 13 * requested / 24), weight: .regular, scale: .large)
+    guard !selected, let colors = colorConfiguration(i) else {
+      return image.withSymbolConfiguration(size) ?? image
+    }
+    return image.withSymbolConfiguration(size.applying(colors)) ?? image
+  }
+
+  /// The colours of segment [i]'s symbol, or nil for a template symbol.
+  private func colorConfiguration(_ i: Int) -> NSImage.SymbolConfiguration? {
     let mode = (i < perSymbolModes.count ? perSymbolModes[i] : nil) ?? defaultIconRenderingMode
     let color = (i < perSymbolColors.count ? perSymbolColors[i] : nil) ?? defaultIconColor
     let palette = (i < perSymbolPalettes.count && !perSymbolPalettes[i].isEmpty) ? perSymbolPalettes[i] : defaultIconPalette
-    if #available(macOS 12.0, *) {
-      switch mode {
-      case "hierarchical":
-        if let c = color {
-          image = image.withSymbolConfiguration(NSImage.SymbolConfiguration(hierarchicalColor: c)) ?? image
-        }
-      case "palette":
-        if !palette.isEmpty {
-          image = image.withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: palette)) ?? image
-        }
-      case "multicolor":
-        image = image.withSymbolConfiguration(NSImage.SymbolConfiguration.preferringMulticolor()) ?? image
-      default:
-        if let c = color {
-          image = image.withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [c])) ?? image
-        }
-      }
+    switch mode {
+    case "hierarchical":
+      return color.map { NSImage.SymbolConfiguration(hierarchicalColor: $0) }
+    case "palette":
+      return palette.isEmpty ? nil : NSImage.SymbolConfiguration(paletteColors: palette)
+    case "multicolor":
+      return NSImage.SymbolConfiguration.preferringMulticolor()
+    default:
+      return color.map { NSImage.SymbolConfiguration(paletteColors: [$0]) }
     }
-    return image
   }
 
   @objc private func onChanged(_ sender: NSSegmentedControl) {

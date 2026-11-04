@@ -36,11 +36,14 @@ class CupertinoColorWellNSView: NSView {
 
     colorWell.color = color
     applySupportsAlpha(supportsAlpha)
+    #if compiler(>=6.2)
     if #available(macOS 26.0, *) {
       // Colours reach Dart as 8-bit sRGB, which has no room for HDR
-      // brightness; keep the picker to standard dynamic range.
+      // brightness; keep the picker to standard dynamic range. (The macOS 26
+      // SDK API; an older Xcode builds without it.)
       colorWell.maximumLinearExposure = 1
     }
+    #endif
     colorWell.isEnabled = enabled
     // What VoiceOver reads for the well (`CNColorWell.semanticLabel`).
     colorWell.setAccessibilityLabel(semanticLabel)
