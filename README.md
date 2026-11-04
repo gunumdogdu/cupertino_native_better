@@ -33,12 +33,24 @@
 - **Liquid Glass everywhere it belongs.** Tab bars that minimize on scroll, glass buttons and button groups that blend, slider thumbs that turn to glass under your finger, menus with submenus, alerts and anchored action sheets.
 - **iPhone Duo ready.** Tabs move to the vertical bar when folded and to a sidebar when open, and layouts can split at the hinge.
 - **Light and dark for free.** Every control follows the app's brightness.
+- **At home on the Mac.** On macOS the same widgets are AppKit's own buttons, sliders, menus, alert sheets and search fields, from macOS&nbsp;12.
 - **Runs everywhere else, too.** Below iOS&nbsp;26 and on Android and the web, each widget falls back to its Cupertino counterpart, so one codebase covers every platform.
 - **Accessible.** Native controls carry their VoiceOver names, values and traits.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/light_dark.png" width="520" alt="The Display and Brightness page in light and in dark mode">
 </p>
+
+## What's new in 2.2
+
+<!-- MEDIA: macOS screenshots go here -->
+
+- **Native controls on every macOS.** Buttons, pop-up buttons, sliders, switches, steppers, date pickers, colour wells, segmented controls and the tab bar use their AppKit controls on macOS&nbsp;12 and later, not only on macOS&nbsp;26. The Liquid Glass styles still need macOS&nbsp;26. See [macOS](#macos).
+- **macOS dialogs, menus and search.** `CNAlert` is an `NSAlert` sheet on the window, `CNActionSheet` a menu that drops down from its anchor, and `CNSearchBar` an `NSSearchField` that can keep recent searches.
+- **Images on macOS.** Image assets, image bytes, SVGs and custom icons draw in `CNIcon`, `CNButton`, `CNPopupMenuButton`, `CNTabBar` and `CNGlassButtonGroup`.
+- **#47 fixed:** a macOS app no longer hangs with a debugger attached.
+- **`CNContextMenu`:** a native context menu for any widget. Right-click on macOS, long press on iOS. See [Context menu](#context-menu).
+- **`CNProgressIndicator`:** a native progress bar or spinner, with a value or without one. See [Progress indicator](#progress-indicator).
 
 ## What's new in 2.1
 
@@ -71,10 +83,10 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.1.2
+  cupertino_native_better: ^2.2.0
 ```
 
-Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26; earlier versions get the Cupertino fallbacks. The iOS deployment target is 15.0.
+The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
 
 ## Quick start
 
@@ -334,6 +346,8 @@ CNTabBar(
 )
 ```
 
+On macOS the bar is an `NSSegmentedControl` used as tabs, on every version, with the tabs role on macOS&nbsp;27. Each tab shows its symbol or image (`imageAsset`, SVGs too) and its label, the bar draws badges, and a `searchItem` becomes a trailing search tab that calls `onSearchActiveChanged(true)` instead of `onTap`, so the app shows its own search field. AppKit has no split bar and no item menus, so `split` is ignored and an item with `menuItems` is a plain tab. `tint` colours the selection up to macOS&nbsp;26; the macOS&nbsp;27 tabs role draws its own neutral selection.
+
 An item with `menuItems` opens a native menu instead of becoming the selected tab.
 
 <p align="center">
@@ -406,6 +420,19 @@ CNGlassButtonGroup(
 )
 ```
 
+On macOS, `CNButton` and `CNPopupMenuButton` are AppKit buttons on every version: an icon-only button is a circle, a button with a title a capsule. On macOS&nbsp;26 the glass styles use AppKit's glass bezel, and `clearGlass` is a borderless button in a clear `NSGlassEffectView`; before macOS&nbsp;26 the buttons are push buttons, filled with the tint for the prominent styles. `CNGlassButtonGroup` is Liquid Glass on macOS&nbsp;26, with badges and menus, and a row of native buttons before that. Image assets, SVGs and custom icons draw in both.
+
+AppKit glass takes its look from the window's light or dark appearance, not from what is behind it. Over a photo, set the label and icon colours yourself:
+
+```dart
+CNButton(
+  label: 'Edit',
+  icon: const CNSymbol('pencil', color: CupertinoColors.white),
+  config: const CNButtonConfig(style: CNButtonStyle.glass, labelColor: CupertinoColors.white),
+  onPressed: edit,
+)
+```
+
 ### Alerts and action sheets
 
 `UIAlertController`, with text fields, cancel and destructive actions. On iOS&nbsp;26 an action sheet anchors to the control that opened it.
@@ -425,6 +452,59 @@ final result = await CNAlert.show<String>(
   ],
 );
 ```
+
+On macOS, with the same API, `CNAlert` is an `NSAlert` sheet on the window: the default action answers Return, the cancel action Escape, destructive actions are marked, and text fields (secure ones too) sit in the alert. `CNActionSheet` is an `NSMenu` that drops down from `anchorRect`, or an `NSAlert` sheet when there is no anchor; closing the menu resolves to `null`.
+
+### Context menu
+
+<!-- MEDIA: CNContextMenu on macOS and iOS -->
+
+`CNContextMenu` gives any widget a native context menu. On macOS a right-click, two-finger click or Control-click opens an `NSMenu` at the pointer, also in a window that is in the background. On iOS&nbsp;17.4 and later a long press opens the system menu at the pressed point. It takes the same entries as `CNPopupMenuButton` and reports the path of the chosen item.
+
+```dart
+CNContextMenu(
+  items: const [
+    CNPopupMenuItem(label: 'Copy', icon: CNSymbol('doc.on.doc')),
+    CNPopupMenuItem(label: 'Share', subtitle: 'AirDrop, Messages, Mail', icon: CNSymbol('square.and.arrow.up')),
+    CNPopupMenuDivider(),
+    CNPopupMenuItem(label: 'Delete', icon: CNSymbol('trash'), isDestructive: true),
+  ],
+  onSelected: (path) {}, // [3] = Delete; dividers count
+  child: const PhotoTile(),
+)
+```
+
+The child keeps its own gestures, so a button inside it still takes taps. On iOS the menu opens as a button's menu does, from the point you pressed, without a lifted preview of the child. Below iOS&nbsp;17.4, and on Android and the web, the menu is a `CupertinoActionSheet`. To open it from code, give it a `GlobalKey<CNContextMenuState>` and call `showMenu()`.
+
+### Progress indicator
+
+<!-- MEDIA: CNProgressIndicator bar and spinner -->
+
+`CNProgressIndicator` is a native progress bar or spinner: `NSProgressIndicator` on every macOS, `UIProgressView` and `UIActivityIndicatorView` on iOS&nbsp;26. Pass a `value` from 0 to 1 when the progress is known, or leave it `null`.
+
+```dart
+CNProgressIndicator(value: _uploaded, semanticLabel: 'Upload') // a bar that fills
+
+CNProgressIndicator(style: CNProgressStyle.spinner, size: CNControlSize.small) // spins
+```
+
+iOS has no bar without a value and no spinner that fills, so both show the spinning indicator there. On macOS the spinning indicator is always grey; `tint` colours the bar and the filling circle. Below iOS&nbsp;26 a Flutter bar and `CupertinoActivityIndicator` stand in, and on Android and the web Material's indicators.
+
+### Search bar
+
+`CNSearchBar` is a native search field: a SwiftUI search bar on iOS&nbsp;26 and an `NSSearchField` on every macOS. With `expandable` it starts as a magnifying-glass button and opens into the field.
+
+```dart
+CNSearchBar(
+  placeholder: 'Search Files',
+  expandable: false,
+  recentsAutosaveName: 'files-search', // macOS: a menu of recent searches
+  onChanged: (text) => setState(() => _query = text),
+  onSubmitted: search,
+)
+```
+
+A Mac search field has no Cancel button beside it, so on macOS `showCancelButton` and `cancelText` are not used. Escape clears the text; a second Escape ends the search, closes an expandable bar, calls `onCancelTap` and gives the keyboard back to Flutter. An expandable bar works like a toolbar's search button, and `tint` colours the magnifying glass and the insertion point.
 
 ### Native sheet
 
@@ -485,7 +565,6 @@ CNFoldableScope(
 | Widget | What it is |
 |---|---|
 | `CNIcon` | SF Symbols drawn by the system, in every rendering mode and with symbol effects, plus your own image assets and `IconData` |
-| `CNSearchBar` | An expanding native search field |
 | `CNToast` | Toasts on Liquid Glass, with success, error, warning, info and loading styles |
 | `CNFloatingIsland` | A glass island that expands into more content |
 | `CNBottomSheet` | Sheets that keep the glass behind them where it belongs |
@@ -504,7 +583,7 @@ Open the example app's **Showcase** section to try every screen above on your ow
 | `CNButton` | Native push button with Liquid Glass effects, SF Symbols, and image assets | - |
 | `CNButton.icon` | Circular icon-only button variant | - |
 | `CNIcon` | Platform-rendered SF Symbols with symbol effects, custom IconData, or image assets | - |
-| `CNTabBar` | Native tab bar with split mode for scroll-aware layouts | - |
+| `CNTabBar` | Native tab bar with split mode for scroll-aware layouts; AppKit tabs on macOS | - |
 | `CNTabRail` | Vertical tab bar (glass rail or sidebar) for the side of the screen | - |
 | `CNTabScaffold` | Tab layout that moves the tabs to the side on iPhone Duo, like the system | - |
 | `CNFoldable` | iPhone Duo hinge (status + angle), vertical-bar side, fold and camera regions | - |
@@ -513,12 +592,15 @@ Open the example app's **Showcase** section to try every screen above on your ow
 | `CNDatePicker` | Native date and time picker: compact, inline or wheels | - |
 | `CNStepper` | Native − / + stepper | - |
 | `CNColorWell` | Native colour well that opens the system colour picker | - |
+| `CNProgressIndicator` | Native progress bar or spinner, with or without a value | - |
 | `CNPageControl` | Native page dots that can follow a `PageView` | `PageController` |
 | `CNPopupMenuButton` | Native popup menu with dividers, icons, image assets, subtitles, submenus, palettes and inline sections | - |
 | `CNPopupMenuButton.icon` | Circular icon-only popup menu variant | - |
-| `CNActionSheet` | Native `UIAlertController` action sheet with destructive styling | - |
-| `CNAlert` | Native `UIAlertController` alert with text fields and destructive styling | - |
+| `CNActionSheet` | Native `UIAlertController` action sheet with destructive styling; a menu or an `NSAlert` sheet on macOS | - |
+| `CNContextMenu` | Native context menu for any widget: right-click on macOS, long press on iOS | - |
+| `CNAlert` | Native `UIAlertController` alert with text fields and destructive styling; an `NSAlert` sheet on macOS | - |
 | `CNSegmentedControl` | Native segmented control with SF Symbols support | - |
+| `CNSearchBar` | Native search field: SwiftUI on iOS 26, `NSSearchField` on macOS | `CNSearchBarController` |
 | `CNGlassButtonGroup` | Grouped buttons with unified glass blending (tint color support) | - |
 | `LiquidGlassContainer` | Apply Liquid Glass effects to any Flutter widget | - |
 | `CNGlassCard` | **(Experimental)** Pre-styled card with optional breathing glow animation | - |
@@ -955,6 +1037,46 @@ await CNNativeSheet.dismiss();
 >
 > **Platforms.** iOS&nbsp;17 and later; Liquid Glass and the collapsed capsule on iOS&nbsp;26 and later. Elsewhere `show` does nothing and returns `false`, so show your own sheet when it does.
 
+### macOS
+
+Since 2.2 a widget whose control exists in AppKit uses it on every supported macOS, 12.0 and later, not only on macOS&nbsp;26. Liquid Glass still needs macOS&nbsp;26: below it, the same widgets keep their AppKit look without glass.
+
+| Widget | On macOS |
+|--------|----------|
+| `CNButton`, `CNPopupMenuButton` | `NSButton` (with an `NSMenu`): glass bezels on macOS&nbsp;26, push and circular buttons before |
+| `CNSlider`, `CNStepper`, `CNDatePicker`, `CNColorWell`, `CNSegmentedControl` | `NSSlider`, `NSStepper`, `NSDatePicker`, `NSColorWell`, `NSSegmentedControl` |
+| `CNSwitch` | The AppKit switch, through a SwiftUI toggle, which takes a tint |
+| `CNTabBar` | An `NSSegmentedControl` used as tabs, with the tabs role on macOS&nbsp;27 |
+| `CNSearchBar` | `NSSearchField` |
+| `CNProgressIndicator` | `NSProgressIndicator`, through SwiftUI's `ProgressView` |
+| `CNIcon` | SF Symbols, image assets, SVGs and custom icons |
+| `CNAlert`, `CNActionSheet` | An `NSAlert` sheet; an `NSMenu` for an anchored action sheet |
+| `CNContextMenu`, `CNPopupGesture` | An `NSMenu` at the pointer on a secondary click |
+| `LiquidGlassContainer` | `NSGlassEffectView` on macOS&nbsp;26, `NSVisualEffectView` before |
+| `CNGlassButtonGroup` | Liquid Glass on macOS&nbsp;26; a row of native buttons before |
+| `CNToast` | Flutter, on native glass on macOS&nbsp;26 |
+| `CNFloatingIsland`, `CNPageControl`, `CNTabRail` | Drawn in Flutter |
+| `CNTabBarNative`, `CNNativeSheet`, `CNFoldable` | iOS only. `CNTabBarNative.enable` does nothing and `CNNativeSheet.show` returns `false` |
+
+**What AppKit has no place for.** These options are ignored on macOS:
+
+- `CNTabBar`: `split` (the tabs stay in one control), item `menuItems` (a plain tab), and `tint` on macOS&nbsp;27, where the tabs role draws its own neutral selection.
+- `CNStepper.color` and `CNDatePicker.tint`: AppKit's stepper and date picker take no tint; the date picker follows the system accent colour.
+- `CNSlider`: `thumbColor`, `trackBackgroundColor` and `CNSliderStyle.thumbless`. The track takes `trackColor` or `color`.
+- `CNSearchBar`: `showCancelButton` and `cancelText`. Escape is the cancel gesture.
+- `CNColorWell`: `title` and `supportsEyedropper`; `supportsAlpha` needs macOS&nbsp;14.
+- `CNPopupMenuButton`: `elementSize` and `keepsMenuPresented`; a palette shows as a section.
+- `LiquidGlassContainer`: `interactive`; `CNGlassEffect.prominent` is regular glass.
+
+**Things to know.**
+
+- AppKit glass takes its look from the window's light or dark appearance, not from what is behind it. Over a photo, set `labelColor` and the icon colours yourself.
+- SVGs are read by `NSImage`, so they stay vector.
+- Menus hold only your entries: the items macOS adds to context menus, such as Ask Siri, are left out. Item icons stay visible on macOS&nbsp;27, which hides them by default.
+- VoiceOver cannot open a `CNContextMenu` on macOS: Flutter gives a widget no Show Menu action there.
+- The package's minimum is macOS&nbsp;12.0, as Xcode&nbsp;27.1 rejects older deployment targets. Set your app's `MACOSX_DEPLOYMENT_TARGET` to 12.0 or later, and with CocoaPods `platform :osx, '12.0'` in `macos/Podfile`.
+- 2.2 was checked on macOS&nbsp;27.2. The code paths for macOS&nbsp;12 to 26 were reviewed, not run on those versions.
+
 ### Accessibility
 
 The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOver, Voice Control and Switch Control see the system's own controls rather than an imitation. Checked through the iOS accessibility tree (iPhone Duo simulator, iOS 27.1):
@@ -965,10 +1087,12 @@ The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOv
 | `CNPopupMenuButton` | A button that opens the system menu |
 | `CNSlider` | An adjustable slider with its value; swipe up or down to change it |
 | `CNSwitch` | A switch with its on/off state |
-| `CNSegmentedControl` | A group of segments, each with its title |
+| `CNSegmentedControl` | A group of segments, named by its `semanticLabel`, each with its title |
 | `CNTabRail` | A button per tab, with its badge as the value and the selected state |
 | `CNTabBarNative`, `CNAlert`, `CNActionSheet` | System controllers, presented by iOS |
 | `CNNativeSheet` | A system sheet: the page title as a heading, each button by its `label`, each row as one element |
+| `CNContextMenu` | The child, with the menu as its long-press action (double-tap and hold) |
+| `CNProgressIndicator` | Its `semanticLabel` with the progress as a percentage ("Upload, 40 percent") |
 
 **Name every icon-only control.** Without a name, an icon-only button is read by its SF Symbol's built-in name, which describes the picture rather than the action (`moon` is read as "do not disturb"), and a switch or slider has no name at all: a native control cannot merge with the Flutter text next to it. Pass `semanticLabel`:
 
@@ -982,6 +1106,8 @@ CNButton.icon(
 CNSwitch(value: wifi, semanticLabel: 'Wi-Fi', onChanged: setWifi)
 CNSlider(value: volume, semanticLabel: 'Volume', onChanged: setVolume)
 ```
+
+**macOS.** The controls are AppKit controls, so VoiceOver on the Mac reads them as the system's own, and `semanticLabel` names them there too: `CNButton`, `CNPopupMenuButton`, `CNSlider`, `CNSwitch`, `CNSegmentedControl`, `CNStepper`, `CNDatePicker`, `CNColorWell` and `CNProgressIndicator`. A `CNTabBar` badge is read as the tab's help. VoiceOver cannot open a `CNContextMenu` on macOS, because Flutter gives a widget no Show Menu action there; offer the same actions in a visible control too, such as a `CNPopupMenuButton`.
 
 **Dynamic Type.** Button titles follow the system text size. Tab bars, the tab rail and segmented controls keep a fixed size, as they do throughout iOS, and offer the **Large Content Viewer** instead: with a large text size, long-press an item to see it enlarged. `CNTabBar` and `CNTabBarNative` are system tab bars, and `CNTabRail` adopts the viewer as well.
 
@@ -1027,10 +1153,10 @@ CNButtonStyle.tinted          // Tinted text
 CNButtonStyle.bordered        // Bordered outline
 CNButtonStyle.borderedProminent // Accent-colored border
 CNButtonStyle.filled          // Solid filled background
-CNButtonStyle.glass           // Liquid Glass effect (iOS 26+)
-CNButtonStyle.prominentGlass  // Prominent glass effect (iOS 26+)
-CNButtonStyle.clearGlass      // Clear glass, for buttons over media (iOS 26+)
-CNButtonStyle.prominentClearGlass // Clear glass tinted with the button's tint (iOS 26+)
+CNButtonStyle.glass           // Liquid Glass effect (iOS 26+, macOS 26+)
+CNButtonStyle.prominentGlass  // Prominent glass effect (iOS 26+, macOS 26+)
+CNButtonStyle.clearGlass      // Clear glass, for buttons over media (iOS 26+, macOS 26+)
+CNButtonStyle.prominentClearGlass // Clear glass tinted with the button's tint (iOS 26+, macOS 26+)
 ```
 
 ### Glass Effect Unioning
@@ -1224,7 +1350,9 @@ An imperative API, like `CNToast.show`. On iOS it presents a real
 control — system destructive red, VoiceOver, Dynamic Type, and on iOS 26 the
 Liquid Glass appearance, which the system applies with no opt-in. Because the
 appearance comes from the OS, the native path is used on **every** supported
-iOS version instead of being gated on iOS 26. Other platforms fall back to
+iOS version instead of being gated on iOS 26. macOS has no action sheet, so
+there it is the control that does the job on a Mac (see
+[On macOS](#on-macos) below). Other platforms fall back to
 `CupertinoActionSheet`.
 
 ```dart
@@ -1290,6 +1418,17 @@ What `anchorRect` itself does depends on the presentation the OS picks:
   It still slides up from the bottom, still renders `cancelLabel` and still has
   no outside-tap dismissal, so pass one.
 
+#### On macOS
+
+- **With `anchorRect`:** an `NSMenu` that drops down from the anchor, as a
+  pull-down button's menu does. `title` is a section header with `message`
+  under it, there is one item per action, and destructive actions are in
+  the system red. Escape or a click outside closes the menu and resolves to
+  `null`, so `cancelLabel` adds no item.
+- **Without an anchor:** an `NSAlert` sheet on the window, with one button
+  per action and, when `cancelLabel` is set, a cancel button that answers
+  Escape. No button answers Return: an action sheet has no preferred action.
+
 #### Content guidance
 
 Apple's [HIG](https://developer.apple.com/design/human-interface-guidelines/action-sheets)
@@ -1311,7 +1450,8 @@ when you need icons — its `UIMenu` path has a public image API.
 An imperative API like `CNActionSheet.show`. On iOS it presents a real
 `UIAlertController` in `.alert` style — system typography, the destructive
 red, VoiceOver, Dynamic Type, and on iOS 26 the Liquid Glass appearance — on
-every supported iOS version. Other platforms fall back to
+every supported iOS version. On macOS it presents a real `NSAlert` as a sheet
+on the window (see below). Other platforms fall back to
 `CupertinoAlertDialog`.
 
 ```dart
@@ -1358,6 +1498,20 @@ second `CNAlert.show` replaced this alert. Things to know:
 - `UIAlertController` has no public API for custom content or action icons,
   so `CNAlert` offers neither.
 
+On every macOS version the alert is an `NSAlert` sheet on the app's window,
+never a blocking modal loop:
+
+- The `isDefault` action sits at the trailing edge and answers Return; the
+  `isCancel` action sits next to it and answers Escape. Without an
+  `isDefault` action, the first action that is not the cancel action takes
+  Return, unless it is destructive.
+- `isDestructive` marks the button as destructive
+  (`NSButton.hasDestructiveAction`).
+- Text fields are `NSTextField`s, `NSSecureTextField` when `obscureText` is
+  set, in the alert; the first one has the focus.
+- The alert shows the app icon, as every `NSAlert` does. A second
+  `CNAlert.show` closes the first, which resolves to `null`.
+
 ### Segmented Control
 
 ```dart
@@ -1369,6 +1523,7 @@ CNSegmentedControl(
     setState(() => _selectedIndex = index);
   },
   color: Colors.blue, // Optional tint color
+  semanticLabel: 'Period', // What VoiceOver calls the control (2.2)
 )
 
 // Segments with SF Symbols
@@ -1408,6 +1563,17 @@ Text('Glass Effect')
   .liquidGlass(cornerRadius: 16)
 ```
 
+The glass takes the size of its child. In a parent that stretches its
+children, such as a `ListView`, wrap it in an `Align` to keep it to the
+child's width.
+
+On macOS 26 the glass is AppKit's `NSGlassEffectView` (regular or clear,
+tinted with `tint`); before macOS 26 it is an `NSVisualEffectView`, the
+translucent material that came before Liquid Glass. `CNGlassEffect.prominent`
+draws as regular glass, and the glass is not interactive on macOS. AppKit
+glass takes its look from the window's light or dark appearance, not from
+what is behind it, so over a photo give the child its own text colours.
+
 ### Experimental: Glass Card
 
 ```dart
@@ -1428,13 +1594,33 @@ CNGlassCard(
 
 ## Platform Fallbacks
 
-| Platform | Liquid Glass | SF Symbols | Other Widgets |
+| Platform | Liquid Glass | SF Symbols | Other widgets |
 |----------|:------------:|:----------:|:-------------:|
-| iOS 26+ | Native | Native | Native |
-| iOS 13-25 | CupertinoButton | Native via CNIcon | CupertinoWidgets |
-| macOS 26+ | Native | Native | Native |
-| macOS 11-25 | CupertinoButton | Native via CNIcon | CupertinoWidgets |
-| Android/Web/etc | Material fallback | Flutter Icon | Material fallback |
+| iOS 26+ | Native | Native | Native (UIKit, SwiftUI) |
+| iOS 15–25 | Cupertino fallback | Native via CNIcon | Cupertino widgets; alerts, action sheets and context menus stay native |
+| macOS 26+ | Native | Native | Native (AppKit, SwiftUI) |
+| macOS 12–15 | None; an AppKit material behind `LiquidGlassContainer` | Native | Native (AppKit, SwiftUI) |
+| Android/Web/etc | Material fallback | Flutter Icon | Material and Cupertino fallbacks |
+
+Widget by widget:
+
+| Widget | iOS 26+ | iOS 15–25 | macOS 26+ | macOS 12–15 | Android, web |
+|--------|---------|-----------|-----------|-------------|--------------|
+| `CNButton`, `CNPopupMenuButton` | Native | Flutter | Native, glass bezels | Native | Flutter |
+| `CNSlider`, `CNSwitch`, `CNSegmentedControl`, `CNDatePicker`, `CNStepper`, `CNColorWell` | Native | Flutter | Native | Native | Flutter |
+| `CNProgressIndicator` | Native | Flutter | Native | Native | Flutter |
+| `CNIcon` | Native | Native | Native | Native | Flutter `Icon` |
+| `CNTabBar` | Native | `CupertinoTabBar` | Native tabs | Native tabs | `CupertinoTabBar` |
+| `CNSearchBar` | Native, glass | Flutter | `NSSearchField` | `NSSearchField` | Flutter |
+| `CNAlert`, `CNActionSheet` | Native | Native | Native sheet or menu | Native sheet or menu | Flutter |
+| `CNContextMenu` | Native menu | Native from iOS 17.4, Flutter before | Native menu | Native menu | Flutter |
+| `CNGlassButtonGroup` | Native glass | Flutter row | Native glass | Row of native buttons | Flutter row |
+| `LiquidGlassContainer` | Native glass | Child only | Native glass | AppKit material | Child only |
+| `CNTabBarNative` | Native | Nothing | Nothing | Nothing | Nothing |
+| `CNNativeSheet` | Native | Native from iOS 17 | Nothing | Nothing | Nothing |
+| `CNTabRail`, `CNPageControl`, `CNFloatingIsland` | Native | Flutter | Flutter | Flutter | Flutter |
+
+"Flutter" means drawn by Flutter widgets: Cupertino ones on Apple platforms, Material or Cupertino ones elsewhere. See [macOS](#macos) for the options macOS ignores.
 
 ## Version Detection
 
@@ -1446,7 +1632,12 @@ if (PlatformVersion.shouldUseNativeGlass) {
   // iOS 26+ or macOS 26+
 }
 
-// Check if SF Symbols are available (iOS 13+, macOS 11+)
+// Check if the standard native controls are used (2.2)
+if (PlatformVersion.shouldUseNativeControls) {
+  // iOS 26+ or any macOS
+}
+
+// Check if SF Symbols are available (iOS and macOS)
 if (PlatformVersion.supportsSFSymbols) {
   // Use CNIcon for native rendering
 }
@@ -1461,7 +1652,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
 - **Flutter**: >= 3.3.0
 - **Dart SDK**: >= 3.9.0
 - **iOS**: >= 15.0 (Liquid Glass requires iOS 26+)
-- **macOS**: >= 11.0 (Liquid Glass requires macOS 26+)
+- **macOS**: >= 12.0 (AppKit controls on every version; Liquid Glass requires macOS 26+)
 
 ## Migration from cupertino_native_plus
 
@@ -1471,7 +1662,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.1.2
+   cupertino_native_better: ^2.2.0
    ```
 
 2. Update imports:
