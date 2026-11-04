@@ -39,6 +39,10 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     let liquidGlassContainerFactory = LiquidGlassContainerFactory(messenger: registrar.messenger)
     registrar.register(liquidGlassContainerFactory, withId: "CupertinoNativeLiquidGlassContainer")
 
+    // Liquid Glass on macOS 26+; below it Flutter draws the group itself.
+    let glassButtonGroupFactory = CupertinoGlassButtonGroupFactory(messenger: registrar.messenger)
+    registrar.register(glassButtonGroupFactory, withId: "CupertinoNativeGlassButtonGroup")
+
     let searchBarFactory = CupertinoSearchBarViewFactory(messenger: registrar.messenger)
     registrar.register(searchBarFactory, withId: "CNSearchBar")
   }
