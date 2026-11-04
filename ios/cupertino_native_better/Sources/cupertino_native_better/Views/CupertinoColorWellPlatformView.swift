@@ -121,6 +121,7 @@ class CupertinoColorWellPlatformView: NSObject, FlutterPlatformView {
       case "setBrightness":
         if let isDark = (args?["isDark"] as? NSNumber)?.boolValue {
           self.container.overrideUserInterfaceStyle = isDark ? .dark : .light
+          self.matchPickerAppearance(tries: 1)
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
       case "setInteractive":
