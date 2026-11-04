@@ -1,3 +1,29 @@
+## 2.1.1
+
+> Patch: four fixes contributed by @yagizdo (#115-#118), and a follow-up to #116. Each was reproduced on 2.1.0 and verified with the fix on the iOS 27 simulator; #115, #117 and the #118 alert also on iOS 26.2. The changes below iOS 26 (#116, the #118 segmented control) were verified with the Flutter fallbacks forced on iOS 27 and with widget tests, as no iOS 18 simulator was available. No API changes.
+
+### Fixed — #115 `CNTabBar` dropped split, font and icon size changes made together with a badge
+
+When only the badges changed, the tab bar sent the badges and stopped, so a `split`, `labelFontSize`/`labelFontFamily` or `iconSize` change in the same `setState` never reached the native bar, until a later update that did not also change a badge. Everything changed in one rebuild now goes out together.
+
+### Fixed — #116 the `CNSearchBar` fallback overflowed its parent
+
+Below iOS 26 the fallback bar was as wide as the screen, so in a padded list, column or row it overflowed by the padding, and an expanded bar pushed its Cancel button off screen, where it could not be tapped. The bar now expands into the width its parent gives it, next to Cancel. It also works inside `IntrinsicHeight` and `IntrinsicWidth`. iOS 26 and later are unchanged.
+
+### Fixed — #117 an uncoloured `CNIcon` was black on a dark theme
+
+Without a `color`, the native icon was drawn black whatever the theme, so it almost disappeared on a dark page. That also hit every `CNButton` with an SF Symbol below iOS 26, and the `CNGlassButtonGroup` fallback. It now takes the theme's label colour (black in light, white in dark) and follows theme changes. A given colour, and the hierarchical, palette and multicolour modes, are unchanged.
+
+### Fixed — #118 open modals and pickers follow the system appearance
+
+- **`CNAlert` and `CNActionSheet`** in an app whose theme follows the system kept the old appearance when the system switched while they were open. Under a theme without a brightness they now follow the system; a theme with a brightness still sets theirs.
+- **An open colour picker (`CNColorWell`) or compact date popover (`CNDatePicker`)** now switches with the app's brightness too, instead of keeping the one it opened with.
+- **The `CNSegmentedControl` fallback** below iOS 26 drew white segments on a dark page. The segments now take the page's background colour.
+
+### Example
+
+- Check pages for #115-#118: `PROBE=pr115` to `pr118`.
+
 ## 2.1.0
 
 > A native sheet over the Flutter app: `CNNativeSheet` rests at a few heights, keeps the screen behind it usable, holds a native list and tab bar, and collapses to a glass capsule with only the tab bar.

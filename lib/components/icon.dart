@@ -56,6 +56,9 @@ class CNIcon extends StatefulWidget {
   final double? size;
 
   /// Overrides the symbol's color for monochrome/hierarchical modes.
+  ///
+  /// Without one, a monochrome icon takes the theme's label color: black in
+  /// a light theme, white in a dark one.
   final Color? color;
 
   /// Overrides the rendering mode.
