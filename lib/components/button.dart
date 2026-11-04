@@ -153,10 +153,16 @@ class CNButtonConfig {
 
 /// A Cupertino-native push button.
 ///
-/// Embeds a native UIButton/NSButton for authentic visuals and behavior on
-/// iOS and macOS. Falls back to [CupertinoButton] on other platforms.
+/// Embeds a native UIButton on iOS 26+ and an NSButton on every macOS for
+/// authentic visuals and behavior. Falls back to [CupertinoButton] on iOS
+/// before 26 and on other platforms.
 ///
-/// All buttons are round by default. Use [config] to customize appearance.
+/// All buttons are round by default: an icon-only button is a circle, a
+/// button with a label a capsule. Use [config] to customize appearance.
+///
+/// On macOS the glass styles use the system's glass bezel from macOS 26;
+/// before that every style but [CNButtonStyle.plain] is a standard push
+/// button, filled with [tint] for the prominent styles.
 class CNButton extends StatefulWidget {
   /// Creates a text button variant of [CNButton].
   ///
@@ -385,17 +391,19 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
+    // An NSButton on every macOS (its glass bezel needs macOS 26), a
+    // UIButton on iOS 26+.
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
-    // Fallback to Flutter implementation for non-iOS/macOS or iOS/macOS < 26
+    // Fallback to Flutter implementation for non-iOS/macOS or iOS < 26
     if (!shouldUseNative) {
       // For non-iOS/macOS, use Material design fallback
       if (!isIOSOrMacOS) {
         return _buildMaterialFallback(context);
       }
 
-      // For iOS/macOS < 26, use Cupertino widgets
+      // For iOS < 26, use Cupertino widgets
       return _buildCupertinoFallback(context);
     }
 
@@ -723,12 +731,13 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
             ),
           );
 
-          // Wrap in IgnorePointer when interaction is disabled to absorb all touches
-          if (!widget.config.interaction) {
-            return IgnorePointer(ignoring: true, child: buttonWidget);
-          }
-
-          return buttonWidget;
+          // Ignores pointers while interaction is off. Always present, so
+          // turning interaction off or on keeps the native view (the native
+          // side gets `setInteraction`) instead of creating a new one.
+          return IgnorePointer(
+            ignoring: !widget.config.interaction,
+            child: buttonWidget,
+          );
         },
       ),
     );
@@ -1141,7 +1150,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
   }
 
   Widget _buildCupertinoFallback(BuildContext context) {
-    // For iOS/macOS < 26, use CupertinoButton with appropriate styling
+    // For iOS < 26, use CupertinoButton with appropriate styling
     Widget? iconWidget;
     if (widget.imageAsset != null) {
       // Use CNIcon to properly render the image asset

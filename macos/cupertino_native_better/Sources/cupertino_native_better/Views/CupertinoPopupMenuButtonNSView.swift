@@ -1,297 +1,133 @@
 import FlutterMacOS
 import Cocoa
 
+/// `CNPopupMenuButton` on macOS: an `NSButton` in the bezel of its
+/// `CNButtonStyle` (see `NativeButtonHost`) that opens an `NSMenu`.
 class CupertinoPopupMenuButtonNSView: NSView {
   private let channel: FlutterMethodChannel
-  private let button: NSButton
+  private let host: NativeButtonHost
   private var popupMenu: NSMenu = NSMenu()
-  private var labels: [String] = []
-  private var symbols: [String] = []
-  private var dividers: [Bool] = []
-  private var enabled: [Bool] = []
-  private var defaultSizes: [NSNumber] = []
-  private var defaultColors: [NSNumber] = []
-  private var defaultModes: [String?] = []
-  private var defaultPalettes: [[NSNumber]] = []
-  private var defaultGradients: [NSNumber?] = []
-  // Subtitles and submenus. Flutter only sends them when the menu uses
-  // them; each submenu arrives as its own level, encoded like the top one.
-  private var subtitles: [String] = []
-  private var isSubmenu: [Bool] = []
-  private var submenus: [[String: Any]?] = []
-  // Submenus shown in place; only sent when used.
-  private var submenuStyles: [String?] = []
+  /// The top level of the menu, from the creation parameters or the last
+  /// `setItems`.
+  private var rootLevel = PopupMenuLevel()
+  private var icon = IconSource()
+  private var isInteractive = true
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativePopupMenuButton_\(viewId)", binaryMessenger: messenger)
-    self.button = NSButton(title: "", target: nil, action: nil)
+    self.host = NativeButtonHost(target: nil, action: nil)
     super.init(frame: .zero)
 
-    var title: String? = nil
-    var iconName: String? = nil
-    var iconSize: CGFloat? = nil
-    var iconColor: NSColor? = nil
-    var makeRound: Bool = false
-    var buttonStyle: String = "automatic"
-    var isDark: Bool = false
-    var tint: NSColor? = nil
-    var labels: [String] = []
-    var symbols: [String] = []
-    var dividers: [NSNumber] = []
-    var enabled: [NSNumber] = []
-    var sizes: [NSNumber] = []
-    var colors: [NSNumber] = []
-    var buttonIconMode: String? = nil
-    var buttonIconPalette: [NSNumber] = []
-
-    if let dict = args as? [String: Any] {
-      if let t = dict["buttonTitle"] as? String { title = t }
-      if let s = dict["buttonIconName"] as? String { iconName = s }
-      if let s = dict["buttonIconSize"] as? NSNumber { iconSize = CGFloat(truncating: s) }
-      if let c = dict["buttonIconColor"] as? NSNumber { iconColor = Self.colorFromARGB(c.intValue) }
-      if let r = dict["round"] as? NSNumber { makeRound = r.boolValue }
-      if let bs = dict["buttonStyle"] as? String { buttonStyle = bs }
-      if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
-      if let style = dict["style"] as? [String: Any], let n = style["tint"] as? NSNumber { tint = Self.colorFromARGB(n.intValue) }
-      labels = (dict["labels"] as? [String]) ?? []
-      symbols = (dict["sfSymbols"] as? [String]) ?? []
-      dividers = (dict["isDivider"] as? [NSNumber]) ?? []
-      enabled = (dict["enabled"] as? [NSNumber]) ?? []
-      if let modes = dict["sfSymbolRenderingModes"] as? [String?] { self.defaultModes = modes }
-      if let palettes = dict["sfSymbolPaletteColors"] as? [[NSNumber]] { self.defaultPalettes = palettes }
-      if let gradients = dict["sfSymbolGradientEnabled"] as? [NSNumber?] { self.defaultGradients = gradients }
-      self.subtitles = (dict["subtitles"] as? [String]) ?? []
-      self.isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
-      self.submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
-      self.submenuStyles = PopupMenuLevel(dict: dict).submenuStyles
-      if let m = dict["buttonIconRenderingMode"] as? String { buttonIconMode = m }
-      if let pal = dict["buttonIconPaletteColors"] as? [NSNumber] { buttonIconPalette = pal }
-      sizes = (dict["sfSymbolSizes"] as? [NSNumber]) ?? []
-      colors = (dict["sfSymbolColors"] as? [NSNumber]) ?? []
-    }
+    let dict = (args as? [String: Any]) ?? [:]
+    let isDark = (dict["isDark"] as? NSNumber)?.boolValue ?? false
+    icon.read(dict)
+    rootLevel = PopupMenuLevel(dict: dict)
 
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
     appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
 
-    if let t = title { button.title = t }
-    if let name = iconName, var image = NSImage(systemSymbolName: name, accessibilityDescription: nil) {
-      if #available(macOS 12.0, *), let sz = iconSize {
-        let cfg = NSImage.SymbolConfiguration(pointSize: sz, weight: .regular)
-        image = image.withSymbolConfiguration(cfg) ?? image
-      }
-      if let mode = buttonIconMode {
-        switch mode {
-        case "hierarchical":
-          if #available(macOS 12.0, *), let c = iconColor {
-            let cfg = NSImage.SymbolConfiguration(hierarchicalColor: c)
-            image = image.withSymbolConfiguration(cfg) ?? image
-          }
-        case "palette":
-          if #available(macOS 12.0, *), !buttonIconPalette.isEmpty {
-            let cols = buttonIconPalette.map { Self.colorFromARGB($0.intValue) }
-            let cfg = NSImage.SymbolConfiguration(paletteColors: cols)
-            image = image.withSymbolConfiguration(cfg) ?? image
-          }
-        case "multicolor":
-          if #available(macOS 12.0, *) {
-            let cfg = NSImage.SymbolConfiguration.preferringMulticolor()
-            image = image.withSymbolConfiguration(cfg) ?? image
-          }
-        default:
-          break
-        }
-      } else if let c = iconColor {
-        image = image.tinted(with: c)
-      }
-      button.image = image
-      button.imagePosition = .imageOnly
+    host.frame = bounds
+    host.autoresizingMask = [.width, .height]
+    addSubview(host)
+    host.button.target = self
+    host.button.action = #selector(onButtonPressed(_:))
+    let image = icon.makeImage()
+    host.update {
+      $0.title = dict["buttonTitle"] as? String
+      $0.image = image
+      $0.style = (dict["buttonStyle"] as? String) ?? "plain"
+      $0.tint = ((dict["style"] as? [String: Any])?["tint"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+      // Icon buttons are `size` square (44 by default), text ones 32 high.
+      $0.expectedHeight = (dict["height"] as? NSNumber).map { CGFloat(truncating: $0) }
+        ?? ((dict["round"] as? NSNumber)?.boolValue == true ? 44 : 32)
+      $0.accessibilityText = (dict["semanticLabel"] as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
-    // Map CNButtonStyle to AppKit bezel styles (best-effort)
-    switch buttonStyle {
-    case "plain":
-      button.bezelStyle = .texturedRounded
-      button.isBordered = false
-    case "gray": button.bezelStyle = .texturedRounded
-    case "tinted": button.bezelStyle = .texturedRounded
-    case "bordered": button.bezelStyle = .rounded
-    case "borderedProminent": button.bezelStyle = .rounded
-    case "filled": button.bezelStyle = .rounded
-    case "glass": button.bezelStyle = .texturedRounded
-    case "prominentGlass": button.bezelStyle = .texturedRounded
-    // AppKit has no clear glass bezel; the clear styles look like glass.
-    case "clearGlass": button.bezelStyle = .texturedRounded
-    case "prominentClearGlass": button.bezelStyle = .texturedRounded
-    default: button.bezelStyle = .rounded
-    }
-    if makeRound { button.bezelStyle = .circular }
-    button.setButtonType(.momentaryPushIn)
-    if #available(macOS 10.14, *), let c = tint {
-      if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(buttonStyle) {
-        button.bezelColor = c
-        button.contentTintColor = .white
-      } else {
-        button.contentTintColor = c
-      }
-    }
-
-    addSubview(button)
-    button.translatesAutoresizingMaskIntoConstraints = false
-    NSLayoutConstraint.activate([
-      button.leadingAnchor.constraint(equalTo: leadingAnchor),
-      button.trailingAnchor.constraint(equalTo: trailingAnchor),
-      button.topAnchor.constraint(equalTo: topAnchor),
-      button.bottomAnchor.constraint(equalTo: bottomAnchor)
-    ])
-
-    self.labels = labels
-    self.symbols = symbols
-    self.dividers = dividers.map { $0.boolValue }
-    self.enabled = enabled.map { $0.boolValue }
-    self.defaultSizes = sizes
-    self.defaultColors = colors
     rebuildMenu()
-
-    button.target = self
-    button.action = #selector(onButtonPressed(_:))
 
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
-      switch call.method {
-      case "getIntrinsicSize":
-        let s = self.button.intrinsicContentSize
-        result(["width": Double(s.width), "height": Double(s.height)])
-      case "setItems":
-        if let args = call.arguments as? [String: Any] {
-          self.labels = (args["labels"] as? [String]) ?? []
-          self.symbols = (args["sfSymbols"] as? [String]) ?? []
-          self.dividers = ((args["isDivider"] as? [NSNumber]) ?? []).map { $0.boolValue }
-          self.enabled = ((args["enabled"] as? [NSNumber]) ?? []).map { $0.boolValue }
-          self.defaultSizes = (args["sfSymbolSizes"] as? [NSNumber]) ?? []
-          self.defaultColors = (args["sfSymbolColors"] as? [NSNumber]) ?? []
-          self.defaultModes = (args["sfSymbolRenderingModes"] as? [String?]) ?? []
-          self.defaultPalettes = (args["sfSymbolPaletteColors"] as? [[NSNumber]]) ?? []
-          self.defaultGradients = (args["sfSymbolGradientEnabled"] as? [NSNumber?]) ?? []
-          self.subtitles = (args["subtitles"] as? [String]) ?? []
-          self.isSubmenu = ((args["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
-          self.submenus = ((args["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
-          self.submenuStyles = PopupMenuLevel(dict: args).submenuStyles
-          self.rebuildMenu()
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing items", details: nil)) }
-      case "setStyle":
-        if let args = call.arguments as? [String: Any] {
-          if #available(macOS 10.14, *), let n = args["tint"] as? NSNumber {
-            let color = Self.colorFromARGB(n.intValue)
-            if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(buttonStyle) {
-              self.button.bezelColor = color
-              self.button.contentTintColor = .white
-            } else {
-              self.button.contentTintColor = color
-            }
-          }
-          if let bs = args["buttonStyle"] as? String {
-            switch bs {
-            case "plain":
-              self.button.bezelStyle = .texturedRounded
-              self.button.isBordered = false
-            case "gray": self.button.bezelStyle = .texturedRounded
-            case "tinted": self.button.bezelStyle = .texturedRounded
-            case "bordered": self.button.bezelStyle = .rounded
-            case "borderedProminent": self.button.bezelStyle = .rounded
-            case "filled": self.button.bezelStyle = .rounded
-            case "glass": self.button.bezelStyle = .texturedRounded
-            case "prominentGlass": self.button.bezelStyle = .texturedRounded
-            case "clearGlass": self.button.bezelStyle = .texturedRounded
-            case "prominentClearGlass": self.button.bezelStyle = .texturedRounded
-            default: self.button.bezelStyle = .rounded
-            }
-            if bs != "plain" { self.button.isBordered = true }
-          }
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
-      case "setButtonIcon":
-        if let args = call.arguments as? [String: Any] {
-          if let name = args["buttonIconName"] as? String, var image = NSImage(systemSymbolName: name, accessibilityDescription: nil) {
-            if #available(macOS 12.0, *), let sz = args["buttonIconSize"] as? NSNumber {
-              let cfg = NSImage.SymbolConfiguration(pointSize: CGFloat(truncating: sz), weight: .regular)
-              image = image.withSymbolConfiguration(cfg) ?? image
-            }
-            if let mode = args["buttonIconRenderingMode"] as? String {
-              switch mode {
-              case "hierarchical":
-                if #available(macOS 12.0, *), let c = args["buttonIconColor"] as? NSNumber {
-                  let cfg = NSImage.SymbolConfiguration(hierarchicalColor: Self.colorFromARGB(c.intValue))
-                  image = image.withSymbolConfiguration(cfg) ?? image
-                }
-              case "palette":
-                if #available(macOS 12.0, *), let pal = args["buttonIconPaletteColors"] as? [NSNumber] {
-                  let cols = pal.map { Self.colorFromARGB($0.intValue) }
-                  let cfg = NSImage.SymbolConfiguration(paletteColors: cols)
-                  image = image.withSymbolConfiguration(cfg) ?? image
-                }
-              case "multicolor":
-                if #available(macOS 12.0, *) {
-                  let cfg = NSImage.SymbolConfiguration.preferringMulticolor()
-                  image = image.withSymbolConfiguration(cfg) ?? image
-                }
-              default:
-                break
-              }
-            } else if let c = args["buttonIconColor"] as? NSNumber {
-              image = image.tinted(with: Self.colorFromARGB(c.intValue))
-            }
-            self.button.image = image
-            self.button.imagePosition = .imageOnly
-          }
-          if let r = args["round"] as? NSNumber, r.boolValue { self.button.bezelStyle = .circular }
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing icon args", details: nil)) }
-      case "setBrightness":
-        if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
-          self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
-      case "setButtonTitle":
-        if let args = call.arguments as? [String: Any], let t = args["title"] as? String {
-          self.button.title = t
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing title", details: nil)) }
-      case "setPressed":
-        if let args = call.arguments as? [String: Any], let p = args["pressed"] as? NSNumber {
-          self.alphaValue = p.boolValue ? 0.7 : 1.0
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing pressed", details: nil)) }
-      default:
-        result(FlutterMethodNotImplemented)
-      }
+      self.handle(call, result: result)
     }
   }
 
   required init?(coder: NSCoder) { return nil }
 
-  @objc private func onButtonPressed(_ sender: NSButton) {
-    let location = NSPoint(x: 0, y: sender.bounds.height)
-    popupMenu.popUp(positioning: nil, at: location, in: sender)
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    guard isInteractive else { return nil }
+    return super.hitTest(point)
   }
 
-  /// The top level of the menu, from the arrays Flutter sent at creation or
-  /// in the last `setItems`.
-  private var rootLevel: PopupMenuLevel {
-    var level = PopupMenuLevel()
-    level.labels = labels
-    level.symbols = symbols
-    level.dividers = dividers
-    level.enabled = enabled
-    level.sizes = defaultSizes
-    level.colors = defaultColors
-    level.modes = defaultModes
-    level.palettes = defaultPalettes
-    level.subtitles = subtitles
-    level.isSubmenu = isSubmenu
-    level.submenus = submenus
-    level.submenuStyles = submenuStyles
-    return level
+  private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any]
+    switch call.method {
+    case "getIntrinsicSize":
+      let s = host.preferredSize()
+      result(["width": Double(s.width), "height": Double(s.height)])
+    case "setItems":
+      guard let args = args else {
+        result(FlutterError(code: "bad_args", message: "Missing items", details: nil)); return
+      }
+      var level = PopupMenuLevel(dict: args)
+      // `setItems` leaves out the top level's custom icons: the view keeps
+      // the ones it was created with.
+      if args["customIconBytes"] == nil {
+        level.customIconBytes = rootLevel.customIconBytes
+        level.customIconColors = rootLevel.customIconColors
+      }
+      rootLevel = level
+      rebuildMenu()
+      result(nil)
+    case "setStyle":
+      guard let args = args else {
+        result(FlutterError(code: "bad_args", message: "Missing style", details: nil)); return
+      }
+      host.update {
+        if let n = args["tint"] as? NSNumber { $0.tint = ImageUtils.colorFromARGB(n.intValue) }
+        if let bs = args["buttonStyle"] as? String { $0.style = bs }
+      }
+      result(nil)
+    case "setButtonIcon":
+      guard let args = args else {
+        result(FlutterError(code: "bad_args", message: "Missing icon args", details: nil)); return
+      }
+      icon.update(args)
+      host.image = icon.makeImage()
+      result(nil)
+    case "setBrightness":
+      guard let isDark = (args?["isDark"] as? NSNumber)?.boolValue else {
+        result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)); return
+      }
+      appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+      result(nil)
+    case "setButtonTitle":
+      guard let t = args?["title"] as? String else {
+        result(FlutterError(code: "bad_args", message: "Missing title", details: nil)); return
+      }
+      host.title = t
+      result(nil)
+    case "setSemanticLabel":
+      let label = args?["label"] as? String
+      host.accessibilityText = (label?.isEmpty ?? true) ? nil : label
+      result(nil)
+    case "setInteractive":
+      isInteractive = (args?["interactive"] as? NSNumber)?.boolValue ?? true
+      result(nil)
+    case "setTransitioning":
+      layer?.masksToBounds = (args?["active"] as? NSNumber)?.boolValue ?? false
+      result(nil)
+    case "setPressed":
+      // NSButton draws its own pressed state.
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  @objc private func onButtonPressed(_ sender: NSButton) {
+    // Below the button, aligned to its leading edge, as a pull-down menu.
+    let location = NSPoint(x: 0, y: sender.isFlipped ? sender.bounds.height + 4 : -4)
+    popupMenu.popUp(positioning: nil, at: location, in: sender)
   }
 
   private func rebuildMenu() {
@@ -344,83 +180,37 @@ class CupertinoPopupMenuButtonNSView: NSView {
         mi.target = self
         mi.tag = i
         mi.representedObject = itemPath
-        if i < level.enabled.count { mi.isEnabled = level.enabled[i] }
+        mi.isEnabled = isEnabled
+        if i < level.checked.count, level.checked[i] { mi.state = .on }
       }
       if #available(macOS 14.4, *), i < level.subtitles.count, !level.subtitles[i].isEmpty {
         mi.subtitle = level.subtitles[i]
       }
-      if i < level.symbols.count, !level.symbols[i].isEmpty {
-        if var img = NSImage(systemSymbolName: level.symbols[i], accessibilityDescription: nil) {
-          if #available(macOS 12.0, *), i < level.sizes.count {
-            let s = CGFloat(truncating: level.sizes[i])
-            if s > 0 {
-              let cfg = NSImage.SymbolConfiguration(pointSize: s, weight: .regular)
-              img = img.withSymbolConfiguration(cfg) ?? img
-            }
-          }
-          if #available(macOS 12.0, *), i < level.modes.count, let mode = level.modes[i] {
-            switch mode {
-            case "hierarchical":
-              if i < level.colors.count {
-                let c = Self.colorFromARGB(level.colors[i].intValue)
-                let cfg = NSImage.SymbolConfiguration(hierarchicalColor: c)
-                img = img.withSymbolConfiguration(cfg) ?? img
-              }
-            case "palette":
-              if i < level.palettes.count, !level.palettes[i].isEmpty {
-                let cols = level.palettes[i].map { Self.colorFromARGB($0.intValue) }
-                let cfg = NSImage.SymbolConfiguration(paletteColors: cols)
-                img = img.withSymbolConfiguration(cfg) ?? img
-              }
-            case "multicolor":
-              let cfg = NSImage.SymbolConfiguration.preferringMulticolor()
-              img = img.withSymbolConfiguration(cfg) ?? img
-            case "monochrome":
-              if i < level.colors.count {
-                let c = Self.colorFromARGB(level.colors[i].intValue)
-                img = img.tinted(with: c)
-              }
-            default:
-              break
-            }
-          } else if #available(macOS 12.0, *), i < level.colors.count {
-            let c = Self.colorFromARGB(level.colors[i].intValue)
-            let cfg = NSImage.SymbolConfiguration(hierarchicalColor: c)
-            img = img.withSymbolConfiguration(cfg) ?? img
-          }
-          mi.image = img
-        }
+      if let image = level.image(at: i) {
+        mi.image = image
+        Self.keepImageVisible(mi)
       }
       menu.addItem(mi)
     }
     return menu
   }
 
+  /// macOS 27 hides menu item images unless the item asks to show them.
+  static func keepImageVisible(_ item: NSMenuItem) {
+    #if compiler(>=6.4)
+    if #available(macOS 27.0, *) { item.preferredImageVisibility = .visible }
+    #else
+    // Built with an SDK older than macOS 27's: the property exists at run
+    // time on macOS 27 even though this SDK does not declare it.
+    let selector = NSSelectorFromString("setPreferredImageVisibility:")
+    if item.responds(to: selector) { item.setValue(1, forKey: "preferredImageVisibility") }
+    #endif
+  }
+
   @objc private func onSelectMenuItem(_ sender: NSMenuItem) {
     // `index` is the top-level entry, as before; `path` the full path.
     let path = (sender.representedObject as? [Int]) ?? [sender.tag]
     channel.invokeMethod("itemSelected", arguments: ["index": path[0], "path": path])
-  }
-
-  private static func colorFromARGB(_ argb: Int) -> NSColor {
-    let a = CGFloat((argb >> 24) & 0xFF) / 255.0
-    let r = CGFloat((argb >> 16) & 0xFF) / 255.0
-    let g = CGFloat((argb >> 8) & 0xFF) / 255.0
-    let b = CGFloat(argb & 0xFF) / 255.0
-    return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
-  }
-}
-
-private extension NSImage {
-  func tinted(with color: NSColor) -> NSImage {
-    let img = NSImage(size: size)
-    img.lockFocus()
-    let rect = NSRect(origin: .zero, size: size)
-    color.set()
-    rect.fill()
-    draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
-    img.unlockFocus()
-    return img
   }
 }
 
@@ -430,12 +220,18 @@ private extension NSImage {
 private struct PopupMenuLevel {
   var labels: [String] = []
   var symbols: [String] = []
+  var customIconBytes: [Data?] = []
+  var customIconColors: [NSColor?] = []
+  var imageAssetPaths: [String] = []
+  var imageAssetData: [Data?] = []
+  var imageAssetFormats: [String] = []
   var dividers: [Bool] = []
   var enabled: [Bool] = []
-  var sizes: [NSNumber] = []
-  var colors: [NSNumber] = []
+  var checked: [Bool] = []
+  var sizes: [CGFloat?] = []
+  var colors: [NSColor?] = []
   var modes: [String?] = []
-  var palettes: [[NSNumber]] = []
+  var palettes: [[NSColor]] = []
   var subtitles: [String] = []
   var isSubmenu: [Bool] = []
   var submenus: [[String: Any]?] = []
@@ -444,19 +240,75 @@ private struct PopupMenuLevel {
   init() {}
 
   /// Reads a level encoded by `encodePopupMenuEntries`, with the same keys
-  /// and types as the top level.
+  /// and types as the top level. Lists of optional values carry NSNull for
+  /// the entries without one, so they are read entry by entry.
   init(dict: [String: Any]) {
     labels = (dict["labels"] as? [String]) ?? []
     symbols = (dict["sfSymbols"] as? [String]) ?? []
-    dividers = ((dict["isDivider"] as? [NSNumber]) ?? []).map { $0.boolValue }
-    enabled = ((dict["enabled"] as? [NSNumber]) ?? []).map { $0.boolValue }
-    sizes = (dict["sfSymbolSizes"] as? [NSNumber]) ?? []
-    colors = (dict["sfSymbolColors"] as? [NSNumber]) ?? []
-    modes = (dict["sfSymbolRenderingModes"] as? [String?]) ?? []
-    palettes = (dict["sfSymbolPaletteColors"] as? [[NSNumber]]) ?? []
-    subtitles = (dict["subtitles"] as? [String]) ?? []
-    isSubmenu = ((dict["isSubmenu"] as? [NSNumber]) ?? []).map { $0.boolValue }
-    submenus = ((dict["submenus"] as? [Any]) ?? []).map { $0 as? [String: Any] }
-    submenuStyles = ((dict["submenuStyles"] as? [Any]) ?? []).map { $0 as? String }
+    customIconBytes = Self.list(dict["customIconBytes"]).map { ($0 as? FlutterStandardTypedData)?.data }
+    customIconColors = Self.list(dict["customIconColors"]).map(Self.color)
+    imageAssetPaths = Self.list(dict["imageAssetPaths"]).map { ($0 as? String) ?? "" }
+    imageAssetData = Self.list(dict["imageAssetData"]).map { ($0 as? FlutterStandardTypedData)?.data }
+    imageAssetFormats = Self.list(dict["imageAssetFormats"]).map { ($0 as? String) ?? "" }
+    dividers = Self.list(dict["isDivider"]).map { ($0 as? NSNumber)?.boolValue ?? false }
+    enabled = Self.list(dict["enabled"]).map { ($0 as? NSNumber)?.boolValue ?? true }
+    checked = Self.list(dict["checked"]).map { ($0 as? NSNumber)?.boolValue ?? false }
+    sizes = Self.list(dict["sfSymbolSizes"]).map { ($0 as? NSNumber).map { CGFloat(truncating: $0) } }
+    colors = Self.list(dict["sfSymbolColors"]).map(Self.color)
+    modes = Self.list(dict["sfSymbolRenderingModes"]).map { $0 as? String }
+    palettes = Self.list(dict["sfSymbolPaletteColors"]).map { Self.list($0).compactMap(Self.color) }
+    subtitles = Self.list(dict["subtitles"]).map { ($0 as? String) ?? "" }
+    isSubmenu = Self.list(dict["isSubmenu"]).map { ($0 as? NSNumber)?.boolValue ?? false }
+    submenus = Self.list(dict["submenus"]).map { $0 as? [String: Any] }
+    submenuStyles = Self.list(dict["submenuStyles"]).map { $0 as? String }
+  }
+
+  private static func list(_ value: Any?) -> [Any] { (value as? [Any]) ?? [] }
+
+  private static func color(_ value: Any) -> NSColor? {
+    (value as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+  }
+
+  /// Menu images larger than the menu's text would stretch the row; the
+  /// system's own menu symbols are about this size.
+  private static let maxImageSize: CGFloat = 16
+
+  /// The image of entry `i`, by the iOS priority: image asset, custom icon,
+  /// SF Symbol.
+  func image(at i: Int) -> NSImage? {
+    let size = min((i < sizes.count ? sizes[i] : nil) ?? Self.maxImageSize, Self.maxImageSize)
+    let color = i < colors.count ? colors[i] : nil
+    let path = i < imageAssetPaths.count ? imageAssetPaths[i] : ""
+    let data = i < imageAssetData.count ? imageAssetData[i] : nil
+    let format = i < imageAssetFormats.count ? imageAssetFormats[i] : ""
+    if !path.isEmpty || data != nil {
+      if let image = ImageUtils.image(
+        assetPath: path.isEmpty ? nil : path,
+        imageData: data,
+        format: format.isEmpty ? nil : format,
+        customIconBytes: nil,
+        size: size,
+        color: color
+      ) {
+        return image
+      }
+    }
+    if i < customIconBytes.count, let bytes = customIconBytes[i] {
+      let custom = i < customIconColors.count ? customIconColors[i] : nil
+      if let image = ImageUtils.image(
+        assetPath: nil, imageData: nil, format: nil,
+        customIconBytes: bytes, size: size, color: custom
+      ) {
+        return image
+      }
+    }
+    guard i < symbols.count, !symbols[i].isEmpty else { return nil }
+    return ImageUtils.symbolImage(
+      name: symbols[i],
+      size: size,
+      color: color,
+      mode: i < modes.count ? modes[i] : nil,
+      palette: i < palettes.count ? palettes[i] : []
+    )
   }
 }

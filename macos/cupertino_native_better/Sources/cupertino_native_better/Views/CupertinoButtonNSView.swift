@@ -2,455 +2,280 @@ import FlutterMacOS
 import Cocoa
 import SwiftUI
 
+/// `CNButton` on macOS: an `NSButton` in the bezel of its `CNButtonStyle`
+/// (see `NativeButtonHost`), or, for a glass button that joins a glass
+/// union or morphs (`glassEffectUnionId` / `glassEffectId`, macOS 26), a
+/// SwiftUI glass button.
 class CupertinoButtonNSView: NSView {
   private let channel: FlutterMethodChannel
-  private var button: NSButton?
+  private var host: NativeButtonHost?
   private var hostingController: NSHostingController<AnyView>?
+  private var swiftUIBase: AnyView?
   private var badgeView: NSView?
-  private var badgeTextField: NSTextField?
   private var isEnabled: Bool = true
-  private var currentButtonStyle: String = "automatic"
+  private var isInteractive: Bool = true
   private var usesSwiftUI: Bool = false
-  private var makeRound: Bool = false
+  private var semanticLabel: String?
+
+  // The icon as Flutter last described it, so a size or colour change can
+  // rebuild it.
+  private var icon = IconSource()
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeButton_\(viewId)", binaryMessenger: messenger)
     super.init(frame: .zero)
 
-    var title: String? = nil
-    var iconName: String? = nil
-    var iconSize: CGFloat? = nil
-    var iconColor: NSColor? = nil
-    var makeRound: Bool = false
-    var buttonStyle: String = "automatic"
-    var isDark: Bool = false
-    var tint: NSColor? = nil
-    var enabled: Bool = true
-    var iconMode: String? = nil
-    var iconPalette: [NSNumber] = []
-    var glassEffectUnionId: String? = nil
-    var glassEffectId: String? = nil
-    var glassEffectInteractive: Bool = false
-    var borderRadius: CGFloat? = nil
-    var paddingTop: CGFloat? = nil
-    var paddingBottom: CGFloat? = nil
-    var paddingLeft: CGFloat? = nil
-    var paddingRight: CGFloat? = nil
-    var paddingHorizontal: CGFloat? = nil
-    var paddingVertical: CGFloat? = nil
-    var minHeight: CGFloat? = nil
-    var imagePadding: CGFloat? = nil
-    var badgeCount: Int? = nil
-
-    if let dict = args as? [String: Any] {
-      if let t = dict["buttonTitle"] as? String { title = t }
-      if let s = dict["buttonIconName"] as? String { iconName = s }
-      if let s = dict["buttonIconSize"] as? NSNumber { iconSize = CGFloat(truncating: s) }
-      if let c = dict["buttonIconColor"] as? NSNumber { iconColor = Self.colorFromARGB(c.intValue) }
-      if let r = dict["round"] as? NSNumber {
-        makeRound = r.boolValue
-        self.makeRound = makeRound
-      }
-      if let gueId = dict["glassEffectUnionId"] as? String { glassEffectUnionId = gueId }
-      if let geId = dict["glassEffectId"] as? String { glassEffectId = geId }
-      if let geInteractive = dict["glassEffectInteractive"] as? NSNumber { glassEffectInteractive = geInteractive.boolValue }
-      if let bs = dict["buttonStyle"] as? String { buttonStyle = bs }
-      if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
-      if let style = dict["style"] as? [String: Any], let n = style["tint"] as? NSNumber { tint = Self.colorFromARGB(n.intValue) }
-      if let e = dict["enabled"] as? NSNumber { enabled = e.boolValue }
-      if let m = dict["buttonIconRenderingMode"] as? String { iconMode = m }
-      if let pal = dict["buttonIconPaletteColors"] as? [NSNumber] { iconPalette = pal }
-      if let br = dict["borderRadius"] as? NSNumber { borderRadius = CGFloat(truncating: br) }
-      if let pt = dict["paddingTop"] as? NSNumber { paddingTop = CGFloat(truncating: pt) }
-      if let pb = dict["paddingBottom"] as? NSNumber { paddingBottom = CGFloat(truncating: pb) }
-      if let pl = dict["paddingLeft"] as? NSNumber { paddingLeft = CGFloat(truncating: pl) }
-      if let pr = dict["paddingRight"] as? NSNumber { paddingRight = CGFloat(truncating: pr) }
-      if let ph = dict["paddingHorizontal"] as? NSNumber { paddingHorizontal = CGFloat(truncating: ph) }
-      if let pv = dict["paddingVertical"] as? NSNumber { paddingVertical = CGFloat(truncating: pv) }
-      if let mh = dict["minHeight"] as? NSNumber { minHeight = CGFloat(truncating: mh) }
-      if let ip = dict["imagePadding"] as? NSNumber { imagePadding = CGFloat(truncating: ip) }
-      if let bc = dict["badgeCount"] as? NSNumber { badgeCount = bc.intValue }
-    }
+    let dict = (args as? [String: Any]) ?? [:]
+    let title = dict["buttonTitle"] as? String
+    let buttonStyle = (dict["buttonStyle"] as? String) ?? "automatic"
+    let isDark = (dict["isDark"] as? NSNumber)?.boolValue ?? false
+    let tint = ((dict["style"] as? [String: Any])?["tint"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+    let enabled = (dict["enabled"] as? NSNumber)?.boolValue ?? true
+    let glassEffectUnionId = dict["glassEffectUnionId"] as? String
+    let glassEffectId = dict["glassEffectId"] as? String
+    let glassEffectInteractive = (dict["glassEffectInteractive"] as? NSNumber)?.boolValue ?? false
+    let borderRadius = Self.cgFloat(dict["borderRadius"])
+    let paddingTop = Self.cgFloat(dict["paddingTop"])
+    let paddingBottom = Self.cgFloat(dict["paddingBottom"])
+    let paddingLeft = Self.cgFloat(dict["paddingLeft"])
+    let paddingRight = Self.cgFloat(dict["paddingRight"])
+    let paddingHorizontal = Self.cgFloat(dict["paddingHorizontal"])
+    let paddingVertical = Self.cgFloat(dict["paddingVertical"])
+    let minHeight = Self.cgFloat(dict["minHeight"])
+    let imagePadding = Self.cgFloat(dict["imagePadding"])
+    let badgeCount = (dict["badgeCount"] as? NSNumber)?.intValue
+    icon.read(dict)
+    isEnabled = enabled
+    isInteractive = (dict["interaction"] as? NSNumber)?.boolValue ?? true
+    if let label = dict["semanticLabel"] as? String, !label.isEmpty { semanticLabel = label }
 
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
     appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
 
-    // Check if we should use SwiftUI for full glass effect support
-    if #available(macOS 26.0, *), (glassEffectUnionId != nil || glassEffectId != nil) {
+    let image = icon.makeImage()
+
+    if NativeButtonHost.hasGlass, glassEffectUnionId != nil || glassEffectId != nil {
       usesSwiftUI = true
-      // Create icon image if needed
-      var iconImage: NSImage? = nil
-      if let name = iconName {
-        iconImage = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+      #if compiler(>=6.2)
+      if #available(macOS 26.0, *) {
+        setupSwiftUIButton(
+          title: title,
+          iconName: icon.symbolName,
+          iconImage: image,
+          iconSize: icon.size ?? 20,
+          iconColor: icon.color.map { Color(nsColor: $0) },
+          tint: tint.map { Color(nsColor: $0) },
+          isRound: true,
+          style: buttonStyle,
+          enabled: enabled,
+          glassEffectUnionId: glassEffectUnionId,
+          glassEffectId: glassEffectId,
+          glassEffectInteractive: glassEffectInteractive,
+          borderRadius: borderRadius,
+          paddingTop: paddingTop,
+          paddingBottom: paddingBottom,
+          paddingLeft: paddingLeft,
+          paddingRight: paddingRight,
+          paddingHorizontal: paddingHorizontal,
+          paddingVertical: paddingVertical,
+          minHeight: minHeight,
+          spacing: imagePadding
+        )
       }
-      
-      setupSwiftUIButton(
-        title: title,
-        iconName: iconName,
-        iconImage: iconImage,
-        iconSize: iconSize ?? 20,
-        iconColor: iconColor != nil ? Color(nsColor: iconColor!) : nil,
-        tint: tint != nil ? Color(nsColor: tint!) : nil,
-        isRound: makeRound,
-        style: buttonStyle,
-        enabled: enabled,
-        glassEffectUnionId: glassEffectUnionId,
-        glassEffectId: glassEffectId,
-        glassEffectInteractive: glassEffectInteractive,
-        borderRadius: borderRadius,
-        paddingTop: paddingTop,
-        paddingBottom: paddingBottom,
-        paddingLeft: paddingLeft,
-        paddingRight: paddingRight,
-        paddingHorizontal: paddingHorizontal,
-        paddingVertical: paddingVertical,
-        minHeight: minHeight,
-        spacing: imagePadding
-      )
+      #endif
     } else {
-      // Use AppKit button for standard implementation
-      let nsButton = NSButton(title: "", target: nil, action: nil)
-      self.button = nsButton
-      
-      // Parse new parameters (basic support)
-      if let argsDict = args as? [String: Any] {
-        if let ip = argsDict["imagePlacement"] as? String {
-          switch ip {
-          case "leading": nsButton.imagePosition = .imageLeft
-          case "trailing": nsButton.imagePosition = .imageRight
-          case "top": nsButton.imagePosition = .imageAbove
-          case "bottom": nsButton.imagePosition = .imageBelow
-          default: nsButton.imagePosition = .imageLeft
-          }
-        }
-      }
-
-      if let t = title { nsButton.title = t }
-    if let name = iconName, var image = NSImage(systemSymbolName: name, accessibilityDescription: nil) {
-      if #available(macOS 12.0, *), let sz = iconSize {
-        let cfg = NSImage.SymbolConfiguration(pointSize: sz, weight: .regular)
-        image = image.withSymbolConfiguration(cfg) ?? image
-      }
-      if let mode = iconMode {
-        switch mode {
-        case "hierarchical":
-          if #available(macOS 12.0, *), let c = iconColor {
-            let cfg = NSImage.SymbolConfiguration(hierarchicalColor: c)
-            image = image.withSymbolConfiguration(cfg) ?? image
-          }
-        case "palette":
-          if #available(macOS 12.0, *), !iconPalette.isEmpty {
-            let cols = iconPalette.map { Self.colorFromARGB($0.intValue) }
-            let cfg = NSImage.SymbolConfiguration(paletteColors: cols)
-            image = image.withSymbolConfiguration(cfg) ?? image
-          }
-        case "multicolor":
-          if #available(macOS 12.0, *) {
-            let cfg = NSImage.SymbolConfiguration.preferringMulticolor()
-            image = image.withSymbolConfiguration(cfg) ?? image
-          }
-        case "monochrome":
-          if let c = iconColor { image = image.tinted(with: c) }
-        default:
-          break
-        }
-      } else if let c = iconColor { image = image.tinted(with: c) }
-        nsButton.image = image
-        nsButton.imagePosition = .imageOnly
-    }
-    // Map button styles best-effort to AppKit
-    switch buttonStyle {
-    case "plain":
-        nsButton.bezelStyle = .texturedRounded
-        nsButton.isBordered = false
-      case "gray": nsButton.bezelStyle = .texturedRounded
-      case "tinted": nsButton.bezelStyle = .texturedRounded
-      case "bordered": nsButton.bezelStyle = .rounded
-      case "borderedProminent": nsButton.bezelStyle = .rounded
-      case "filled": nsButton.bezelStyle = .rounded
-      case "glass": nsButton.bezelStyle = .texturedRounded
-      case "prominentGlass": nsButton.bezelStyle = .texturedRounded
-      // AppKit has no clear glass bezel; the clear styles look like glass.
-      case "clearGlass": nsButton.bezelStyle = .texturedRounded
-      case "prominentClearGlass": nsButton.bezelStyle = .texturedRounded
-      default: nsButton.bezelStyle = .rounded
-    }
-      if makeRound { nsButton.bezelStyle = .circular }
-      nsButton.setButtonType(.momentaryPushIn)
-    if #available(macOS 10.14, *), let c = tint {
-      if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(buttonStyle) {
-          nsButton.bezelColor = c
-          nsButton.contentTintColor = .white
-      } else {
-          nsButton.contentTintColor = c
-      }
-    }
-    currentButtonStyle = buttonStyle
-      nsButton.isEnabled = enabled
-    isEnabled = enabled
-
-      addSubview(nsButton)
-      nsButton.translatesAutoresizingMaskIntoConstraints = false
-    NSLayoutConstraint.activate([
-        nsButton.leadingAnchor.constraint(equalTo: leadingAnchor),
-        nsButton.trailingAnchor.constraint(equalTo: trailingAnchor),
-        nsButton.topAnchor.constraint(equalTo: topAnchor),
-        nsButton.bottomAnchor.constraint(equalTo: bottomAnchor)
-    ])
-
-      nsButton.target = self
-      nsButton.action = #selector(onPressed(_:))
-      
-      // Force layout update for proper first-time rendering
-      // Similar to TabBar fix - ensures button is properly laid out before display
-      DispatchQueue.main.async { [weak self, weak nsButton] in
-        guard let self = self, let nsButton = nsButton else { return }
-        self.needsLayout = true
-        self.layout()
-        nsButton.needsLayout = true
-        nsButton.layout()
-        // Force another update cycle for proper rendering
-        DispatchQueue.main.async { [weak nsButton] in
-          guard let nsButton = nsButton else { return }
-          nsButton.needsDisplay = true
-          nsButton.needsLayout = true
-          nsButton.layout()
-        }
+      let host = NativeButtonHost(target: self, action: #selector(onPressed(_:)))
+      self.host = host
+      host.frame = bounds
+      host.autoresizingMask = [.width, .height]
+      addSubview(host)
+      host.update {
+        $0.title = title
+        $0.image = image
+        $0.imagePlacement = (dict["imagePlacement"] as? String) ?? "leading"
+        $0.imagePadding = imagePadding
+        $0.style = buttonStyle
+        $0.tint = tint
+        $0.borderRadius = borderRadius
+        $0.expectedHeight = minHeight ?? 44
+        $0.paddingLeft = paddingLeft ?? paddingHorizontal
+        $0.paddingRight = paddingRight ?? paddingHorizontal
+        $0.labelColor = (dict["labelColor"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+        $0.labelFontSize = Self.cgFloat(dict["labelFontSize"]).flatMap { $0 > 0 ? $0 : nil }
+        $0.labelFontFamily = (dict["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        $0.labelFontWeight = (dict["labelFontWeight"] as? NSNumber)?.intValue
+        $0.isEnabled = enabled
+        $0.isInteractive = isInteractive
+        $0.accessibilityText = semanticLabel
       }
     }
 
-    // Add badge if badgeCount is provided
     if let count = badgeCount, count > 0 {
       addBadge(count: count)
     }
 
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
-      switch call.method {
-      case "getIntrinsicSize":
-        if usesSwiftUI {
-          result(["width": 80.0, "height": 32.0])
-        } else if let button = self.button {
-          let s = button.intrinsicContentSize
-        result(["width": Double(s.width), "height": Double(s.height)])
-        } else {
-          result(["width": 80.0, "height": 32.0])
-        }
-      case "setStyle":
-        if let args = call.arguments as? [String: Any] {
-          if usesSwiftUI {
-            // For SwiftUI buttons, style changes would require recreating the view
-            result(nil)
-          } else if let button = self.button {
-          if #available(macOS 10.14, *), let n = args["tint"] as? NSNumber {
-            let color = Self.colorFromARGB(n.intValue)
-            if ["filled", "borderedProminent", "prominentGlass", "prominentClearGlass"].contains(self.currentButtonStyle) {
-                button.bezelColor = color
-                button.contentTintColor = .white
-            } else {
-                button.contentTintColor = color
-            }
-          } else if #available(macOS 10.14, *), (args["clearTint"] as? NSNumber)?.boolValue == true {
-            // Back to the colours of a button created without a tint.
-            button.bezelColor = nil
-            button.contentTintColor = nil
-          }
-          if let bs = args["buttonStyle"] as? String {
-            self.currentButtonStyle = bs
-            switch bs {
-            case "plain":
-                button.bezelStyle = .texturedRounded
-                button.isBordered = false
-              case "gray": button.bezelStyle = .texturedRounded
-              case "tinted": button.bezelStyle = .texturedRounded
-              case "bordered": button.bezelStyle = .rounded
-              case "borderedProminent": button.bezelStyle = .rounded
-              case "filled": button.bezelStyle = .rounded
-              case "glass": button.bezelStyle = .texturedRounded
-              case "prominentGlass": button.bezelStyle = .texturedRounded
-              case "clearGlass": button.bezelStyle = .texturedRounded
-              case "prominentClearGlass": button.bezelStyle = .texturedRounded
-              default: button.bezelStyle = .rounded
-            }
-              if bs != "plain" { button.isBordered = true }
-              if #available(macOS 10.14, *), let c = button.contentTintColor, ["filled", "borderedProminent"].contains(self.currentButtonStyle) {
-                button.bezelColor = c
-              }
-            }
-          }
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
-      case "setButtonTitle":
-        if let args = call.arguments as? [String: Any], let t = args["title"] as? String {
-          if !usesSwiftUI, let button = self.button {
-            button.title = t
-            button.image = nil
-          }
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing title", details: nil)) }
-      case "setImagePlacement":
-        if let args = call.arguments as? [String: Any], let placement = args["placement"] as? String {
-          if !usesSwiftUI, let button = self.button {
-          switch placement {
-            case "leading": button.imagePosition = .imageLeft
-            case "trailing": button.imagePosition = .imageRight
-            case "top": button.imagePosition = .imageAbove
-            case "bottom": button.imagePosition = .imageBelow
-            default: button.imagePosition = .imageLeft
-            }
-          }
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing placement", details: nil)) }
-      case "setImagePadding":
-        // Limited support on macOS
-        result(nil)
-      case "setTextStyle":
-        if let args = call.arguments as? [String: Any] {
-          let color = (args["color"] as? NSNumber).map { Self.colorFromARGB($0.intValue) }
-          let fontSize = (args["fontSize"] as? NSNumber).map { CGFloat(truncating: $0) }
-          let fontWeight = args["fontWeight"] as? Int
-          let fontFamily = args["fontFamily"] as? String
-          
-          var font: NSFont? = nil
-          if let fontSize = fontSize {
-            if let fontFamily = fontFamily, let customFont = NSFont(name: fontFamily, size: fontSize) {
-              font = customFont
-            } else {
-              let weight: NSFont.Weight
-              switch fontWeight ?? 400 {
-              case 100: weight = .ultraLight
-              case 200: weight = .thin
-              case 300: weight = .light
-              case 400: weight = .regular
-              case 500: weight = .medium
-              case 600: weight = .semibold
-              case 700: weight = .bold
-              case 800: weight = .heavy
-              case 900: weight = .black
-              default: weight = .regular
-              }
-              font = NSFont.systemFont(ofSize: fontSize, weight: weight)
-            }
-          }
-          
-          if !usesSwiftUI, let button = self.button, !button.title.isEmpty {
-            let title = button.title
-            let attrString = NSMutableAttributedString(string: title)
-            if let font = font {
-              attrString.addAttribute(.font, value: font, range: NSRange(location: 0, length: title.count))
-            }
-            if let color = color {
-              attrString.addAttribute(.foregroundColor, value: color, range: NSRange(location: 0, length: title.count))
-            }
-            button.attributedTitle = attrString
-          }
-          result(nil)
-        } else {
-          // Clear text style
-          if !usesSwiftUI, let button = self.button {
-            button.attributedTitle = NSAttributedString(string: button.title)
-          }
-          result(nil)
-        }
-      case "setHorizontalPadding":
-        // Limited support on macOS - NSButton doesn't have direct contentInsets
-        // Could use padding via attributed string or other means
-        result(nil)
-      case "setEnabled":
-        if let args = call.arguments as? [String: Any], let e = args["enabled"] as? NSNumber {
-          self.isEnabled = e.boolValue
-          if !usesSwiftUI, let button = self.button {
-            button.isEnabled = self.isEnabled
-          }
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing enabled", details: nil)) }
-      case "setButtonIcon":
-        if let args = call.arguments as? [String: Any] {
-          if let name = args["buttonIconName"] as? String, var image = NSImage(systemSymbolName: name, accessibilityDescription: nil) {
-            if #available(macOS 12.0, *), let sz = args["buttonIconSize"] as? NSNumber {
-              let cfg = NSImage.SymbolConfiguration(pointSize: CGFloat(truncating: sz), weight: .regular)
-              image = image.withSymbolConfiguration(cfg) ?? image
-            }
-            if let mode = args["buttonIconRenderingMode"] as? String {
-              switch mode {
-              case "hierarchical":
-                if #available(macOS 12.0, *), let c = args["buttonIconColor"] as? NSNumber {
-                  let cfg = NSImage.SymbolConfiguration(hierarchicalColor: Self.colorFromARGB(c.intValue))
-                  image = image.withSymbolConfiguration(cfg) ?? image
-                }
-              case "palette":
-                if #available(macOS 12.0, *), let pal = args["buttonIconPaletteColors"] as? [NSNumber] {
-                  let cols = pal.map { Self.colorFromARGB($0.intValue) }
-                  let cfg = NSImage.SymbolConfiguration(paletteColors: cols)
-                  image = image.withSymbolConfiguration(cfg) ?? image
-                }
-              case "multicolor":
-                if #available(macOS 12.0, *) {
-                  let cfg = NSImage.SymbolConfiguration.preferringMulticolor()
-                  image = image.withSymbolConfiguration(cfg) ?? image
-                }
-              case "monochrome":
-                if let c = args["buttonIconColor"] as? NSNumber {
-                  image = image.tinted(with: Self.colorFromARGB(c.intValue))
-                }
-              default:
-                break
-              }
-            } else if let c = args["buttonIconColor"] as? NSNumber {
-              image = image.tinted(with: Self.colorFromARGB(c.intValue))
-            }
-            if !usesSwiftUI, let button = self.button {
-              button.image = image
-              button.title = ""
-              button.imagePosition = .imageOnly
-            }
-          }
-          if !usesSwiftUI, let button = self.button, let r = args["round"] as? NSNumber, r.boolValue {
-            button.bezelStyle = .circular
-          }
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing icon args", details: nil)) }
-      case "setBrightness":
-        if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
-          self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
-      case "setPressed":
-        if let args = call.arguments as? [String: Any], let p = args["pressed"] as? NSNumber {
-          self.alphaValue = p.boolValue ? 0.7 : 1.0
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing pressed", details: nil)) }
-      case "setBadgeCount":
-        if let args = call.arguments as? [String: Any] {
-          if let count = args["badgeCount"] as? NSNumber {
-            let intCount = count.intValue
-            if intCount > 0 {
-              self.addBadge(count: intCount)
-            } else {
-              self.removeBadge()
-            }
-          } else {
-            self.removeBadge()
-          }
-          result(nil)
-        } else {
-          self.removeBadge()
-          result(nil)
-        }
-      default:
-        result(FlutterMethodNotImplemented)
-      }
+      self.handle(call, result: result)
     }
   }
 
   required init?(coder: NSCoder) { return nil }
 
-  @objc private func onPressed(_ sender: NSButton?) {
-    guard isEnabled else { return }
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    guard isInteractive else { return nil }
+    return super.hitTest(point)
+  }
+
+  // MARK: - Method calls
+
+  private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any]
+    switch call.method {
+    case "getIntrinsicSize":
+      if let host = host {
+        let size = host.preferredSize()
+        result(["width": Double(size.width), "height": Double(size.height)])
+      } else {
+        let size = hostingController?.view.fittingSize ?? .zero
+        result(["width": Double(size.width > 0 ? size.width : 80), "height": Double(size.height > 0 ? size.height : 32)])
+      }
+    case "setStyle":
+      guard let args = args else {
+        result(FlutterError(code: "bad_args", message: "Missing style", details: nil)); return
+      }
+      // A SwiftUI button keeps the style it was created with.
+      if let host = host {
+        host.update {
+          if let n = args["tint"] as? NSNumber {
+            $0.tint = ImageUtils.colorFromARGB(n.intValue)
+          } else if (args["clearTint"] as? NSNumber)?.boolValue == true {
+            $0.tint = nil
+          }
+          if let bs = args["buttonStyle"] as? String { $0.style = bs }
+        }
+      }
+      result(nil)
+    case "setButtonTitle":
+      guard let t = args?["title"] as? String else {
+        result(FlutterError(code: "bad_args", message: "Missing title", details: nil)); return
+      }
+      host?.title = t
+      result(nil)
+    case "setImagePlacement":
+      guard let placement = args?["placement"] as? String else {
+        result(FlutterError(code: "bad_args", message: "Missing placement", details: nil)); return
+      }
+      host?.imagePlacement = placement
+      result(nil)
+    case "setImagePadding":
+      host?.imagePadding = Self.cgFloat(args?["padding"])
+      result(nil)
+    case "setHorizontalPadding":
+      host?.paddingLeft = Self.cgFloat(args?["padding"])
+      host?.paddingRight = Self.cgFloat(args?["padding"])
+      result(nil)
+    case "setTextStyle", "setLabelStyle":
+      // `setLabelStyle` is CNButtonConfig's label style (#40); `setTextStyle`
+      // its older form with color / fontSize / fontWeight / fontFamily keys.
+      host?.update { h in
+        let a = args ?? [:]
+        if (a["clearFontFamily"] as? NSNumber)?.boolValue == true { h.labelFontFamily = nil }
+        if (a["clearFontSize"] as? NSNumber)?.boolValue == true { h.labelFontSize = nil }
+        if (a["clearLabelColor"] as? NSNumber)?.boolValue == true { h.labelColor = nil }
+        if (a["clearFontWeight"] as? NSNumber)?.boolValue == true { h.labelFontWeight = nil }
+        if call.method == "setTextStyle", args == nil {
+          h.labelFontFamily = nil; h.labelFontSize = nil; h.labelColor = nil; h.labelFontWeight = nil
+        }
+        if let f = (a["labelFontFamily"] ?? a["fontFamily"]) as? String, !f.isEmpty { h.labelFontFamily = f }
+        if let s = Self.cgFloat(a["labelFontSize"] ?? a["fontSize"]), s > 0 { h.labelFontSize = s }
+        if let c = (a["labelColor"] ?? a["color"]) as? NSNumber { h.labelColor = ImageUtils.colorFromARGB(c.intValue) }
+        if let w = (a["labelFontWeight"] ?? a["fontWeight"]) as? NSNumber { h.labelFontWeight = w.intValue }
+      }
+      result(nil)
+    case "setEnabled":
+      guard let e = args?["enabled"] as? NSNumber else {
+        result(FlutterError(code: "bad_args", message: "Missing enabled", details: nil)); return
+      }
+      isEnabled = e.boolValue
+      host?.isEnabled = isEnabled
+      result(nil)
+    case "setInteraction":
+      guard let i = args?["interaction"] as? NSNumber else {
+        result(FlutterError(code: "bad_args", message: "Missing interaction", details: nil)); return
+      }
+      isInteractive = i.boolValue
+      host?.isInteractive = isInteractive
+      result(nil)
+    case "setInteractive":
+      // A modal route above the button (ModalHideMixin).
+      if let i = args?["interactive"] as? NSNumber {
+        isInteractive = i.boolValue
+        host?.isInteractive = isInteractive
+      }
+      result(nil)
+    case "setSemanticLabel":
+      let label = args?["label"] as? String
+      semanticLabel = (label?.isEmpty ?? true) ? nil : label
+      applySemanticLabel()
+      result(nil)
+    case "setButtonIcon":
+      guard let args = args else {
+        result(FlutterError(code: "bad_args", message: "Missing icon args", details: nil)); return
+      }
+      icon.update(args)
+      host?.image = icon.makeImage()
+      result(nil)
+    case "setBrightness":
+      guard let isDark = (args?["isDark"] as? NSNumber)?.boolValue else {
+        result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)); return
+      }
+      appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+      result(nil)
+    case "setPressed":
+      // NSButton draws its own pressed state; only the SwiftUI button needs
+      // the feedback.
+      if usesSwiftUI, let p = args?["pressed"] as? NSNumber {
+        alphaValue = p.boolValue ? 0.7 : 1.0
+      }
+      result(nil)
+    case "setTransitioning":
+      // Keep the bezel inside the view while the route animates.
+      layer?.masksToBounds = (args?["active"] as? NSNumber)?.boolValue ?? false
+      result(nil)
+    case "setBadgeCount":
+      if let count = (args?["badgeCount"] as? NSNumber)?.intValue, count > 0 {
+        addBadge(count: count)
+      } else {
+        removeBadge()
+      }
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  @objc private func onPressed(_ sender: Any?) {
+    guard isEnabled, isInteractive else { return }
     channel.invokeMethod("pressed", arguments: nil)
   }
-  
+
+  private func applySemanticLabel() {
+    if let host = host {
+      host.accessibilityText = semanticLabel
+    } else if let hosting = hostingController, let base = swiftUIBase {
+      hosting.rootView = semanticLabel.map { AnyView(base.accessibilityLabel(Text($0))) } ?? base
+    }
+  }
+
+  private static func cgFloat(_ value: Any?) -> CGFloat? {
+    (value as? NSNumber).map { CGFloat(truncating: $0) }
+  }
+
+  // MARK: - SwiftUI glass (glass unions and morphing, macOS 26)
+
+  #if compiler(>=6.2)
   @available(macOS 26.0, *)
   private func setupSwiftUIButton(
     title: String?,
@@ -473,10 +298,8 @@ class CupertinoButtonNSView: NSView {
     paddingHorizontal: CGFloat?,
     paddingVertical: CGFloat?,
     minHeight: CGFloat?,
-    spacing: CGFloat?,
-    badgeCount: Int? = nil
+    spacing: CGFloat?
   ) {
-    // Create GlassButtonConfig with provided values or defaults
     let config = GlassButtonConfig(
       borderRadius: borderRadius,
       top: paddingTop,
@@ -488,72 +311,33 @@ class CupertinoButtonNSView: NSView {
       minHeight: minHeight ?? 44.0,
       spacing: spacing ?? 8.0
     )
-    
-    // Create a wrapper view that provides a namespace for the button
-    struct ButtonWrapperView: View {
-      @Namespace private var namespace
-
-      let title: String?
-      let iconName: String?
-      let iconImage: NSImage?
-      let iconSize: CGFloat
-      let iconColor: Color?
-      let tint: Color?
-      let isRound: Bool
-      let style: String
-      let isEnabled: Bool
-      let onPressed: () -> Void
-      let glassEffectUnionId: String?
-      let glassEffectId: String?
-      let glassEffectInteractive: Bool
-      let config: GlassButtonConfig
-      let badgeCount: Int?
-
-      var body: some View {
-        GlassButtonSwiftUI(
-          title: title,
-          iconName: iconName,
-          iconImage: iconImage,
-          iconSize: iconSize,
-          iconColor: iconColor,
-          tint: tint,
-          isRound: isRound,
-          style: style,
-          isEnabled: isEnabled,
-          onPressed: onPressed,
-          glassEffectUnionId: glassEffectUnionId,
-          glassEffectId: glassEffectId,
-          glassEffectInteractive: glassEffectInteractive,
-          config: config,
-          badgeCount: badgeCount
-        )
-      }
-    }
-    
-    let swiftUIButton = ButtonWrapperView(
+    // A symbol keeps its name so SwiftUI draws it as a symbol; any other
+    // image is passed as an image.
+    let swiftUIButton = GlassButtonSwiftUI(
       title: title,
-      iconName: iconName,
-      iconImage: iconImage,
+      iconName: icon.isSymbol ? iconName : nil,
+      iconImage: icon.isSymbol ? nil : iconImage,
       iconSize: iconSize,
       iconColor: iconColor,
       tint: tint,
       isRound: isRound,
       style: style,
       isEnabled: enabled,
-      onPressed: { [weak self] in
-        self?.onPressed(nil)
-      },
+      onPressed: { [weak self] in self?.onPressed(nil) },
       glassEffectUnionId: glassEffectUnionId,
       glassEffectId: glassEffectId,
       glassEffectInteractive: glassEffectInteractive,
       config: config,
-      badgeCount: badgeCount
+      badgeCount: nil
     )
-    
-    let hostingController = NSHostingController(rootView: AnyView(swiftUIButton))
+    let base = AnyView(swiftUIButton)
+    swiftUIBase = base
+    let hostingController = NSHostingController(
+      rootView: semanticLabel.map { AnyView(base.accessibilityLabel(Text($0))) } ?? base
+    )
+    hostingController.view.wantsLayer = true
     hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
     self.hostingController = hostingController
-    
     hostingController.view.translatesAutoresizingMaskIntoConstraints = false
     addSubview(hostingController.view)
     NSLayoutConstraint.activate([
@@ -562,75 +346,32 @@ class CupertinoButtonNSView: NSView {
       hostingController.view.topAnchor.constraint(equalTo: topAnchor),
       hostingController.view.bottomAnchor.constraint(equalTo: bottomAnchor),
     ])
-    
-    // Force layout update for proper first-time rendering
-    // Similar to TabBar fix - ensures SwiftUI view is properly laid out before display
-    DispatchQueue.main.async { [weak self, weak hostingController] in
-      guard let self = self, let hostingController = hostingController else { return }
-      self.needsLayout = true
-      self.layout()
-      hostingController.view.needsLayout = true
-      hostingController.view.layout()
-      // Force another update cycle for proper rendering
-      DispatchQueue.main.async { [weak hostingController] in
-        guard let hostingController = hostingController else { return }
-        hostingController.view.needsDisplay = true
-        hostingController.view.needsLayout = true
-        hostingController.view.layout()
-      }
-    }
   }
+  #endif
 
-  private static func colorFromARGB(_ argb: Int) -> NSColor {
-    let a = CGFloat((argb >> 24) & 0xFF) / 255.0
-    let r = CGFloat((argb >> 16) & 0xFF) / 255.0
-    let g = CGFloat((argb >> 8) & 0xFF) / 255.0
-    let b = CGFloat(argb & 0xFF) / 255.0
-    return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
-  }
-
-  // MARK: - Badge Management
+  // MARK: - Badge
 
   private func addBadge(count: Int) {
-    // Remove existing badge first
     removeBadge()
-
-    // Format badge text (show "99+" for counts > 99)
-    let badgeText = count > 99 ? "99+" : "\(count)"
-
-    // Create badge container
     let badge = NSView()
     badge.wantsLayer = true
     badge.layer?.backgroundColor = NSColor.systemRed.cgColor
     badge.layer?.cornerRadius = 10
     badge.translatesAutoresizingMaskIntoConstraints = false
-
-    // Create badge label
-    let textField = NSTextField(labelWithString: badgeText)
-    textField.textColor = .white
-    textField.font = .systemFont(ofSize: 12, weight: .semibold)
-    textField.alignment = .center
-    textField.translatesAutoresizingMaskIntoConstraints = false
-
-    badge.addSubview(textField)
+    let label = NSTextField(labelWithString: count > 99 ? "99+" : "\(count)")
+    label.textColor = .white
+    label.font = .systemFont(ofSize: 12, weight: .semibold)
+    label.alignment = .center
+    label.translatesAutoresizingMaskIntoConstraints = false
+    badge.addSubview(label)
     addSubview(badge)
-
-    // Store references
     badgeView = badge
-    badgeTextField = textField
-
-    // Layout constraints for label inside badge
     NSLayoutConstraint.activate([
-      textField.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 5),
-      textField.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -5),
-      textField.topAnchor.constraint(equalTo: badge.topAnchor, constant: 2),
-      textField.bottomAnchor.constraint(equalTo: badge.bottomAnchor, constant: -2),
-    ])
-
-    // Badge positioning constraints (top-right corner)
-    NSLayoutConstraint.activate([
-      badge.topAnchor.constraint(equalTo: topAnchor, constant: 0),
-      badge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: 0),
+      label.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 5),
+      label.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -5),
+      label.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
+      badge.topAnchor.constraint(equalTo: topAnchor),
+      badge.trailingAnchor.constraint(equalTo: trailingAnchor),
       badge.heightAnchor.constraint(equalToConstant: 20),
       badge.widthAnchor.constraint(greaterThanOrEqualToConstant: 20),
     ])
@@ -639,20 +380,77 @@ class CupertinoButtonNSView: NSView {
   private func removeBadge() {
     badgeView?.removeFromSuperview()
     badgeView = nil
-    badgeTextField = nil
   }
 }
 
-private extension NSImage {
-  func tinted(with color: NSColor) -> NSImage {
-    guard isTemplate else { return self }
-    let image = self.copy() as! NSImage
-    image.lockFocus()
-    color.set()
-    let imageRect = NSRect(origin: .zero, size: image.size)
-    imageRect.fill(using: .sourceAtop)
-    image.unlockFocus()
-    image.isTemplate = false
-    return image
+/// A button's image as Flutter describes it: an image asset, raw bytes, a
+/// custom icon rendered by Flutter or an SF Symbol, with size, colour and
+/// rendering mode. Shared by `CNButton` and `CNPopupMenuButton`.
+struct IconSource {
+  var symbolName: String?
+  var assetPath: String?
+  var imageData: Data?
+  var imageFormat: String?
+  var customIconBytes: Data?
+  var size: CGFloat?
+  var color: NSColor?
+  var mode: String?
+  var palette: [NSColor] = []
+
+  /// Whether the image is the SF Symbol (no other source wins over it).
+  var isSymbol: Bool {
+    symbolName != nil && assetPath == nil && imageData == nil && customIconBytes == nil
+  }
+
+  /// Reads the `button*` keys of creation parameters.
+  mutating func read(_ dict: [String: Any]) {
+    symbolName = (dict["buttonIconName"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    assetPath = (dict["buttonAssetPath"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    imageData = (dict["buttonImageData"] as? FlutterStandardTypedData)?.data
+    imageFormat = dict["buttonImageFormat"] as? String
+    customIconBytes = (dict["buttonCustomIconBytes"] as? FlutterStandardTypedData)?.data
+    size = (dict["buttonIconSize"] as? NSNumber).map { CGFloat(truncating: $0) }
+    color = (dict["buttonIconColor"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+    mode = dict["buttonIconRenderingMode"] as? String
+    palette = ((dict["buttonIconPaletteColors"] as? [NSNumber]) ?? []).map { ImageUtils.colorFromARGB($0.intValue) }
+  }
+
+  /// Applies a `setButtonIcon` update: a new source replaces the old one;
+  /// size, colour and mode change only when sent.
+  mutating func update(_ args: [String: Any]) {
+    let hasAsset = (args["buttonAssetPath"] as? String).map { !$0.isEmpty } ?? false
+    let hasData = args["buttonImageData"] is FlutterStandardTypedData
+    let hasCustom = args["buttonCustomIconBytes"] is FlutterStandardTypedData
+    let hasSymbol = (args["buttonIconName"] as? String).map { !$0.isEmpty } ?? false
+    if hasAsset || hasData || hasCustom || hasSymbol {
+      symbolName = nil; assetPath = nil; imageData = nil; imageFormat = nil; customIconBytes = nil
+      if hasAsset { assetPath = args["buttonAssetPath"] as? String }
+      if hasData { imageData = (args["buttonImageData"] as? FlutterStandardTypedData)?.data }
+      if hasAsset || hasData { imageFormat = args["buttonImageFormat"] as? String }
+      if hasCustom { customIconBytes = (args["buttonCustomIconBytes"] as? FlutterStandardTypedData)?.data }
+      if hasSymbol { symbolName = args["buttonIconName"] as? String }
+    }
+    if let s = args["buttonIconSize"] as? NSNumber { size = CGFloat(truncating: s) }
+    if let c = args["buttonIconColor"] as? NSNumber { color = ImageUtils.colorFromARGB(c.intValue) }
+    if let m = args["buttonIconRenderingMode"] as? String { mode = m }
+    if let p = args["buttonIconPaletteColors"] as? [NSNumber] { palette = p.map { ImageUtils.colorFromARGB($0.intValue) } }
+  }
+
+  /// The image to show, by the iOS priority: image asset or bytes, then a
+  /// custom icon, then the SF Symbol.
+  func makeImage() -> NSImage? {
+    if assetPath != nil || imageData != nil || customIconBytes != nil {
+      let image = ImageUtils.image(
+        assetPath: assetPath,
+        imageData: imageData,
+        format: imageFormat,
+        customIconBytes: assetPath == nil && imageData == nil ? customIconBytes : nil,
+        size: size,
+        color: color
+      )
+      if image != nil { return image }
+    }
+    guard let name = symbolName else { return nil }
+    return ImageUtils.symbolImage(name: name, size: size, color: color, mode: mode, palette: palette)
   }
 }
