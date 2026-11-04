@@ -121,17 +121,26 @@ final class ImageUtils {
       let svgSize = size ?? CGSize(width: 24, height: 24)
       image = SVGImageLoader.shared.loadSVG(from: assetPath, size: svgSize)
     } else {
-      // Use UIImage for raster images (PNG, JPG, etc.)
-      image = UIImage(contentsOfFile: path)
+      // Raster images (PNG, JPG, ...): a variant from a `2.0x`/`3.0x` folder
+      // has that many pixels per point. Read at scale 1, a 72 px @3x icon
+      // was drawn 72 pt wide and clipped by its button.
+      if let data = FileManager.default.contents(atPath: path) {
+        image = UIImage(data: data, scale: assetDensity(of: path))
+      }
+      if let img = image, let target = size, target.width > 0, target.height > 0,
+        img.size != target
+      {
+        image = fit(img, in: target, scale: scale)
+      }
     }
-    
+
     // Apply tinting if color is provided
     if let img = image, let col = color, #available(iOS 13.0, *) {
       let targetSize = size ?? img.size
       let isSVG = detectedFormat == "svg"
       return tintImage(img, with: col, size: targetSize, isSVG: isSVG, scale: scale)
     }
-    
+
     return image
   }
   
@@ -195,7 +204,32 @@ final class ImageUtils {
     image.draw(in: CGRect(origin: .zero, size: size))
     return UIGraphicsGetImageFromCurrentImageContext() ?? image
   }
-  
+
+  /// Pixels per point of a Flutter asset variant, from its folder: 3 for
+  /// `.../3.0x/icon.png`, 1 for the base file.
+  static func assetDensity(of path: String) -> CGFloat {
+    let folder = ((path as NSString).deletingLastPathComponent as NSString).lastPathComponent
+    if folder.hasSuffix("x"), let value = Double(folder.dropLast()), value > 0 {
+      return CGFloat(value)
+    }
+    return 1
+  }
+
+  /// Draws `image` aspect-fit and centred on a canvas of `size` points.
+  static func fit(_ image: UIImage, in size: CGSize, scale: CGFloat) -> UIImage {
+    guard image.size.width > 0, image.size.height > 0 else { return image }
+    let ratio = min(size.width / image.size.width, size.height / image.size.height)
+    let drawn = CGSize(width: image.size.width * ratio, height: image.size.height * ratio)
+    let origin = CGPoint(x: (size.width - drawn.width) / 2, y: (size.height - drawn.height) / 2)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = scale
+    format.opaque = false
+    let fitted = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+      image.draw(in: CGRect(origin: origin, size: drawn))
+    }
+    return fitted.withRenderingMode(image.renderingMode)
+  }
+
   // MARK: - Image Tinting
   
   /// Applies a color tint to an image using mask-based approach

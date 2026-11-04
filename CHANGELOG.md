@@ -36,6 +36,7 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 
 - `CNTabBar` did not send a change of an item's `imageAsset`, `activeImageAsset`, image bytes or `customIcon` to the native bar once it was created, and after `setItems` an asset could be swapped for its blurry 1x file. Both are fixed, on iOS and macOS.
 - iOS: a raster `imageAsset` in `CNTabBar` was drawn at its pixel size, far larger than the tab; it now fits the item.
+- iOS: a PNG or JPG `imageAsset` on a `CNPopupMenuButton` (and wherever a raster asset is loaded with a size) was read at one pixel per point and not fitted, so a @3x icon was drawn three times too large and clipped: the popup's check-circle showed as a blurry zoomed checkmark, and a tinted one showed no icon. Raster assets now use their variant's density and fit the requested size.
 - iOS: in debug builds the first SVG an app showed could be missing. SVGKit's device check threw on the first parse, which a warm-up parse raced; the warm-up now runs before any real SVG.
 - iOS (#66): uncoloured single-colour image assets on `CNButton` and `CNPopupMenuButton` are now drawn as templates that take the tint or adapt to the glass, as 1.6.0 intended. The check that decides it never ran: Core Graphics rejected the bitmap context it used.
 - iOS: `CNButtonConfig.labelFontWeight` was ignored.
