@@ -75,9 +75,7 @@ void main() {
       expect(circle.value, isNull);
     }, variant: android);
 
-    testWidgets('a bar in an unbounded row gets a fixed width', (
-      tester,
-    ) async {
+    testWidgets('a bar in an unbounded row gets a fixed width', (tester) async {
       await tester.pumpWidget(
         const CupertinoApp(
           home: Row(children: [CNProgressIndicator(value: 0.5)]),

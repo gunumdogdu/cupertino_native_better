@@ -125,7 +125,8 @@ void main() {
       final calls = mockChannel((call) async => <int>[3, 1]);
       await _withPlatform(TargetPlatform.macOS, () async {
         final selected = await pumpMenu(tester, brightness: Brightness.dark);
-        final at = tester.getTopLeft(find.byKey(childKey)) + const Offset(30, 20);
+        final at =
+            tester.getTopLeft(find.byKey(childKey)) + const Offset(30, 20);
         await secondaryClick(tester, at);
 
         expect(calls, hasLength(1));
@@ -134,10 +135,13 @@ void main() {
         expect(args['x'], at.dx);
         expect(args['y'], at.dy);
         expect(args['isDark'], true);
-        expect(
-          (args['menu']! as Map<Object?, Object?>)['labels'],
-          ['Copy', 'Share', '', 'Move to', 'Delete'],
-        );
+        expect((args['menu']! as Map<Object?, Object?>)['labels'], [
+          'Copy',
+          'Share',
+          '',
+          'Move to',
+          'Delete',
+        ]);
         expect(selected, [
           [3, 1],
         ]);
@@ -256,9 +260,7 @@ void main() {
     testWidgets('below iOS 17.4 the menu falls back to an action sheet', (
       tester,
     ) async {
-      mockChannel(
-        (call) async => throw PlatformException(code: 'unavailable'),
-      );
+      mockChannel((call) async => throw PlatformException(code: 'unavailable'));
       await _withPlatform(TargetPlatform.iOS, () async {
         final selected = await pumpMenu(tester);
         await tester.longPress(find.byKey(childKey));
@@ -313,7 +315,6 @@ void main() {
       });
     });
   });
-
 }
 
 /// Runs [body] with [debugDefaultTargetPlatformOverride] set, clearing it

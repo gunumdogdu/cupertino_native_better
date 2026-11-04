@@ -762,10 +762,7 @@ void main() {
 
     testWidgets('a cancel answer still reports its value', (tester) async {
       mockChannel(
-        (call) async => <String, Object?>{
-          'index': 0,
-          'textFields': <String>[],
-        },
+        (call) async => <String, Object?>{'index': 0, 'textFields': <String>[]},
       );
 
       await _withPlatform(TargetPlatform.macOS, () async {
@@ -792,9 +789,7 @@ void main() {
     testWidgets('no window to attach the sheet to resolves to null', (
       tester,
     ) async {
-      mockChannel(
-        (call) async => throw PlatformException(code: 'no_window'),
-      );
+      mockChannel((call) async => throw PlatformException(code: 'no_window'));
 
       await _withPlatform(TargetPlatform.macOS, () async {
         final context = await _pumpContext(tester);

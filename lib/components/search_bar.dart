@@ -499,27 +499,25 @@ class _CNSearchBarState extends State<CNSearchBar>
   }
 
   /// The creation parameters of the native views.
-  Map<String, dynamic> _creationParams(BuildContext context) =>
-      <String, dynamic>{
-        'placeholder': widget.placeholder,
-        'expandable': widget.expandable,
-        'initiallyExpanded': widget.initiallyExpanded,
-        'collapsedWidth': widget.collapsedWidth,
-        'expandedHeight': widget.expandedHeight,
-        'tint': resolveColorToArgb(widget.tint, context),
-        'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
-        'textColor': resolveColorToArgb(widget.textColor, context),
-        'placeholderColor': resolveColorToArgb(
-          widget.placeholderColor,
-          context,
-        ),
-        'showCancelButton': widget.showCancelButton,
-        'cancelText': widget.cancelText,
-        'autofocus': widget.autofocus,
-        'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
-        'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
-        'isDark': ThemeHelper.isDark(context),
-      };
+  Map<String, dynamic> _creationParams(
+    BuildContext context,
+  ) => <String, dynamic>{
+    'placeholder': widget.placeholder,
+    'expandable': widget.expandable,
+    'initiallyExpanded': widget.initiallyExpanded,
+    'collapsedWidth': widget.collapsedWidth,
+    'expandedHeight': widget.expandedHeight,
+    'tint': resolveColorToArgb(widget.tint, context),
+    'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
+    'textColor': resolveColorToArgb(widget.textColor, context),
+    'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
+    'showCancelButton': widget.showCancelButton,
+    'cancelText': widget.cancelText,
+    'autofocus': widget.autofocus,
+    'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
+    'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
+    'isDark': ThemeHelper.isDark(context),
+  };
 
   /// macOS: an `NSSearchField` as wide as the parent allows (the window
   /// when the parent is unbounded), or a [CNSearchBar.collapsedWidth] wide

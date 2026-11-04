@@ -103,15 +103,19 @@ void main() {
   });
 
   group('CNIcon without a colour', () {
-    testWidgets('is created in the theme label colour', (tester) async {
-      await pumpHost(
-        tester,
-        const CNIcon(symbol: CNSymbol('heart')),
-        brightness: Brightness.dark,
-      );
-      expect(createdColor(), _white);
-      debugDefaultTargetPlatformOverride = null;
-    }, skip: !(Platform.isMacOS || Platform.isIOS));
+    testWidgets(
+      'is created in the theme label colour',
+      (tester) async {
+        await pumpHost(
+          tester,
+          const CNIcon(symbol: CNSymbol('heart')),
+          brightness: Brightness.dark,
+        );
+        expect(createdColor(), _white);
+        debugDefaultTargetPlatformOverride = null;
+      },
+      skip: !(Platform.isMacOS || Platform.isIOS),
+    );
 
     testWidgets('follows a runtime theme change', (tester) async {
       final host = await pumpHost(
@@ -130,33 +134,39 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }, skip: !(Platform.isMacOS || Platform.isIOS));
 
-    testWidgets('leaves hierarchical mode to the native default', (
-      tester,
-    ) async {
-      await pumpHost(
-        tester,
-        const CNIcon(
-          symbol: CNSymbol('heart'),
-          mode: CNSymbolRenderingMode.hierarchical,
-        ),
-        brightness: Brightness.dark,
-      );
-      expect(createdColor(), isNull);
-      debugDefaultTargetPlatformOverride = null;
-    }, skip: !(Platform.isMacOS || Platform.isIOS));
+    testWidgets(
+      'leaves hierarchical mode to the native default',
+      (tester) async {
+        await pumpHost(
+          tester,
+          const CNIcon(
+            symbol: CNSymbol('heart'),
+            mode: CNSymbolRenderingMode.hierarchical,
+          ),
+          brightness: Brightness.dark,
+        );
+        expect(createdColor(), isNull);
+        debugDefaultTargetPlatformOverride = null;
+      },
+      skip: !(Platform.isMacOS || Platform.isIOS),
+    );
   });
 
-  testWidgets('a given colour wins over the theme', (tester) async {
-    final host = await pumpHost(
-      tester,
-      const CNIcon(symbol: CNSymbol('heart'), color: Color(_red)),
-      brightness: Brightness.dark,
-    );
-    expect(createdColor(), _red);
+  testWidgets(
+    'a given colour wins over the theme',
+    (tester) async {
+      final host = await pumpHost(
+        tester,
+        const CNIcon(symbol: CNSymbol('heart'), color: Color(_red)),
+        brightness: Brightness.dark,
+      );
+      expect(createdColor(), _red);
 
-    host.currentState!.setBrightness(Brightness.light);
-    await tester.pumpAndSettle();
-    expect(sentColors(), isEmpty);
-    debugDefaultTargetPlatformOverride = null;
-  }, skip: !(Platform.isMacOS || Platform.isIOS));
+      host.currentState!.setBrightness(Brightness.light);
+      await tester.pumpAndSettle();
+      expect(sentColors(), isEmpty);
+      debugDefaultTargetPlatformOverride = null;
+    },
+    skip: !(Platform.isMacOS || Platform.isIOS),
+  );
 }

@@ -90,10 +90,7 @@ void main() {
       host.currentState!.setTint(null);
       await tester.pumpAndSettle();
 
-      expect(styleCalls(), [
-        '{tint: ${0xFFFFCC00}}',
-        '{clearTint: true}',
-      ]);
+      expect(styleCalls(), ['{tint: ${0xFFFFCC00}}', '{clearTint: true}']);
       debugDefaultTargetPlatformOverride = null;
     },
     skip: !PlatformVersion.shouldUseNativeGlass,

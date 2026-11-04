@@ -147,8 +147,9 @@ class CNContextMenuState extends State<CNContextMenu> {
           TapGestureRecognizer:
               GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
                 () => TapGestureRecognizer(debugOwner: this),
-                (t) => t.onSecondaryTapUp = (d) =>
-                    showMenu(globalPosition: d.globalPosition),
+                (t) =>
+                    t.onSecondaryTapUp = (d) =>
+                        showMenu(globalPosition: d.globalPosition),
               ),
           // A long press is the touch gesture for a context menu; with a
           // mouse it is not, so desktops leave it to the child.
@@ -166,8 +167,9 @@ class CNContextMenuState extends State<CNContextMenu> {
                   ControlClickGestureRecognizer
                 >(
                   () => ControlClickGestureRecognizer(debugOwner: this),
-                  (c) => c.onControlClick = (position) =>
-                      showMenu(globalPosition: position),
+                  (c) =>
+                      c.onControlClick = (position) =>
+                          showMenu(globalPosition: position),
                 ),
         },
         child: widget.child,
