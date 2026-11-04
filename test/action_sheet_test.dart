@@ -123,8 +123,10 @@ void main() {
       expect(await sentIsDark(tester, theme: Brightness.dark), true);
     });
 
-    testWidgets('no theme brightness follows the system', (tester) async {
-      expect(await sentIsDark(tester, system: Brightness.dark), true);
+    testWidgets('no theme brightness leaves the style to the system', (
+      tester,
+    ) async {
+      expect(await sentIsDark(tester, system: Brightness.dark), isNull);
     });
   });
 

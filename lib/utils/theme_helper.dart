@@ -42,4 +42,14 @@ class ThemeHelper {
   static bool isDark(BuildContext context) {
     return getBrightness(context) == Brightness.dark;
   }
+
+  /// Whether the theme itself is dark, or null when the theme sets no
+  /// brightness and follows the system.
+  ///
+  /// For native modals: a style set when one opens stays until it closes, so
+  /// a modal that should follow the system gets none.
+  static bool? themeIsDark(BuildContext context) {
+    final brightness = CupertinoTheme.of(context).brightness;
+    return brightness == null ? null : brightness == Brightness.dark;
+  }
 }

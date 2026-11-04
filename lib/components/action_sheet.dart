@@ -175,7 +175,7 @@ class CNActionSheet {
       message: message,
       cancelLabel: cancelLabel,
       anchorRect: anchorRect,
-      isDark: context.mounted ? ThemeHelper.isDark(context) : null,
+      isDark: context.mounted ? ThemeHelper.themeIsDark(context) : null,
     );
   }
 
