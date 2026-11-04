@@ -1212,11 +1212,26 @@ channel.setMethodCallHandler { [weak self] call, result in
   }
 
   private static func loadFlutterAsset(_ assetPath: String, size: CGSize? = nil) -> UIImage? {
-    return ImageUtils.loadFlutterAsset(assetPath, size: size)
+    return fitted(ImageUtils.loadFlutterAsset(assetPath, size: size), in: size)
   }
 
   private static func createImageFromData(_ data: Data, format: String?, scale: CGFloat, size: CGSize? = nil) -> UIImage? {
-    return ImageUtils.createImageFromData(data, format: format, size: size, scale: scale)
+    return fitted(ImageUtils.createImageFromData(data, format: format, size: size, scale: scale), in: size)
+  }
+
+  /// `image` scaled to fit `size`, keeping its aspect ratio. An SVG comes
+  /// back at the item size already, but a raster asset at its pixel size: a
+  /// 24 pt icon from a `3.0x` folder was drawn 72 pt tall over the bar.
+  private static func fitted(_ image: UIImage?, in size: CGSize?) -> UIImage? {
+    guard let image = image, let box = size, box.width > 0, box.height > 0,
+          image.size.width > 0, image.size.height > 0 else { return image }
+    let factor = min(box.width / image.size.width, box.height / image.size.height)
+    let target = CGSize(width: image.size.width * factor, height: image.size.height * factor)
+    if abs(target.width - image.size.width) < 0.5 && abs(target.height - image.size.height) < 0.5 {
+      return image
+    }
+    let scaled = ImageUtils.scaleImage(image, to: target, scale: UIScreen.main.scale) ?? image
+    return scaled.withRenderingMode(image.renderingMode)
   }
 
 }

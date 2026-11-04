@@ -20,7 +20,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _macSources = 'macos/cupertino_native_better/Sources/cupertino_native_better';
+const _macSources =
+    'macos/cupertino_native_better/Sources/cupertino_native_better';
 
 /// Methods a widget may send with invokeMethod although macOS does not
 /// answer them, because only its iOS code path sends them. Empty: add a

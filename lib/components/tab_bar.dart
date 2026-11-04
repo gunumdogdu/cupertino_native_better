@@ -1250,13 +1250,26 @@ class _CNTabBarState extends State<CNTabBar> {
         final customIconBytes = iconBytes[0];
         final activeCustomIconBytes = iconBytes[1];
 
-        // Extract imageAsset properties
-        final imageAssetPaths = widget.items
-            .map((e) => e.imageAsset?.assetPath ?? '')
-            .toList();
-        final activeImageAssetPaths = widget.items
-            .map((e) => e.activeImageAsset?.assetPath ?? '')
-            .toList();
+        // Extract imageAsset properties. The paths are resolved for the
+        // pixel ratio, as at creation: the 1x file of an asset with `2.0x` and
+        // `3.0x` variants came out blurred.
+        final imageAssetPaths = await Future.wait(
+          widget.items.map(
+            (e) async => e.imageAsset != null
+                ? await resolveAssetPathForPixelRatio(e.imageAsset!.assetPath)
+                : '',
+          ),
+        );
+        final activeImageAssetPaths = await Future.wait(
+          widget.items.map(
+            (e) async => e.activeImageAsset != null
+                ? await resolveAssetPathForPixelRatio(
+                    e.activeImageAsset!.assetPath,
+                  )
+                : '',
+          ),
+        );
+        if (!mounted || _channel != ch) return;
         final imageAssetData = widget.items
             .map((e) => e.imageAsset?.imageData)
             .toList();

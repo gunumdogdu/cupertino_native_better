@@ -279,9 +279,7 @@ class _TabBarDemoPageState extends State<TabBarDemoPage> {
                 onTap: (i) => setState(() => _imageTab = i),
               ),
               CupertinoButton(
-                child: Text(
-                  _alternateImages ? 'Home icon' : 'Profile icon',
-                ),
+                child: Text(_alternateImages ? 'Home icon' : 'Profile icon'),
                 onPressed: () =>
                     setState(() => _alternateImages = !_alternateImages),
               ),
