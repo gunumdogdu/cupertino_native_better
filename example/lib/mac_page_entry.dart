@@ -8,7 +8,11 @@
 //   flutter run -d macos -t lib/mac_page_entry.dart --dart-define=PAGES=main
 //     (PAGES: a comma list of names, `main` for the Showcase, Components and
 //     Navigation sections plus Alert, or `all`; HOLD=<s> per page;
-//     BRIGHTNESS=dark; DELAY=<s> before the first push)
+//     BRIGHTNESS=dark; DELAY=<s> before the first push; SCROLL=<px> scrolls
+//     the page by that much once it is open, or to its end with -1;
+//     OPEN_MENU=<n> then clicks the n-th CNPopupMenuButton of the page and
+//     prints `MACPAGE_MENU <name>` while its menu is open; BACK=true clicks
+//     the page's back button and prints `MACPAGE_BACK <name> home|stayed`)
 //
 // It prints `MACPAGE_PUSH <name>` before each push and `MACPAGE_READY <name>`
 // once the page has settled, so a script can screenshot each page. A page
@@ -99,6 +103,12 @@ const String _page = String.fromEnvironment('PAGE');
 const String _pages = String.fromEnvironment('PAGES');
 const int _hold = int.fromEnvironment('HOLD', defaultValue: 4);
 const int _delay = int.fromEnvironment('DELAY', defaultValue: 3);
+const int _scroll = int.fromEnvironment('SCROLL');
+const int _openMenu = int.fromEnvironment('OPEN_MENU', defaultValue: -1);
+
+/// Clicks the open page's navigation bar back button once it is ready and
+/// prints `MACPAGE_BACK <name> home` when that took the app back home.
+const bool _back = bool.fromEnvironment('BACK');
 
 /// Opens each page with a synthesized mouse click on its home-list tile
 /// (through AppKit, like a real click) instead of a programmatic push.
@@ -495,13 +505,122 @@ Future<void> _drive() async {
       );
     }
     await Future<void>.delayed(const Duration(milliseconds: 2500));
+    if (_scroll != 0) {
+      await _scrollPage();
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+    }
+    if (_tap || _realClick) {
+      // Brings the window to the front and makes it key, so AppKit controls
+      // show their active-window look in a screenshot taken now.
+      await _auditChannel.invokeMethod<void>('toScreen', <String, double>{
+        'x': 0,
+        'y': 0,
+      });
+    }
     debugPrint('MACPAGE_READY $name');
+    if (_openMenu >= 0) {
+      await _clickPopupMenuButton(_openMenu);
+      debugPrint('MACPAGE_MENU $name');
+    }
+    if (_back) {
+      await _clickBackButton();
+      final home = !_navigatorKey.currentState!.canPop();
+      debugPrint('MACPAGE_BACK $name ${home ? 'home' : 'stayed'}');
+      continue;
+    }
     await Future<void>.delayed(const Duration(seconds: _hold));
     if (pages.length == 1) break;
     _navigatorKey.currentState!.popUntil((route) => route.isFirst);
     await Future<void>.delayed(const Duration(milliseconds: 1500));
   }
   debugPrint('MACPAGE_DONE');
+}
+
+/// SCROLL: scrolls the open page's vertical list by [_scroll] points, or to
+/// its end when negative. The page's list is the last vertical one in the
+/// tree, as the pushed route comes after the home page.
+Future<void> _scrollPage() async {
+  ScrollableState? last;
+  void visit(Element e) {
+    if (e is StatefulElement &&
+        e.state is ScrollableState &&
+        (e.state as ScrollableState).position.axis == Axis.vertical) {
+      last = e.state as ScrollableState;
+    }
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement!.visitChildren(visit);
+  final position = last?.position;
+  if (position == null) return;
+  // A lazily built list learns its full extent while it scrolls, so jump
+  // again until the end stops moving.
+  for (var i = 0; i < 20; i++) {
+    final extent = position.maxScrollExtent;
+    position.jumpTo(
+      _scroll < 0 ? extent : _scroll.toDouble().clamp(0.0, extent),
+    );
+    await WidgetsBinding.instance.endOfFrame;
+    if (position.maxScrollExtent == extent) break;
+  }
+}
+
+/// OPEN_MENU: clicks the [index]-th CNPopupMenuButton of the open page, with
+/// an AppKit click, so its menu opens.
+Future<void> _clickPopupMenuButton(int index) async {
+  final boxes = <RenderBox>[];
+  void visit(Element e) {
+    if (e.widget is CNPopupMenuButton) {
+      final box = e.findRenderObject();
+      final onTop = ModalRoute.of(e)?.isCurrent ?? false;
+      if (onTop && box is RenderBox && box.attached) boxes.add(box);
+      return;
+    }
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement!.visitChildren(visit);
+  // The open page's buttons, in tree order.
+  if (index >= boxes.length) {
+    debugPrint('MACPAGE_UNKNOWN popup $index of ${boxes.length}');
+    return;
+  }
+  final box = boxes[index];
+  final center = box.localToGlobal(box.size.center(Offset.zero));
+  await _auditChannel.invokeMethod<void>('click', <String, double>{
+    'x': center.dx,
+    'y': center.dy,
+  });
+  await Future<void>.delayed(const Duration(milliseconds: 1500));
+}
+
+/// BACK: clicks the open page's navigation bar back button, with an AppKit
+/// click.
+Future<void> _clickBackButton() async {
+  RenderBox? found;
+  void visit(Element e) {
+    if (found != null) return;
+    if (e.widget is CupertinoNavigationBarBackButton &&
+        (ModalRoute.of(e)?.isCurrent ?? false)) {
+      final box = e.findRenderObject();
+      if (box is RenderBox && box.attached) found = box;
+      return;
+    }
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement!.visitChildren(visit);
+  final box = found;
+  if (box == null) {
+    debugPrint('MACPAGE_UNKNOWN back button');
+    return;
+  }
+  final center = box.localToGlobal(box.size.center(Offset.zero));
+  await _auditChannel.invokeMethod<void>('click', <String, double>{
+    'x': center.dx,
+    'y': center.dy,
+  });
+  await Future<void>.delayed(const Duration(milliseconds: 1500));
 }
 
 /// `toggle_theme`: presses the home page's light/dark CNButton (a real click
