@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../mac_back_bar.dart';
+
 /// A map-style screen with a native sheet over it: it rests collapsed to its
 /// tab bar, medium or large, never closes, and keeps the screen behind it
 /// usable up to medium. Four pages put a tab bar inside the sheet.
@@ -161,7 +163,10 @@ class _NativeSheetDemoPageState extends State<NativeSheetDemoPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      MacBackBar(title: 'Native Sheet', child: _buildPage(context));
+
+  Widget _buildPage(BuildContext context) {
     final file = widget.backgroundFile;
     return CupertinoPageScaffold(
       child: Stack(
