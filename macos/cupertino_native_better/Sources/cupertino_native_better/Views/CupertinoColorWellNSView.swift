@@ -83,6 +83,8 @@ class CupertinoColorWellNSView: NSView {
         let label = args?["label"] as? String
         self.colorWell.setAccessibilityLabel((label?.isEmpty ?? true) ? nil : label)
         result(nil)
+      case "setInteractive":
+        result(nil)
       case "setBrightness":
         if let isDark = (args?["isDark"] as? NSNumber)?.boolValue {
           self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)

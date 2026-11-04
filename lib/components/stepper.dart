@@ -14,9 +14,9 @@ import '../utils/modal_hide_mixin.dart';
 ///
 /// On iOS 26+ this embeds the system stepper through a platform view, as a
 /// SwiftUI `Stepper`: it draws the same control as `UIStepper`, which on
-/// iOS 26+ ignores a tint and has no disabled look. On macOS 26+ it embeds
-/// an `NSStepper` (the small up/down arrows that sit next to a text field).
-/// Below iOS/macOS 26 and on other platforms it draws a Flutter stepper
+/// iOS 26+ ignores a tint and has no disabled look. On every macOS it
+/// embeds an `NSStepper` (the small up/down arrows that sit next to a text
+/// field). Below iOS 26 and on other platforms it draws a Flutter stepper
 /// shaped like the iOS 18 `UIStepper`.
 ///
 /// The stepper shows no number of its own; put the value in a label next to
@@ -168,7 +168,7 @@ class _CNStepperState extends State<CNStepper> with ModalHideMixin<CNStepper> {
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
     // Flutter has no stepper, so every platform without the native one gets
     // the same Cupertino-shaped fallback.

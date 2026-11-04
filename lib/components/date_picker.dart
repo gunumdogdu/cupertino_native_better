@@ -34,9 +34,11 @@ enum CNDatePickerMode {
 /// How a [CNDatePicker] is drawn.
 ///
 /// On iOS these are the `UIDatePickerStyle` values. macOS has no wheels and
-/// no compact pill; there [compact] and [wheels] use `NSDatePicker`'s text
-/// field and stepper ([compact] with its calendar overlay), and [inline] its
-/// clock and calendar.
+/// no compact pill; there each style is the `NSDatePicker` style closest to
+/// it: [compact] the text field, which opens a calendar when a date field is
+/// clicked, as the pill opens its popover; [wheels] the text field and
+/// stepper, whose arrows step the selected field as a wheel does; [inline]
+/// the clock and calendar.
 enum CNDatePickerStyle {
   /// Lets the platform choose. For every [CNDatePickerMode] but
   /// [CNDatePickerMode.yearAndMonth] this is [compact], as it is in UIKit.
@@ -59,9 +61,9 @@ enum CNDatePickerStyle {
 
 /// A Cupertino-native date and time picker rendered by the host platform.
 ///
-/// On iOS 26+ this embeds a `UIDatePicker`, and on macOS 26+ an
-/// `NSDatePicker`, through a platform view. Below 26 and on other platforms
-/// it falls back to [CupertinoDatePicker]: as wheels for
+/// On iOS 26+ this embeds a `UIDatePicker`, and on every macOS an
+/// `NSDatePicker`, through a platform view. Below iOS 26 and on other
+/// platforms it falls back to [CupertinoDatePicker]: as wheels for
 /// [CNDatePickerStyle.wheels] and [CNDatePickerStyle.inline], and for
 /// [CNDatePickerStyle.compact] as a pill that opens one in a popup.
 ///
@@ -285,9 +287,9 @@ class _CNDatePickerState extends State<CNDatePicker>
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
-    // Fallback to Flutter widgets for non-iOS/macOS or iOS/macOS < 26. Unlike
+    // Fallback to Flutter widgets for non-Apple platforms and iOS < 26. Unlike
     // the switch and slider, the fallback stays Cupertino on every platform:
     // there is no Material date picker that can be shown in place.
     if (!shouldUseNative) {

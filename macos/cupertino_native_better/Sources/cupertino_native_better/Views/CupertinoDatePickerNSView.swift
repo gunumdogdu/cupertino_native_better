@@ -3,11 +3,13 @@ import Cocoa
 
 /// `CNDatePicker` on macOS: an `NSDatePicker`.
 ///
-/// macOS has no wheels and no compact pill. The compact style is the text
-/// field and stepper with its calendar overlay, wheels the text field and
-/// stepper alone, and inline the clock and calendar. NSDatePicker has no
-/// minute step and no accent color: values are rounded to `minuteInterval`
-/// after each change, and the tint is ignored.
+/// macOS has no wheels and no compact pill; each style is the NSDatePicker
+/// style closest to it. Compact is the text field, which opens a calendar
+/// overlay when a date field is clicked (as the pill opens its popover);
+/// wheels the text field and stepper, whose arrows step the selected field;
+/// inline the clock and calendar. NSDatePicker has no minute step and no
+/// accent color: values are rounded to `minuteInterval` after each change,
+/// and the tint is ignored.
 class CupertinoDatePickerNSView: NSView {
   private let channel: FlutterMethodChannel
   private let picker: NSDatePicker
@@ -18,6 +20,9 @@ class CupertinoDatePickerNSView: NSView {
   private var mode: String = "date"
   private var minuteInterval: Int = 1
   private var lastReportedSize: NSSize = .zero
+  /// Room around the text field styles, whose bezel reaches past the
+  /// picker's fitting size.
+  private var inset: CGFloat { pickerStyle == "inline" ? 0 : 2 }
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeDatePicker_\(viewId)", binaryMessenger: messenger)
@@ -62,13 +67,14 @@ class CupertinoDatePickerNSView: NSView {
     switch pickerStyle {
     case "inline":
       picker.datePickerStyle = .clockAndCalendar
-    default:
+    case "wheels":
       picker.datePickerStyle = .textFieldAndStepper
       picker.isBezeled = true
-      if pickerStyle == "compact", #available(macOS 10.15.4, *) {
-        // Clicking the date opens a calendar, like the iOS pill's popover.
-        picker.presentsCalendarOverlay = true
-      }
+    default:
+      picker.datePickerStyle = .textField
+      picker.isBezeled = true
+      // Clicking a date field opens a calendar, like the iOS pill's popover.
+      picker.presentsCalendarOverlay = true
     }
     // Zone, locale, fields and range go before the date, which the picker
     // clamps against them.
@@ -93,7 +99,7 @@ class CupertinoDatePickerNSView: NSView {
       ])
     } else {
       NSLayoutConstraint.activate([
-        picker.leadingAnchor.constraint(equalTo: leadingAnchor),
+        picker.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
         picker.centerYAnchor.constraint(equalTo: centerYAnchor),
       ])
     }
@@ -147,6 +153,8 @@ class CupertinoDatePickerNSView: NSView {
         result(nil)
       case "setStyle":
         // NSDatePicker has no accent color; it follows the system's.
+        result(nil)
+      case "setInteractive":
         result(nil)
       case "setBrightness":
         if let isDark = (args?["isDark"] as? NSNumber)?.boolValue {
@@ -204,7 +212,8 @@ class CupertinoDatePickerNSView: NSView {
   // MARK: - Size
 
   private func measure() -> NSSize {
-    return picker.fittingSize
+    let size = picker.fittingSize
+    return NSSize(width: size.width + 2 * inset, height: size.height + 2 * inset)
   }
 
   private func reportSizeIfChanged() {
