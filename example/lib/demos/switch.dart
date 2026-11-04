@@ -27,6 +27,7 @@ class _SwitchDemoPageState extends State<SwitchDemoPage> {
                 Spacer(),
                 CNSwitch(
                   value: _basicSwitchValue,
+                  semanticLabel: 'Basic',
                   onChanged: (v) => setState(() => _basicSwitchValue = v),
                 ),
               ],
@@ -38,6 +39,7 @@ class _SwitchDemoPageState extends State<SwitchDemoPage> {
                 Spacer(),
                 CNSwitch(
                   value: _coloredSwitchValue,
+                  semanticLabel: 'Colored',
                   color: CupertinoColors.systemPink,
                   onChanged: (v) => setState(() => _coloredSwitchValue = v),
                 ),
@@ -48,7 +50,12 @@ class _SwitchDemoPageState extends State<SwitchDemoPage> {
               children: [
                 Text('Disabled'),
                 Spacer(),
-                CNSwitch(value: false, enabled: false, onChanged: (_) {}),
+                CNSwitch(
+                  value: false,
+                  enabled: false,
+                  semanticLabel: 'Disabled',
+                  onChanged: (_) {},
+                ),
               ],
             ),
           ],

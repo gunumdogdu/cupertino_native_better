@@ -43,8 +43,10 @@ class CNSwitchController {
 
 /// A Cupertino-native switch rendered by the host platform.
 ///
-/// On iOS/macOS this uses a platform view to embed UISwitch/NSSwitch, and
-/// falls back to Flutter's [Switch] on unsupported platforms.
+/// On iOS 26+ and on every macOS this embeds the system switch through a
+/// platform view (on macOS a SwiftUI toggle in the switch style, which draws
+/// the AppKit switch and takes [color]). Below iOS 26 it is a
+/// [CupertinoSwitch], and on other platforms Flutter's [Switch].
 class CNSwitch extends StatefulWidget {
   /// Creates a Cupertino-native switch.
   const CNSwitch({
@@ -147,9 +149,9 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
-    // Fallback to Flutter widgets for non-iOS/macOS or iOS/macOS < 26
+    // Fallback to Flutter widgets for non-Apple platforms and iOS < 26
     if (!shouldUseNative) {
       // For non-iOS/macOS, use Material Switch
       if (!isIOSOrMacOS) {
@@ -164,7 +166,7 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
         );
       }
 
-      // For iOS/macOS < 26, use CupertinoSwitch
+      // For iOS < 26, use CupertinoSwitch
       return _labelled(
         SizedBox(
           height: widget.height,

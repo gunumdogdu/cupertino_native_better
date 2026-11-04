@@ -29,8 +29,10 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
     var enabled: Bool = true
     var isDark: Bool = false
     var tint: UIColor? = nil
+    var semanticLabel: String? = nil
 
     if let dict = args as? [String: Any] {
+      if let v = dict["semanticLabel"] as? String, !v.isEmpty { semanticLabel = v }
       if let arr = dict["labels"] as? [String] { labels = arr }
       if let arr = dict["sfSymbols"] as? [String] { sfSymbols = arr }
       if let sizes = dict["sfSymbolSizes"] as? [NSNumber] {
@@ -74,6 +76,9 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
     control.selectedSegmentIndex = selectedIndex
     control.isEnabled = enabled
     if #available(iOS 13.0, *), let c = tint { control.selectedSegmentTintColor = c }
+    // What VoiceOver reads for the control (`CNSegmentedControl.semanticLabel`);
+    // each segment reads its own title.
+    applySemanticLabel(semanticLabel)
 
     control.translatesAutoresizingMaskIntoConstraints = false
     container.addSubview(control)
@@ -126,6 +131,10 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+      case "setSemanticLabel":
+        let label = (call.arguments as? [String: Any])?["label"] as? String
+        self.applySemanticLabel((label?.isEmpty ?? true) ? nil : label)
+        result(nil)
       case "setInteractive":
         if let args = call.arguments as? [String: Any],
            let interactive = (args["interactive"] as? NSNumber)?.boolValue {
@@ -141,6 +150,15 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  /// Names the control as a group, which VoiceOver reads when it moves into
+  /// the segments.
+  private func applySemanticLabel(_ label: String?) {
+    control.accessibilityLabel = label
+    if #available(iOS 13.0, *) {
+      control.accessibilityContainerType = label == nil ? .none : .semanticGroup
+    }
+  }
 
   private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
     guard let view = view else { return }

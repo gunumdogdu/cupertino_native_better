@@ -93,6 +93,8 @@ class CupertinoStepperNSView: NSView {
       case "setStyle":
         // NSStepper has no tint; `CNStepper.color` applies on iOS only.
         result(nil)
+      case "setInteractive":
+        result(nil)
       case "setBrightness":
         if let isDark = (args?["isDark"] as? NSNumber)?.boolValue {
           self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)

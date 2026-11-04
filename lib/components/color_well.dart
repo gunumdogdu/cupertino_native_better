@@ -14,10 +14,11 @@ import '../utils/modal_hide_mixin.dart';
 ///
 /// On iOS 26+ this embeds a `UIColorWell`, which presents
 /// `UIColorPickerViewController` (grid, spectrum and sliders, the
-/// eyedropper, saved colours) by itself. On macOS 26+ it embeds an
-/// `NSColorWell` in its minimal style, which opens the system colour popover.
-/// Below iOS/macOS 26 and on other platforms it draws a round swatch that
-/// opens a sheet with a palette of system colours.
+/// eyedropper, saved colours) by itself. On every macOS it embeds an
+/// `NSColorWell`: in its minimal style, which opens the system colour
+/// popover, on macOS 13+, and the bordered well that opens the colour panel
+/// on macOS 12. Below iOS 26 and on other platforms it draws a round swatch
+/// that opens a sheet with a palette of system colours.
 ///
 /// ```dart
 /// CNColorWell(
@@ -80,8 +81,10 @@ class CNColorWell extends StatefulWidget {
   /// Whether the control is interactive.
   final bool enabled;
 
-  /// Width and height of the well on iOS and in the fallback. The macOS well
-  /// keeps the system size.
+  /// Width and height of the well on iOS and in the fallback.
+  ///
+  /// The macOS well keeps the shape of `NSColorWell` (44 × 24 points at the
+  /// default 32) and scales with this size, e.g. 60.5 × 33 at 44.
   final double size;
 
   /// When true (default), destroys the native colour well's PlatformView
@@ -120,8 +123,13 @@ int _srgbArgb(Color color) {
       channel(c.b);
 }
 
-/// Size of the box an `NSColorWell` in the minimal style fills on macOS.
+/// Size of the box an `NSColorWell` in the minimal style fills on macOS at
+/// the default [CNColorWell.size] of 32. Other sizes scale it.
 const Size _kMacOSColorWellSize = Size(44, 24);
+
+/// The macOS well for a [CNColorWell.size] of [size]: the system shape,
+/// scaled so the default 32 gives the system size.
+Size _macOSColorWellSize(double size) => _kMacOSColorWellSize * (size / 32);
 
 class _CNColorWellState extends State<CNColorWell>
     with ModalHideMixin<CNColorWell> {
@@ -171,7 +179,7 @@ class _CNColorWellState extends State<CNColorWell>
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
     if (!shouldUseNative) {
       return _CNFallbackColorWell(
@@ -189,7 +197,7 @@ class _CNColorWellState extends State<CNColorWell>
     // A fixed size, so the well also works in a Row, where a platform view
     // would otherwise try to grow to an infinite width.
     final size = defaultTargetPlatform == TargetPlatform.macOS
-        ? _kMacOSColorWellSize
+        ? _macOSColorWellSize(widget.size)
         : Size.square(widget.size);
 
     // Issue #53 fix: when a modal is presented above our host route, destroy

@@ -5,13 +5,19 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/sf_symbol.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/optional_method_call.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 
 /// A Cupertino-native segmented control.
 ///
-/// Embeds a native UISegmentedControl/NSSegmentedControl for pixel-perfect
-/// fidelity on iOS and macOS.
+/// Embeds a native `UISegmentedControl` on iOS 26+ and an
+/// `NSSegmentedControl` on every macOS. Below iOS 26 and on other platforms
+/// it is a [CupertinoSegmentedControl].
+///
+/// The control fills the width it is given, with equal segments, unless
+/// [shrinkWrap] is set; that holds on iOS and macOS alike. On macOS the
+/// control keeps the system height and is centred in [height].
 class CNSegmentedControl extends StatefulWidget {
   /// Creates a Cupertino-native segmented control.
   const CNSegmentedControl({
@@ -30,6 +36,7 @@ class CNSegmentedControl extends StatefulWidget {
     this.iconGradientEnabled,
     this.iconRenderingMode,
     this.autoHideOnModal = true,
+    this.semanticLabel,
   });
 
   /// Segment labels to display, in order.
@@ -78,6 +85,13 @@ class CNSegmentedControl extends StatefulWidget {
   /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
   final bool autoHideOnModal;
 
+  /// What VoiceOver reads for the control as a whole, e.g. `'Appearance'`.
+  ///
+  /// Each segment already reads its own label; this names the group, which a
+  /// native control cannot take from the text next to it. Pass the same
+  /// text as its visible label.
+  final String? semanticLabel;
+
   @override
   State<CNSegmentedControl> createState() => _CNSegmentedControlState();
 }
@@ -96,6 +110,7 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
   bool? _lastEnabled;
   bool? _lastIsDark;
   int? _lastTint;
+  String? _lastSemanticLabel;
   double? _intrinsicWidth;
 
   bool get _isDark => ThemeHelper.isDark(context);
@@ -125,26 +140,28 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
-    // Fallback to Flutter widgets for non-iOS/macOS or iOS/macOS < 26
+    // Fallback to Flutter widgets for non-Apple platforms and iOS < 26
     if (!shouldUseNative) {
-      // For both non-iOS/macOS and iOS/macOS < 26, use CupertinoSegmentedControl
-      return SizedBox(
-        height: widget.height,
-        child: CupertinoSegmentedControl<int>(
-          // The default, primaryContrastingColor, is white in a dark theme too.
-          unselectedColor: CupertinoColors.systemBackground.resolveFrom(
-            context,
+      // For non-Apple platforms and iOS < 26, use CupertinoSegmentedControl
+      return _labelled(
+        SizedBox(
+          height: widget.height,
+          child: CupertinoSegmentedControl<int>(
+            // The default, primaryContrastingColor, is white in a dark theme too.
+            unselectedColor: CupertinoColors.systemBackground.resolveFrom(
+              context,
+            ),
+            children: {
+              for (var i = 0; i < widget.labels.length; i++)
+                i: Text(widget.labels[i]),
+            },
+            groupValue: widget.selectedIndex,
+            onValueChanged: widget.enabled
+                ? (i) => widget.onValueChanged(i)
+                : (_) {},
           ),
-          children: {
-            for (var i = 0; i < widget.labels.length; i++)
-              i: Text(widget.labels[i]),
-          },
-          groupValue: widget.selectedIndex,
-          onValueChanged: widget.enabled
-              ? (i) => widget.onValueChanged(i)
-              : (_) {},
         ),
       );
     }
@@ -167,6 +184,7 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
       'labels': widget.labels,
       'selectedIndex': widget.selectedIndex,
       'enabled': widget.enabled,
+      if (widget.semanticLabel != null) 'semanticLabel': widget.semanticLabel,
       'isDark': _isDark,
       'style': encodeStyle(context, tint: widget.color)
         ..addAll({
@@ -273,6 +291,14 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
     _lastEnabled = widget.enabled;
     _lastIsDark = _isDark;
     _lastTint = resolveColorToArgb(widget.color, context);
+    _lastSemanticLabel = widget.semanticLabel;
+  }
+
+  /// Names the fallback control with [CNSegmentedControl.semanticLabel].
+  Widget _labelled(Widget child) {
+    final label = widget.semanticLabel;
+    if (label == null) return child;
+    return Semantics(container: true, label: label, child: child);
   }
 
   Future<void> _syncPropsToNativeIfNeeded() async {
@@ -294,6 +320,12 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
     if (_lastTint != tint && tint != null) {
       await channel.invokeMethod('setStyle', {'tint': tint});
       _lastTint = tint;
+    }
+    if (_lastSemanticLabel != widget.semanticLabel) {
+      _lastSemanticLabel = widget.semanticLabel;
+      await channel.invokeOptionalMethod('setSemanticLabel', {
+        'label': widget.semanticLabel,
+      });
     }
   }
 

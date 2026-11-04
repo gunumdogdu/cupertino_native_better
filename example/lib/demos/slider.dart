@@ -32,6 +32,7 @@ class _SliderDemoPageState extends State<SliderDemoPage> {
               ],
             ),
             CNSlider(
+              semanticLabel: 'Default',
               value: _defaultSliderValue,
               min: 0,
               max: 100,
@@ -47,6 +48,7 @@ class _SliderDemoPageState extends State<SliderDemoPage> {
               ],
             ),
             CNSlider(
+              semanticLabel: 'Shared value',
               value: _defaultSliderValue,
               min: 0,
               max: 100,
@@ -62,6 +64,7 @@ class _SliderDemoPageState extends State<SliderDemoPage> {
               ],
             ),
             CNSlider(
+              semanticLabel: 'With color',
               value: _coloredSliderValue,
               min: 0,
               max: 100,
@@ -79,6 +82,7 @@ class _SliderDemoPageState extends State<SliderDemoPage> {
               ],
             ),
             CNSlider(
+              semanticLabel: 'Step slider',
               value: _stepSliderValue,
               min: 0,
               max: 100,
@@ -91,6 +95,7 @@ class _SliderDemoPageState extends State<SliderDemoPage> {
 
             const Text('Disabled'),
             CNSlider(
+              semanticLabel: 'Disabled',
               value: 50,
               min: 0,
               max: 100,

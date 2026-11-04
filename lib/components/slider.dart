@@ -53,19 +53,25 @@ enum CNSliderStyle {
   standard,
 
   /// No thumb: a thicker track that fills up to the value, as in media
-  /// players (`UISlider.Style.thumbless`, iOS 26+). macOS has no such style
-  /// and keeps the thumb, as do the Flutter fallbacks.
+  /// players (`UISlider.Style.thumbless`, iOS 26+). `NSSlider` has no such
+  /// style, so macOS keeps the thumb, as do the Flutter fallbacks.
   thumbless,
 }
 
 /// A Cupertino-native slider rendered by the host platform.
 ///
-/// On iOS/macOS this embeds UISlider/NSSlider via a platform view and falls
-/// back to Flutter's [Slider] on other platforms.
+/// On iOS 26+ and on every macOS this embeds a `UISlider` / `NSSlider`
+/// through a platform view. Below iOS 26 it is a [CupertinoSlider], and on
+/// other platforms Flutter's [Slider].
 ///
-/// On iOS 26+ and macOS 26+ the track can show tick marks ([numberOfTicks]
-/// or [tickValues]), snap to them ([allowsTickValuesOnly]) and fill from a
-/// [neutralValue]; iOS 26+ also has a [CNSliderStyle.thumbless] [style].
+/// The track can show tick marks ([numberOfTicks] or [tickValues]) and snap
+/// to them ([allowsTickValuesOnly]) on iOS 26+ and on macOS, and fill from a
+/// [neutralValue] on iOS 26+ and macOS 26+; iOS 26+ also has a
+/// [CNSliderStyle.thumbless] [style].
+///
+/// On macOS the track takes [color] / [trackColor]; `NSSlider` has no thumb
+/// colour and no colour for the unfilled track, so [thumbColor] and
+/// [trackBackgroundColor] apply on iOS only.
 class CNSlider extends StatefulWidget {
   /// Creates a Cupertino-native slider.
   const CNSlider({
@@ -156,18 +162,21 @@ class CNSlider extends StatefulWidget {
 
   /// Draws this many evenly spaced tick marks along the track, the first at
   /// [min] and the last at [max] (`UISlider.TrackConfiguration
-  /// (numberOfTicks:)` on iOS 26+, SwiftUI slider ticks on macOS 26+).
+  /// (numberOfTicks:)` on iOS 26+, `NSSlider` tick marks on macOS).
   ///
-  /// Below iOS/macOS 26 nothing is drawn, but with [allowsTickValuesOnly]
-  /// the Flutter fallback snaps to the same values (`divisions`). UIKit
-  /// draws no tick marks on a [CNSliderStyle.thumbless] slider.
+  /// Below iOS 26 nothing is drawn, but with [allowsTickValuesOnly] the
+  /// Flutter fallback snaps to the same values (`divisions`). UIKit draws no
+  /// tick marks on a [CNSliderStyle.thumbless] slider.
   final int? numberOfTicks;
 
   /// Draws tick marks at these values, which need not be evenly spaced.
   /// Use this or [numberOfTicks], not both.
   ///
-  /// Below iOS/macOS 26 nothing is drawn, but with [allowsTickValuesOnly]
-  /// the Flutter fallback snaps to the nearest of these values.
+  /// On macOS, values evenly spaced from [min] to [max] are `NSSlider` tick
+  /// marks; other values are drawn by the SwiftUI slider on macOS 26+, and
+  /// below macOS 26 only snapped to. Below iOS 26 nothing is drawn, but with
+  /// [allowsTickValuesOnly] the Flutter fallback snaps to the nearest of
+  /// these values.
   final List<double>? tickValues;
 
   /// Whether the slider only settles on tick values. Like UIKit, defaults to
@@ -176,7 +185,7 @@ class CNSlider extends StatefulWidget {
 
   /// The value the filled part of the track starts from, so a slider from
   /// -10 to 10 can fill outward from 0 (iOS 26+, macOS 26+). Null fills from
-  /// [min]. The Flutter fallbacks always fill from [min].
+  /// [min]. Older macOS and the Flutter fallbacks always fill from [min].
   final double? neutralValue;
 
   @override
@@ -322,9 +331,9 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
-    // Fallback to Flutter widgets for non-iOS/macOS or iOS/macOS < 26
+    // Fallback to Flutter widgets for non-Apple platforms and iOS < 26
     if (!shouldUseNative) {
       // For non-iOS/macOS, use Material Slider
       if (!isIOSOrMacOS) {
@@ -343,7 +352,7 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
         );
       }
 
-      // For iOS/macOS < 26, use CupertinoSlider
+      // For iOS < 26, use CupertinoSlider
       return _labelled(
         SizedBox(
           height: widget.height,
