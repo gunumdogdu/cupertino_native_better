@@ -127,8 +127,7 @@ class PlatformVersion {
   /// control should use it: on every supported macOS, where those controls
   /// predate Liquid Glass, and on iOS 26 or later. Styling that needs Liquid
   /// Glass keeps checking [isMacOS26OrLater] / [isIOS26OrLater].
-  static bool get shouldUseNativeControls =>
-      isIOS26OrLater || Platform.isMacOS;
+  static bool get shouldUseNativeControls => isIOS26OrLater || Platform.isMacOS;
 
   /// Alias for [shouldUseNativeGlass].
   static bool get supportsLiquidGlass => shouldUseNativeGlass;
@@ -168,6 +167,17 @@ class PlatformVersion {
       return version >= min && version <= max;
     }
     return version >= min;
+  }
+
+  /// Pretends the running OS has these major versions, so a test can check
+  /// the version gates (e.g. macOS 15, where [shouldUseNativeGlass] is false
+  /// but [shouldUseNativeControls] is true). [Platform] itself is not
+  /// changed. Call [reset] afterwards.
+  @visibleForTesting
+  static void debugOverrideVersions({int? iosVersion, int? macOSVersion}) {
+    _cachedIOSVersion = iosVersion;
+    _cachedMacOSVersion = macOSVersion;
+    _isInitialized = true;
   }
 
   /// Forces a refresh of the cached version (useful for testing).
