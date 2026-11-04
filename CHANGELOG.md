@@ -14,7 +14,7 @@ Some widgets sent the macOS view a method it did not implement (`setSemanticLabe
 - **`CNTabBar`** shows each tab's symbol and label, keeps the selected tab readable (it was blue on blue), is no longer clipped at the window's bottom, uses the macOS 27 tabs role, draws badges, follows item, badge, font and selection changes, and turns a search item into a search tab.
 - **`LiquidGlassContainer`** uses `NSGlassEffectView` on macOS 26, with its outline visible (it was clipped), and an `NSVisualEffectView` before 26.
 - **Image assets, image bytes, SVGs and custom icons** draw on macOS in `CNIcon`, `CNButton`, `CNPopupMenuButton` (button and items), `CNTabBar` (`imageAsset`, `activeImageAsset`) and `CNGlassButtonGroup`. SVGs are read by `NSImage` (checked on macOS 27.2).
-- **Menu item icons stay visible on macOS 27**, which hides them by default, and checked items show a checkmark.
+- **Native menus on macOS** (`CNPopupMenuButton`, `CNContextMenu`, `CNActionSheet`) are built the same way: disabled items are greyed out and can no longer be chosen, also inside submenus; destructive items are red; checked items show a checkmark; inline and palette sections end at a separator. Item icons stay visible on macOS 27, which hides them by default, and a single-colour icon with no colour follows the menu's text colour in light and dark. `keepsMenuPresented` has no AppKit equivalent and is ignored on macOS.
 - **VoiceOver:** `semanticLabel` reaches VoiceOver on macOS for `CNButton`, `CNPopupMenuButton`, `CNSlider`, `CNSwitch`, `CNSegmentedControl`, `CNStepper`, `CNDatePicker` and `CNColorWell`.
 
 ### macOS — dialogs, menus and search
