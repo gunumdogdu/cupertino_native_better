@@ -74,6 +74,11 @@
 //     pickers following the system (BRIGHTNESS=system, SCENARIO=alert opens
 //     the alert) and the segmented fallback (FALLBACK=true BRIGHTNESS=dark))
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=sheetdismiss
+//     (email 2026-11-04: menus in bottom sheets that do not close on an
+//     outside tap; host page with a native tab bar, OBSERVER=true, a
+//     floating + menu in sheet 1, "…" menus in the stacked sheet 2)
+//
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=sheet
 //     (2.1.0: CNNativeSheet over a map-style screen; BG=<image file> and
 //     AVATARS=<png>,<png> draw local files for screenshot comparisons;
@@ -114,6 +119,7 @@ import 'demos/pr94_tab_accessory_null_test.dart';
 import 'demos/alert.dart';
 import 'demos/tabbar_overlap_variants_test.dart';
 import 'demos/pr111_runtime_theme_test.dart';
+import 'demos/sheet_menus_dismiss_test.dart';
 import 'demos/prs_115_118_test.dart';
 import 'demos/issue60_tabbar_labels_after_pop_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
@@ -307,6 +313,7 @@ class _ProbeApp extends StatelessWidget {
     if (_probe == 'pr118') {
       return Pr118ThemeFollowPage(openAlert: _scenario == 'alert');
     }
+    if (_probe == 'sheetdismiss') return const SheetMenusDismissTestPage();
     if (_probe == 'pr111') {
       return const Pr111RuntimeThemeTestPage();
     }
