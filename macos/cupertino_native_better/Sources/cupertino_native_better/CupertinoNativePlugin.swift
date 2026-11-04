@@ -7,6 +7,13 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     let instance = CupertinoNativePlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
 
+    // Window-level presenters (no platform view): NSAlert sheets for CNAlert
+    // and CNActionSheet, NSMenus for anchored action sheets and context menus.
+    MacFlutterWindow.registrar = registrar
+    CNAlertManager.shared.setup(messenger: registrar.messenger)
+    CNActionSheetManager.shared.setup(messenger: registrar.messenger)
+    CNContextMenuManager.shared.setup(messenger: registrar.messenger)
+
     let sliderFactory = CupertinoSliderViewFactory(messenger: registrar.messenger)
     registrar.register(sliderFactory, withId: "CupertinoNativeSlider")
 
