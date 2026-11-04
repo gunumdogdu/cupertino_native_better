@@ -551,35 +551,28 @@ struct CNSheetPageView: View {
             list
             .modifier(CNClearNavigationBackground())
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // System sheets such as Find My's draw the title at the
-                // leading edge in Title Bold (28 pt at the default text
-                // size), beside the bar buttons; a large navigation title is
-                // 34 pt. Measured against Find My on iOS 27.
-                if #available(iOS 26.0, *) {
-                    ToolbarItem(placement: .topBarLeading) { title(page.title) }
-                        .sharedBackgroundVisibility(.hidden)
-                } else {
-                    ToolbarItem(placement: .topBarLeading) { title(page.title) }
-                }
-                ForEach(page.buttons.indices, id: \.self) { b in
-                    let button = page.buttons[b]
-                    ToolbarItem(placement: .topBarTrailing) {
-                        SwiftUI.Button {
-                            onEvent("onButtonTap", ["page": index, "id": button.id])
-                        } label: {
-                            if let symbol = button.symbol {
-                                Image(systemName: symbol)
-                            } else {
-                                Text(button.label ?? "")
-                            }
-                        }
-                        .accessibilityLabel(button.label ?? button.symbol ?? "")
-                    }
-                }
-            }
+            .modifier(CNSheetToolbar(title: title(page.title), buttons: buttons(of: page)))
         }
         .tint(store.tint.map { Color($0) })
+    }
+
+    @ToolbarContentBuilder
+    private func buttons(of page: CNSheetConfig.Page) -> some ToolbarContent {
+        ForEach(page.buttons.indices, id: \.self) { b in
+            let button = page.buttons[b]
+            ToolbarItem(placement: .topBarTrailing) {
+                SwiftUI.Button {
+                    onEvent("onButtonTap", ["page": index, "id": button.id])
+                } label: {
+                    if let symbol = button.symbol {
+                        Image(systemName: symbol)
+                    } else {
+                        Text(button.label ?? "")
+                    }
+                }
+                .accessibilityLabel(button.label ?? button.symbol ?? "")
+            }
+        }
     }
 
     // Find My's two-line rows at the default text size, in the sheet's own
@@ -654,10 +647,52 @@ private struct CNSheetRowInsets: ViewModifier {
     let twoLines: Bool
 
     func body(content: Content) -> some View {
+        #if compiler(>=6.2)
         if twoLines, #available(iOS 26.0, *) {
             content.listRowInsets(.vertical, 0)
         } else {
             content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+/// The page's navigation bar: the title at the leading edge in Title Bold
+/// (28 pt at the default text size), beside the buttons, as system sheets
+/// such as Find My's draw it; a large navigation title is 34 pt. Measured
+/// against Find My on iOS 27. On iOS 26 and later the title has no glass
+/// behind it.
+///
+/// The availability check is made here, in a view builder, with a
+/// `.toolbar` in each branch: an `if #available` inside the toolbar's own
+/// builder does not compile with every Xcode (#119).
+@available(iOS 17.0, *)
+private struct CNSheetToolbar<Title: View, Buttons: ToolbarContent>: ViewModifier {
+    let title: Title
+    let buttons: Buttons
+
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content.toolbar {
+                ToolbarItem(placement: .topBarLeading) { title }
+                    .sharedBackgroundVisibility(.hidden)
+                buttons
+            }
+        } else {
+            withTitle(content)
+        }
+        #else
+        withTitle(content)
+        #endif
+    }
+
+    private func withTitle(_ content: Content) -> some View {
+        content.toolbar {
+            ToolbarItem(placement: .topBarLeading) { title }
+            buttons
         }
     }
 }
@@ -667,10 +702,14 @@ private struct CNSheetRowInsets: ViewModifier {
 @available(iOS 17.0, *)
 private struct CNClearNavigationBackground: ViewModifier {
     func body(content: Content) -> some View {
+        #if compiler(>=6.0)
         if #available(iOS 18.0, *) {
             content.containerBackground(.clear, for: .navigation)
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 }
