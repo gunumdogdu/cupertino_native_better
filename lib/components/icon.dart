@@ -128,6 +128,8 @@ class _CNIconState extends State<CNIcon> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncBrightnessIfNeeded();
+    // The default colour and dynamic colours resolve against the theme.
+    _syncPropsToNativeIfNeeded();
   }
 
   @override
@@ -274,7 +276,9 @@ class _CNIconState extends State<CNIcon> {
       'isDark': _isDark,
       'style': <String, dynamic>{
         'iconSize': size,
-        if (color != null) 'iconColor': resolveColorToArgb(color, context),
+        if (_withDefaultColor(resolveColorToArgb(color, context), mode?.name)
+            case final argb?)
+          'iconColor': argb,
         if (mode != null) 'iconRenderingMode': mode.name,
         if (gradient != null) 'iconGradientEnabled': gradient == true,
         if (paletteColors != null)
@@ -363,7 +367,16 @@ class _CNIconState extends State<CNIcon> {
       _lastMode = widget.mode?.name;
       _lastGradient = widget.gradient;
     }
+    _lastColor = _withDefaultColor(_lastColor, _lastMode);
   }
+
+  /// Without a colour the native view draws the icon black, which a dark
+  /// theme hides; use the theme's label colour, as a native button does.
+  int? _withDefaultColor(int? argb, String? mode) =>
+      argb ??
+      (mode == null || mode == CNSymbolRenderingMode.monochrome.name
+          ? resolveColorToArgb(CupertinoColors.label, context)
+          : null);
 
   Future<void> _syncPropsToNativeIfNeeded() async {
     final channel = _channel;
@@ -421,6 +434,8 @@ class _CNIconState extends State<CNIcon> {
       mode = widget.mode?.name;
       gradient = widget.gradient;
     }
+
+    color = _withDefaultColor(color, mode);
 
     if (_lastName != name) {
       final symbolArgs = <String, dynamic>{'name': name};
