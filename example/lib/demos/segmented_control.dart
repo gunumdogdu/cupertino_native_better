@@ -100,7 +100,9 @@ class _SegmentedControlDemoPageState extends State<SegmentedControlDemoPage> {
             const SizedBox(height: 12),
             Center(
               child: CNSegmentedControl(
-                labels: const [],
+                // Shown for the symbols only to VoiceOver.
+                labels: const ['Notes', 'Recycle', 'Walk'],
+                semanticLabel: 'Activity',
                 sfSymbols: const [
                   CNSymbol('list.clipboard'),
                   CNSymbol('leaf.arrow.trianglehead.clockwise'),

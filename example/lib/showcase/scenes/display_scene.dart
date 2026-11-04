@@ -47,6 +47,7 @@ class _DisplaySceneState extends State<DisplayScene> {
               padding: const EdgeInsets.all(16),
               child: CNSegmentedControl(
                 labels: const ['Light', 'Dark', 'Automatic'],
+                semanticLabel: 'Appearance',
                 selectedIndex: _appearance,
                 onValueChanged: (i) {
                   setState(() => _appearance = i);

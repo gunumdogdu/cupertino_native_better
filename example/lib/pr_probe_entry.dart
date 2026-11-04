@@ -56,6 +56,9 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=slider26
 //     (2.0.0: CNSlider thumbless style, ticks and neutral value, on a timer)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=tabbar
+//     (CNTabBar badges, tint and font, search tab, changing items;
+//     AUTO=true changes them on a timer)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=stepper
 //     (CNStepper; the values and the tint change every 1.5 s. Add
 //     --dart-define=FALLBACK=true to draw the Flutter fallbacks instead.)
@@ -128,6 +131,7 @@ import 'demos/stepper.dart';
 import 'demos/color_well.dart';
 import 'demos/page_control.dart';
 import 'demos/native_sheet_demo.dart';
+import 'demos/tab_bar_demo.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -314,6 +318,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'alert') {
       return AlertDemoPage(autoScenario: _scenario);
+    }
+    if (_probe == 'tabbar') {
+      return const TabBarDemoPage(autoCycle: _auto);
     }
     if (_probe == 'stepper') {
       return const StepperDemoPage(autoCycle: true);

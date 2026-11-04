@@ -40,6 +40,7 @@ import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
 import 'demos/iphone_duo_demo.dart';
 import 'demos/native_tab_bar_demo.dart';
+import 'demos/tab_bar_demo.dart';
 import 'demos/native_sheet_demo.dart';
 import 'demos/bottom_nav_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
@@ -158,6 +159,10 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   'button': (_) => const ButtonDemoPage(),
   // iPhone Duo
   'i_phone_duo': (_) => const IPhoneDuoDemoPage(),
+  // Tab Bar
+  'tab_bar': (_) => const TabBarDemoPage(),
+  // Tab Bar, changing on its own
+  'tab_bar_cycle': (_) => const TabBarDemoPage(autoCycle: true),
   // Native Tab Bar (iOS 26)
   'native_tab_bar': (_) => const NativeTabBarDemoPage(),
   // Native Sheet
@@ -309,6 +314,7 @@ const List<String> macMainPages = <String>[
   'action_sheet',
   'button',
   'i_phone_duo',
+  'tab_bar',
   'native_tab_bar',
   'native_sheet',
   'app_bar',
@@ -335,6 +341,7 @@ const Map<String, (String, int)> macPageTitles = <String, (String, int)>{
   'action_sheet': ('Action Sheet', 0),
   'button': ('Button', 0),
   'i_phone_duo': ('iPhone Duo', 1),
+  'tab_bar': ('Tab Bar', 0),
   'native_tab_bar': ('Native Tab Bar (iOS 26)', 0),
   'native_sheet': ('Native Sheet', 0),
   'app_bar': ('Glass container', 0),

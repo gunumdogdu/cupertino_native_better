@@ -72,6 +72,7 @@ import 'demos/issue33_svg_tabbar_test.dart';
 import 'demos/stack_positioned_tabbar_test.dart';
 import 'demos/tabbar_split_search_clip_test.dart';
 import 'demos/alert.dart';
+import 'demos/tab_bar_demo.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -483,6 +484,24 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const IPhoneDuoDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Tab Bar'),
+                  subtitle: Text('Badges, tint and font, search tab, items'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'menubar.dock.rectangle',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const TabBarDemoPage(),
                       ),
                     );
                   },
