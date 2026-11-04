@@ -64,6 +64,13 @@
 //     (CNColorWell; the colours change every 1.5 s. FALLBACK=true as above;
 //     add --dart-define=SCENARIO=sheet to open the fallback palette sheet.)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=sheet
+//     (2.1.0: CNNativeSheet over a map-style screen; BG=<image file> and
+//     AVATARS=<png>,<png> draw local files for screenshot comparisons;
+//     MIDDLE=<points> rests the sheet at that height instead of medium;
+//     SMALL=<points> replaces the collapsed height; START=small opens there;
+//     ROWS=name|place|distance;... replaces the People rows; SINGLE=true
+//     shows the People page alone, without a tab bar)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=pagecontrol
 //     (CNPageControl; the pages turn every 1.5 s. FALLBACK=true as above.)
 //
@@ -112,6 +119,7 @@ import 'demos/upgrades_2_0_probes.dart';
 import 'demos/stepper.dart';
 import 'demos/color_well.dart';
 import 'demos/page_control.dart';
+import 'demos/native_sheet_demo.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -227,7 +235,7 @@ class _ProbeApp extends StatelessWidget {
       return const NativeTabBarDemoPage(
         autoLaunch: true,
         initialAsRoot: true,
-        initialProminent: true,
+        initialProminent: bool.fromEnvironment('PROMINENT', defaultValue: true),
       );
     }
     if (_probe == 'tabmenus') {
@@ -295,6 +303,35 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'stepper') {
       return const StepperDemoPage(autoCycle: true);
+    }
+    if (_probe == 'sheet') {
+      const bg = String.fromEnvironment('BG');
+      const avatars = String.fromEnvironment('AVATARS');
+      const middle = String.fromEnvironment('MIDDLE');
+      const rows = String.fromEnvironment('ROWS');
+      const single = bool.fromEnvironment('SINGLE');
+      const small = String.fromEnvironment('SMALL');
+      const start = String.fromEnvironment('START');
+      return NativeSheetDemoPage(
+        autoLaunch: true,
+        singlePage: single,
+        people: rows.isEmpty
+            ? const NativeSheetDemoPage().people
+            : [
+                for (final row in rows.split(';'))
+                  if (row.split('|') case [final a, final b, final c])
+                    (a, b, c),
+              ],
+        smallDetent: small.isEmpty
+            ? const NativeSheetDemoPage().smallDetent
+            : CNSheetDetent.height(double.parse(small)),
+        startSmall: start == 'small',
+        middleDetent: middle.isEmpty
+            ? CNSheetDetent.medium
+            : CNSheetDetent.height(double.parse(middle)),
+        backgroundFile: bg.isEmpty ? null : bg,
+        avatarFiles: avatars.isEmpty ? const [] : avatars.split(','),
+      );
     }
     if (_probe == 'pagecontrol') {
       return const PageControlDemoPage(autoCycle: true);

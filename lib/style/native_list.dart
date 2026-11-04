@@ -15,6 +15,16 @@ class CNListItem {
   /// Optional leading SF Symbol shown in a rounded container.
   final CNSymbol? leadingSymbol;
 
+  /// Optional leading image, drawn as a circle, such as a contact photo.
+  ///
+  /// Shown by `CNNativeSheet` rows; takes precedence over [leadingSymbol].
+  final CNImageAsset? leadingImage;
+
+  /// Optional text at the trailing end of the title row, such as a distance.
+  ///
+  /// Shown by `CNNativeSheet` rows.
+  final String? trailingText;
+
   /// Whether to show a trailing chevron.
   final bool showChevron;
 
@@ -23,6 +33,8 @@ class CNListItem {
     required this.title,
     this.subtitle,
     this.leadingSymbol,
+    this.leadingImage,
+    this.trailingText,
     this.showChevron = false,
   });
 }

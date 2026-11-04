@@ -1,3 +1,14 @@
+## 2.1.0 (unreleased)
+
+### Added
+
+- **`CNNativeSheet`: a native sheet over the Flutter app,** drawn by UIKit and SwiftUI (`UISheetPresentationController`). It rests at `CNSheetDetent`s (`collapsed`, `medium`, `large`, a height or a fraction) and can be dragged between them; `collapsed` shrinks a sheet with a tab bar to a glass capsule holding only the tab bar, as Find My's does. Up to `undimmedDetent` the app behind it stays undimmed and keeps taking touches, so a map behind it still pans, and `dismissible: false` keeps it from being dragged closed. On iOS 26 it is Liquid Glass at its partial heights. The content is native: each `CNSheetPage` has a title, buttons beside it (`CNSheetButton`) and a list of `CNListItem`s, and with more than one page a tab bar sits inside the sheet. Checked against Find My's People sheet on iOS 27, at its middle height and collapsed: the title, buttons, rows, separators, capsule and tab bar land within a pixel of Find My's. Flutter widgets cannot be placed inside the sheet, because an iOS app has one Flutter view, and it stays behind. iOS 17 and later.
+- **`CNListItem.leadingImage` and `trailingText`,** for a contact photo and a value such as a distance. `CNNativeSheet` rows show them.
+
+### Example
+
+- Native Sheet demo page, and `PROBE=sheet`.
+
 ## 2.0.0
 
 > Major: four new native controls (`CNDatePicker`, `CNStepper`, `CNColorWell`, `CNPageControl`), SF Symbol effects in `CNIcon`, clear glass buttons, sliders without a thumb and with tick marks, tab bar items that open a menu (#113, thanks @johan-perso), palettes and inline sections in pop-up menus, and the iOS 27 prominent tab. Three APIs deprecated since 1.3.0 and 1.5.0 are removed, and `CNButtonStyle` gains two values; see "Breaking changes".

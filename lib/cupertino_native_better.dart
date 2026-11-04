@@ -75,6 +75,7 @@ export 'components/tab_rail.dart';
 export 'components/tab_scaffold.dart';
 export 'components/foldable.dart';
 export 'components/native_tab_bar.dart';
+export 'components/native_sheet.dart';
 export 'components/action_sheet.dart';
 export 'components/bottom_sheet.dart' show CNBottomSheet, CNSheetGeometryProbe;
 export 'components/popup_menu_button.dart';

@@ -14,6 +14,7 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
 
     // Setup the native tab bar (iOS 26: search + minimize + accessory + native lists)
     CNNativeTabBarManager.shared.setup(messenger: registrar.messenger())
+    CNNativeSheetManager.shared.setup(messenger: registrar.messenger())
 
     // Setup the action sheet presenter (UIAlertController, no platform view)
     CNActionSheetManager.shared.setup(messenger: registrar.messenger())

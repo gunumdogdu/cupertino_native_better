@@ -18,6 +18,7 @@ import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
 import 'demos/iphone_duo_demo.dart';
 import 'demos/native_tab_bar_demo.dart';
+import 'demos/native_sheet_demo.dart';
 import 'demos/bottom_nav_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
 import 'demos/bottom_nav_custom_icons_test.dart';
@@ -496,6 +497,23 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const NativeTabBarDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Native Sheet'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'rectangle.bottomhalf.inset.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const NativeSheetDemoPage(),
                       ),
                     );
                   },
