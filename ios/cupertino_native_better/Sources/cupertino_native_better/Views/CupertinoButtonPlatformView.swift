@@ -689,10 +689,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     }
   }
 
-  /// Maps Flutter's `FontWeight.value` (0-8) to UIKit's `UIFont.Weight`.
-  /// Returns nil when the input is nil.
+  /// Maps Flutter's `FontWeight.value` (100–900, which Dart sends) to
+  /// UIKit's `UIFont.Weight`; the 0–8 index is accepted too. Returns nil when
+  /// the input is nil.
   private static func uiFontWeight(fromFlutterValue value: Int?) -> UIFont.Weight? {
-    guard let v = value else { return nil }
+    guard var v = value else { return nil }
+    if v >= 100 { v = min(max((v + 50) / 100 - 1, 0), 8) }
     switch v {
     case 0: return .ultraLight  // w100
     case 1: return .thin        // w200
