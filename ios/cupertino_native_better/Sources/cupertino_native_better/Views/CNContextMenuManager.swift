@@ -74,9 +74,10 @@ final class CNContextMenuManager: NSObject {
     }
 
     let button = CNContextMenuButton(type: .custom)
-    // A fingertip-sized source around the pressed point, so the menu opens
-    // beside the finger rather than under it.
-    let side: CGFloat = 44
+    // A point-sized source: iOS 26 outlines the source of a button menu as
+    // the menu grows out of it, and a larger one left a stray outline above
+    // the menu.
+    let side: CGFloat = 2
     button.frame = CGRect(x: point.x - side / 2, y: point.y - side / 2, width: side, height: side)
     button.showsMenuAsPrimaryAction = true
     button.preferredMenuElementOrder = .fixed
