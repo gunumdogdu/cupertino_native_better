@@ -175,9 +175,12 @@ enum MacMenuBuilder {
       return sized(tinted(img, color), size ?? 16)
     }
     if let data = level.customIconBytes(i), let img = NSImage(data: data) {
-      // Rendered by Flutter at the screen scale, in the requested colour.
+      // Rendered by Flutter at the screen scale. Without an `iconColor` it
+      // is a template, as on iOS, so it takes the menu's text colour (white
+      // in a dark menu, white when highlighted); with one it keeps it.
       let scale = NSScreen.main?.backingScaleFactor ?? 2
       img.size = NSSize(width: img.size.width / scale, height: img.size.height / scale)
+      img.isTemplate = level.customIconColor(i) == nil
       return img
     }
     guard let name = level.symbol(i),
@@ -363,6 +366,10 @@ struct MacMenuLevel {
 
   func size(_ i: Int) -> CGFloat? {
     (slot("sfSymbolSizes", i) as? NSNumber).map { CGFloat(truncating: $0) }
+  }
+
+  func customIconColor(_ i: Int) -> NSColor? {
+    (slot("customIconColors", i) as? NSNumber).map { MacMenuBuilder.color(argb: $0.intValue) }
   }
 
   func color(_ i: Int) -> NSColor? {
