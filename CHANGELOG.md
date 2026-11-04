@@ -1,4 +1,6 @@
-## 2.1.0 (unreleased)
+## 2.1.0
+
+> A native sheet over the Flutter app: `CNNativeSheet` rests at a few heights, keeps the screen behind it usable, holds a native list and tab bar, and collapses to a glass capsule with only the tab bar.
 
 ### Added
 
@@ -7,7 +9,7 @@
 
 ### Example
 
-- Native Sheet demo page, and `PROBE=sheet`.
+- Native Sheet demo page over a drawn map, and `PROBE=sheet`.
 
 ## 2.0.0
 

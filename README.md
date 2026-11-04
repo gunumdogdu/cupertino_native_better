@@ -40,6 +40,15 @@
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/light_dark.png" width="520" alt="The Display and Brightness page in light and in dark mode">
 </p>
 
+## What's new in 2.1
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/native_sheet.gif" width="250" alt="A map with a native glass sheet over it: the sheet collapses to its tab bar, switches tabs, rises to half height, opens to full height and comes back">
+</p>
+
+- **`CNNativeSheet`:** a native sheet over your Flutter app, the kind a map app keeps open. It rests at a few heights, the screen behind it stays usable, and with more than one page it holds a native tab bar. At `CNSheetDetent.collapsed` it shrinks to a glass capsule that holds only the tab bar, as Find My's does. See [Native sheet](#native-sheet).
+- **`CNListItem.leadingImage` and `trailingText`,** for a photo and a value such as a distance.
+
 ## What's new in 2.0
 
 <p align="center">
@@ -62,7 +71,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.0.0
+  cupertino_native_better: ^2.1.0
 ```
 
 Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26; earlier versions get the Cupertino fallbacks. The iOS deployment target is 15.0.
@@ -414,6 +423,40 @@ final result = await CNAlert.show<String>(
     CNAlertAction(label: 'Cancel', isCancel: true),
     CNAlertAction(label: 'Sign Out', value: 'out', isDestructive: true),
   ],
+);
+```
+
+### Native sheet
+
+`CNNativeSheet` presents a `UISheetPresentationController` over the Flutter app. It rests at the heights you give it, keeps the screen behind it usable up to the height you choose, and holds native content: a title with buttons, a list, and a tab bar when it has more than one page. Collapsed, it shrinks to its tab bar.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/native_sheet_heights.png" width="420" alt="The native sheet at half height over a map, with a title, two people and a tab bar, and collapsed to a glass capsule that holds only the tab bar">
+</p>
+
+```dart
+await CNNativeSheet.show(
+  pages: [
+    CNSheetPage(
+      title: 'People',
+      sfSymbol: CNSymbol('person.2.fill'),
+      buttons: [CNSheetButton(id: 'add', sfSymbol: CNSymbol('plus'), label: 'Share My Location')],
+      items: [
+        CNListItem(
+          title: 'Ada',
+          subtitle: 'London · Now',
+          trailingText: '2 km',
+          leadingImage: CNImageAsset('assets/ada.png'),
+        ),
+      ],
+    ),
+    CNSheetPage(title: 'Devices', sfSymbol: CNSymbol('macbook.and.iphone')),
+  ],
+  detents: [CNSheetDetent.collapsed, CNSheetDetent.medium, CNSheetDetent.large],
+  initialDetent: CNSheetDetent.medium,
+  undimmedDetent: CNSheetDetent.medium, // the map stays usable up to here
+  dismissible: false,
+  onItemTap: (page, index) {},
 );
 ```
 
@@ -869,6 +912,49 @@ Use the hinge angle for effects and the status and regions for layout, as Apple 
 >
 > **Simulator:** Xcode 27.1 replaces Simulator with Device Hub. The *Closed*, *Partially Open* and *Open* pose buttons sit below the device; hold Option and drag the slider for any angle.
 
+### Native sheet (CNNativeSheet)
+
+`CNNativeSheet` is a `UISheetPresentationController` presented over the Flutter app, with SwiftUI content that the package builds from your Dart descriptions. It is a static API: `show` presents the sheet, the setters update it, `dismiss` closes it. One sheet is shown at a time; calling `show` again replaces it.
+
+**Heights.** Pass the heights the sheet may rest at as `detents`, and the one it opens at as `initialDetent` (the first by default):
+
+| `CNSheetDetent` | Rests at |
+|---|---|
+| `collapsed` | Only the tab bar. On iOS&nbsp;26 and later the sheet becomes a glass capsule; as it gets there, the page fades out and the tab bar settles in the middle. For sheets with more than one page |
+| `medium` | About half the screen |
+| `large` | Nearly the full screen |
+| `height(points)` | A fixed height |
+| `fraction(f)` | A fraction of the largest height, from 0 to 1 |
+
+**The screen behind.** Up to and including `undimmedDetent` the Flutter screen behind the sheet is not dimmed and keeps taking touches, so a map can still be panned. Leave it null to dim at every height. `dismissible: false` keeps the sheet from being dragged closed.
+
+**Content.** Each `CNSheetPage` has a `title`, `buttons` beside it (`CNSheetButton` with an `id`, an `sfSymbol` and a `label` that VoiceOver reads) and `items`. Rows are `CNListItem`s: `title`, `subtitle`, `trailingText`, a `leadingImage` or `leadingSymbol`, and `showChevron`. With more than one page, each page gets a tab from its `title` and `sfSymbol` (`activeSfSymbol` while selected, `badgeCount` for a badge).
+
+**Events and updates.**
+
+```dart
+await CNNativeSheet.show(
+  pages: pages,
+  detents: const [CNSheetDetent.collapsed, CNSheetDetent.medium, CNSheetDetent.large],
+  onDetentChanged: (detent) {},     // the user dragged it to another height
+  onPageSelected: (page) {},        // a tab was chosen
+  onItemTap: (page, index) {},
+  onButtonTap: (page, id) {},
+  onDismissed: () {},
+);
+
+await CNNativeSheet.setItems(page: 0, items: people);   // new rows
+await CNNativeSheet.setBadgeCounts([2, null]);
+await CNNativeSheet.setSelectedPage(1);
+await CNNativeSheet.setDetent(CNSheetDetent.large);
+await CNNativeSheet.setBrightness(isDark: true);
+await CNNativeSheet.dismiss();
+```
+
+> **Native content only.** An iOS app has one Flutter view, and it stays behind the sheet, so Flutter widgets cannot be placed inside. The sheet shows what `CNSheetPage` and `CNListItem` describe.
+>
+> **Platforms.** iOS&nbsp;17 and later; Liquid Glass and the collapsed capsule on iOS&nbsp;26 and later. Elsewhere `show` does nothing and returns `false`, so show your own sheet when it does.
+
 ### Accessibility
 
 The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOver, Voice Control and Switch Control see the system's own controls rather than an imitation. Checked through the iOS accessibility tree (iPhone Duo simulator, iOS 27.1):
@@ -882,6 +968,7 @@ The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOv
 | `CNSegmentedControl` | A group of segments, each with its title |
 | `CNTabRail` | A button per tab, with its badge as the value and the selected state |
 | `CNTabBarNative`, `CNAlert`, `CNActionSheet` | System controllers, presented by iOS |
+| `CNNativeSheet` | A system sheet: the page title as a heading, each button by its `label`, each row as one element |
 
 **Name every icon-only control.** Without a name, an icon-only button is read by its SF Symbol's built-in name, which describes the picture rather than the action (`moon` is read as "do not disturb"), and a switch or slider has no name at all: a native control cannot merge with the Flutter text next to it. Pass `semanticLabel`:
 
@@ -1384,7 +1471,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.0.0
+   cupertino_native_better: ^2.1.0
    ```
 
 2. Update imports:
