@@ -1,11 +1,19 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/native_context_menu.dart';
 import 'icon.dart';
 import 'popup_menu_button.dart';
 
 /// A widget that wraps a child and shows a popup menu on long press.
+///
+/// On macOS a secondary click (right click, two-finger click) on the child
+/// also opens the menu, as a native `NSMenu` at the pointer: the Mac's
+/// context-menu gesture. It shows the same items and dividers and reports
+/// the same index to [onSelected]. For a native menu on iOS as well, with
+/// submenus, use `CNContextMenu`.
 ///
 /// Usage:
 /// ```dart
@@ -48,8 +56,31 @@ class CNPopupGesture extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onLongPress: () => _showPopup(context),
+      onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+          ? (details) => _showNativeMenu(context, details.globalPosition)
+          : null,
       child: child,
     );
+  }
+
+  /// The macOS secondary-click menu. The long-press menu shows items and
+  /// dividers only, so this one does too, and an item reports its index
+  /// among the items, dividers excluded, as there.
+  Future<void> _showNativeMenu(BuildContext context, Offset position) async {
+    final entries = [
+      for (final e in items)
+        if (e is CNPopupMenuItem || e is CNPopupMenuDivider) e,
+    ];
+    final path = await showNativeContextMenu(
+      context,
+      items: entries,
+      globalPosition: position,
+    );
+    if (path == null || path.length != 1) return;
+    final chosen = path.single;
+    if (chosen < 0 || chosen >= entries.length) return;
+    if (entries[chosen] is! CNPopupMenuItem) return;
+    onSelected(entries.take(chosen).whereType<CNPopupMenuItem>().length);
   }
 
   Future<void> _showPopup(BuildContext context) async {
