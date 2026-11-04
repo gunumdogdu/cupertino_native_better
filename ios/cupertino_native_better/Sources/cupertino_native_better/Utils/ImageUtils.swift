@@ -351,8 +351,10 @@ final class ImageUtils {
   ///
   /// Only near-opaque pixels are compared, so antialiased edges — which vary
   /// in alpha but not in colour — do not count as a second colour. The scan
-  /// is capped at a 32x32 sample grid and returns as soon as it finds a
-  /// second colour, so cost stays flat regardless of source resolution.
+  /// is capped at a 96x96 sample grid and returns as soon as it finds a
+  /// second colour, so cost stays flat regardless of source resolution. (At
+  /// 32x32 the 1.5 pt strokes of a line icon shrank below one pixel and left
+  /// no opaque pixel to judge, so a grey stroked SVG was never templated.)
   static func isEffectivelyMonochrome(_ image: UIImage) -> Bool {
     guard let cgImage = image.cgImage else {
       // No bitmap to inspect (e.g. a CIImage-backed UIImage). Leave the image
@@ -367,8 +369,8 @@ final class ImageUtils {
 
     // Render into a known layout — the source may be any colour space,
     // bit depth, or alpha arrangement.
-    let sampleWidth = min(width, 32)
-    let sampleHeight = min(height, 32)
+    let sampleWidth = min(width, 96)
+    let sampleHeight = min(height, 96)
     let bytesPerRow = sampleWidth * 4
     var buffer = [UInt8](repeating: 0, count: bytesPerRow * sampleHeight)
 
@@ -379,9 +381,11 @@ final class ImageUtils {
       bitsPerComponent: 8,
       bytesPerRow: bytesPerRow,
       space: CGColorSpaceCreateDeviceRGB(),
-      // Straight (non-premultiplied) alpha keeps edge pixels at their true
-      // colour instead of fading them toward black.
-      bitmapInfo: CGImageAlphaInfo.last.rawValue
+      // Premultiplied: Core Graphics has no 8-bit RGB context with straight
+      // alpha (`.last` made this return nil, so no asset was ever templated).
+      // Only near-opaque pixels are compared below, and their premultiplied
+      // values are their colour within the tolerance.
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
     ) else {
       return false
     }
