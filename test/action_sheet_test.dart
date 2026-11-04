@@ -394,6 +394,92 @@ void main() {
       });
     });
   });
+
+  group('CNActionSheet.show on macOS', () {
+    testWidgets('anchored: sends the anchor and returns the chosen value', (
+      tester,
+    ) async {
+      MethodCall? received;
+      mockChannel((call) async {
+        received = call;
+        return 1;
+      });
+
+      await _withPlatform(TargetPlatform.macOS, () async {
+        final context = await _pumpContext(tester, brightness: Brightness.dark);
+        final selected = await CNActionSheet.show<String>(
+          context: context,
+          actions: const [
+            CNActionSheetAction<String>(label: 'Share', value: 'share'),
+            CNActionSheetAction<String>(
+              label: 'Remove',
+              value: 'remove',
+              isDestructive: true,
+            ),
+          ],
+          cancelLabel: 'Cancel',
+          anchorRect: const Rect.fromLTWH(16, 540, 300, 44),
+        );
+        expect(selected, 'remove');
+        expect(find.byType(CupertinoActionSheet), findsNothing);
+      });
+
+      expect(
+        received?.arguments,
+        debugBuildActionSheetPayload(
+          actions: const [
+            CNActionSheetAction<String>(label: 'Share', value: 'share'),
+            CNActionSheetAction<String>(
+              label: 'Remove',
+              value: 'remove',
+              isDestructive: true,
+            ),
+          ],
+          cancelLabel: 'Cancel',
+          anchorRect: const Rect.fromLTWH(16, 540, 300, 44),
+          isDark: true,
+        ),
+      );
+    });
+
+    testWidgets('a closed menu or the cancel button resolves to null', (
+      tester,
+    ) async {
+      mockChannel((call) async => null);
+
+      await _withPlatform(TargetPlatform.macOS, () async {
+        final context = await _pumpContext(tester);
+        final selected = await CNActionSheet.show<String>(
+          context: context,
+          actions: const [CNActionSheetAction<String>(label: 'A', value: 'a')],
+          cancelLabel: 'Cancel',
+        );
+        expect(selected, isNull);
+      });
+    });
+
+    testWidgets('no theme brightness sends no isDark (#118)', (tester) async {
+      MethodCall? received;
+      mockChannel((call) async {
+        received = call;
+        return null;
+      });
+
+      await _withPlatform(TargetPlatform.macOS, () async {
+        final context = await _pumpContext(tester);
+        await CNActionSheet.show<String>(
+          context: context,
+          actions: const [CNActionSheetAction<String>(label: 'A', value: 'a')],
+          cancelLabel: 'Cancel',
+        );
+      });
+
+      expect(
+        (received!.arguments as Map<Object?, Object?>).containsKey('isDark'),
+        isFalse,
+      );
+    });
+  });
 }
 
 /// Runs [body] with [debugDefaultTargetPlatformOverride] set, clearing it even

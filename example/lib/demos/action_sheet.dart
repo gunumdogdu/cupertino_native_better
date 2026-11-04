@@ -60,6 +60,7 @@ class _ActionSheetDemoPageState extends State<ActionSheetDemoPage> {
     // Every caller awaits `CNActionSheet.show` first, and a superseded sheet
     // resolves its caller as soon as the next one is requested, so the page can
     // be gone by the time the result lands.
+    debugPrint('CNB_RESULT action_sheet ${value ?? 'null'}');
     if (!mounted) return;
     setState(() => _lastResult = value ?? '(cancelled)');
   }
