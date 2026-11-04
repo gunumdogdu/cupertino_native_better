@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 
-/// CNTabBar: badges, a tint and a font, a search tab, and items that change
-/// at runtime, each on its own bar.
+/// CNTabBar: badges, a tint and a font, a search tab, items that change at
+/// runtime and items with image assets and custom icons, each on its own bar.
 ///
 /// On iOS 26+ each bar is a `UITabBar`; on macOS an `NSSegmentedControl`
 /// used as tabs, with the badge drawn over the tab. The buttons change the
@@ -38,6 +38,9 @@ class _TabBarDemoPageState extends State<TabBarDemoPage> {
   int _itemsTab = 0;
   bool _fourItems = false;
 
+  int _imageTab = 0;
+  bool _alternateImages = false;
+
   Timer? _timer;
   int _tick = 0;
 
@@ -55,6 +58,8 @@ class _TabBarDemoPageState extends State<TabBarDemoPage> {
           _styledTab = (_styledTab + 1) % 3;
           _fourItems = !_fourItems;
           _itemsTab = 0;
+          _alternateImages = !_alternateImages;
+          _imageTab = (_imageTab + 1) % 3;
         });
         if (_tick % 2 == 0) {
           _search.activateSearch();
@@ -235,6 +240,48 @@ class _TabBarDemoPageState extends State<TabBarDemoPage> {
                   _fourItems = !_fourItems;
                   _itemsTab = 0;
                 }),
+              ),
+            ),
+            _section(
+              'Image assets and a custom icon',
+              CNTabBar(
+                items: [
+                  // An SVG asset, with a filled SVG for the selected tab.
+                  CNTabBarItem(
+                    label: 'Home',
+                    imageAsset: CNImageAsset(
+                      _alternateImages
+                          ? 'assets/icons/profile.svg'
+                          : 'assets/icons/home.svg',
+                    ),
+                    activeImageAsset: CNImageAsset(
+                      _alternateImages
+                          ? 'assets/icons/profile-filled.svg'
+                          : 'assets/icons/home_filled.svg',
+                    ),
+                  ),
+                  // A PNG asset (resolved for the pixel ratio).
+                  CNTabBarItem(
+                    label: 'Recent',
+                    imageAsset: CNImageAsset('assets/icons/clock.png'),
+                    activeImageAsset: CNImageAsset(
+                      'assets/icons/clock_filled.png',
+                    ),
+                  ),
+                  // A Flutter IconData rendered to an image.
+                  const CNTabBarItem(
+                    label: 'Chats',
+                    customIcon: CupertinoIcons.chat_bubble,
+                    activeCustomIcon: CupertinoIcons.chat_bubble_fill,
+                  ),
+                ],
+                currentIndex: _imageTab,
+                onTap: (i) => setState(() => _imageTab = i),
+              ),
+              CupertinoButton(
+                child: Text(_alternateImages ? 'Home icon' : 'Profile icon'),
+                onPressed: () =>
+                    setState(() => _alternateImages = !_alternateImages),
               ),
             ),
           ],

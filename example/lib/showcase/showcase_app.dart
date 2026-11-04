@@ -84,13 +84,16 @@ Widget buildShowcaseScene(
     _ => DisplayScene(onBrightnessChanged: onBrightnessChanged),
   };
   final page = CupertinoPageScaffold(child: scene);
-  // The Music and iPhone Duo scenes have no bar of their own; on a Mac,
-  // which has no edge swipe, they get one with a back button.
-  if (inApp && (id == 'music' || id == 'duo')) {
-    return MacBackBar(
-      title: id == 'music' ? 'Music' : 'iPhone Duo',
-      child: page,
-    );
+  // The Files, Music and iPhone Duo scenes have no bar of their own; on a
+  // Mac, which has no edge swipe, they get one with a back button.
+  const macBarTitles = {
+    'files': 'Files',
+    'music': 'Music',
+    'duo': 'iPhone Duo',
+  };
+  final macBarTitle = macBarTitles[id];
+  if (inApp && macBarTitle != null) {
+    return MacBackBar(title: macBarTitle, child: page);
   }
   return page;
 }

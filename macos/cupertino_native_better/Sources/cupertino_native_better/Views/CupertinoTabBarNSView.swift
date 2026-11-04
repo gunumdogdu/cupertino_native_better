@@ -4,8 +4,12 @@ import Cocoa
 /// `CNTabBar` on macOS: an `NSSegmentedControl` used as a row of tabs, the
 /// way Mac apps switch between views (with `role = .tabs` on macOS 27).
 ///
-/// - Each tab shows its symbol (or custom icon) and its label side by side;
-///   the selected tab shows `activeIcon`.
+/// - Each tab shows its image and its label side by side, by the iOS
+///   priority: an image asset (Flutter asset or bytes, PNG/JPG/GIF/SVG),
+///   then a custom icon, then the SF Symbol; the selected tab shows its
+///   active image (`activeImageAsset`, `activeCustomIcon`, `activeIcon`).
+///   Single-colour art becomes a template, as symbols are, so it reads on
+///   the selection; multi-colour art keeps its colours.
 /// - The control keeps its natural width and is centred in the bar, with
 ///   room around it, so it is not clipped by the window's rounded corners.
 /// - `tint` colours the selected segment where AppKit lets it
@@ -38,6 +42,14 @@ class CupertinoTabBarNSView: NSView {
   private var badges: [String] = []
   private var customIconBytes: [Data?] = []
   private var activeCustomIconBytes: [Data?] = []
+  /// `CNTabBarItem.imageAsset` / `activeImageAsset`: a Flutter asset path,
+  /// its bytes and their format ("" where an item has none).
+  private var imageAssetPaths: [String] = []
+  private var activeImageAssetPaths: [String] = []
+  private var imageAssetData: [Data?] = []
+  private var activeImageAssetData: [Data?] = []
+  private var imageAssetFormats: [String] = []
+  private var activeImageAssetFormats: [String] = []
   private var sizes: [CGFloat?] = []
   private var tint: NSColor?
   private var labelFontFamily: String?
@@ -198,6 +210,12 @@ class CupertinoTabBarNSView: NSView {
     badges = (dict["badges"] as? [String]) ?? []
     customIconBytes = ((dict["customIconBytes"] as? [Any]) ?? []).map { ($0 as? FlutterStandardTypedData)?.data }
     activeCustomIconBytes = ((dict["activeCustomIconBytes"] as? [Any]) ?? []).map { ($0 as? FlutterStandardTypedData)?.data }
+    imageAssetPaths = (dict["imageAssetPaths"] as? [Any] ?? []).map { ($0 as? String) ?? "" }
+    activeImageAssetPaths = (dict["activeImageAssetPaths"] as? [Any] ?? []).map { ($0 as? String) ?? "" }
+    imageAssetData = ((dict["imageAssetData"] as? [Any]) ?? []).map { ($0 as? FlutterStandardTypedData)?.data }
+    activeImageAssetData = ((dict["activeImageAssetData"] as? [Any]) ?? []).map { ($0 as? FlutterStandardTypedData)?.data }
+    imageAssetFormats = (dict["imageAssetFormats"] as? [Any] ?? []).map { ($0 as? String) ?? "" }
+    activeImageAssetFormats = (dict["activeImageAssetFormats"] as? [Any] ?? []).map { ($0 as? String) ?? "" }
     sizes = ((dict["sfSymbolSizes"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { CGFloat(truncating: $0) } }
   }
 
@@ -209,7 +227,7 @@ class CupertinoTabBarNSView: NSView {
   // MARK: - Segments
 
   private var itemCount: Int {
-    max(labels.count, symbols.count, customIconBytes.count)
+    max(labels.count, symbols.count, customIconBytes.count, imageAssetPaths.count, imageAssetData.count)
   }
 
   private var searchSegment: Int? { hasSearch ? itemCount : nil }
@@ -252,6 +270,17 @@ class CupertinoTabBarNSView: NSView {
   private func image(for i: Int, active: Bool) -> NSImage? {
     let label = i < labels.count ? labels[i] : ""
     let requested = i < sizes.count ? sizes[i] : nil
+    // An image asset wins; the active one on the selected tab, else the
+    // plain one for both states.
+    if active, let image = assetImage(at: i, paths: activeImageAssetPaths, data: activeImageAssetData,
+                                      formats: activeImageAssetFormats, requested: requested, label: label) {
+      return image
+    }
+    let hasActiveCustomIcon = active && i < activeCustomIconBytes.count && activeCustomIconBytes[i] != nil
+    if !hasActiveCustomIcon, let image = assetImage(at: i, paths: imageAssetPaths, data: imageAssetData,
+                                                    formats: imageAssetFormats, requested: requested, label: label) {
+      return image
+    }
     let bytes = active
       ? ((i < activeCustomIconBytes.count ? activeCustomIconBytes[i] : nil) ?? (i < customIconBytes.count ? customIconBytes[i] : nil))
       : (i < customIconBytes.count ? customIconBytes[i] : nil)
@@ -269,6 +298,26 @@ class CupertinoTabBarNSView: NSView {
       : (i < symbols.count ? symbols[i] : "")
     guard !name.isEmpty else { return nil }
     return symbolImage(name, requestedSize: requested, description: label.isEmpty ? name : label)
+  }
+
+  /// Item `i`'s image asset from `data` (its bytes) or `paths` (a Flutter
+  /// asset), at the size a custom icon gets. Without a colour it becomes a
+  /// template when single-coloured, so AppKit colours it like a symbol.
+  private func assetImage(
+    at i: Int, paths: [String], data: [Data?], formats: [String], requested: CGFloat?, label: String
+  ) -> NSImage? {
+    let bytes = i < data.count ? data[i] : nil
+    let path = i < paths.count && !paths[i].isEmpty ? paths[i] : nil
+    guard bytes != nil || path != nil else { return nil }
+    let format = i < formats.count && !formats[i].isEmpty ? formats[i] : nil
+    guard let loaded = ImageUtils.image(
+      assetPath: path, imageData: bytes, format: format, customIconBytes: nil,
+      size: Self.symbolPointSize(requested) * 1.25, color: nil
+    ) else { return nil }
+    // The loaded image is shared through the cache: describe a copy.
+    let image = (loaded.copy() as? NSImage) ?? loaded
+    image.accessibilityDescription = label.isEmpty ? nil : label
+    return image
   }
 
   private func symbolImage(_ name: String, requestedSize: CGFloat?, description: String) -> NSImage? {
