@@ -35,6 +35,9 @@ import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/action_sheet.dart';
 import 'demos/button.dart';
+import 'demos/search_bar.dart';
+import 'demos/glass_button_group.dart';
+import 'demos/progress_indicator.dart';
 import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
@@ -156,6 +159,12 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   'action_sheet': (_) => const ActionSheetDemoPage(),
   // Button
   'button': (_) => const ButtonDemoPage(),
+  // Glass Button Group
+  'glass_button_group': (_) => const GlassButtonGroupDemoPage(),
+  // Search Bar
+  'search_bar': (_) => const SearchBarDemoPage(),
+  // Progress Indicator
+  'progress_indicator': (_) => const ProgressIndicatorDemoPage(),
   // iPhone Duo
   'i_phone_duo': (_) => const IPhoneDuoDemoPage(),
   // Native Tab Bar (iOS 26)
@@ -308,6 +317,9 @@ const List<String> macMainPages = <String>[
   'popup_menu_button',
   'action_sheet',
   'button',
+  'glass_button_group',
+  'search_bar',
+  'progress_indicator',
   'i_phone_duo',
   'native_tab_bar',
   'native_sheet',
@@ -334,6 +346,9 @@ const Map<String, (String, int)> macPageTitles = <String, (String, int)>{
   'popup_menu_button': ('Popup Menu Button', 0),
   'action_sheet': ('Action Sheet', 0),
   'button': ('Button', 0),
+  'glass_button_group': ('Glass Button Group', 0),
+  'search_bar': ('Search Bar', 0),
+  'progress_indicator': ('Progress Indicator', 0),
   'i_phone_duo': ('iPhone Duo', 1),
   'native_tab_bar': ('Native Tab Bar (iOS 26)', 0),
   'native_sheet': ('Native Sheet', 0),

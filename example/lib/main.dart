@@ -13,6 +13,9 @@ import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/action_sheet.dart';
 import 'demos/button.dart';
+import 'demos/search_bar.dart';
+import 'demos/glass_button_group.dart';
+import 'demos/progress_indicator.dart';
 import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
@@ -465,6 +468,48 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const ButtonDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Glass Button Group'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('square.on.square', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const GlassButtonGroupDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Search Bar'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('magnifyingglass', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const SearchBarDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Progress Indicator'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('progress.indicator', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const ProgressIndicatorDemoPage(),
                       ),
                     );
                   },
