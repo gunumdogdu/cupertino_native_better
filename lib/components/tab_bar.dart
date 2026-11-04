@@ -48,8 +48,9 @@ class CNTabBarItem {
 
   /// Optional badge text to display on the tab bar item.
   /// On iOS, this displays as a red badge with the text; pass [dotBadge] for
-  /// a small dot without a count.
-  /// On macOS, badges are not supported by NSSegmentedControl.
+  /// a small dot without a count. `NSSegmentedControl` has no badges, so on
+  /// macOS the bar draws the same red badge (or dot) at the top-trailing
+  /// corner of the tab, and VoiceOver reads the text as the tab's help.
   final String? badge;
 
   /// A [badge] value that shows a small red dot instead of a count, e.g. for
@@ -99,7 +100,10 @@ class CNTabBarItem {
   final List<CNPopupMenuEntry>? menuItems;
 }
 
-/// A Cupertino-native tab bar. Uses native UITabBar/NSTabView style visuals.
+/// A Cupertino-native tab bar: a `UITabBar` on iOS 26+, and on every macOS
+/// an `NSSegmentedControl` used as tabs (with the `.tabs` role of macOS 27),
+/// each tab showing its symbol and label, centred at its natural width.
+/// Below iOS 26 and on other platforms it is a [CupertinoTabBar].
 ///
 /// On iOS 26+, supports a dedicated search tab that follows Apple's native
 /// behavior: appearing as a floating circular button that expands into a
@@ -188,6 +192,8 @@ class CNTabBar extends StatefulWidget {
   ///
   /// Note: When [searchItem] is provided, split mode is automatically enabled
   /// with the search tab appearing as a floating button on the right.
+  ///
+  /// macOS has no split tab bar; there the tabs stay in one control.
   final bool split;
 
   /// How many trailing items to pin right when [split] is true.
@@ -220,6 +226,10 @@ class CNTabBar extends StatefulWidget {
   /// - Collapses other tabs during search
   ///
   /// On iOS < 26, the search behavior is simulated using Flutter widgets.
+  /// On macOS the search tab is a trailing tab with the search symbol and
+  /// label; selecting it reports [CNTabBarSearchItem.onSearchActiveChanged]
+  /// (true) instead of [onTap], as the iOS 26 search tab does, and the app
+  /// shows its own search field.
   final CNTabBarSearchItem? searchItem;
 
   /// Optional controller for programmatic search management.
@@ -556,7 +566,7 @@ class _CNTabBarState extends State<CNTabBar> {
     final isIOSOrMacOS =
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
-    if (!(isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass)) return;
+    if (!(isIOSOrMacOS && PlatformVersion.shouldUseNativeControls)) return;
     if (_preparing) return;
 
     _preparing = true;
@@ -629,7 +639,7 @@ class _CNTabBarState extends State<CNTabBar> {
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
     final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+        isIOSOrMacOS && PlatformVersion.shouldUseNativeControls;
 
     if (!shouldUseNative) {
       return _buildFlutterFallback(context);
@@ -1294,6 +1304,9 @@ class _CNTabBarState extends State<CNTabBar> {
         });
         _lastLabelFontFamily = widget.labelFontFamily;
         _lastLabelFontSize = widget.labelFontSize;
+        // Another label size changes the bar's size: the macOS bar's width
+        // follows its labels.
+        _requestIntrinsicSize();
       }
 
       // Layout updates (split / insets)

@@ -1,184 +1,391 @@
 import FlutterMacOS
 import Cocoa
 
+/// `CNTabBar` on macOS: an `NSSegmentedControl` used as a row of tabs, the
+/// way Mac apps switch between views (with `role = .tabs` on macOS 27).
+///
+/// - Each tab shows its symbol (or custom icon) and its label side by side;
+///   the selected tab shows `activeIcon`.
+/// - The control keeps its natural width and is centred in the bar, with
+///   room around it, so it is not clipped by the window's rounded corners.
+/// - `tint` colours the selected segment where AppKit lets it
+///   (`selectedSegmentBezelColor`); the `.tabs` role of macOS 27 draws its
+///   own neutral selection and ignores it. Symbols stay template images, so
+///   AppKit picks a colour that reads on the selection.
+/// - `badge` is drawn as a small red capsule (or dot for `dotBadge`) at the
+///   top-trailing corner of the tab's content: AppKit has no segment badge.
+/// - `split` has no AppKit counterpart and is ignored: the tabs stay in one
+///   control. A `searchItem` becomes a trailing tab with its symbol and
+///   label which, like the iOS 26 search tab, reports `searchActiveChanged`
+///   instead of `valueChanged`; the app shows its own search field.
+/// - Item menus (`menuItems`) stay plain tabs.
 class CupertinoTabBarNSView: NSView {
+  /// Room around the control: it must not touch the window's rounded corners
+  /// at the bottom of a window, and the badges reach above it.
+  private static let horizontalPadding: CGFloat = 16
+  private static let verticalPadding: CGFloat = 8
+  /// Point size of a symbol at `CNSymbol`'s default size (24): the size of
+  /// the control's label font, so icon and label match.
+  private static let defaultSymbolPointSize: CGFloat = 13
+  private static let defaultRequestedIconSize: CGFloat = 24
+
   private let channel: FlutterMethodChannel
   private let control: NSSegmentedControl
-  private var currentLabels: [String] = []
-  private var currentSymbols: [String] = []
-  private var currentBadges: [String] = []
-  private var currentCustomIconBytes: [Data?] = []
-  private var currentActiveCustomIconBytes: [Data?] = []
-  private var iconScale: CGFloat = NSScreen.main?.backingScaleFactor ?? 2.0
-  private var currentSizes: [NSNumber] = []
-  private var currentTint: NSColor? = nil
-  private var currentBackground: NSColor? = nil
+
+  private var labels: [String] = []
+  private var symbols: [String] = []
+  private var activeSymbols: [String] = []
+  private var badges: [String] = []
+  private var customIconBytes: [Data?] = []
+  private var activeCustomIconBytes: [Data?] = []
+  private var sizes: [CGFloat?] = []
+  private var tint: NSColor?
+  private var labelFontFamily: String?
+  private var labelFontSize: CGFloat?
+
+  private var hasSearch = false
+  private var searchLabel = "Search"
+  private var searchSymbol = "magnifyingglass"
+  private var searchActiveSymbol = "magnifyingglass"
+  private var searchActive = false
+  /// The selected tab (not the search tab).
+  private var selectedIndex = 0
+
+  private var badgeViews: [Int: CNMacTabBadgeView] = [:]
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeTabBar_\(viewId)", binaryMessenger: messenger)
     self.control = NSSegmentedControl(labels: [], trackingMode: .selectOne, target: nil, action: nil)
 
-    var labels: [String] = []
-    var symbols: [String] = []
-    var badges: [String] = []
-    var customIconBytes: [Data?] = []
-    var activeCustomIconBytes: [Data?] = []
-    var iconScale: CGFloat = NSScreen.main?.backingScaleFactor ?? 2.0
-    var sizes: [NSNumber] = []
-    var selectedIndex: Int = 0
-    var isDark: Bool = false
-    var tint: NSColor? = nil
-    var bg: NSColor? = nil
+    super.init(frame: .zero)
 
+    var isDark = false
+    var background: NSColor?
     if let dict = args as? [String: Any] {
-      labels = (dict["labels"] as? [String]) ?? []
-      symbols = (dict["sfSymbols"] as? [String]) ?? []
-      badges = (dict["badges"] as? [String]) ?? []
-      if let bytesArray = dict["customIconBytes"] as? [FlutterStandardTypedData?] {
-        customIconBytes = bytesArray.map { $0?.data }
-      }
-      if let bytesArray = dict["activeCustomIconBytes"] as? [FlutterStandardTypedData?] {
-        activeCustomIconBytes = bytesArray.map { $0?.data }
-      }
-      if let scale = dict["iconScale"] as? NSNumber {
-        iconScale = CGFloat(truncating: scale)
-      }
-      sizes = (dict["sfSymbolSizes"] as? [NSNumber]) ?? []
+      readItems(dict)
       if let v = dict["selectedIndex"] as? NSNumber { selectedIndex = v.intValue }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
       if let style = dict["style"] as? [String: Any] {
         if let n = style["tint"] as? NSNumber { tint = Self.colorFromARGB(n.intValue) }
-        if let n = style["backgroundColor"] as? NSNumber { bg = Self.colorFromARGB(n.intValue) }
+        if let n = style["backgroundColor"] as? NSNumber { background = Self.colorFromARGB(n.intValue) }
+      }
+      readFont(dict)
+      if (dict["hasSearch"] as? NSNumber)?.boolValue == true {
+        hasSearch = true
+        if let v = dict["searchLabel"] as? String, !v.isEmpty { searchLabel = v }
+        if let v = dict["searchSymbol"] as? String, !v.isEmpty { searchSymbol = v }
+        if let v = dict["searchActiveSymbol"] as? String, !v.isEmpty { searchActiveSymbol = v }
       }
     }
 
-    super.init(frame: .zero)
-
     wantsLayer = true
-    layer?.backgroundColor = NSColor.clear.cgColor
+    layer?.backgroundColor = (background ?? .clear).cgColor
     appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
 
-    configureSegments(labels: labels, symbols: symbols, customIconBytes: customIconBytes, iconScale: iconScale, sizes: sizes)
-    if selectedIndex >= 0 { control.selectedSegment = selectedIndex }
-    // Save current style and content for retinting
-    self.currentLabels = labels
-    self.currentSymbols = symbols
-    self.currentBadges = badges  // Note: macOS NSSegmentedControl doesn't support badges natively
-    self.currentCustomIconBytes = customIconBytes
-    self.currentActiveCustomIconBytes = activeCustomIconBytes
-    self.iconScale = iconScale
-    self.currentSizes = sizes
-    self.currentTint = tint
-    self.currentBackground = bg
-    if let b = bg { wantsLayer = true; layer?.backgroundColor = b.cgColor }
-    applySegmentTint()
-
+    // Tabs share the width equally, as UITabBar items do.
+    control.segmentDistribution = .fillEqually
+    #if canImport(AppKit, _version: 2775)
+    if #available(macOS 27.0, *) {
+      // The macOS 27 look for a segmented control that switches views.
+      control.role = .tabs
+    }
+    #endif
     control.target = self
     control.action = #selector(onChanged(_:))
+    applyFont()
+    rebuildSegments()
+    applyTint()
 
-    addSubview(control)
     control.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(control)
+    // Natural width, centred; it only shrinks when the bar is narrower.
+    let pad = Self.horizontalPadding
     NSLayoutConstraint.activate([
-      control.leadingAnchor.constraint(equalTo: leadingAnchor),
-      control.trailingAnchor.constraint(equalTo: trailingAnchor),
-      control.topAnchor.constraint(equalTo: topAnchor),
-      control.bottomAnchor.constraint(equalTo: bottomAnchor)
+      control.centerXAnchor.constraint(equalTo: centerXAnchor),
+      control.centerYAnchor.constraint(equalTo: centerYAnchor),
+      control.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: pad),
+      control.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -pad),
     ])
 
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
-      switch call.method {
-      case "getIntrinsicSize":
-        let size = self.control.intrinsicContentSize
-        result(["width": Double(size.width), "height": Double(size.height)])
-      case "setSelectedIndex":
-        if let args = call.arguments as? [String: Any], let idx = (args["index"] as? NSNumber)?.intValue {
-          self.control.selectedSegment = idx
-          self.applySegmentTint()
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing index", details: nil)) }
-      case "setStyle":
-        if let args = call.arguments as? [String: Any] {
-          if let n = args["tint"] as? NSNumber { self.currentTint = Self.colorFromARGB(n.intValue) }
-          if let n = args["backgroundColor"] as? NSNumber {
-            let c = Self.colorFromARGB(n.intValue)
-            self.currentBackground = c
-            self.wantsLayer = true
-            self.layer?.backgroundColor = c.cgColor
-          }
-          self.applySegmentTint()
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
-      case "setBrightness":
-        if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
-          self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
-          result(nil)
-        } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
-      default:
-        result(FlutterMethodNotImplemented)
-      }
+      self.handle(call, result: result)
     }
   }
 
   required init?(coder: NSCoder) { return nil }
 
-  private func configureSegments(labels: [String], symbols: [String], customIconBytes: [Data?], iconScale: CGFloat, sizes: [NSNumber]) {
-    let count = max(labels.count, max(symbols.count, customIconBytes.count))
-    control.segmentCount = count
-    for i in 0..<count {
-      // Custom icon bytes take precedence over SF Symbol
-      if i < customIconBytes.count, let data = customIconBytes[i],
-         let image = NSImage(data: data) {
-        // Set the scale on the image representation
-        if let rep = image.representations.first {
-          rep.pixelsWide = Int(25.0 * iconScale) // 25pt is the standard icon size
-          rep.pixelsHigh = Int(25.0 * iconScale)
+  // MARK: - Method channel
+
+  private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any]
+    switch call.method {
+    case "getIntrinsicSize":
+      let size = control.intrinsicContentSize
+      result([
+        "width": Double(size.width + 2 * Self.horizontalPadding),
+        "height": Double(size.height + 2 * Self.verticalPadding),
+      ])
+    case "setSelectedIndex":
+      if let idx = (args?["index"] as? NSNumber)?.intValue {
+        selectedIndex = idx
+        if !searchActive { control.selectedSegment = idx }
+        refreshImages()
+        result(nil)
+      } else { result(FlutterError(code: "bad_args", message: "Missing index", details: nil)) }
+    case "setItems":
+      if let args = args {
+        readItems(args)
+        if let v = args["selectedIndex"] as? NSNumber { selectedIndex = v.intValue }
+        rebuildSegments()
+        result(nil)
+      } else { result(FlutterError(code: "bad_args", message: "Missing items", details: nil)) }
+    case "setBadges":
+      if let badges = args?["badges"] as? [String] {
+        self.badges = badges
+        applyBadges()
+        result(nil)
+      } else { result(FlutterError(code: "bad_args", message: "Missing badges", details: nil)) }
+    case "setStyle":
+      if let args = args {
+        if let n = args["tint"] as? NSNumber { tint = Self.colorFromARGB(n.intValue) }
+        if let n = args["backgroundColor"] as? NSNumber {
+          layer?.backgroundColor = Self.colorFromARGB(n.intValue).cgColor
         }
-        image.size = NSSize(width: 25.0, height: 25.0)
-        image.isTemplate = true  // Allow macOS to tint the icon
-        control.setImage(image, forSegment: i)
-      } else if i < symbols.count && !symbols[i].isEmpty,
-                #available(macOS 11.0, *),
-                var image = NSImage(systemSymbolName: symbols[i], accessibilityDescription: nil) {
-        if i < sizes.count, #available(macOS 12.0, *) {
-          let size = CGFloat(truncating: sizes[i])
-          let cfg = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
-          image = image.withSymbolConfiguration(cfg) ?? image
-        }
-        control.setImage(image, forSegment: i)
-      } else if i < labels.count {
-        control.setLabel(labels[i], forSegment: i)
-      } else {
-        control.setLabel("", forSegment: i)
+        applyTint()
+        result(nil)
+      } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
+    case "setFont":
+      readFont(args ?? [:])
+      applyFont()
+      needsLayout = true
+      result(nil)
+    case "setLayout":
+      // `split`, `rightCount` and `splitSpacing` have no AppKit counterpart:
+      // the tabs stay in one segmented control.
+      if let v = (args?["selectedIndex"] as? NSNumber)?.intValue {
+        selectedIndex = v
+        if !searchActive { control.selectedSegment = v }
+        refreshImages()
       }
+      result(nil)
+    case "setBrightness":
+      if let isDark = (args?["isDark"] as? NSNumber)?.boolValue {
+        appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+        result(nil)
+      } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+    case "activateSearch":
+      if hasSearch { setSearchActive(true) }
+      result(nil)
+    case "deactivateSearch":
+      if hasSearch { setSearchActive(false) }
+      result(nil)
+    case "setSearchText", "setMenus", "refresh", "setInteractive":
+      // The search text lives in the app's own field; item menus stay plain
+      // tabs; `refresh` works around a UITabBar layout bug.
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
     }
   }
 
-  private func applySegmentTint() {
+  // MARK: - Reading arguments
+
+  private func readItems(_ dict: [String: Any]) {
+    labels = (dict["labels"] as? [String]) ?? []
+    symbols = (dict["sfSymbols"] as? [String]) ?? []
+    activeSymbols = (dict["activeSfSymbols"] as? [String]) ?? []
+    badges = (dict["badges"] as? [String]) ?? []
+    customIconBytes = ((dict["customIconBytes"] as? [Any]) ?? []).map { ($0 as? FlutterStandardTypedData)?.data }
+    activeCustomIconBytes = ((dict["activeCustomIconBytes"] as? [Any]) ?? []).map { ($0 as? FlutterStandardTypedData)?.data }
+    sizes = ((dict["sfSymbolSizes"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { CGFloat(truncating: $0) } }
+  }
+
+  private func readFont(_ dict: [String: Any]) {
+    labelFontFamily = (dict["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    labelFontSize = (dict["labelFontSize"] as? NSNumber).map { CGFloat(truncating: $0) }
+  }
+
+  // MARK: - Segments
+
+  private var itemCount: Int {
+    max(labels.count, symbols.count, customIconBytes.count)
+  }
+
+  private var searchSegment: Int? { hasSearch ? itemCount : nil }
+
+  private func rebuildSegments() {
+    let count = itemCount + (hasSearch ? 1 : 0)
+    control.segmentCount = count
+    for i in 0..<itemCount {
+      control.setLabel(i < labels.count ? labels[i] : "", forSegment: i)
+    }
+    if let s = searchSegment {
+      control.setLabel(searchLabel, forSegment: s)
+    }
+    if searchActive, let s = searchSegment {
+      control.selectedSegment = s
+    } else if selectedIndex >= 0 && selectedIndex < itemCount {
+      control.selectedSegment = selectedIndex
+    } else {
+      control.selectedSegment = -1
+    }
+    refreshImages()
+    applyBadges()
+    invalidateIntrinsicContentSize()
+  }
+
+  /// Sets each segment's image: the active symbol or icon on the selected
+  /// segment, the plain one elsewhere.
+  private func refreshImages() {
+    let selected = control.selectedSegment
+    for i in 0..<itemCount {
+      control.setImage(image(for: i, active: i == selected), forSegment: i)
+      control.setImageScaling(.scaleProportionallyDown, forSegment: i)
+    }
+    if let s = searchSegment {
+      let name = s == selected ? searchActiveSymbol : searchSymbol
+      control.setImage(symbolImage(name, requestedSize: nil, description: searchLabel), forSegment: s)
+    }
+  }
+
+  private func image(for i: Int, active: Bool) -> NSImage? {
+    let label = i < labels.count ? labels[i] : ""
+    let requested = i < sizes.count ? sizes[i] : nil
+    let bytes = active
+      ? ((i < activeCustomIconBytes.count ? activeCustomIconBytes[i] : nil) ?? (i < customIconBytes.count ? customIconBytes[i] : nil))
+      : (i < customIconBytes.count ? customIconBytes[i] : nil)
+    if let data = bytes, let image = NSImage(data: data) {
+      // Rendered by Flutter at the requested size times the pixel ratio;
+      // shown at the size a symbol of that size gets here.
+      let side = Self.symbolPointSize(requested) * 1.25
+      image.size = NSSize(width: side, height: side)
+      image.isTemplate = true
+      image.accessibilityDescription = label.isEmpty ? nil : label
+      return image
+    }
+    let name = active
+      ? ((i < activeSymbols.count && !activeSymbols[i].isEmpty) ? activeSymbols[i] : (i < symbols.count ? symbols[i] : ""))
+      : (i < symbols.count ? symbols[i] : "")
+    guard !name.isEmpty else { return nil }
+    return symbolImage(name, requestedSize: requested, description: label.isEmpty ? name : label)
+  }
+
+  private func symbolImage(_ name: String, requestedSize: CGFloat?, description: String) -> NSImage? {
+    guard let base = NSImage(systemSymbolName: name, accessibilityDescription: description) else { return nil }
+    let config = NSImage.SymbolConfiguration(pointSize: Self.symbolPointSize(requestedSize), weight: .regular)
+    return base.withSymbolConfiguration(config) ?? base
+  }
+
+  /// A Mac segmented control shows symbols at its label size. `CNSymbol`
+  /// sizes are iOS tab bar sizes (24 by default), so they scale from there.
+  private static func symbolPointSize(_ requested: CGFloat?) -> CGFloat {
+    let r = requested ?? defaultRequestedIconSize
+    return max(8, defaultSymbolPointSize * r / defaultRequestedIconSize)
+  }
+
+  private func applyTint() {
+    // A template symbol takes the colour AppKit picks for the segment, which
+    // reads on the selection; the tint goes to the selection itself.
+    control.selectedSegmentBezelColor = tint
+  }
+
+  private func applyFont() {
+    let size = labelFontSize ?? NSFont.systemFontSize(for: control.controlSize)
+    if let family = labelFontFamily, let font = NSFont(name: family, size: size) {
+      control.font = font
+    } else {
+      control.font = NSFont.systemFont(ofSize: size)
+    }
+    invalidateIntrinsicContentSize()
+  }
+
+  // MARK: - Selection
+
+  @objc private func onChanged(_ sender: NSSegmentedControl) {
+    let index = sender.selectedSegment
+    if let s = searchSegment, index == s {
+      if !searchActive {
+        searchActive = true
+        refreshImages()
+        channel.invokeMethod("searchActiveChanged", arguments: ["isActive": true])
+      }
+      return
+    }
+    searchActive = false
+    selectedIndex = index
+    refreshImages()
+    // Every tap is reported, a reselect too, as UITabBar does (#13).
+    channel.invokeMethod("valueChanged", arguments: ["index": index])
+  }
+
+  private func setSearchActive(_ active: Bool) {
+    searchActive = active
+    if active, let s = searchSegment {
+      control.selectedSegment = s
+    } else if selectedIndex >= 0 && selectedIndex < itemCount {
+      control.selectedSegment = selectedIndex
+    }
+    refreshImages()
+    channel.invokeMethod("searchActiveChanged", arguments: ["isActive": active])
+  }
+
+  // MARK: - Badges
+
+  private func applyBadges() {
+    for i in 0..<itemCount {
+      let value = i < badges.count ? badges[i] : ""
+      if value.isEmpty {
+        badgeViews.removeValue(forKey: i)?.removeFromSuperview()
+        control.setToolTip(nil, forSegment: i)
+        continue
+      }
+      let view = badgeViews[i] ?? {
+        let v = CNMacTabBadgeView()
+        addSubview(v, positioned: .above, relativeTo: control)
+        badgeViews[i] = v
+        return v
+      }()
+      view.value = value
+      // VoiceOver reads a segment's help text after its label.
+      control.setToolTip(value == CNMacTabBadgeView.dotValue ? nil : value, forSegment: i)
+    }
+    for key in badgeViews.keys where key >= itemCount {
+      badgeViews.removeValue(forKey: key)?.removeFromSuperview()
+    }
+    needsLayout = true
+  }
+
+  override func layout() {
+    super.layout()
+    layoutBadges()
+  }
+
+  /// Puts each badge at the top-trailing corner of its tab's content (symbol
+  /// and label). The segments share the control's width equally and centre
+  /// their content, so the content's width gives its end.
+  private func layoutBadges() {
+    guard !badgeViews.isEmpty else { return }
     let count = control.segmentCount
     guard count > 0 else { return }
-    let sel = control.selectedSegment
-    for i in 0..<count {
-      // Custom icon bytes don't get retinted, only SF Symbols
-      let hasCustomIcon = i < currentCustomIconBytes.count && currentCustomIconBytes[i] != nil
-      if !hasCustomIcon,
-         let name = (i < currentSymbols.count ? currentSymbols[i] : nil), !name.isEmpty,
-         var image = NSImage(systemSymbolName: name, accessibilityDescription: nil) {
-        if i < currentSizes.count, #available(macOS 12.0, *) {
-          let size = CGFloat(truncating: currentSizes[i])
-          let cfg = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
-          image = image.withSymbolConfiguration(cfg) ?? image
-        }
-        if i == sel, let tint = currentTint {
-          if #available(macOS 12.0, *) {
-            let cfg = NSImage.SymbolConfiguration(hierarchicalColor: tint)
-            image = image.withSymbolConfiguration(cfg) ?? image
-          } else {
-            image = image.tinted(with: tint)
-          }
-        }
-        control.setImage(image, forSegment: i)
+    let frame = control.frame
+    let segmentWidth = frame.width / CGFloat(count)
+    let font = control.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    for (i, badge) in badgeViews {
+      let label = control.label(forSegment: i) ?? ""
+      var content: CGFloat = 0
+      if let image = control.image(forSegment: i) { content += image.size.width }
+      if !label.isEmpty {
+        if content > 0 { content += 4 }
+        content += (label as NSString).size(withAttributes: [.font: font]).width
       }
+      let centerX = frame.minX + segmentWidth * (CGFloat(i) + 0.5)
+      let size = badge.fittingSize
+      let x = min(centerX + content / 2 - size.width / 3, frame.minX + segmentWidth * CGFloat(i + 1) - size.width / 2)
+      // Flipped or not, sit across the control's top edge.
+      let top = isFlipped ? frame.minY : frame.maxY
+      let y = isFlipped ? top - size.height / 2 + 2 : top - size.height / 2 - 2
+      badge.frame = NSRect(x: x.rounded(), y: y.rounded(), width: size.width, height: size.height)
     }
   }
 
@@ -189,21 +396,59 @@ class CupertinoTabBarNSView: NSView {
     let b = CGFloat(argb & 0xFF) / 255.0
     return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
   }
-
-  @objc private func onChanged(_ sender: NSSegmentedControl) {
-    channel.invokeMethod("valueChanged", arguments: ["index": sender.selectedSegment])
-  }
 }
 
-private extension NSImage {
-  func tinted(with color: NSColor) -> NSImage {
-    let img = NSImage(size: size)
-    img.lockFocus()
-    let rect = NSRect(origin: .zero, size: size)
-    color.set()
-    rect.fill()
-    draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
-    img.unlockFocus()
-    return img
+/// A red badge over a tab: a capsule with the value, or a dot for
+/// `CNTabBarItem.dotBadge`. Clicks go through to the tab under it.
+final class CNMacTabBadgeView: NSView {
+  /// `CNTabBarItem.dotBadge`.
+  static let dotValue = "\u{200B}"
+  private static let dotSize: CGFloat = 8
+  private static let height: CGFloat = 16
+
+  private let text = NSTextField(labelWithString: "")
+
+  var value: String = "" {
+    didSet {
+      let dot = value == Self.dotValue
+      text.isHidden = dot
+      text.stringValue = dot ? "" : value
+      invalidateIntrinsicContentSize()
+      needsLayout = true
+    }
   }
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.backgroundColor = NSColor.systemRed.cgColor
+    // Above the control's selection, which macOS 27 draws in a raised layer.
+    layer?.zPosition = 100
+    text.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+    text.textColor = .white
+    text.alignment = .center
+    text.lineBreakMode = .byClipping
+    addSubview(text)
+    setAccessibilityElement(false)
+  }
+
+  required init?(coder: NSCoder) { return nil }
+
+  override var fittingSize: NSSize { intrinsicContentSize }
+
+  override var intrinsicContentSize: NSSize {
+    if value == Self.dotValue { return NSSize(width: Self.dotSize, height: Self.dotSize) }
+    let w = ceil(text.intrinsicContentSize.width) + 10
+    return NSSize(width: max(Self.height, w), height: Self.height)
+  }
+
+  override func layout() {
+    super.layout()
+    layer?.cornerRadius = bounds.height / 2
+    let h = ceil(text.intrinsicContentSize.height)
+    text.frame = NSRect(x: 0, y: ((bounds.height - h) / 2).rounded(), width: bounds.width, height: h)
+  }
+
+  // Never takes a click: the tab under it does.
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
