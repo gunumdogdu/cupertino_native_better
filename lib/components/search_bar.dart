@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
@@ -526,82 +527,88 @@ class _CNSearchBarState extends State<CNSearchBar>
           children: [
             // The bar expands into what the Cancel button leaves of the row.
             Flexible(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final expandedWidth = constraints.maxWidth;
-                  final currentWidth = widget.expandable
-                      ? widget.collapsedWidth +
-                            (expandedWidth - widget.collapsedWidth) *
-                                _expandAnimation.value
-                      : expandedWidth;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOutCubic,
-                    width: currentWidth,
-                    height: widget.expandedHeight,
-                    child: GestureDetector(
-                      onTap: _onTap,
-                      child: LiquidGlassContainer(
-                        config: LiquidGlassConfig(
-                          effect: CNGlassEffect.regular,
-                          shape: CNGlassEffectShape.capsule,
-                          tint: effectiveBackgroundColor,
-                          interactive: true,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Row(
-                            children: [
-                              Icon(
-                                CupertinoIcons.search,
-                                size: 18,
-                                color: effectiveTint,
-                              ),
-                              if (_expandAnimation.value > 0.3) ...[
-                                // The gap sits inside Expanded: the field
-                                // appears while AnimatedContainer still lags
-                                // near collapsedWidth, too narrow for a fixed
-                                // 8 px gap.
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 8),
-                                    child: Opacity(
-                                      opacity:
-                                          (_expandAnimation.value - 0.3) / 0.7,
-                                      child: CupertinoTextField(
-                                        controller: _textController,
-                                        focusNode: _focusNode,
-                                        placeholder: widget.placeholder,
-                                        placeholderStyle: TextStyle(
-                                          color: effectivePlaceholderColor,
+              child: _BarIntrinsics(
+                minWidth: widget.collapsedWidth,
+                maxWidth: MediaQuery.sizeOf(context).width,
+                height: widget.expandedHeight,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final expandedWidth = constraints.maxWidth;
+                    final currentWidth = widget.expandable
+                        ? widget.collapsedWidth +
+                              (expandedWidth - widget.collapsedWidth) *
+                                  _expandAnimation.value
+                        : expandedWidth;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      width: currentWidth,
+                      height: widget.expandedHeight,
+                      child: GestureDetector(
+                        onTap: _onTap,
+                        child: LiquidGlassContainer(
+                          config: LiquidGlassConfig(
+                            effect: CNGlassEffect.regular,
+                            shape: CNGlassEffectShape.capsule,
+                            tint: effectiveBackgroundColor,
+                            interactive: true,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  CupertinoIcons.search,
+                                  size: 18,
+                                  color: effectiveTint,
+                                ),
+                                if (_expandAnimation.value > 0.3) ...[
+                                  // The gap sits inside Expanded: the field
+                                  // appears while AnimatedContainer still lags
+                                  // near collapsedWidth, too narrow for a fixed
+                                  // 8 px gap.
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(left: 8),
+                                      child: Opacity(
+                                        opacity:
+                                            (_expandAnimation.value - 0.3) /
+                                            0.7,
+                                        child: CupertinoTextField(
+                                          controller: _textController,
+                                          focusNode: _focusNode,
+                                          placeholder: widget.placeholder,
+                                          placeholderStyle: TextStyle(
+                                            color: effectivePlaceholderColor,
+                                          ),
+                                          style: TextStyle(
+                                            color: effectiveTextColor,
+                                          ),
+                                          decoration: null,
+                                          padding: EdgeInsets.zero,
+                                          onSubmitted: _onSubmitted,
                                         ),
-                                        style: TextStyle(
-                                          color: effectiveTextColor,
-                                        ),
-                                        decoration: null,
-                                        padding: EdgeInsets.zero,
-                                        onSubmitted: _onSubmitted,
                                       ),
                                     ),
                                   ),
-                                ),
-                                if (_searchText.isNotEmpty)
-                                  GestureDetector(
-                                    onTap: _onClear,
-                                    child: Icon(
-                                      CupertinoIcons.xmark_circle_fill,
-                                      size: 18,
-                                      color: effectivePlaceholderColor,
+                                  if (_searchText.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: _onClear,
+                                      child: Icon(
+                                        CupertinoIcons.xmark_circle_fill,
+                                        size: 18,
+                                        color: effectivePlaceholderColor,
+                                      ),
                                     ),
-                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
             // Hidden but still sized while collapsing, so the bar does not
@@ -629,4 +636,71 @@ class _CNSearchBarState extends State<CNSearchBar>
       ),
     );
   }
+}
+
+/// Answers intrinsic size queries for the fallback bar, whose width comes
+/// from a [LayoutBuilder] that cannot answer them: the collapsed width at
+/// least, the screen width at most, and the bar's height. Lets the bar sit
+/// inside [IntrinsicHeight] or [IntrinsicWidth].
+class _BarIntrinsics extends SingleChildRenderObjectWidget {
+  const _BarIntrinsics({
+    required this.minWidth,
+    required this.maxWidth,
+    required this.height,
+    required super.child,
+  });
+
+  final double minWidth;
+  final double maxWidth;
+  final double height;
+
+  @override
+  _RenderBarIntrinsics createRenderObject(BuildContext context) =>
+      _RenderBarIntrinsics(minWidth, maxWidth, height);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderBarIntrinsics renderObject,
+  ) {
+    renderObject.update(minWidth, maxWidth, height);
+  }
+}
+
+class _RenderBarIntrinsics extends RenderProxyBox {
+  _RenderBarIntrinsics(this._minWidth, this._maxWidth, this._height);
+
+  double _minWidth;
+  double _maxWidth;
+  double _height;
+
+  void update(double minWidth, double maxWidth, double height) {
+    if (minWidth == _minWidth && maxWidth == _maxWidth && height == _height) {
+      return;
+    }
+    _minWidth = minWidth;
+    _maxWidth = maxWidth;
+    _height = height;
+    markNeedsLayout();
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) => _minWidth;
+
+  @override
+  double computeMaxIntrinsicWidth(double height) => _maxWidth;
+
+  @override
+  double computeMinIntrinsicHeight(double width) => _height;
+
+  @override
+  double computeMaxIntrinsicHeight(double width) => _height;
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) => constraints.constrain(
+    Size(
+      constraints.hasBoundedWidth ? constraints.maxWidth : _maxWidth,
+      _height,
+    ),
+  );
 }

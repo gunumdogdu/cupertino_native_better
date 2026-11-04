@@ -132,4 +132,30 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Cancel'), findsOneWidget);
   });
+
+  for (final expandable in [true, false]) {
+    testWidgets(
+      'expandable: $expandable: inside IntrinsicHeight and IntrinsicWidth',
+      (tester) async {
+        await pumpHost(
+          tester,
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IntrinsicHeight(child: CNSearchBar(expandable: expandable)),
+                IntrinsicWidth(child: CNSearchBar(expandable: expandable)),
+              ],
+            ),
+          ),
+        );
+        if (expandable) {
+          await tester.tap(find.byIcon(CupertinoIcons.search).first);
+          await tester.pumpAndSettle();
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
