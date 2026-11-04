@@ -74,7 +74,9 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
   /// LABEL renders in the system red destructive color (not just the icon).
   /// On iOS < 26 fallback (CupertinoActionSheet) the entry uses
   /// `isDestructiveAction: true`. On iOS 13 legacy UIAlertController fallback
-  /// the action uses `.destructive` style.
+  /// the action uses `.destructive` style. On macOS, which has no destructive
+  /// menu item style, the label and an icon without its own colour are drawn
+  /// in the system red.
   final bool isDestructive;
 
   /// Whether the menu stays open after this item is chosen, for an action

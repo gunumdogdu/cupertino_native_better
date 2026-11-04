@@ -13,6 +13,20 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
   int? _lastSelected;
   List<int>? _lastPath;
   bool _useAlternateSvgIcons = false;
+  bool _showPreview = true;
+
+  /// Shows the index a menu reported, and prints it for the macOS probe
+  /// (`lib/mac_popup_probe_entry.dart`).
+  void _onSelected(String menu, int index) {
+    debugPrint('CNB_RESULT popup $menu index=$index');
+    setState(() => _lastSelected = index);
+  }
+
+  /// Shows the path a menu reported, and prints it for the macOS probe.
+  void _onPathSelected(String menu, List<int> path) {
+    debugPrint('CNB_RESULT popup $menu path=$path');
+    setState(() => _lastPath = path);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +66,64 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
         label: 'Zoom out',
         icon: CNSymbol('minus.magnifyingglass'),
         keepsMenuPresented: true,
+      ),
+    ];
+    // One of each kind of entry, for checking a menu at a glance: a checked
+    // item with a subtitle, a disabled one, a nested submenu with SVG, PNG
+    // and custom icons, items with an SVG, a PNG and a coloured custom icon,
+    // and a destructive one.
+    final kindItems = <CNPopupMenuEntry>[
+      CNPopupMenuItem(
+        label: 'Show Preview',
+        subtitle: 'Checked, with a subtitle',
+        icon: const CNSymbol('eye'),
+        checked: _showPreview,
+      ),
+      const CNPopupMenuItem(
+        label: 'Archive',
+        subtitle: 'Disabled',
+        icon: CNSymbol('archivebox'),
+        enabled: false,
+      ),
+      const CNPopupMenuDivider(),
+      CNPopupMenuSubmenu(
+        label: 'Move to',
+        icon: const CNSymbol('folder'),
+        items: [
+          CNPopupMenuItem(
+            label: 'Home',
+            imageAsset: CNImageAsset('assets/icons/home.svg', size: 16),
+          ),
+          CNPopupMenuItem(
+            label: 'Recents',
+            imageAsset: CNImageAsset('assets/icons/clock.png', size: 16),
+          ),
+          const CNPopupMenuItem(
+            label: 'Favourites',
+            customIcon: CupertinoIcons.heart,
+          ),
+          const CNPopupMenuDivider(),
+          const CNPopupMenuItem(label: 'Elsewhere', enabled: false),
+        ],
+      ),
+      CNPopupMenuItem(
+        label: 'Search (SVG)',
+        imageAsset: CNImageAsset('assets/icons/search.svg', size: 16),
+      ),
+      CNPopupMenuItem(
+        label: 'Coins (PNG)',
+        imageAsset: CNImageAsset('assets/icons/coins.png', size: 16),
+      ),
+      const CNPopupMenuItem(
+        label: 'Star (custom icon)',
+        customIcon: CupertinoIcons.star_fill,
+        iconColor: CupertinoColors.systemOrange,
+      ),
+      const CNPopupMenuDivider(),
+      const CNPopupMenuItem(
+        label: 'Delete',
+        icon: CNSymbol('trash'),
+        isDestructive: true,
       ),
     ];
     final items = [
@@ -232,9 +304,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                 CNPopupMenuButton(
                   buttonLabel: 'Actions',
                   items: items,
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('actions', index),
                   buttonStyle: CNButtonStyle.plain,
                 ),
               ],
@@ -249,9 +319,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                   buttonIcon: const CNSymbol('ellipsis', size: 18),
                   size: 44,
                   items: items,
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('icon', index),
                   buttonStyle: CNButtonStyle.glass,
                 ),
               ],
@@ -270,9 +338,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                   ),
                   size: 44,
                   items: coloredItems,
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('colored', index),
                   buttonStyle: CNButtonStyle.bordered,
                 ),
               ],
@@ -289,9 +355,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       CupertinoIcons.ellipsis_circle, // Custom IconData!
                   size: 44,
                   items: customIconItems,
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('custom', index),
                   buttonStyle: CNButtonStyle.tinted,
                 ),
               ],
@@ -346,9 +410,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                   ),
                   size: 44,
                   items: svgItems,
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('svg', index),
                   buttonStyle: CNButtonStyle.glass,
                 ),
               ],
@@ -370,9 +432,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                   ),
                   size: 44,
                   items: coloredSvgItems,
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('colored_svg', index),
                   buttonStyle: CNButtonStyle.borderedProminent,
                 ),
               ],
@@ -424,9 +484,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       ),
                     ),
                   ],
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('png', index),
                   buttonStyle: CNButtonStyle.glass,
                 ),
               ],
@@ -483,9 +541,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       ),
                     ),
                   ],
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('colored_png', index),
                   buttonStyle: CNButtonStyle.borderedProminent,
                 ),
               ],
@@ -516,9 +572,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       ),
                     ),
                   ],
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('png_small', index),
                   buttonStyle: CNButtonStyle.glass,
                 ),
                 CNPopupMenuButton.icon(
@@ -536,9 +590,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       ),
                     ),
                   ],
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('png_medium', index),
                   buttonStyle: CNButtonStyle.glass,
                 ),
                 CNPopupMenuButton.icon(
@@ -556,9 +608,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       ),
                     ),
                   ],
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('png_large', index),
                   buttonStyle: CNButtonStyle.glass,
                 ),
                 CNPopupMenuButton.icon(
@@ -576,9 +626,7 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                       ),
                     ),
                   ],
-                  onSelected: (index) {
-                    setState(() => _lastSelected = index);
-                  },
+                  onSelected: (index) => _onSelected('png_xlarge', index),
                   buttonStyle: CNButtonStyle.glass,
                 ),
               ],
@@ -594,10 +642,32 @@ class _PopupMenuButtonDemoPageState extends State<PopupMenuButtonDemoPage> {
                   buttonIcon: const CNSymbol('textformat', size: 18),
                   size: 44,
                   items: layoutItems,
-                  onPathSelected: (path) {
-                    setState(() => _lastPath = path);
-                  },
+                  onPathSelected: (path) => _onPathSelected('layout', path),
                   buttonStyle: CNButtonStyle.glass,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Every item kind: checked, subtitle, disabled, '
+                    'submenu, SVG, PNG, custom icon, destructive',
+                  ),
+                ),
+                CNPopupMenuButton(
+                  buttonLabel: 'Item kinds',
+                  items: kindItems,
+                  onSelected: (index) {
+                    _onSelected('kinds', index);
+                    if (index == 0) {
+                      setState(() => _showPreview = !_showPreview);
+                    }
+                  },
+                  onPathSelected: (path) => _onPathSelected('kinds', path),
+                  buttonStyle: CNButtonStyle.bordered,
                 ),
               ],
             ),
