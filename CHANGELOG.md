@@ -1,3 +1,11 @@
+## 2.1.2
+
+> Patch: `CNNativeSheet` failed to compile with some Xcode versions (#119). No API changes.
+
+### Fixed — #119 a build error in `CNNativeSheet.swift`
+
+Building or archiving an app with 2.1.0 or 2.1.1 could stop with "Static method 'buildExpression' requires that 'some ToolbarContent' conform to 'View'" in `CNNativeSheet.swift`, depending on the Xcode version. An availability check sat inside the sheet's toolbar builder, which not every Xcode accepts there. The check now sits outside it, with the same result: on the iOS 27 simulator the sheet is pixel-identical to 2.1.1.
+
 ## 2.1.1
 
 > Patch: four fixes contributed by @yagizdo (#115-#118), and a follow-up to #116. Each was reproduced on 2.1.0 and verified with the fix on the iOS 27 simulator; #115, #117 and the #118 alert also on iOS 26.2. The changes below iOS 26 (#116, the #118 segmented control) were verified with the Flutter fallbacks forced on iOS 27 and with widget tests, as no iOS 18 simulator was available. No API changes.

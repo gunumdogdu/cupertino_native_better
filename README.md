@@ -71,7 +71,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.1.1
+  cupertino_native_better: ^2.1.2
 ```
 
 Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26; earlier versions get the Cupertino fallbacks. The iOS deployment target is 15.0.
@@ -1471,7 +1471,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.1.1
+   cupertino_native_better: ^2.1.2
    ```
 
 2. Update imports:
