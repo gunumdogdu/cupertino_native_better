@@ -48,6 +48,52 @@ class MainFlutterWindow: NSWindow {
         result(["x": Double(screenPoint.x), "y": Double(primaryHeight - screenPoint.y)])
         return
       }
+      if call.method == "type", let self = self,
+        let args = call.arguments as? [String: Any]
+      {
+        // Key presses through the app's own event queue, to the first
+        // responder: `text` types each character, `keyCodes` presses keys
+        // (36 Return, 53 Esc, 48 Tab, 125 Down). `delayMs` posts them later,
+        // e.g. into a menu that a click is about to open.
+        NSApp.activate(ignoringOtherApps: true)
+        self.makeKeyAndOrderFront(nil)
+        var keys: [(String, UInt16)] = []
+        if let text = args["text"] as? String {
+          keys += text.map { (String($0), UInt16(0)) }
+        }
+        let chars: [Int: String] = [36: "\r", 53: "\u{1b}", 48: "\t", 125: "\u{F701}"]
+        for code in (args["keyCodes"] as? [Int]) ?? [] {
+          keys.append((chars[code] ?? "", UInt16(code)))
+        }
+        let windowNumber = self.windowNumber
+        let post = {
+          for (chars, code) in keys {
+            for type in [NSEvent.EventType.keyDown, .keyUp] {
+              if let event = NSEvent.keyEvent(
+                with: type, location: .zero, modifierFlags: code == 125 ? [.function, .numericPad] : [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: windowNumber, context: nil, characters: chars,
+                charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)
+              {
+                NSApp.postEvent(event, atStart: false)
+              }
+            }
+          }
+        }
+        if let delay = args["delayMs"] as? Int {
+          DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay), execute: post)
+        } else {
+          post()
+        }
+        result(nil)
+        return
+      }
+      if call.method == "firstResponder", let self = self {
+        // The class of the window's first responder, to check who has the
+        // keyboard.
+        result(self.firstResponder.map { NSStringFromClass(type(of: $0)) } ?? "nil")
+        return
+      }
       guard call.method == "click", let self = self, let controller = controller,
         let args = call.arguments as? [String: Any],
         let x = args["x"] as? Double, let y = args["y"] as? Double

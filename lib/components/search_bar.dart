@@ -7,6 +7,7 @@ import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../style/sf_symbol.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/optional_method_call.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
@@ -88,6 +89,26 @@ class CNSearchBarController {
 /// and expands to a full-width text field when tapped. This creates an
 /// elegant iOS-native animation.
 ///
+/// On iOS 26+ it is a SwiftUI search bar with a Liquid Glass background; on
+/// older iOS and on other platforms it is drawn in Flutter.
+///
+/// On macOS (every supported version) it is a native `NSSearchField`, which
+/// keeps the keyboard while the user types and hands it back to Flutter when
+/// the search ends. macOS search fields have no Cancel button, so there:
+///
+/// * [expandable] works like the search item of a window toolbar: the bar
+///   starts as a magnifying-glass button ([collapsedWidth] wide, Liquid
+///   Glass on macOS 26+), a click opens the field and focuses it, and the
+///   field closes again when it loses focus while empty.
+/// * Esc is the cancel gesture: the first Esc clears the text, Esc in an
+///   empty field ends the search, closes an expandable bar and calls
+///   [onCancelTap]. [showCancelButton] and [cancelText] are not used.
+/// * [tint] colours the magnifying glass, the insertion point and the
+///   collapsed button; the field itself keeps the system look.
+/// * [recentsAutosaveName] keeps a menu of recent searches.
+/// * The [controller]'s methods all work; `setText` and `clear` report the
+///   new text through [onChanged], as a click on the clear button does.
+///
 /// Example:
 /// ```dart
 /// CNSearchBar(
@@ -121,6 +142,7 @@ class CNSearchBar extends StatefulWidget {
     this.searchIcon,
     this.clearIcon,
     this.autoHideOnModal = true,
+    this.recentsAutosaveName,
   });
 
   /// Placeholder text shown when the search field is empty.
@@ -189,6 +211,12 @@ class CNSearchBar extends StatefulWidget {
   /// fallback).
   final bool autoHideOnModal;
 
+  /// macOS only: the name under which the field saves its recent searches
+  /// (`NSSearchField.recentsAutosaveName`). When set, the magnifying glass
+  /// opens a menu of them; a search is recorded when the user presses
+  /// Return. Searches saved under the same name are shared between fields.
+  final String? recentsAutosaveName;
+
   @override
   State<CNSearchBar> createState() => _CNSearchBarState();
 }
@@ -215,6 +243,9 @@ class _CNSearchBarState extends State<CNSearchBar>
   Animation<double>? _secondaryRouteAnim;
 
   bool? _lastIsDark;
+
+  /// The options last sent to the macOS search field, to send changes only.
+  Map<String, Object?>? _lastMacConfig;
 
   CNSearchBarController get _controller =>
       widget.controller ?? (_internalController ??= CNSearchBarController());
@@ -254,6 +285,39 @@ class _CNSearchBarState extends State<CNSearchBar>
     super.didChangeDependencies();
     _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
+    _syncMacConfigIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant CNSearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncMacConfigIfNeeded();
+  }
+
+  bool get _usesMacSearchField =>
+      defaultTargetPlatform == TargetPlatform.macOS &&
+      PlatformVersion.shouldUseNativeControls;
+
+  /// The options of the macOS field that can change after it is created.
+  Map<String, Object?> _macConfig(BuildContext context) => <String, Object?>{
+    'placeholder': widget.placeholder,
+    'tint': resolveColorToArgb(widget.tint, context),
+    'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
+    'textColor': resolveColorToArgb(widget.textColor, context),
+    'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
+    'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
+    'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
+    'collapsedWidth': widget.collapsedWidth,
+    'autofocus': widget.autofocus,
+  };
+
+  void _syncMacConfigIfNeeded() {
+    final ch = _channel;
+    if (ch == null || !_usesMacSearchField) return;
+    final config = _macConfig(context);
+    if (mapEquals(config, _lastMacConfig)) return;
+    _lastMacConfig = config;
+    ch.invokeOptionalMethod('setConfig', config).catchError((_) {});
   }
 
   Future<void> _syncBrightnessIfNeeded() async {
@@ -332,6 +396,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     _controller._attach(ch);
     ch.setMethodCallHandler(_onMethodCall);
     _lastIsDark = ThemeHelper.isDark(context);
+    if (_usesMacSearchField) _lastMacConfig = _macConfig(context);
     _pushContainmentIfNeeded();
   }
 
@@ -420,17 +485,97 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   @override
   Widget build(BuildContext context) {
-    final isIOSOrMacOS =
-        defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
-    final shouldUseNative =
-        isIOSOrMacOS && PlatformVersion.shouldUseNativeGlass;
+    // macOS: NSSearchField, which every supported macOS has.
+    if (_usesMacSearchField) {
+      return _buildMacOSSearchBar(context);
+    }
 
-    if (shouldUseNative) {
+    if (defaultTargetPlatform == TargetPlatform.iOS &&
+        PlatformVersion.shouldUseNativeGlass) {
       return _buildNativeSearchBar(context);
     }
 
     return _buildFlutterSearchBar(context);
+  }
+
+  /// The creation parameters of the native views.
+  Map<String, dynamic> _creationParams(BuildContext context) =>
+      <String, dynamic>{
+        'placeholder': widget.placeholder,
+        'expandable': widget.expandable,
+        'initiallyExpanded': widget.initiallyExpanded,
+        'collapsedWidth': widget.collapsedWidth,
+        'expandedHeight': widget.expandedHeight,
+        'tint': resolveColorToArgb(widget.tint, context),
+        'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
+        'textColor': resolveColorToArgb(widget.textColor, context),
+        'placeholderColor': resolveColorToArgb(
+          widget.placeholderColor,
+          context,
+        ),
+        'showCancelButton': widget.showCancelButton,
+        'cancelText': widget.cancelText,
+        'autofocus': widget.autofocus,
+        'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
+        'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
+        'isDark': ThemeHelper.isDark(context),
+      };
+
+  /// macOS: an `NSSearchField` as wide as the parent allows (the window
+  /// when the parent is unbounded), or a [CNSearchBar.collapsedWidth] wide
+  /// magnifying-glass button that Flutter widens into the field.
+  Widget _buildMacOSSearchBar(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final platformView = AppKitView(
+      viewType: 'CNSearchBar',
+      creationParams: <String, dynamic>{
+        ..._creationParams(context),
+        if (widget.recentsAutosaveName != null)
+          'recentsAutosaveName': widget.recentsAutosaveName,
+      },
+      creationParamsCodec: const StandardMessageCodec(),
+      onPlatformViewCreated: _onPlatformViewCreated,
+    );
+
+    return _BarIntrinsics(
+      minWidth: widget.collapsedWidth,
+      maxWidth: screenWidth,
+      height: widget.expandedHeight,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final expandedWidth = constraints.hasBoundedWidth
+              ? constraints.maxWidth
+              : screenWidth;
+          double widthAt(double t) => widget.expandable
+              ? widget.collapsedWidth +
+                    (expandedWidth - widget.collapsedWidth) * t
+              : expandedWidth;
+          final hidden = maybeHiddenPlaceholder(
+            height: widget.expandedHeight,
+            width: widthAt(_expandAnimation.value),
+          );
+          if (hidden != null) return hidden;
+          return wrapWithModalInteractionGuard(
+            AnimatedBuilder(
+              animation: _expandAnimation,
+              // Starts at the leading edge and takes only the bar's width
+              // when the parent lets it, so a collapsed bar is a button.
+              builder: (context, child) => Align(
+                alignment: AlignmentDirectional.centerStart,
+                widthFactor: 1,
+                heightFactor: 1,
+                child: SizedBox(
+                  width: widthAt(_expandAnimation.value),
+                  height: widget.expandedHeight,
+                  child: child,
+                ),
+              ),
+              child: platformView,
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildNativeSearchBar(BuildContext context) {
@@ -447,38 +592,12 @@ class _CNSearchBarState extends State<CNSearchBar>
     );
     if (hidden != null) return hidden;
 
-    const viewType = 'CNSearchBar';
-    final creationParams = <String, dynamic>{
-      'placeholder': widget.placeholder,
-      'expandable': widget.expandable,
-      'initiallyExpanded': widget.initiallyExpanded,
-      'collapsedWidth': widget.collapsedWidth,
-      'expandedHeight': widget.expandedHeight,
-      'tint': resolveColorToArgb(widget.tint, context),
-      'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
-      'textColor': resolveColorToArgb(widget.textColor, context),
-      'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
-      'showCancelButton': widget.showCancelButton,
-      'cancelText': widget.cancelText,
-      'autofocus': widget.autofocus,
-      'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
-      'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
-      'isDark': ThemeHelper.isDark(context),
-    };
-
-    final platformView = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPlatformViewCreated,
-          )
-        : AppKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPlatformViewCreated,
-          );
+    final platformView = UiKitView(
+      viewType: 'CNSearchBar',
+      creationParams: _creationParams(context),
+      creationParamsCodec: const StandardMessageCodec(),
+      onPlatformViewCreated: _onPlatformViewCreated,
+    );
 
     return wrapWithModalInteractionGuard(
       AnimatedBuilder(
