@@ -1,4 +1,4 @@
-## 2.2.0 (unreleased)
+## 2.2.0
 
 > macOS goes native. Every control that has an AppKit counterpart now uses it on every supported macOS (12 and later), not only on macOS 26: buttons, pop-up buttons, sliders, switches, steppers, date pickers, colour wells, segmented controls and the tab bar. Alerts are window sheets, action sheets are menus, search bars are search fields, and image assets and SVGs draw on macOS. New: `CNContextMenu` (right-click on macOS, long press on iOS) and `CNProgressIndicator`. Fixes the macOS hang in #47. Checked on macOS 27.2 and on the iOS 27 and 26.2 simulators; code that only runs on macOS 12–26 was reviewed and forced on macOS 27, not run on those versions.
 

@@ -43,7 +43,13 @@
 
 ## What's new in 2.2
 
-<!-- MEDIA: macOS screenshots go here -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/macos_display_light_dark.png" width="640" alt="A macOS window with a Display and Brightness page in light and dark mode side by side, drawn with the native segmented control, slider and switches">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/macos_buttons_before_after.png" width="640" alt="Before and after on macOS: in 2.1.2 buttons with titles were small circles with the title spilling out; in 2.2.0 they are native capsule buttons, and icon buttons are circles">
+</p>
 
 - **Native controls on every macOS.** Buttons, pop-up buttons, sliders, switches, steppers, date pickers, colour wells, segmented controls and the tab bar use their AppKit controls on macOS&nbsp;12 and later, not only on macOS&nbsp;26. The Liquid Glass styles still need macOS&nbsp;26. See [macOS](#macos).
 - **macOS dialogs, menus and search.** `CNAlert` is an `NSAlert` sheet on the window, `CNActionSheet` a menu that drops down from its anchor, and `CNSearchBar` an `NSSearchField` that can keep recent searches.
@@ -457,7 +463,9 @@ On macOS, with the same API, `CNAlert` is an `NSAlert` sheet on the window: the 
 
 ### Context menu
 
-<!-- MEDIA: CNContextMenu on macOS and iOS -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/macos_context_menu.png" width="520" alt="A native macOS context menu opened by a right-click on a photo card, with icons, subtitles, an open Move to submenu, a Rotate section, a disabled Print item and a red Delete item">
+</p>
 
 `CNContextMenu` gives any widget a native context menu. On macOS a right-click, two-finger click or Control-click opens an `NSMenu` at the pointer, also in a window that is in the background. On iOS&nbsp;17.4 and later a long press opens the system menu at the pressed point. It takes the same entries as `CNPopupMenuButton` and reports the path of the chosen item.
 
@@ -478,7 +486,9 @@ The child keeps its own gestures, so a button inside it still takes taps. On iOS
 
 ### Progress indicator
 
-<!-- MEDIA: CNProgressIndicator bar and spinner -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/macos_progress.png" width="420" alt="Native macOS progress bars and spinners: determinate bars in blue and pink, an indeterminate bar, four bar sizes and spinners in four sizes">
+</p>
 
 `CNProgressIndicator` is a native progress bar or spinner: `NSProgressIndicator` on every macOS, `UIProgressView` and `UIActivityIndicatorView` on iOS&nbsp;26. Pass a `value` from 0 to 1 when the progress is known, or leave it `null`.
 
