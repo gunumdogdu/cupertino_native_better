@@ -133,6 +133,10 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
       return SizedBox(
         height: widget.height,
         child: CupertinoSegmentedControl<int>(
+          // The default, primaryContrastingColor, is white in a dark theme too.
+          unselectedColor: CupertinoColors.systemBackground.resolveFrom(
+            context,
+          ),
           children: {
             for (var i = 0; i < widget.labels.length; i++)
               i: Text(widget.labels[i]),

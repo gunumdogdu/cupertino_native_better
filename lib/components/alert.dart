@@ -285,7 +285,7 @@ class CNAlert {
       textFields: textFields,
       // The app's theme, not the window's: a light app on a dark system gets
       // a light alert, as CNActionSheet does.
-      isDark: context.mounted ? ThemeHelper.isDark(context) : null,
+      isDark: context.mounted ? ThemeHelper.themeIsDark(context) : null,
     );
   }
 
