@@ -35,9 +35,9 @@ enum CNButtonStyle {
   /// .clearGlass()`, iOS 26+).
   ///
   /// With a `glassEffectUnionId` or `glassEffectId`, the SwiftUI path uses
-  /// `Glass.clear`. On macOS, AppKit has no clear glass bezel, so the button
-  /// looks like [glass] unless one of those IDs selects the SwiftUI path.
-  /// Below iOS/macOS 26 it falls back like [glass].
+  /// `Glass.clear`. On macOS 26+ without those IDs, AppKit has no clear
+  /// glass bezel, so the button is a borderless button inside a clear
+  /// `NSGlassEffectView`. Below iOS/macOS 26 it falls back like [glass].
   clearGlass,
 
   /// Clear Liquid Glass tinted with the button's tint, the clear
@@ -50,7 +50,8 @@ enum CNButtonStyle {
   /// On both paths the label and icon are white, as on [prominentGlass]; an
   /// icon colour, or `CNButtonConfig.labelColor` without a glass ID,
   /// overrides it.
-  /// On macOS without those IDs it looks like [prominentGlass]. Below
-  /// iOS/macOS 26 it falls back like [prominentGlass].
+  /// On macOS 26+ without those IDs it is a borderless button inside a clear
+  /// `NSGlassEffectView` tinted with the tint. Below iOS/macOS 26 it falls
+  /// back like [prominentGlass].
   prominentClearGlass,
 }
