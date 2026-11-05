@@ -182,6 +182,18 @@ final class CNToolbarManager: NSObject, NSToolbarDelegate, NSSearchFieldDelegate
     NotificationCenter.default.addObserver(
       self, selector: #selector(windowContentDidChange(_:)),
       name: Self.windowContentDidChange, object: nil)
+    // After a hot restart no CNToolbar is mounted any more (the new isolate
+    // mounts its own, if any, after this): give the window its own toolbar
+    // back instead of leaving the old one on it.
+    NotificationCenter.default.addObserver(
+      forName: MacEngineRestart.notification, object: nil, queue: nil
+    ) { [weak self] _ in
+      self?.enqueue {
+        $0.pendingConfig = nil
+        $0.uninstall()
+      }
+    }
+    MacEngineRestart.observe(messenger)
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

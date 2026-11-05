@@ -48,17 +48,18 @@ final class CNPopoverManager: NSObject, NSPopoverDelegate {
     ch.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result: result)
     }
-    // A hot restart starts a new root isolate, and the engine announces it
-    // on this channel (debug and profile builds; the macOS embedder itself
-    // does not listen to it). The popover's caller is gone then, so the
-    // popover closes. Only a popover opened before the message is closed.
-    _ = messenger.setMessageHandlerOnChannel("flutter/isolate") { [weak self] _, reply in
-      reply(nil)
+    // A hot restart starts a new root isolate (see MacEngineRestart). The
+    // popover's caller is gone then, so the popover closes. Only a popover
+    // opened before the announcement is closed.
+    NotificationCenter.default.addObserver(
+      forName: MacEngineRestart.notification, object: nil, queue: nil
+    ) { [weak self] _ in
       guard let self, let stale = self.session else { return }
       DispatchQueue.main.async {
         if self.session == stale { self.finish(nil, close: true) }
       }
     }
+    MacEngineRestart.observe(messenger)
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
