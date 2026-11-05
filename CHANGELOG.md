@@ -1,3 +1,19 @@
+## 2.2.1
+
+> Patch: the iOS part of the package compiles with every Xcode from 26.0 on again (#119). No API changes, no visual changes.
+
+### Fixed — #119 `CNNativeSheet.swift` still failed to build with Xcode 26
+
+2.1.2 moved one cause of the #119 error, but archiving with Xcode 26 then stopped at the sheet's toolbar buttons: "No exact matches in call to static method 'buildExpression'". The buttons were a `ForEach` of toolbar items, and only the iOS 27 SDK (Xcode 27) has a `ForEach` that takes toolbar items. The buttons are now one toolbar item group with the `ForEach` inside it, which every SDK accepts. They share one glass capsule as before: with no, one and two buttons the sheet is pixel-identical to 2.2.0 on the iOS 27 simulator, and with two buttons on iOS 26.2.
+
+### Fixed — `CNTabBarNative` failed to build with Xcode 26.1
+
+The bottom accessory used `tabViewBottomAccessory(isEnabled:)` whenever the compiler was Swift 6.2.1 or newer, but that API first ships in the iOS 26.2 SDK, so Xcode 26.1 stopped with an error. Xcode 26.2 and 26.3, whose compiler reports Swift 6.2, skipped it and showed the empty accessory pill that #93 fixed. The check now asks for the SwiftUI version of the iOS 26.2 SDK instead. Apps built with Xcode 27 are unaffected.
+
+### Checked
+
+The package's iOS Swift code was compiled against the iOS 26.0, 26.1, 26.2, 26.3, 26.4, 26.5, 27.0 and 27.1 SDKs, each with its Xcode's Swift version, and the macOS code against the macOS 26.5 and 27.2 SDKs. All compile. Xcode 16 was never supported (the package uses iOS 26 APIs throughout), and the App Store needs Xcode 26 anyway; the README now says so.
+
 ## 2.2.0
 
 > macOS goes native. Every control that has an AppKit counterpart now uses it on every supported macOS (12 and later), not only on macOS 26: buttons, pop-up buttons, sliders, switches, steppers, date pickers, colour wells, segmented controls and the tab bar. Alerts are window sheets, action sheets are menus, search bars are search fields, and image assets and SVGs draw on macOS. New: `CNContextMenu` (right-click on macOS, long press on iOS) and `CNProgressIndicator`. Fixes the macOS hang in #47. Checked on macOS 27.2 and on the iOS 27 and 26.2 simulators; code that only runs on macOS 12–26 was reviewed and forced on macOS 27, not run on those versions.

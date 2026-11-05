@@ -370,9 +370,11 @@ struct CNMinimizingTabView: View {
         // seen when entering/leaving the tab that hides its accessory.
         //
         // iOS 26.1 draws an empty accessory pill for `EmptyView()`; only
-        // `isEnabled: false` hides it (#93). That API needs the iOS 26.1 SDK,
-        // which Xcode 26.1 (Swift 6.2.1) is the first to ship.
-#if compiler(>=6.2.1)
+        // `isEnabled: false` hides it (#93). That API first ships in the iOS
+        // 26.2 SDK (SwiftUI 7.2.5, Xcode 26.2), though it runs on iOS 26.1.
+        // A compiler check can't tell: Xcode 26.1 has Swift 6.2.1 and no such
+        // API, Xcode 26.2 and 26.3 report Swift 6.2 (#119).
+#if canImport(SwiftUI, _version: 7.2.5)
         if #available(iOS 26.1, *) {
             base.tabViewBottomAccessory(isEnabled: store.accessory != nil) {
                 accessoryContent

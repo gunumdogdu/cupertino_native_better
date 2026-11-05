@@ -556,23 +556,32 @@ struct CNSheetPageView: View {
         .tint(store.tint.map { Color($0) })
     }
 
+    /// The trailing buttons as one group, with the ForEach inside the group's
+    /// view builder: a ForEach of toolbar items only compiles with the iOS 27
+    /// SDK (Xcode 26 and older have no such initializer, #119). The buttons
+    /// share one glass capsule either way.
     @ToolbarContentBuilder
     private func buttons(of page: CNSheetConfig.Page) -> some ToolbarContent {
-        ForEach(page.buttons.indices, id: \.self) { b in
-            let button = page.buttons[b]
-            ToolbarItem(placement: .topBarTrailing) {
-                SwiftUI.Button {
-                    onEvent("onButtonTap", ["page": index, "id": button.id])
-                } label: {
-                    if let symbol = button.symbol {
-                        Image(systemName: symbol)
-                    } else {
-                        Text(button.label ?? "")
-                    }
+        if !page.buttons.isEmpty {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                ForEach(page.buttons.indices, id: \.self) { b in
+                    toolbarButton(page.buttons[b])
                 }
-                .accessibilityLabel(button.label ?? button.symbol ?? "")
             }
         }
+    }
+
+    private func toolbarButton(_ button: CNSheetConfig.Button) -> some View {
+        SwiftUI.Button {
+            onEvent("onButtonTap", ["page": index, "id": button.id])
+        } label: {
+            if let symbol = button.symbol {
+                Image(systemName: symbol)
+            } else {
+                Text(button.label ?? "")
+            }
+        }
+        .accessibilityLabel(button.label ?? button.symbol ?? "")
     }
 
     // Find My's two-line rows at the default text size, in the sheet's own
