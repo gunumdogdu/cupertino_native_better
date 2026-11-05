@@ -35,6 +35,8 @@
 /// - [CNGlassButtonGroup] - Grouped buttons with unified glass effects
 /// - [CNSearchBar] - Expandable search bar with animations
 /// - [CNProgressIndicator] - Native progress bar or spinner
+/// - [CNPopUpButton] - Native pop-up button that picks one value from a menu
+/// - [CNGauge] - Native gauge (level indicator on macOS): capacity, rating, circular
 /// - [CNToast] - Toast notifications with glass effects
 /// - [CNAlert] - Native alert dialog with actions and text fields
 /// - [CNActionSheet] - Native action sheet (a menu or an alert sheet on macOS)
@@ -91,6 +93,8 @@ export 'components/glass_button_group.dart';
 export 'components/liquid_glass_container.dart';
 export 'components/search_bar.dart';
 export 'components/progress_indicator.dart';
+export 'components/pop_up_button.dart';
+export 'components/gauge.dart';
 export 'components/toast.dart';
 export 'components/floating_island.dart';
 export 'components/search_scaffold.dart';

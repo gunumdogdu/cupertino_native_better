@@ -89,6 +89,8 @@ const _viewTypes = <String>[
   'CupertinoNativeSegmentedControl',
   'CupertinoNativePopupMenuButton',
   'CupertinoNativeProgressIndicator',
+  'CupertinoNativePopUpButton',
+  'CupertinoNativeGauge',
   'CupertinoNativeTabBar',
   'CNSearchBar',
 ];
@@ -151,6 +153,20 @@ class _HostState extends State<_Host> {
             onValueChanged: (_) {},
           ),
           CNProgressIndicator(
+            value: on ? 0.8 : 0.2,
+            tint: on ? CupertinoColors.systemPink : null,
+          ),
+          CNPopUpButton<int>(
+            value: on ? 1 : 0,
+            items: const [
+              CNPopUpButtonItem(value: 0, label: 'A'),
+              CNPopUpButtonItem(value: 1, label: 'B'),
+            ],
+            semanticLabel: on ? 'Pick, dark' : 'Pick',
+            buttonStyle: on ? CNButtonStyle.glass : null,
+            onChanged: (_) {},
+          ),
+          CNGauge(
             value: on ? 0.8 : 0.2,
             tint: on ? CupertinoColors.systemPink : null,
           ),

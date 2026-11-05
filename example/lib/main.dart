@@ -18,6 +18,8 @@ import 'demos/button.dart';
 import 'demos/search_bar.dart';
 import 'demos/glass_button_group.dart';
 import 'demos/progress_indicator.dart';
+import 'demos/pop_up_button.dart';
+import 'demos/gauge.dart';
 import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
@@ -542,6 +544,35 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) => const ProgressIndicatorDemoPage(),
                       ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Pop-Up Button'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'chevron.up.chevron.down',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const PopUpButtonDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Gauge'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('gauge.with.needle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(builder: (_) => const GaugeDemoPage()),
                     );
                   },
                 ),

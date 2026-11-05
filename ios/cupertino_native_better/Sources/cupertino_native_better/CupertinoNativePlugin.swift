@@ -37,6 +37,12 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     let progressFactory = CupertinoProgressIndicatorViewFactory(messenger: registrar.messenger())
     registrar.register(progressFactory, withId: "CupertinoNativeProgressIndicator")
 
+    let popUpButtonFactory = CupertinoPopUpButtonViewFactory(messenger: registrar.messenger())
+    registrar.register(popUpButtonFactory, withId: "CupertinoNativePopUpButton")
+
+    let gaugeFactory = CupertinoGaugeViewFactory(messenger: registrar.messenger())
+    registrar.register(gaugeFactory, withId: "CupertinoNativeGauge")
+
     // Page control (iOS only: macOS has no native one, it is drawn in Flutter)
     let pageControlFactory = CupertinoPageControlViewFactory(messenger: registrar.messenger())
     registrar.register(pageControlFactory, withId: "CupertinoNativePageControl")
