@@ -40,6 +40,7 @@
 /// - [CNActionSheet] - Native action sheet (a menu or an alert sheet on macOS)
 /// - [CNTabRail] - Vertical tab bar (rail or sidebar) for the side of the screen
 /// - [CNTabScaffold] - Tab layout that moves the tabs to the side on iPhone Duo
+/// - [CNToolbar] - Native toolbar: the window toolbar on macOS, a bottom toolbar on iOS
 /// - [CNFoldable] - iPhone Duo hinge, vertical bar and fold regions
 /// - [LiquidGlassContainer] - Apply glass effects to any widget
 ///
@@ -92,6 +93,8 @@ export 'components/progress_indicator.dart';
 export 'components/toast.dart';
 export 'components/floating_island.dart';
 export 'components/search_scaffold.dart';
+export 'components/toolbar.dart'
+    hide debugResolveToolbarItemIds, debugResetCNToolbarWindow;
 export 'components/alert.dart';
 export 'components/experimental/glass_card.dart';
 

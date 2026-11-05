@@ -13,6 +13,8 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     CNAlertManager.shared.setup(messenger: registrar.messenger)
     CNActionSheetManager.shared.setup(messenger: registrar.messenger)
     CNContextMenuManager.shared.setup(messenger: registrar.messenger)
+    // The window toolbar of CNToolbar (NSToolbar on the Flutter window).
+    CNToolbarManager.shared.setup(messenger: registrar.messenger)
 
     let sliderFactory = CupertinoSliderViewFactory(messenger: registrar.messenger)
     registrar.register(sliderFactory, withId: "CupertinoNativeSlider")
