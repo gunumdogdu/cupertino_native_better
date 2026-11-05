@@ -1,3 +1,38 @@
+## 2.3.0
+
+> The Mac window goes native, and five new controls. On macOS, `CNTabBarNative` becomes the window's sidebar, `CNNativeSheet` its inspector and the new `CNToolbar` its toolbar, around your unchanged Flutter content. New on both platforms: `CNPopover`, `CNPopUpButton`, `CNGauge`, `CNToolbar` and `CNSidebar`. Fixes #120 and four older bugs. Checked on macOS 27.2 and on the iOS 27 and 26.2 simulators, touches included; code that only runs on macOS 12–26 was reviewed, not run. Compiles with every Xcode from 26.0 on.
+
+### Added
+
+- **`CNPopover`**: a native popover that points at a widget or a rect. `NSPopover` on macOS; a UIKit popover on iPhone and iPad (it stays a popover on iPhone instead of becoming a sheet); Liquid Glass on 26. Its content is native and described by data: a title and message, `CNListItem` rows with a checkmark for choice lists, switches that report changes while it stays open, and default, cancel and destructive buttons. `show` returns the chosen id, or null when it is dismissed; `update` and `dismiss` change or close it. It follows its anchor, closes on navigation and on hot restart, and VoiceOver treats it as modal. Escape and Return work on macOS. Flutter widgets cannot go inside it.
+- **`CNPopUpButton`**: the native pop-up button, a value picker that shows the current choice. `NSPopUpButton` on macOS; on iOS 26 a button whose menu selects one item. SF Symbol and image-asset items, dividers, titled sections, disabled items, the `CNButton` styles (glass on macOS 26 and iOS 26), a controlled `value` and the native width.
+- **`CNGauge`**: the native gauge, a level indicator on macOS. Capacity, discrete capacity, relevancy and rating on `NSLevelIndicator`; linear and circular SwiftUI `Gauge` styles on both platforms. Warning and critical zones, tick marks (macOS), labels, and an editable star rating that VoiceOver can adjust. A gauge that only shows a value lets taps through to the row under it.
+- **`CNToolbar`**: the Apple toolbar. On macOS it puts an `NSToolbar` on the window while the widget is mounted (unified, unified compact or expanded, with the window title and subtitle): buttons with badges and the prominent style on macOS 26, segmented groups, menus, a search field (`NSSearchToolbarItem`), spaces, and the sidebar and inspector toggles while the window has a sidebar or inspector. The widget takes no room; the window keeps its frame and gets its own toolbar back when the widget goes away. On iOS 26 it is a Liquid Glass bottom toolbar with grouped items (toolbar badges need iOS 27). Items update in place.
+- **`CNSidebar`**: a native sidebar list in your own layout: SwiftUI `List(.sidebar)` on macOS, on Liquid Glass on 26, with sections, symbols, images, badges and selection. On iOS it draws a `CNTabRail` sidebar.
+
+### macOS — the window
+
+- **`CNTabBarNative`** turns the window into a native split view: the tabs become sidebar rows with symbols, badges and selection, beside your Flutter content, which is moved, not recreated. The search tab is the sidebar's search field, and a tab with a `CNNativeList` shows that list instead of the Flutter content. Same API and callbacks as on iOS; View › Show Sidebar (⌃⌘S) is added. `disable()` gives the window back as it was. `bottomAccessory` and `minimizeBehavior` have no Mac counterpart and are ignored.
+- **`CNNativeSheet.show`** opens the window's inspector with the same pages, a segmented page switcher and a close button when `dismissible`; it returns `true` on macOS now. Detents have no Mac meaning. The sidebar and the inspector work together.
+- **`CNTabRail` and `CNTabScaffold`** draw a native sidebar on macOS instead of a Flutter one.
+- **`CNSearchScaffold`** puts its tabs and its search field in the window toolbar.
+- Typing, scrolling, right-clicks and full screen keep working in Flutter content inside the split view, and the window comes back as it was after a hot restart.
+
+### Fixed
+
+- **#120: `CNSegmentedControl` follows a press-and-drag across segments.** Its platform view declared no gesture recognizers, so inside a scrolling list Flutter's gesture arena kept every drag and the control only got taps. Taps and horizontal drags now go to the native control, on iOS and macOS; a vertical drag that starts on it still scrolls the list. Thanks to @LucasLau00 for the report and the fix.
+- **`CNTabBarNative`: popping its page in code left the bar on screen.** The bar was presented full screen, which takes the Flutter view out of the window; Flutter then drew no frames, so the page's exit animation never finished and its `dispose` (with its `disable()`) never ran. The bar is now presented over the Flutter view and looks the same. The home indicator now follows your app's setting, as on your Flutter screens (Flutter hides it after a few seconds unless the app sets `SystemUiMode.edgeToEdge`).
+- **iOS `CNSearchScaffold` showed an empty tab bar** on iOS 26 and 27. Its fallback tab bar also shows each item's symbol instead of a placeholder circle.
+- **macOS: a popover or toolbar no longer stays on the window after a hot restart.**
+
+### Changed
+
+- `CNTabBarNative.enable(isDark: null)` follows the app on macOS; on iOS it stays light, as before.
+
+### Checked
+
+Each new control was checked on macOS 27.2 in light and dark, and on the iOS 27 and iOS 26.2 simulators, with real touches on iOS: popover rows, switches, buttons and outside taps; pop-up selection, press-and-drag and scrolling; the editable rating; toolbar segments, menus and badges; the segmented control's press-and-drag. The Swift code was compiled against the iOS 26.0, 26.1, 26.2, 26.4, 26.5, 27.0 and 27.1 SDKs and the macOS 26.5 and 27.2 SDKs, each with its Xcode's Swift version.
+
 ## 2.2.1
 
 > Patch: the iOS part of the package compiles with every Xcode from 26.0 on again (#119). No API changes, no visual changes.

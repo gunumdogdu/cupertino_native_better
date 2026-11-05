@@ -41,6 +41,24 @@
   <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/light_dark.png" width="520" alt="The Display and Brightness page in light and in dark mode">
 </p>
 
+## What's new in 2.3
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/macos_window_light.png" width="720" alt="A mail-style macOS window built with the package: a native sidebar with Inbox, Drafts, Sent, Junk and Archive, a unified window toolbar with buttons, a menu, a prominent New Message button and a search field, a message list drawn in Flutter, and a native inspector with a Details page">
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/ios_new_controls.png" width="720" alt="Four iPhone screens: a native popover with switches and Cancel and Apply buttons, a pop-up button's menu with a checkmark on the current size, native gauges with warning colours, star ratings and rings, and a Liquid Glass bottom toolbar with a badge">
+</p>
+
+- **The Mac window goes native.** On macOS, `CNTabBarNative` becomes the window's sidebar, `CNNativeSheet` its inspector, and the new `CNToolbar` its toolbar, around your unchanged Flutter content. See [Mac window](#mac-window-sidebar-toolbar-and-inspector).
+- **`CNPopover`:** a native popover pointing at a widget, on iPhone, iPad and Mac. See [Popover](#popover).
+- **`CNPopUpButton`:** the pop-up button that picks one value and shows it. See [Pop-up button](#pop-up-button).
+- **`CNGauge`:** gauges and level indicators, with warning and critical zones and an editable rating. See [Gauge](#gauge).
+- **`CNToolbar`:** the window toolbar on macOS, a Liquid Glass bottom toolbar on iOS. See [Toolbar](#toolbar).
+- **`CNSidebar`:** a native sidebar list for your own layout; `CNTabRail` and `CNTabScaffold` use it on macOS.
+- **Fixed:** #120 (`CNSegmentedControl` press-and-drag), `CNTabBarNative` left on screen when its page was popped in code, the empty tab bar of `CNSearchScaffold` on iOS.
+
 ## What's new in 2.2
 
 <p align="center">
@@ -89,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.2.1
+  cupertino_native_better: ^2.3.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -500,6 +518,133 @@ CNProgressIndicator(style: CNProgressStyle.spinner, size: CNControlSize.small) /
 
 iOS has no bar without a value and no spinner that fills, so both show the spinning indicator there. On macOS the spinning indicator is always grey; `tint` colours the bar and the filling circle. Below iOS&nbsp;26 a Flutter bar and `CupertinoActivityIndicator` stand in, and on Android and the web Material's indicators.
 
+### Popover
+
+`CNPopover` shows a native popover that points at a widget: `NSPopover` on macOS and a UIKit popover on iPhone and iPad, where it stays a popover instead of becoming a sheet. Its content is native and described by data: a title and message, `CNListItem` rows (with a checkmark for a choice list), switches that report changes while it stays open, and buttons. `show` returns the id of the chosen row or button, or `null` when the popover is dismissed.
+
+```dart
+final sortKey = GlobalKey();
+// ...
+CNButton(key: sortKey, label: 'Sort', onPressed: () async {
+  final id = await CNPopover.show(
+    context: context,
+    anchorKey: sortKey,
+    preferredEdge: CNPopoverEdge.bottom,
+    content: CNPopoverContent(
+      title: 'Sort By',
+      rows: [
+        CNPopoverRow(id: 'name', item: const CNListItem(title: 'Name', leadingSymbol: CNSymbol('textformat')), checked: sort == 'name'),
+        CNPopoverRow(id: 'date', item: const CNListItem(title: 'Date Modified', leadingSymbol: CNSymbol('calendar')), checked: sort == 'date'),
+      ],
+      toggles: const [CNPopoverToggle(id: 'hidden', label: 'Show hidden files', value: false)],
+    ),
+    onToggleChanged: (id, value) {},
+  );
+  if (id != null) setState(() => sort = id);
+})
+```
+
+It follows its anchor, and closes when the page changes, on a hot restart and with `CNPopover.dismiss()`. Escape closes it on macOS and Return presses the default button. Flutter widgets cannot go inside it. On Android and the web the same content shows in a Cupertino popup.
+
+### Pop-up button
+
+`CNPopUpButton` picks one value from a short list and shows it, unlike `CNPopupMenuButton`, which runs actions. It is an `NSPopUpButton` on macOS and, on iOS&nbsp;26, a button whose menu selects one item and marks it with a checkmark.
+
+```dart
+CNPopUpButton<String>(
+  value: size,
+  items: const [
+    CNPopUpButtonItem(value: 's', label: 'Small', icon: CNSymbol('tortoise')),
+    CNPopUpButtonItem(value: 'm', label: 'Medium'),
+    CNPopUpButtonDivider(),
+    CNPopUpButtonSection(title: 'More', items: [
+      CNPopUpButtonItem(value: 'l', label: 'Large', enabled: false),
+    ]),
+  ],
+  onChanged: (v) => setState(() => size = v), // null disables it
+)
+```
+
+The value is controlled: if `onChanged` keeps the old value, the button goes back to it. It takes the `CNButton` styles, with glass on macOS&nbsp;26 and iOS&nbsp;26, and is as wide as the native control. Below iOS&nbsp;26 a Cupertino button opens an action sheet.
+
+### Gauge
+
+`CNGauge` shows a level. macOS calls it a level indicator and draws it with `NSLevelIndicator`; iOS draws it with SwiftUI's `Gauge`.
+
+```dart
+CNGauge(value: 72, max: 100, warningValue: 75, criticalValue: 90,
+  label: 'Storage', currentValueLabel: '72 GB',
+  minimumValueLabel: '0', maximumValueLabel: '100')
+
+CNGauge(value: rating, max: 5, style: CNGaugeStyle.rating,
+  onChanged: (v) => setState(() => rating = v)) // an editable star rating
+```
+
+| Style | macOS | iOS&nbsp;26 |
+|---|---|---|
+| `capacity` | `NSLevelIndicator`, continuous | `Gauge`, linear capacity |
+| `discreteCapacity` | `NSLevelIndicator`, discrete, with tick marks | linear capacity, whole units |
+| `relevancy` | `NSLevelIndicator`, relevancy | accessory linear capacity |
+| `rating` | `NSLevelIndicator`, rating | SF Symbol stars |
+| `circularCapacity`, `circular`, `linear` | SwiftUI `Gauge` (a level indicator on macOS&nbsp;12) | SwiftUI `Gauge` |
+
+The bar and ring change colour at `warningValue` and `criticalValue`, also on a scale where low is bad. A gauge that only shows a value lets taps through to the row under it.
+
+### Toolbar
+
+`CNToolbar` is the Apple toolbar: at the top of the window on macOS, at the bottom of the screen on iPhone.
+
+```dart
+CNToolbar(title: 'Inbox', subtitle: '3 unread', items: [
+  const CNToolbarSidebarToggle(),
+  const CNToolbarSidebarTrackingSeparator(),
+  CNToolbarSegmentedGroup(label: 'View', selectedIndices: {view}, onSelected: setView,
+    segments: const [
+      CNToolbarSegment(label: 'List', icon: CNSymbol('list.bullet')),
+      CNToolbarSegment(label: 'Grid', icon: CNSymbol('square.grid.2x2')),
+    ]),
+  const CNToolbarSpace.flexible(),
+  CNToolbarMenu(label: 'Sort', icon: const CNSymbol('arrow.up.arrow.down'), items: sortItems, onSelected: sort),
+  CNToolbarButton(label: 'New Message', icon: const CNSymbol('square.and.pencil'),
+    style: CNToolbarItemStyle.prominent, badge: const CNToolbarBadge.count(3), onPressed: compose),
+  CNToolbarSearch(placeholder: 'Search mail', onChanged: filter),
+])
+```
+
+On macOS the widget takes no room: while it is mounted the window gets an `NSToolbar` (unified, unified compact or expanded) with the title and subtitle, and the Flutter content sits below it. When the widget goes away, or its page is covered, the window gets its own toolbar back. On iOS&nbsp;26 place it at the bottom of the page: it is a Liquid Glass `UIToolbar` with grouped items; search and sidebar items are macOS only, and toolbar badges need iOS&nbsp;27. Items update in place.
+
+### Mac window: sidebar, toolbar and inspector
+
+On macOS, `CNTabBarNative` and `CNNativeSheet` keep their API and become parts of the window. `CNTabBarNative.enable` turns the window into a native split view: the tabs are sidebar rows beside your Flutter content, which is moved, not recreated, and the search tab is the sidebar's search field. `CNNativeSheet.show` opens the window's inspector with the same pages. With `CNToolbar` on top, you get a complete Mac window, as in the picture above. `disable()` and `dismiss()` give the window back as it was.
+
+```dart
+await CNTabBarNative.enable(tabs: const [
+  CNTab(title: 'Inbox', sfSymbol: CNSymbol('tray'), badgeCount: 3),
+  CNTab(title: 'Archive', sfSymbol: CNSymbol('archivebox')),
+], onTabSelected: (i) => setState(() => mailbox = i));
+
+await CNNativeSheet.show(pages: const [
+  CNSheetPage(title: 'Details', sfSymbol: CNSymbol('info.circle'), items: [
+    CNListItem(title: 'From', subtitle: 'Design Team'),
+  ]),
+]);
+```
+
+For a sidebar inside your own layout, use `CNSidebar`: a SwiftUI sidebar list with sections, symbols, badges and selection. `CNTabRail` and `CNTabScaffold` use it on macOS.
+
+```dart
+CNSidebar(
+  sections: const [
+    CNSidebarSection(items: [
+      CNSidebarItem(title: 'Inbox', sfSymbol: CNSymbol('tray'), badge: '3'),
+      CNSidebarItem(title: 'Archive', sfSymbol: CNSymbol('archivebox')),
+    ]),
+  ],
+  selectedIndex: index,
+  onSelected: (i) => setState(() => index = i),
+)
+```
+
 ### Search bar
 
 `CNSearchBar` is a native search field: a SwiftUI search bar on iOS&nbsp;26 and an `NSSearchField` on every macOS. With `expandable` it starts as a magnifying-glass button and opens into the field.
@@ -603,18 +748,23 @@ Open the example app's **Showcase** section to try every screen above on your ow
 | `CNStepper` | Native − / + stepper | - |
 | `CNColorWell` | Native colour well that opens the system colour picker | - |
 | `CNProgressIndicator` | Native progress bar or spinner, with or without a value | - |
+| `CNGauge` | Native gauge: `NSLevelIndicator` on macOS, SwiftUI `Gauge` on iOS, with an editable rating | - |
+| `CNPopUpButton` | Native pop-up button that picks one value and shows it | - |
 | `CNPageControl` | Native page dots that can follow a `PageView` | `PageController` |
 | `CNPopupMenuButton` | Native popup menu with dividers, icons, image assets, subtitles, submenus, palettes and inline sections | - |
 | `CNPopupMenuButton.icon` | Circular icon-only popup menu variant | - |
 | `CNActionSheet` | Native `UIAlertController` action sheet with destructive styling; a menu or an `NSAlert` sheet on macOS | - |
 | `CNContextMenu` | Native context menu for any widget: right-click on macOS, long press on iOS | - |
+| `CNPopover` | Native popover pointing at a widget, with rows, switches and buttons | - |
+| `CNToolbar` | Native toolbar: the window toolbar on macOS, a Liquid Glass bottom toolbar on iOS | - |
+| `CNSidebar` | Native sidebar list with sections, symbols and badges (macOS; a rail sidebar on iOS) | - |
 | `CNAlert` | Native `UIAlertController` alert with text fields and destructive styling; an `NSAlert` sheet on macOS | - |
 | `CNSegmentedControl` | Native segmented control with SF Symbols support | - |
 | `CNSearchBar` | Native search field: SwiftUI on iOS 26, `NSSearchField` on macOS | `CNSearchBarController` |
 | `CNGlassButtonGroup` | Grouped buttons with unified glass blending (tint color support) | - |
 | `LiquidGlassContainer` | Apply Liquid Glass effects to any Flutter widget | - |
 | `CNGlassCard` | **(Experimental)** Pre-styled card with optional breathing glow animation | - |
-| `CNTabBarNative` | **iOS 26 Native Tab Bar** with UITabBarController + search | - |
+| `CNTabBarNative` | **iOS 26 Native Tab Bar** with UITabBarController + search; the window's sidebar on macOS | - |
 | `CNToast` | Toast notifications with Liquid Glass effects | - |
 
 ### Tab Bar with Split Mode
@@ -1065,8 +1215,15 @@ Since 2.2 a widget whose control exists in AppKit uses it on every supported mac
 | `LiquidGlassContainer` | `NSGlassEffectView` on macOS&nbsp;26, `NSVisualEffectView` before |
 | `CNGlassButtonGroup` | Liquid Glass on macOS&nbsp;26; a row of native buttons before |
 | `CNToast` | Flutter, on native glass on macOS&nbsp;26 |
-| `CNFloatingIsland`, `CNPageControl`, `CNTabRail` | Drawn in Flutter |
-| `CNTabBarNative`, `CNNativeSheet`, `CNFoldable` | iOS only. `CNTabBarNative.enable` does nothing and `CNNativeSheet.show` returns `false` |
+| `CNTabBarNative` | The window's sidebar: an `NSSplitViewController` around your Flutter content, with the search tab as the sidebar's search field (2.3) |
+| `CNNativeSheet` | The window's inspector, with a page switcher (2.3) |
+| `CNToolbar`, `CNSearchScaffold` | The window's `NSToolbar`, with `NSSearchToolbarItem` (2.3) |
+| `CNPopover` | `NSPopover` (2.3) |
+| `CNPopUpButton` | `NSPopUpButton` (2.3) |
+| `CNGauge` | `NSLevelIndicator`, or SwiftUI `Gauge` for the rings (2.3) |
+| `CNSidebar`, `CNTabRail`, `CNTabScaffold` | A SwiftUI sidebar list (2.3) |
+| `CNFloatingIsland`, `CNPageControl` | Drawn in Flutter |
+| `CNFoldable` | iPhone Duo only |
 
 **What AppKit has no place for.** These options are ignored on macOS:
 
@@ -1085,7 +1242,8 @@ Since 2.2 a widget whose control exists in AppKit uses it on every supported mac
 - Menus hold only your entries: the items macOS adds to context menus, such as Ask Siri, are left out. Item icons stay visible on macOS&nbsp;27, which hides them by default.
 - VoiceOver cannot open a `CNContextMenu` on macOS: Flutter gives a widget no Show Menu action there.
 - The package's minimum is macOS&nbsp;12.0, as Xcode&nbsp;27.1 rejects older deployment targets. Set your app's `MACOSX_DEPLOYMENT_TARGET` to 12.0 or later, and with CocoaPods `platform :osx, '12.0'` in `macos/Podfile`.
-- 2.2 was checked on macOS&nbsp;27.2. The code paths for macOS&nbsp;12 to 26 were reviewed, not run on those versions.
+- `CNTabBarNative` on macOS: `bottomAccessory` and `minimizeBehavior` have no Mac counterpart. `CNNativeSheet` on macOS: detents are ignored. The window gets View › Show Sidebar (⌃⌘S).
+- 2.2 and 2.3 were checked on macOS&nbsp;27.2. The code paths for macOS&nbsp;12 to 26 were reviewed, not run on those versions.
 
 ### Accessibility
 
@@ -1103,6 +1261,10 @@ The widgets that render natively are real UIKit and SwiftUI controls, so VoiceOv
 | `CNNativeSheet` | A system sheet: the page title as a heading, each button by its `label`, each row as one element |
 | `CNContextMenu` | The child, with the menu as its long-press action (double-tap and hold) |
 | `CNProgressIndicator` | Its `semanticLabel` with the progress as a percentage ("Upload, 40 percent") |
+| `CNPopover` | A modal popover: VoiceOver stays inside it, and the escape gesture (two-finger scrub) closes it |
+| `CNPopUpButton` | A pop-up button with its `semanticLabel` and the selected item as its value |
+| `CNGauge` | Its label and value; the editable rating is adjustable (swipe up or down) |
+| `CNToolbar` | Each item by its label, the badge as its value |
 
 **Name every icon-only control.** Without a name, an icon-only button is read by its SF Symbol's built-in name, which describes the picture rather than the action (`moon` is read as "do not disturb"), and a switch or slider has no name at all: a native control cannot merge with the Flutter text next to it. Pass `semanticLabel`:
 
@@ -1673,7 +1835,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.2.1
+   cupertino_native_better: ^2.3.0
    ```
 
 2. Update imports:

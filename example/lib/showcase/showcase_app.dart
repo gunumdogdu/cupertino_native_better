@@ -1,6 +1,7 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show DefaultMaterialLocalizations;
+import 'package:flutter/services.dart';
 
 import '../mac_back_bar.dart';
 import 'scenes/account_scene.dart';
@@ -9,6 +10,7 @@ import 'scenes/duo_scene.dart';
 import 'scenes/editor_scene.dart';
 import 'scenes/event_scene.dart';
 import 'scenes/files_scene.dart';
+import 'scenes/mailbox_scene.dart';
 import 'scenes/music_scene.dart';
 import 'scenes/notes_scene.dart';
 import 'scenes/photos_scene.dart';
@@ -18,13 +20,23 @@ import 'scenes/welcome_scene.dart';
 ///
 ///   flutter run -t lib/showcase/showcase_app.dart --dart-define=SCENE=display
 ///
-/// `BRIGHTNESS=dark` starts in dark mode.
+/// `BRIGHTNESS=dark` starts in dark mode. On macOS, `WINDOW=1280x800` sizes
+/// the window (debug builds, through the example's `cnb_mac_audit` channel).
 const _scene = String.fromEnvironment('SCENE', defaultValue: 'display');
 const _dark = String.fromEnvironment('BRIGHTNESS') == 'dark';
+const _window = String.fromEnvironment('WINDOW');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const ShowcaseApp(scene: _scene, dark: _dark));
+  final size = _window.split('x').map(double.tryParse).toList();
+  if (size.length == 2 && size.every((v) => v != null)) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      const MethodChannel(
+        'cnb_mac_audit',
+      ).invokeMethod('resize', {'width': size[0], 'height': size[1]});
+    });
+  }
 }
 
 class ShowcaseApp extends StatefulWidget {
@@ -80,6 +92,7 @@ Widget buildShowcaseScene(
     'welcome' => const WelcomeScene(),
     'editor' => const EditorScene(),
     'notes' => const NotesScene(),
+    'mailbox' => const MailboxScene(),
     _ when inApp => const _LocalBrightness(),
     _ => DisplayScene(onBrightnessChanged: onBrightnessChanged),
   };
