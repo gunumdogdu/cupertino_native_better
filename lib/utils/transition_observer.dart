@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../cupertino_native_platform_interface.dart';
+import 'route_changes.dart';
 
 /// A navigation observer that automatically notifies native Cupertino components
 /// when route transitions begin and end.
@@ -39,24 +40,28 @@ class CNTransitionObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _beginTransition();
+    notifyCNRouteChange();
     _scheduleEndTransition(route);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _beginTransition();
+    notifyCNRouteChange();
     _scheduleEndTransition(previousRoute);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     _beginTransition();
+    notifyCNRouteChange();
     _scheduleEndTransition(newRoute);
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _beginTransition();
+    notifyCNRouteChange();
     _scheduleEndTransition(previousRoute);
   }
 
