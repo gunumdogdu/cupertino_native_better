@@ -14,6 +14,8 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
     private var searchPlaceholder: String = "Search"
     private var automaticallyActivatesSearch: Bool = true
     private weak var internalSearchController: UISearchController?
+    private var initialIsDark: Bool?
+    private var initialSelectedIndex = 0
 
     struct TabConfig {
         let title: String?
@@ -35,6 +37,9 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
         if let args = args {
             setupFromArgs(args)
         }
+        // UITabBarController loads its view in init, before the tabs were
+        // parsed: viewDidLoad found none, and the tab bar stayed empty.
+        configureTabBar()
 
         // Setup method call handler
         channel.setMethodCallHandler { [weak self] call, result in
@@ -46,11 +51,18 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
+    /// Puts the parsed tabs, selection, appearance and tints on the
+    /// controller.
+    private func configureTabBar() {
+        if let isDark = initialIsDark {
+            view.overrideUserInterfaceStyle = isDark ? .dark : .light
+        }
 
         // Setup tabs using the new UITab API
         setupTabs()
+        if initialSelectedIndex >= 0, initialSelectedIndex < tabConfigurations.count {
+            selectedIndex = initialSelectedIndex
+        }
 
         // Set tint colors
         if let tint = tintColor {
@@ -86,10 +98,8 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
             }
         }
 
-        // Parse dark mode
-        if let isDark = args["isDark"] as? Bool {
-            view.overrideUserInterfaceStyle = isDark ? .dark : .light
-        }
+        // Applied with the tabs, in configureTabBar.
+        initialIsDark = args["isDark"] as? Bool
 
         let count = max(labels.count, symbols.count)
         tabConfigurations = (0..<count).map { i in
@@ -106,7 +116,7 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
             )
         }
 
-        self.selectedIndex = selectedIndex
+        initialSelectedIndex = selectedIndex
     }
 
     private func setupTabs() {
@@ -317,13 +327,44 @@ private class SearchContentViewController: UIViewController {
 
 // MARK: - Platform View Wrapper (available on all iOS, runtime check inside)
 
+/// Holds the tab bar controller's view and makes the controller a child of
+/// the view controller that shows Flutter while the view is in a window. A
+/// tab bar controller outside the view controller hierarchy gets no
+/// appearance callbacks, and the iOS 18+ tab bar is never shown.
+private final class CNSearchScaffoldContainer: UIView {
+    weak var hosted: UIViewController?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard let hosted else { return }
+        if window != nil {
+            guard hosted.parent == nil, let parent = owningViewController() else { return }
+            parent.addChild(hosted)
+            hosted.didMove(toParent: parent)
+        } else if hosted.parent != nil {
+            hosted.willMove(toParent: nil)
+            hosted.removeFromParent()
+        }
+    }
+
+    private func owningViewController() -> UIViewController? {
+        var responder: UIResponder? = superview
+        while let current = responder {
+            if let controller = current as? UIViewController { return controller }
+            responder = current.next
+        }
+        return nil
+    }
+}
+
 class CNSearchScaffoldPlatformView: NSObject, FlutterPlatformView {
     private let containerView: UIView
     // IMPORTANT: Must retain the controller to prevent deallocation
     private var controller: AnyObject?
 
     init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
-        self.containerView = UIView(frame: frame)
+        let container = CNSearchScaffoldContainer(frame: frame)
+        self.containerView = container
         containerView.backgroundColor = .clear
 
         super.init()
@@ -343,6 +384,7 @@ class CNSearchScaffoldPlatformView: NSObject, FlutterPlatformView {
 
             // Retain the controller
             self.controller = ctrl
+            container.hosted = ctrl
 
             // Add controller's view as subview
             if let view = ctrl.view {

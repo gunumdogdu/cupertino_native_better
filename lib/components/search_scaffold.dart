@@ -7,7 +7,9 @@ import '../style/sf_symbol.dart';
 import '../style/tab_bar_search_item.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
+import 'icon.dart';
 import 'tab_bar.dart';
+import 'toolbar.dart';
 
 /// A search scaffold item configuration.
 class CNSearchScaffoldItem {
@@ -34,13 +36,25 @@ class CNSearchScaffoldItem {
   final bool isSearchTab;
 }
 
-/// A full-screen scaffold with native iOS 26 tab bar and search support.
+/// A full-screen scaffold with native tabs and search.
 ///
-/// This widget uses `UITabBarController` with `UISearchController` on iOS 26+
-/// to achieve the native liquid glass morphing effect when search is activated.
+/// - **iOS 26+**: a `UITabBarController` with a `UISearchTab`, for the
+///   native Liquid Glass morphing effect when search is activated. Flutter
+///   content is rendered on top of the native tab bar controller.
+/// - **macOS** (every supported version): the Mac form of tabs and search,
+///   in the window toolbar (see [CNToolbar]): the tabs that are not the
+///   search tab are a segmented control in the middle of the toolbar (with
+///   the tabs look of macOS 27), and the search tab is the toolbar's search
+///   field (`NSSearchToolbarItem`) at its trailing edge. Clicking into the
+///   field selects the search tab and calls [onSearchActiveChanged]; the
+///   text goes to [onSearchChanged] and Return to [onSearchSubmit].
+///   [searchController] starts and ends the search and sets its text. The
+///   content fills the window under the toolbar. [tint] and
+///   [unselectedTint] are not used: toolbar controls take the accent
+///   colour. A tab is shown by its label, or by its icon when it has none.
+/// - **iOS below 26 and other platforms**: a `CupertinoTabScaffold`.
 ///
-/// Unlike [CNTabBar], this widget manages the entire screen layout, with
-/// Flutter content rendered on top of the native tab bar controller.
+/// Unlike [CNTabBar], this widget manages the entire screen layout.
 ///
 /// Example:
 /// ```dart
@@ -185,6 +199,9 @@ class _CNSearchScaffoldState extends State<CNSearchScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    if (defaultTargetPlatform == TargetPlatform.macOS) {
+      return _buildMacScaffold(context);
+    }
     // Only use native on iOS 26+
     final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
     final shouldUseNative = isIOS && PlatformVersion.shouldUseNativeGlass;
@@ -331,6 +348,76 @@ class _CNSearchScaffoldState extends State<CNSearchScaffold> {
     }
   }
 
+  /// macOS: the tabs and the search field in the window toolbar, the
+  /// selected tab's content under it.
+  Widget _buildMacScaffold(BuildContext context) {
+    final searchIndex = widget.items.indexWhere((item) => item.isSearchTab);
+    final tabs = <int>[
+      for (var i = 0; i < widget.items.length; i++)
+        if (!widget.items[i].isSearchTab) i,
+    ];
+    final selected = tabs.indexOf(widget.currentIndex);
+    final searchItem = searchIndex >= 0 ? widget.items[searchIndex] : null;
+
+    void select(int index) {
+      if (index == widget.currentIndex) return;
+      _lastIndex = index;
+      widget.onTap(index);
+    }
+
+    return Column(
+      children: [
+        CNToolbar(
+          items: [
+            if (tabs.isNotEmpty)
+              CNToolbarSegmentedGroup(
+                id: 'tabs',
+                label: 'Tabs',
+                role: CNToolbarGroupRole.tabs,
+                centered: true,
+                segments: [
+                  for (final i in tabs)
+                    CNToolbarSegment(
+                      label: widget.items[i].label ?? '',
+                      // A label reads better than an icon in a toolbar.
+                      icon: (widget.items[i].label ?? '').isEmpty
+                          ? widget.items[i].icon
+                          : null,
+                    ),
+                ],
+                selectedIndices: selected >= 0 ? {selected} : const {},
+                onSelected: (segment) => select(tabs[segment]),
+              ),
+            const CNToolbarSpace.flexible(),
+            if (searchItem != null)
+              CNToolbarSearch(
+                id: 'search',
+                label: searchItem.label ?? 'Search',
+                placeholder: widget.searchPlaceholder,
+                controller: widget.searchController,
+                onChanged: (text) {
+                  _searchText = text;
+                  widget.onSearchChanged?.call(text);
+                },
+                onSubmitted: widget.onSearchSubmit,
+                onActiveChanged: (active) {
+                  if (active) select(searchIndex);
+                  setState(() => _isSearchActive = active);
+                  widget.onSearchActiveChanged?.call(active);
+                },
+              ),
+          ],
+        ),
+        Expanded(
+          child: IndexedStack(
+            index: widget.currentIndex,
+            children: widget.children,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFlutterFallback(BuildContext context) {
     // Use regular CNTabBar for non-iOS 26 platforms
     return CupertinoTabScaffold(
@@ -338,9 +425,18 @@ class _CNSearchScaffoldState extends State<CNSearchScaffold> {
         items: [
           for (final item in widget.items)
             BottomNavigationBarItem(
+              // The item's symbol: native on iOS, the package's placeholder
+              // elsewhere.
               icon: item.icon != null
-                  ? Icon(CupertinoIcons.circle) // Placeholder
+                  ? CNIcon(symbol: item.icon, size: 24)
                   : const Icon(CupertinoIcons.circle),
+              activeIcon: (item.activeIcon ?? item.icon) != null
+                  ? CNIcon(
+                      symbol: item.activeIcon ?? item.icon,
+                      size: 24,
+                      color: _effectiveTint,
+                    )
+                  : null,
               label: item.label,
             ),
         ],

@@ -80,6 +80,8 @@ import 'demos/stack_positioned_tabbar_test.dart';
 import 'demos/tabbar_split_search_clip_test.dart';
 import 'demos/alert.dart';
 import 'demos/tab_bar_demo.dart';
+import 'demos/toolbar.dart';
+import 'demos/search_scaffold.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -608,6 +610,36 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const TabBarDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Toolbar'),
+                  subtitle: Text('Window toolbar on macOS, bottom toolbar on iOS'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('menubar.rectangle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const ToolbarDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Search Scaffold'),
+                  subtitle: Text('Tabs and search: tab bar on iOS, toolbar on macOS'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('magnifyingglass.circle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const SearchScaffoldDemoPage(),
                       ),
                     );
                   },

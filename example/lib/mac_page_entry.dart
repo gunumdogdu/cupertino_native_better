@@ -13,8 +13,8 @@
 //     OPEN_MENU=<n> then clicks the n-th CNPopupMenuButton of the page and
 //     prints `MACPAGE_MENU <name>` while its menu is open; BACK=true clicks
 //     the page's back button and prints `MACPAGE_BACK <name> home|stayed`;
-//     SCENARIO=<name> for the alert, action_sheet, context_menu and popover
-//     pages' autoScenario; AUTO=true for the pages that change their values on a
+//     SCENARIO=<name> for the alert, action_sheet, context_menu, popover,
+//     toolbar and search_scaffold pages' autoScenario; AUTO=true for the pages that change their values on a
 //     timer (pop_up_button, gauge); OPEN_POPUP=<n> clicks the n-th
 //     CNPopUpButton of the page, prints `CNB_SHOT <name>_popup_open` while
 //     its menu is open, then `CNB_KEYS 125 36` (Down, Return; POPUP_KEYS=
@@ -65,6 +65,8 @@ import 'demos/issues_test.dart';
 import 'demos/iphone_duo_demo.dart';
 import 'demos/native_tab_bar_demo.dart';
 import 'demos/tab_bar_demo.dart';
+import 'demos/toolbar.dart';
+import 'demos/search_scaffold.dart';
 import 'demos/native_sheet_demo.dart';
 import 'demos/bottom_nav_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
@@ -224,6 +226,13 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   'tab_bar': (_) => const TabBarDemoPage(),
   // Tab Bar, changing on its own
   'tab_bar_cycle': (_) => const TabBarDemoPage(autoCycle: true),
+  // Toolbar
+  'toolbar': (_) =>
+      const ToolbarDemoPage(autoScenario: _scenario == '' ? null : _scenario),
+  // Search Scaffold
+  'search_scaffold': (_) => const SearchScaffoldDemoPage(
+    autoScenario: _scenario == '' ? null : _scenario,
+  ),
   // Native Tab Bar (iOS 26)
   'native_tab_bar': (_) => const NativeTabBarDemoPage(),
   // Native Sheet
@@ -384,6 +393,8 @@ const List<String> macMainPages = <String>[
   'gauge',
   'i_phone_duo',
   'tab_bar',
+  'toolbar',
+  'search_scaffold',
   'native_tab_bar',
   'native_sheet',
   'app_bar',
@@ -418,6 +429,8 @@ const Map<String, (String, int)> macPageTitles = <String, (String, int)>{
   'gauge': ('Gauge', 0),
   'i_phone_duo': ('iPhone Duo', 1),
   'tab_bar': ('Tab Bar', 0),
+  'toolbar': ('Toolbar', 0),
+  'search_scaffold': ('Search Scaffold', 0),
   'native_tab_bar': ('Native Tab Bar (iOS 26)', 0),
   'native_sheet': ('Native Sheet', 0),
   'app_bar': ('Glass container', 0),
