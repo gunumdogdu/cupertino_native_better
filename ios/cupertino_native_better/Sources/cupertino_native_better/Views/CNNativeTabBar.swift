@@ -162,6 +162,9 @@ final class CNNativeTabBarManager: NSObject {
             // two look the same.
             host.modalPresentationStyle = .overFullScreen
             host.modalPresentationCapturesStatusBarAppearance = true
+            // The Flutter page stays in the window under the bar: keep
+            // VoiceOver on the bar (#88).
+            host.view.accessibilityViewIsModal = true
             self.hostController = host
             presenter.present(host, animated: true)
         }

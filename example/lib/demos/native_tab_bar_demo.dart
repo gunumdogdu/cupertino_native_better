@@ -57,6 +57,13 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
     }
   }
 
+  @override
+  void dispose() {
+    // The bar is native and outlives this route: take it away with the page.
+    CNTabBarNative.disable();
+    super.dispose();
+  }
+
   static const _tints = <MapEntry<String, Color>>[
     MapEntry('Blue', CupertinoColors.systemBlue),
     MapEntry('Pink', CupertinoColors.systemPink),

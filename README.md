@@ -964,7 +964,8 @@ await CNTabBarNative.enable(
   onDismissed: () => debugPrint('bar closed (✕ or disable())'),
 );
 
-// Later, when leaving the experience:
+// When leaving the experience, for example in the page's dispose().
+// The bar is native and stays up after its route is popped until then.
 await CNTabBarNative.disable();
 ```
 

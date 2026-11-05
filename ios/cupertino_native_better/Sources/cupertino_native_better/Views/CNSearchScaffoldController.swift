@@ -204,12 +204,11 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
                 return
             }
             self.selectedIndex = index
+            activateSearchIfSelectedInCode(index)
             result(nil)
 
         case "activateSearch":
-            if let searchController = self.internalSearchController {
-                searchController.isActive = true
-            }
+            activateSearch()
             result(nil)
 
         case "deactivateSearch":
@@ -260,6 +259,25 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+
+    /// Shows the search field with the keyboard up, as a tap on the search
+    /// tab does.
+    private func activateSearch() {
+        guard let searchController = internalSearchController else { return }
+        if !searchController.isActive { searchController.isActive = true }
+        if !searchController.searchBar.isFirstResponder {
+            searchController.searchBar.becomeFirstResponder()
+        }
+    }
+
+    /// UIKit activates a `UISearchTab` selected in code on iOS 27, but on
+    /// iOS 26 only when the user taps it; do it here so both match.
+    private func activateSearchIfSelectedInCode(_ index: Int) {
+        guard #unavailable(iOS 27.0) else { return }
+        guard automaticallyActivatesSearch, tabs.indices.contains(index),
+              tabs[index] is UISearchTab else { return }
+        DispatchQueue.main.async { [weak self] in self?.activateSearch() }
     }
 
     // MARK: - UISearchResultsUpdating

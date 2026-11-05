@@ -221,7 +221,8 @@ private struct MacSidebarRowView: View {
     if let badge = row.badge {
       // At the icon's top-trailing corner, as on the iOS rail.
       if badge == MacSidebarRow.dotBadge {
-        Circle().fill(Color.accentColor).frame(width: 7, height: 7).offset(x: 4, y: -3)
+        // Red like the count badges here and the iOS rail's dot.
+        Circle().fill(Color.red).frame(width: 7, height: 7).offset(x: 4, y: -3)
       } else {
         Text(badge)
           .font(.system(size: 9, weight: .semibold))

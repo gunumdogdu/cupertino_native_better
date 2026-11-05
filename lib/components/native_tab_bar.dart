@@ -193,6 +193,9 @@ class CNTabBarNative {
 
   /// Dismiss the native tab bar and return to the Flutter app.
   ///
+  /// The bar (on macOS the sidebar) is native and stays up after the route
+  /// that showed it is popped: call this from that page's `dispose`.
+  ///
   /// On macOS this also removes a sidebar left by the app before a hot
   /// restart, which the restarted Dart side does not know about.
   static Future<void> disable() async {
