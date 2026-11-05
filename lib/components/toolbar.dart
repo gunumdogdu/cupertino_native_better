@@ -72,9 +72,10 @@ enum CNToolbarGroupRole {
 
 /// A badge on a [CNToolbarButton]: a count, a short text, or a dot.
 ///
-/// `NSItemBadge` on macOS 26+, `UIBarButtonItem.Badge` on iOS 26+. Older
-/// systems have no toolbar badges; there the badge is not shown (the iOS
-/// fallback draws one in Flutter).
+/// `NSItemBadge` on macOS 26+, `UIBarButtonItem.Badge` on iOS 27+ (iOS 26
+/// draws bar button badges in navigation bars only). Older systems have no
+/// toolbar badges, so there the badge is not shown; the Flutter toolbar of
+/// iOS below 26 draws one.
 @immutable
 class CNToolbarBadge {
   /// A badge showing [count].
@@ -168,7 +169,7 @@ class CNToolbarButton extends CNToolbarItem {
   /// Whether the button can be pressed.
   final bool enabled;
 
-  /// A badge on the button (macOS 26+, iOS 26+).
+  /// A badge on the button (macOS 26+, iOS 27+).
   final CNToolbarBadge? badge;
 
   /// [CNToolbarItemStyle.prominent] tints the button (macOS 26+, iOS 26+).

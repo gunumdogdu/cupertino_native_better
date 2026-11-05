@@ -187,6 +187,8 @@ final class CNToolbarPlatformView: NSObject, FlutterPlatformView, UIToolbarDeleg
     #if compiler(>=6.2)
     if #available(iOS 26.0, *) {
       item.style = (d["style"] as? String) == "prominent" ? .prominent : .plain
+      // Drawn in toolbars from iOS 27; iOS 26 shows badges in navigation
+      // bars only.
       item.badge = Self.badge(d["badge"])
     }
     #endif
