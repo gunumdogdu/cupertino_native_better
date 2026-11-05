@@ -70,6 +70,11 @@ final class MacSplitWindow: NSObject {
   /// while it lives in the content item, as the window no longer holds it.
   private var original: NSViewController?
   private var addedFullSizeContentView = false
+  /// The last window the split view was installed in, and whether it had a
+  /// full-size content view of its own, for the full screen fix below.
+  private weak var lastWindow: NSWindow?
+  private var lastWindowHadFullSize = false
+  private var observingFullScreen = false
   private var savedAppearance: NSAppearance?
   private weak var savedInitialFirstResponder: NSView?
   private var sidebarItem: NSSplitViewItem?
@@ -283,6 +288,9 @@ final class MacSplitWindow: NSObject {
     window.contentViewController = split
     addedFullSizeContentView = !window.styleMask.contains(.fullSizeContentView)
     if addedFullSizeContentView { window.styleMask.insert(.fullSizeContentView) }
+    lastWindow = window
+    lastWindowHadFullSize = !addedFullSizeContentView
+    observeFullScreen()
     if !window.styleMask.contains(.fullScreen) && window.frame != frame {
       window.setFrame(frame, display: false)
     }
@@ -339,6 +347,30 @@ final class MacSplitWindow: NSObject {
       NotificationCenter.default.post(name: Self.contentDidChange, object: window)
     }
     self.window = nil
+  }
+
+  /// Leaving full screen, AppKit puts back the style mask the window had
+  /// when it entered, which undoes a full-size content view added or
+  /// removed meanwhile (the split view shown or hidden in full screen). It
+  /// is set again to what the window needs now.
+  private func observeFullScreen() {
+    guard !observingFullScreen else { return }
+    observingFullScreen = true
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(windowDidExitFullScreen(_:)),
+      name: NSWindow.didExitFullScreenNotification, object: nil)
+  }
+
+  @objc private func windowDidExitFullScreen(_ notification: Notification) {
+    guard let window = notification.object as? NSWindow, window === lastWindow else { return }
+    let wanted = split != nil || lastWindowHadFullSize
+    if window.styleMask.contains(.fullSizeContentView) != wanted {
+      if wanted {
+        window.styleMask.insert(.fullSizeContentView)
+      } else {
+        window.styleMask.remove(.fullSizeContentView)
+      }
+    }
   }
 
   /// Tells `CNToolbar` the items changed: the window posts no KVO for its

@@ -25,6 +25,16 @@ final class CNNativeSheetManager: NSObject {
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result: result)
     }
+    // A hot restart starts a Dart side that knows nothing of the sheet: the
+    // inspector goes away.
+    MacEngineRestart.observe(messenger)
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(engineRestarted),
+      name: MacEngineRestart.notification, object: nil)
+  }
+
+  @objc private func engineRestarted() {
+    close(notify: false)
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

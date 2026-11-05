@@ -21,7 +21,8 @@ class SplitWindowDemoPage extends StatefulWidget {
   /// click with both shown; `plain` without them), `toggle` (the View
   /// menu's Show Sidebar), `stress` (on and off many times), `resize`,
   /// `restart` (prints `CNB_RESTART` for the driver to hot restart, then
-  /// checks that the left-over sidebar is replaced) and `fullscreen`.
+  /// checks that the window came back without the sidebar and the
+  /// inspector) and `fullscreen`.
   final String? autoScenario;
 
   @override
@@ -412,6 +413,9 @@ class _SplitWindowDemoPageState extends State<SplitWindowDemoPage> {
         await _setSidebar(true);
         await _setInspector(true);
         await _wait(1000);
+        // The last size with the Inbox list over the (hidden) Flutter view,
+        // which must still follow the window.
+        Future<void> inbox() => CNTabBarNative.setSelectedIndex(1);
         for (final (w, h) in [
           (1200.0, 800.0),
           (760.0, 560.0),
@@ -424,12 +428,14 @@ class _SplitWindowDemoPageState extends State<SplitWindowDemoPage> {
           await _wait(1200);
           _size('resize ${w.toInt()}x${h.toInt()}');
           await _shot('resize${w.toInt()}');
+          if (w == 760) await inbox();
         }
       case 'restart':
         // First run: show both, then ask the driver for a hot restart. The
-        // restarted app finds the marker file and the window still split:
-        // its Dart side knows nothing of the sidebar and the inspector, and
-        // disable() / dismiss() must still remove them.
+        // restarted app finds the marker file, and the window back as it
+        // was: its new Dart side knows nothing of the sidebar and the
+        // inspector, so the native side removed them. disable() and
+        // dismiss() are harmless then, and showing both again works.
         final marker = File('${Directory.systemTemp.path}/cnb_split_restart');
         if (!marker.existsSync()) {
           marker.writeAsStringSync('1');
@@ -455,16 +461,38 @@ class _SplitWindowDemoPageState extends State<SplitWindowDemoPage> {
         _size('again');
         await _shot('again');
       case 'fullscreen':
+        // Shown before full screen, hidden in it, shown in it and hidden
+        // after it: the window must come back with its own style each time.
+        Future<void> toggleFullScreen(String label) async {
+          await _front();
+          debugPrint('CNB_FULLSCREEN');
+          await _wait(3500);
+          _size(label);
+        }
         await _setSidebar(true);
         await _setInspector(true);
         await _wait(1000);
-        debugPrint('CNB_FULLSCREEN');
-        await _wait(4000);
-        _size('fullscreen');
+        await toggleFullScreen('fullscreen with both');
+        await _shot('fs_both');
         await _checks(prefix: 'fs_');
-        debugPrint('CNB_FULLSCREEN');
-        await _wait(3000);
-        _size('windowed');
+        await toggleFullScreen('windowed with both');
+        await toggleFullScreen('fullscreen again');
+        await _setSidebar(false);
+        await _setInspector(false);
+        await _wait(1000);
+        _size('fullscreen, both hidden');
+        await toggleFullScreen('windowed, both hidden in full screen');
+        await _shot('fs_restored');
+        await toggleFullScreen('fullscreen, none');
+        await _setSidebar(true);
+        await _setInspector(true);
+        await _wait(1000);
+        await toggleFullScreen('windowed, both shown in full screen');
+        await _shot('fs_shown_in_fs');
+        await _setSidebar(false);
+        await _setInspector(false);
+        await _wait(1000);
+        _size('windowed, all hidden');
     }
     await _wait(600);
     debugPrint('CNB_DONE');

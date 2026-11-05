@@ -28,6 +28,17 @@ final class CNNativeTabBarManager: NSObject {
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result: result)
     }
+    // A hot restart starts a Dart side that knows nothing of the sidebar:
+    // the window goes back to how it was.
+    MacEngineRestart.observe(messenger)
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(engineRestarted),
+      name: MacEngineRestart.notification, object: nil)
+  }
+
+  @objc private func engineRestarted() {
+    guard store != nil else { return }
+    teardown(notify: false)
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
