@@ -51,15 +51,18 @@ class CNTabAccessory {
 /// On macOS the tabs become the window's native sidebar: the window's
 /// content is put in an `NSSplitViewController`, with the tabs as sidebar
 /// rows (their symbols, badges and selection) and the Flutter view beside
-/// them, where it keeps working as before. On macOS 26 it is the floating
-/// Liquid Glass sidebar. The search tab becomes the sidebar's search field:
+/// them, where it keeps working as before: the system's sidebar, Liquid
+/// Glass on macOS 26 and later. The search tab becomes the sidebar's search
+/// field:
 /// typing selects the search tab and reports the text to `onSearchChanged`,
 /// clearing it goes back to the previous tab. A tab with a [CNNativeList]
 /// shows that list in place of the Flutter content, under the tab's title;
 /// clicking a row calls `onListItemTap`. Every other tab shows the Flutter
-/// content, whatever `asRoot` says. The callbacks are the same as on iOS.
-/// `bottomAccessory`, `minimizeBehavior` and `unselectedTintColor` have no
-/// Mac counterpart and are ignored, and a chevron row pushes no detail page.
+/// content, whatever `asRoot` says, and the sidebar is always there
+/// (`sidebarOnWideScreens` is implied). The callbacks are the same as on
+/// iOS. `bottomAccessory`, `minimizeBehavior` and `unselectedTintColor`
+/// have no Mac counterpart and are ignored, and a chevron row pushes no
+/// detail page.
 /// [disable] (or the close button with `showCloseButton`) puts the window
 /// back as it was. The View menu gets the standard Show Sidebar command
 /// (Control-Command-S) when the app's menu has none; with a `CNToolbar`, its

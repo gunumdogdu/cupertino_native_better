@@ -134,55 +134,51 @@ class _SidebarDemoPageState extends State<SidebarDemoPage> {
           ),
         ),
         Expanded(
-          child: Padding(
+          child: ListView(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _title,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
+            children: [
+              Text(
+                _title,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 8),
-                Text('Row $_selected selected', style: TextStyle(color: label)),
-                const SizedBox(height: 16),
-                CupertinoButton.filled(
-                  onPressed: () => setState(() => _unread++),
-                  child: const Text('New mail (badge +1)'),
-                ),
-                const SizedBox(height: 8),
-                CupertinoButton(
-                  onPressed: () => setState(() => _unread = 0),
-                  child: const Text('Mark all read'),
-                ),
-                CupertinoButton(
-                  onPressed: () =>
-                      setState(() => _selected = (_selected + 1) % 7),
-                  child: const Text('Select the next row'),
-                ),
-                Row(
-                  children: [
-                    const Text('Icons only'),
-                    const SizedBox(width: 8),
-                    CupertinoSwitch(
-                      value: _iconsOnly,
-                      onChanged: (v) => setState(() => _iconsOnly = v),
-                    ),
-                  ],
-                ),
-                if (defaultTargetPlatform != TargetPlatform.macOS) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'iOS has no standalone sidebar: CNSidebar draws a '
-                    'CNTabRail, without the section headers.',
-                    style: TextStyle(color: label, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              Text('Row $_selected selected', style: TextStyle(color: label)),
+              const SizedBox(height: 16),
+              CupertinoButton.filled(
+                onPressed: () => setState(() => _unread++),
+                child: const Text('New mail (badge +1)'),
+              ),
+              const SizedBox(height: 8),
+              CupertinoButton(
+                onPressed: () => setState(() => _unread = 0),
+                child: const Text('Mark all read'),
+              ),
+              CupertinoButton(
+                onPressed: () =>
+                    setState(() => _selected = (_selected + 1) % 7),
+                child: const Text('Select the next row'),
+              ),
+              Row(
+                children: [
+                  const Expanded(child: Text('Icons only')),
+                  CupertinoSwitch(
+                    value: _iconsOnly,
+                    onChanged: (v) => setState(() => _iconsOnly = v),
                   ),
                 ],
+              ),
+              if (defaultTargetPlatform != TargetPlatform.macOS) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'iOS has no standalone sidebar: CNSidebar draws a '
+                  'CNTabRail, without the section headers.',
+                  style: TextStyle(color: label, fontSize: 13),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ],
