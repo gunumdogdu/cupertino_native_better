@@ -13,6 +13,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/platform_view_guard.dart';
 import '../utils/popup_menu_encoder.dart';
 import '../utils/popup_menu_fallback_sheet.dart';
+import '../utils/route_changes.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/optional_method_call.dart';
@@ -2088,6 +2089,7 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _bumpUp(route);
+    notifyCNRouteChange();
   }
 
   @override
@@ -2095,12 +2097,14 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     // Defer ONLY the broad _anyModalDepth decrement; the narrow _modalDepth
     // path remains synchronous inside _bumpDown.
     _bumpDown(route, deferAnyModal: true);
+    notifyCNRouteChange();
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     // didRemove represents a non-animated removal; deferring would never fire.
     _bumpDown(route);
+    notifyCNRouteChange();
   }
 
   @override
@@ -2108,5 +2112,6 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     // Replaced route's pixels are immediately gone; keep synchronous.
     if (oldRoute != null) _bumpDown(oldRoute);
     if (newRoute != null) _bumpUp(newRoute);
+    notifyCNRouteChange();
   }
 }

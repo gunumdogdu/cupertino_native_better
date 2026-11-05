@@ -227,6 +227,62 @@ void main() {
     );
   });
 
+  test('every method sent on a window-level channel is answered on macOS', () {
+    // Channels with no platform view (alerts, action sheets, menus,
+    // popovers): `MethodChannel('cn_…')` in Dart, a manager owning
+    // `FlutterMethodChannel(name: "cn_…")` in Swift.
+    const iosOnly = {
+      // CNTabBarNative, CNNativeSheet and CNFoldable return before sending
+      // anything on macOS.
+      'cn_native_tab_bar',
+      'cn_native_sheet',
+      'cn_foldable',
+    };
+    final swift = _swiftFiles();
+    final dart = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.dart'));
+    final missing = <String>[];
+    final checked = <String>{};
+    for (final file in dart) {
+      final source = file.readAsStringSync();
+      for (final m in RegExp(
+        r"MethodChannel\('(cn_\w+)'\)",
+      ).allMatches(source)) {
+        final name = m.group(1)!;
+        if (iosOnly.contains(name)) continue;
+        final owners = swift
+            .where(
+              (f) => f.readAsStringSync().contains(
+                'FlutterMethodChannel(name: "$name"',
+              ),
+            )
+            .toList();
+        if (owners.isEmpty) {
+          missing.add('$name: no macOS manager');
+          continue;
+        }
+        checked.add(name);
+        for (final call in _requiredCalls(
+          source,
+        ).difference(_swiftCases(owners))) {
+          missing.add('$name: $call');
+        }
+      }
+    }
+    expect(
+      checked,
+      containsAll([
+        'cn_alert',
+        'cn_action_sheet',
+        'cn_context_menu',
+        'cn_popover',
+      ]),
+    );
+    expect(missing, isEmpty);
+  });
+
   group('a native side without the optional methods', () {
     final calls = <String>[];
     late Map<String, Set<String>> optional;

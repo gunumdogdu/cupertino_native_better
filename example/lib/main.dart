@@ -13,6 +13,7 @@ import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/action_sheet.dart';
 import 'demos/context_menu.dart';
+import 'demos/popover.dart';
 import 'demos/button.dart';
 import 'demos/search_bar.dart';
 import 'demos/glass_button_group.dart';
@@ -475,6 +476,20 @@ class HomePage extends StatelessWidget {
                   },
                 ),
                 CupertinoListTile(
+                  title: Text('Popover'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('bubble.middle.top', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const PopoverDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
                   title: Text('Button'),
                   leading: CNIcon(
                     symbol: CNSymbol('hand.tap', color: accentColor),
@@ -866,10 +881,7 @@ class HomePage extends StatelessWidget {
                 CupertinoListTile(
                   title: Text('#76: CNPopupGesture long press'),
                   leading: CNIcon(
-                    symbol: CNSymbol(
-                      'contextualmenu.and.cursorarrow',
-                      color: accentColor,
-                    ),
+                    symbol: CNSymbol('contextualmenu.and.cursorarrow', color: accentColor),
                   ),
                   trailing: CupertinoListTileChevron(),
                   onTap: () {

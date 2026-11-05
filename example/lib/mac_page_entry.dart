@@ -13,8 +13,8 @@
 //     OPEN_MENU=<n> then clicks the n-th CNPopupMenuButton of the page and
 //     prints `MACPAGE_MENU <name>` while its menu is open; BACK=true clicks
 //     the page's back button and prints `MACPAGE_BACK <name> home|stayed`;
-//     SCENARIO=<name> for the alert, action_sheet and context_menu pages'
-//     autoScenario)
+//     SCENARIO=<name> for the alert, action_sheet, context_menu and popover
+//     pages' autoScenario)
 //
 // It prints `MACPAGE_PUSH <name>` before each push and `MACPAGE_READY <name>`
 // once the page has settled, so a script can screenshot each page. A page
@@ -41,6 +41,7 @@ import 'demos/icon.dart';
 import 'demos/popup_menu_button.dart';
 import 'demos/action_sheet.dart';
 import 'demos/context_menu.dart';
+import 'demos/popover.dart';
 import 'demos/button.dart';
 import 'demos/search_bar.dart';
 import 'demos/glass_button_group.dart';
@@ -134,7 +135,7 @@ const MethodChannel _auditChannel = MethodChannel('cnb_mac_audit');
 const String _window = String.fromEnvironment('WIN');
 
 /// Passed as `autoScenario` to the pages that take one (alert, action_sheet,
-/// context_menu).
+/// context_menu, popover).
 const String _scenario = String.fromEnvironment('SCENARIO');
 const String _brightness = String.fromEnvironment(
   'BRIGHTNESS',
@@ -181,6 +182,9 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   'context_menu': (_) => const ContextMenuDemoPage(
     autoScenario: _scenario == '' ? null : _scenario,
   ),
+  // Popover
+  'popover': (_) =>
+      const PopoverDemoPage(autoScenario: _scenario == '' ? null : _scenario),
   // Button
   'button': (_) => const ButtonDemoPage(),
   // Glass Button Group
@@ -346,6 +350,7 @@ const List<String> macMainPages = <String>[
   'popup_menu_button',
   'action_sheet',
   'context_menu',
+  'popover',
   'button',
   'glass_button_group',
   'search_bar',
@@ -377,6 +382,7 @@ const Map<String, (String, int)> macPageTitles = <String, (String, int)>{
   'popup_menu_button': ('Popup Menu Button', 0),
   'action_sheet': ('Action Sheet', 0),
   'context_menu': ('Context Menu', 0),
+  'popover': ('Popover', 0),
   'button': ('Button', 0),
   'glass_button_group': ('Glass Button Group', 0),
   'search_bar': ('Search Bar', 0),
