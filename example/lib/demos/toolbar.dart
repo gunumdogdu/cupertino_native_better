@@ -25,6 +25,7 @@ class ToolbarDemoPage extends StatefulWidget {
   /// - `search`: puts "Invoices" in the search field through its controller.
   /// - `compact` / `expanded`: the other toolbar styles.
   /// - `plain`: the toolbar without badge, filters or prominent style.
+  /// - `badge`: New Message plain, with a badge of 5.
   /// - `relayout`: the view group gets a segment while there is a query, so
   ///   the window rebuilds that group while the user types in the search
   ///   field (which keeps the keyboard).
@@ -80,6 +81,9 @@ class _ToolbarDemoPageState extends State<ToolbarDemoPage> {
         _style = CNToolbarStyle.unifiedCompact;
       case 'expanded':
         _style = CNToolbarStyle.expanded;
+      case 'badge':
+        _prominent = false;
+        _badge = 5;
       case 'plain':
         _prominent = false;
         _badge = 0;
