@@ -59,6 +59,10 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
 
     let progressFactory = CupertinoProgressIndicatorViewFactory(messenger: registrar.messenger)
     registrar.register(progressFactory, withId: "CupertinoNativeProgressIndicator")
+
+    // CNSidebar, and CNTabRail on macOS.
+    let sidebarFactory = CNSidebarViewFactory(messenger: registrar.messenger)
+    registrar.register(sidebarFactory, withId: "CNSidebar")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

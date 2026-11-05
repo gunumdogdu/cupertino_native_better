@@ -33,6 +33,12 @@ enum CNTabPlacement {
 /// It reads the vertical-bar side from [CNFoldable], so put a
 /// [CNFoldableScope] above it (or anywhere above the app).
 ///
+/// On macOS the sidebar placement is a native sidebar list (`CNSidebar`,
+/// through [CNTabRail]), and the bottom placement a native segmented
+/// control ([CNTabBar]); `sidebarOnWideScreens: true` gives a Mac window
+/// the sidebar once it is [sidebarMinWidth] wide. For a sidebar that is part
+/// of the window itself, use `CNTabBarNative`.
+///
 /// [body] stays mounted across every placement change, so folding and
 /// unfolding never resets the page's state. It receives a `MediaQuery` whose
 /// padding includes the space the tabs take, so scroll views keep their last
