@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    name: No generated or machine-specific files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No committed file is listed in a .gitignore
+        run: |
+          files=$(git ls-files --cached --ignored --exclude-standard)
+          if [ -n "$files" ]; then
+            echo "::error::These files are generated and must not be committed. Remove them with 'git rm --cached <file>':"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: No committed symlinks
+        run: |
+          links=$(git ls-files -s | awk '$1 == "120000" { print $4 }')
+          if [ -n "$links" ]; then
+            echo "::error::Symlinks point into the machine that made them. Remove them with 'git rm --cached <file>':"
+            echo "$links"
+            exit 1
+          fi
+
+      - name: No committed home-directory paths
+        run: |
+          files=$(git grep -lIE '/(Users|home)/[A-Za-z0-9._-]+/' || true)
+          if [ -n "$files" ]; then
+            echo "::error::These files contain a path from someone's machine:"
+            git grep -nIE '/(Users|home)/[A-Za-z0-9._-]+/'
+            exit 1
+          fi
+
+  dart:
+    name: Analyze, format and test (Flutter from .fvmrc)
+    # The tests use dart:io platform checks, so they run on macOS like the
+    # package's own development machines.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pinned Flutter version
+        id: fvm
+        run: echo "flutter=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvm.outputs.flutter }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Analyze the package
+        run: flutter analyze
+
+      - name: Analyze the example app
+        working-directory: example
+        run: flutter analyze
+
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test example/lib
+
+      - name: Test
+        run: flutter test
+
+  older-flutter:
+    name: Analyze lib with Flutter 3.38
+    # Users are on older Flutter versions than the one the package is
+    # developed with: lib/ must not use APIs that only newer versions have.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.4
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Analyze lib
+        run: flutter analyze lib

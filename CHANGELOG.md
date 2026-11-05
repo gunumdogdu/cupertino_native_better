@@ -1,3 +1,29 @@
+## 2.3.1
+
+> Patch: the repository and the published package no longer contain files that Flutter, Xcode and FVM generated on the maintainer's machine, and every pull request now runs CI. Nothing changes for apps that use the package: no API, native or visual changes.
+
+### Fixed — generated files with machine paths were committed (#121)
+
+The repository tracked 20 generated files:
+- the example app's `Generated.xcconfig`, `flutter_export_environment.sh`, plugin registrants and `Flutter/ephemeral/` files;
+- the `ios/.symlinks/` and `.fvm/` links;
+- an Xcode user-state file.
+
+Six of them held paths from the maintainer's Mac and four were symlinks into it. A fresh clone therefore got dangling links and settings that pointed to a Flutter install that wasn't there, and `git status` showed changes after every build.
+
+These files are no longer committed. Flutter recreates them on `flutter pub get` and `flutter run`. The example app now has Flutter's standard iOS and macOS `.gitignore` files, and the Flutter version pin is in `.fvmrc`.
+
+The published package no longer includes the example's `ios/Flutter/ephemeral/` folder, one file of which held a machine path.
+
+Thanks to @runoob-coder for #121. It keeps the analyzer out of `build/`, `ios/` and `macos/`, and it led to this fix.
+
+### Added — CI
+
+Every pull request now runs these checks:
+- `flutter analyze` on the package and the example app, `dart format` and `flutter test`;
+- `flutter analyze lib` with Flutter 3.38, so the package keeps working on older Flutter versions;
+- a check that fails if a generated or machine-specific file is committed.
+
 ## 2.3.0
 
 > The Mac window goes native, and five new controls. On macOS, `CNTabBarNative` becomes the window's sidebar, `CNNativeSheet` its inspector and the new `CNToolbar` its toolbar, around your unchanged Flutter content. New on both platforms: `CNPopover`, `CNPopUpButton`, `CNGauge`, `CNToolbar` and `CNSidebar`. Fixes #120 and four older bugs. Checked on macOS 27.2 and on the iOS 27 and 26.2 simulators, touches included; code that only runs on macOS 12–26 was reviewed, not run. Compiles with every Xcode from 26.0 on.

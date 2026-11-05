@@ -1,8 +1,17 @@
+# Files that Flutter, Xcode or FVM generate are never committed: they hold
+# paths from the machine that made them and change on every build. Flutter
+# recreates them on `flutter pub get` and `flutter run`. CI fails if one is
+# committed (.github/workflows/ci.yml).
+
 # Dart/Flutter
 .dart_tool/
 .packages
 build/
+coverage/
 pubspec.lock
+
+# FVM: the pinned Flutter version is in .fvmrc; .fvm/ only holds local links.
+.fvm/
 
 # IDE
 .idea/
@@ -13,9 +22,15 @@ pubspec.lock
 .DS_Store
 *.swp
 
+# Xcode
+**/Pods/
+**/xcuserdata/
+**/DerivedData/
+
 # iOS/Xcode
-**/ios/Pods/
 **/ios/.symlinks/
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/ephemeral/
 **/ios/Flutter/Flutter.framework
 **/ios/Flutter/Flutter.podspec
 **/ios/Flutter/Generated.xcconfig

@@ -8,9 +8,11 @@ example/.dart_tool/
 example/.flutter-plugins
 example/.flutter-plugins-dependencies
 
-# Example iOS generated files (gitignored but checked-in)
+# Example iOS generated files
 example/ios/.symlinks/
 example/ios/Pods/
+example/ios/Flutter/ephemeral/
+example/ios/Flutter/.last_build_id
 example/ios/Flutter/Flutter.podspec
 example/ios/Flutter/Flutter.framework
 example/ios/Flutter/Generated.xcconfig
