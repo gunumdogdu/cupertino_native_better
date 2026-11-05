@@ -45,7 +45,25 @@ class CNTabAccessory {
 /// A tab that wants the minimize behavior must supply a [CNNativeList]
 /// (`CNTab(..., nativeList: ...)`) so iOS has a real native scroll view to
 /// observe. A tab with no list and no search role hosts your Flutter content
-/// (root mode) or a placeholder (modal). iOS 26+ only; a no-op elsewhere.
+/// (root mode) or a placeholder (modal). Native on iOS 26 and later and on
+/// macOS; a no-op elsewhere.
+///
+/// On macOS the tabs become the window's native sidebar: the window's
+/// content is put in an `NSSplitViewController`, with the tabs as sidebar
+/// rows (their symbols, badges and selection) and the Flutter view beside
+/// them, where it keeps working as before. On macOS 26 it is the floating
+/// Liquid Glass sidebar. The search tab becomes the sidebar's search field:
+/// typing selects the search tab and reports the text to `onSearchChanged`,
+/// clearing it goes back to the previous tab. A tab with a [CNNativeList]
+/// shows that list in place of the Flutter content, under the tab's title;
+/// clicking a row calls `onListItemTap`. Every other tab shows the Flutter
+/// content, whatever `asRoot` says. The callbacks are the same as on iOS.
+/// `bottomAccessory`, `minimizeBehavior` and `unselectedTintColor` have no
+/// Mac counterpart and are ignored, and a chevron row pushes no detail page.
+/// [disable] (or the close button with `showCloseButton`) puts the window
+/// back as it was. The View menu gets the standard Show Sidebar command
+/// (Control-Command-S) when the app's menu has none; with a `CNToolbar`, its
+/// sidebar toggle and tracking separator apply to this sidebar.
 ///
 /// On iPhone Duo (iOS 27.1, app built with Xcode 27.1) the tab bar moves to
 /// the system vertical bar on its own — on the outer display, and in
@@ -82,7 +100,11 @@ class CNTabBarNative {
   ///
   /// [showCloseButton] false hides the close button in each tab's navigation
   /// bar, for a root-mode app whose tab bar is the whole app; it is then
-  /// closed only by [disable].
+  /// closed only by [disable]. On macOS the close button is at the trailing
+  /// end of a native list's title.
+  ///
+  /// [isDark] sets the bar's appearance. Null draws it light on iOS and
+  /// follows the system on macOS.
   static Future<void> enable({
     required List<CNTab> tabs,
     int selectedIndex = 0,
@@ -101,9 +123,14 @@ class CNTabBarNative {
     VoidCallback? onAccessoryTap,
     VoidCallback? onDismissed,
   }) async {
-    // iOS 26+ only — no-op elsewhere.
-    if (defaultTargetPlatform != TargetPlatform.iOS ||
-        !PlatformVersion.shouldUseNativeGlass) {
+    // iOS 26+ and macOS — no-op elsewhere.
+    final mac =
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.macOS &&
+        PlatformVersion.shouldUseNativeControls;
+    if (!mac &&
+        (defaultTargetPlatform != TargetPlatform.iOS ||
+            !PlatformVersion.shouldUseNativeGlass)) {
       return;
     }
     if (_enabled) return;
@@ -115,7 +142,7 @@ class CNTabBarNative {
     _onDismissed = onDismissed;
     _channel.setMethodCallHandler(_handle);
 
-    await _channel.invokeMethod('enable', {
+    final args = {
       'tabs': [
         for (final t in tabs)
           {
@@ -139,20 +166,40 @@ class CNTabBarNative {
       if (tintColor != null) 'tint': tintColor.toARGB32(),
       if (unselectedTintColor != null)
         'unselectedTint': unselectedTintColor.toARGB32(),
-      'isDark': isDark ?? false,
+      // Missing means light on iOS and the system's appearance on macOS.
+      if (isDark != null) 'isDark': isDark,
       'asRoot': asRoot,
       'nativeSearchFilter': nativeSearchFilter,
       'sidebar': sidebarOnWideScreens,
       'showCloseButton': showCloseButton,
-    });
+    };
+    if (mac) {
+      try {
+        await _channel.invokeMethod('enable', args);
+      } on PlatformException {
+        // No window to put the sidebar in (a headless engine).
+        _reset();
+        return;
+      }
+    } else {
+      await _channel.invokeMethod('enable', args);
+    }
 
     _enabled = true;
   }
 
   /// Dismiss the native tab bar and return to the Flutter app.
+  ///
+  /// On macOS this also removes a sidebar left by the app before a hot
+  /// restart, which the restarted Dart side does not know about.
   static Future<void> disable() async {
-    if (!_enabled) return;
-    await _channel.invokeMethod('disable');
+    final mac = !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+    if (!_enabled && !mac) return;
+    try {
+      await _channel.invokeMethod('disable');
+    } on MissingPluginException {
+      // A macOS host without the plugin's native side.
+    }
     _reset();
   }
 
