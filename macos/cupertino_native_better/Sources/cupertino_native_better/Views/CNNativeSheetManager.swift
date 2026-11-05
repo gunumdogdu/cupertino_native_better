@@ -325,15 +325,12 @@ struct MacPageSegments: NSViewRepresentable {
       context.coordinator.segments = segments
       control.segmentCount = segments.count
       for (i, segment) in segments.enumerated() {
-        var image: NSImage?
-        if let symbol = segment.symbol {
-          image = NSImage(systemSymbolName: symbol, accessibilityDescription: segment.title)
-        }
+        let image = segment.symbol.flatMap { Self.image(symbol: $0, segment: segment) }
         control.setImage(image, forSegment: i)
-        control.setImageScaling(.scaleProportionallyDown, forSegment: i)
-        // A segment without a symbol shows its title; the count follows.
+        control.setImageScaling(.scaleNone, forSegment: i)
+        // A segment without a symbol shows its title and count as text.
         var label = image == nil ? segment.title : ""
-        if let badge = segment.badge { label += label.isEmpty ? "\(badge)" : " \(badge)" }
+        if image == nil, let badge = segment.badge { label += " \(badge)" }
         control.setLabel(label, forSegment: i)
         control.setToolTip(segment.title, forSegment: i)
         control.setWidth(0, forSegment: i)
@@ -342,6 +339,37 @@ struct MacPageSegments: NSViewRepresentable {
     if control.selectedSegment != selection, segments.indices.contains(selection) {
       control.selectedSegment = selection
     }
+  }
+
+  /// The page's symbol, with its badge count drawn after it, as one
+  /// template image: the segment tints both, and VoiceOver reads the page
+  /// title and the count (a segment's own label would be read instead of
+  /// the title).
+  static func image(symbol: String, segment: Segment) -> NSImage? {
+    let description = segment.badge.map { "\(segment.title), \($0)" } ?? segment.title
+    guard let glyph = NSImage(systemSymbolName: symbol, accessibilityDescription: description) else {
+      return nil
+    }
+    guard let badge = segment.badge else { return glyph }
+    let text = NSAttributedString(
+      string: "\(badge)",
+      attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)])
+    let textSize = text.size()
+    let gap: CGFloat = 3
+    let size = NSSize(
+      width: ceil(glyph.size.width + gap + textSize.width),
+      height: ceil(max(glyph.size.height, textSize.height)))
+    let image = NSImage(size: size, flipped: false) { rect in
+      glyph.draw(in: NSRect(
+        x: 0, y: (rect.height - glyph.size.height) / 2,
+        width: glyph.size.width, height: glyph.size.height))
+      text.draw(at: NSPoint(
+        x: glyph.size.width + gap, y: (rect.height - textSize.height) / 2))
+      return true
+    }
+    image.isTemplate = true
+    image.accessibilityDescription = description
+    return image
   }
 
   final class Coordinator: NSObject {
