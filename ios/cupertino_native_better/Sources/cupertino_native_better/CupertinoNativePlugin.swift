@@ -85,6 +85,10 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     // Setup the foldable observer (hinge, vertical bar, reserved regions)
     CNFoldableManager.shared.setup(messenger: registrar.messenger())
 
+    // CNToolbar: a UIToolbar where the widget is laid out (iOS 26+)
+    let toolbarFactory = CNToolbarViewFactory(messenger: registrar.messenger())
+    registrar.register(toolbarFactory, withId: "CNToolbar")
+
     // Register the vertical tab rail platform view
     let tabRailFactory = CNTabRailViewFactory(messenger: registrar.messenger())
     registrar.register(tabRailFactory, withId: "CNTabRail")
