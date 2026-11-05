@@ -27,7 +27,8 @@
 
 ### Changed
 
-- `CNTabBarNative.enable(isDark: null)` follows the app on macOS; on iOS it stays light, as before.
+- `CNTabBarNative.enable(isDark: null)` follows the system appearance on macOS; on iOS it stays light, as before.
+- `CNTransitionObserver` is exported from the package library. It was public and documented, but only reachable through its own file.
 
 ### Checked
 
