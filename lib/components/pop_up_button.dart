@@ -12,6 +12,7 @@ import '../utils/optional_method_call.dart';
 import '../utils/popup_menu_encoder.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
+import 'button.dart' show CNButton;
 import 'icon.dart';
 import 'popup_menu_button.dart';
 
