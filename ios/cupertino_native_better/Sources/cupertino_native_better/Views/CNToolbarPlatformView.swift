@@ -172,6 +172,15 @@ final class CNToolbarPlatformView: NSObject, FlutterPlatformView, UIToolbarDeleg
   // MARK: Buttons and menus
 
   private func button(key: String, id: String, _ d: [String: Any]) -> UIBarButtonItem {
+    // UIKit does not redraw a badge changed on an item a toolbar already
+    // shows (iOS 27): a new badge gets a new item, which the toolbar lays
+    // out again.
+    if let previous = applied[key],
+      previous["badge"] as? NSDictionary != d["badge"] as? NSDictionary
+    {
+      barItems[key] = nil
+      applied[key] = nil
+    }
     let item = cached(key) {
       let item = CNToolbarBarButtonItem()
       item.target = self
