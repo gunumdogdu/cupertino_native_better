@@ -13,3 +13,6 @@ analyzer:
     # Exclude example app from the strict public API doc lint to focus on the
     # package's public surface under lib/.
     - example/**
+    - build/**
+    - ios/**
+    - macos/**
