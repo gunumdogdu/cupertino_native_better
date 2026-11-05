@@ -4,7 +4,7 @@ import UIKit
 /// iOS 26+ Native Search Scaffold using UITab and UISearchTab APIs
 /// This enables the true liquid glass morphing effect for search tabs.
 @available(iOS 26.0, *)
-class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, UISearchBarDelegate {
+class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, UISearchBarDelegate, UISearchControllerDelegate {
 
     private let channel: FlutterMethodChannel
     private var searchTabIndex: Int = -1
@@ -13,6 +13,9 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
     private var unselectedTintColor: UIColor?
     private var searchPlaceholder: String = "Search"
     private var automaticallyActivatesSearch: Bool = true
+    /// Set when search is activated in code: the field gets the keyboard
+    /// once the search controller is presented.
+    private var focusSearchWhenPresented = false
     private weak var internalSearchController: UISearchController?
     private var initialIsDark: Bool?
     private var initialSelectedIndex = 0
@@ -145,6 +148,7 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
                     let searchController = UISearchController(searchResultsController: nil)
                     searchController.searchResultsUpdater = self
                     searchController.searchBar.delegate = self
+                    searchController.delegate = self
                     searchController.obscuresBackgroundDuringPresentation = false
                     searchController.searchBar.placeholder = self.searchPlaceholder
                     searchController.hidesNavigationBarDuringPresentation = false
@@ -262,22 +266,39 @@ class CNSearchScaffoldController: UITabBarController, UISearchResultsUpdating, U
     }
 
     /// Shows the search field with the keyboard up, as a tap on the search
-    /// tab does.
+    /// tab does. `isActive` alone presents the field without the keyboard.
     private func activateSearch() {
         guard let searchController = internalSearchController else { return }
-        if !searchController.isActive { searchController.isActive = true }
-        if !searchController.searchBar.isFirstResponder {
-            searchController.searchBar.becomeFirstResponder()
+        if searchController.isActive {
+            if !searchController.searchBar.isFirstResponder {
+                searchController.searchBar.becomeFirstResponder()
+            }
+        } else {
+            focusSearchWhenPresented = true
+            searchController.isActive = true
         }
     }
 
-    /// UIKit activates a `UISearchTab` selected in code on iOS 27, but on
-    /// iOS 26 only when the user taps it; do it here so both match.
+    /// UIKit activates a `UISearchTab` the user taps, but one selected in
+    /// code only sometimes (never on iOS 26, not reliably on iOS 27): do it
+    /// here, so a selection in code always behaves like a tap. Does nothing
+    /// when UIKit already did it.
     private func activateSearchIfSelectedInCode(_ index: Int) {
-        guard #unavailable(iOS 27.0) else { return }
         guard automaticallyActivatesSearch, tabs.indices.contains(index),
               tabs[index] is UISearchTab else { return }
         DispatchQueue.main.async { [weak self] in self?.activateSearch() }
+    }
+
+    // MARK: - UISearchControllerDelegate
+
+    func didPresentSearchController(_ searchController: UISearchController) {
+        guard focusSearchWhenPresented else { return }
+        focusSearchWhenPresented = false
+        DispatchQueue.main.async {
+            if !searchController.searchBar.isFirstResponder {
+                searchController.searchBar.becomeFirstResponder()
+            }
+        }
     }
 
     // MARK: - UISearchResultsUpdating

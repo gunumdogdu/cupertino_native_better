@@ -21,8 +21,8 @@
 ### Fixed
 
 - **#120: `CNSegmentedControl` follows a press-and-drag across segments.** Its platform view declared no gesture recognizers, so inside a scrolling list Flutter's gesture arena kept every drag and the control only got taps. Taps and horizontal drags now go to the native control, on iOS and macOS; a vertical drag that starts on it still scrolls the list. Thanks to @LucasLau00 for the report and the fix.
-- **`CNTabBarNative`: popping its page in code left the bar on screen.** The bar was presented full screen, which takes the Flutter view out of the window; Flutter then drew no frames, so the page's exit animation never finished and its `dispose` (with its `disable()`) never ran. The bar is now presented over the Flutter view and looks the same. The home indicator now follows your app's setting, as on your Flutter screens (Flutter hides it after a few seconds unless the app sets `SystemUiMode.edgeToEdge`).
-- **iOS `CNSearchScaffold` showed an empty tab bar** on iOS 26 and 27. Its fallback tab bar also shows each item's symbol instead of a placeholder circle.
+- **`CNTabBarNative`: popping its page in code left the bar on screen.** The bar was presented full screen, which takes the Flutter view out of the window; Flutter then drew no frames, so the page's exit animation never finished and its `dispose` (with its `disable()`) never ran. The bar is now presented over the Flutter view and looks the same. The home indicator now follows your app's setting, as on your Flutter screens (Flutter hides it after a few seconds unless the app sets `SystemUiMode.edgeToEdge`). The bar is marked modal for VoiceOver, so the page under it stays out of reach.
+- **iOS `CNSearchScaffold` showed an empty tab bar** on iOS 26 and 27. Its fallback tab bar also shows each item's symbol instead of a placeholder circle. Selecting the search tab in code (`currentIndex`) now opens the search field with the keyboard, as a tap does: UIKit never did this on iOS 26 and not reliably on iOS 27. `CNTabBarSearchController.activateSearch()` brings up the keyboard too.
 - **macOS: a popover or toolbar no longer stays on the window after a hot restart.**
 
 ### Changed
