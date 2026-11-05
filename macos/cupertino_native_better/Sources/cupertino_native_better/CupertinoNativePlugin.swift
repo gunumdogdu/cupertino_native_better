@@ -59,6 +59,8 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     let popUpButtonFactory = CupertinoPopUpButtonViewFactory(messenger: registrar.messenger)
     registrar.register(popUpButtonFactory, withId: "CupertinoNativePopUpButton")
 
+    let gaugeFactory = CupertinoGaugeViewFactory(messenger: registrar.messenger)
+    registrar.register(gaugeFactory, withId: "CupertinoNativeGauge")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
