@@ -23,6 +23,8 @@ import 'demos/issues_test.dart';
 import 'demos/iphone_duo_demo.dart';
 import 'demos/native_tab_bar_demo.dart';
 import 'demos/native_sheet_demo.dart';
+import 'demos/sidebar_demo.dart';
+import 'demos/split_window_demo.dart';
 import 'demos/bottom_nav_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
 import 'demos/bottom_nav_custom_icons_test.dart';
@@ -463,7 +465,10 @@ class HomePage extends StatelessWidget {
                 CupertinoListTile(
                   title: Text('Context Menu'),
                   leading: CNIcon(
-                    symbol: CNSymbol('contextualmenu.and.cursorarrow', color: accentColor),
+                    symbol: CNSymbol(
+                      'contextualmenu.and.cursorarrow',
+                      color: accentColor,
+                    ),
                   ),
                   trailing: CupertinoListTileChevron(),
                   onTap: () {
@@ -567,7 +572,8 @@ class HomePage extends StatelessWidget {
                   },
                 ),
                 CupertinoListTile(
-                  title: Text('Native Tab Bar (iOS 26)'),
+                  title: Text('Native Tab Bar'),
+                  subtitle: Text('iOS 26 tab bar, Mac window sidebar'),
                   leading: CNIcon(
                     symbol: CNSymbol('dock.rectangle', color: accentColor),
                   ),
@@ -593,6 +599,36 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const NativeSheetDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Mac Window'),
+                  subtitle: Text('Sidebar and inspector around Flutter'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('rectangle.split.3x1', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const SplitWindowDemoPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Sidebar'),
+                  subtitle: Text('CNSidebar, CNTabRail, CNTabScaffold'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('sidebar.left', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const SidebarDemoPage(),
                       ),
                     );
                   },
