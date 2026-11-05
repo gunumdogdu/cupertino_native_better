@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
@@ -114,6 +115,17 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
   double? _intrinsicWidth;
 
   bool get _isDark => ThemeHelper.isDark(context);
+
+  /// Taps and horizontal drags go to the native control, so a press on one
+  /// segment can slide to another, as in UIKit (#120). A vertical drag that
+  /// starts on the control still scrolls a parent list.
+  static final Set<Factory<OneSequenceGestureRecognizer>> _gestureRecognizers =
+      <Factory<OneSequenceGestureRecognizer>>{
+        Factory<HorizontalDragGestureRecognizer>(
+          () => HorizontalDragGestureRecognizer(),
+        ),
+        Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+      };
 
   @override
   void dispose() {
@@ -233,6 +245,7 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
         creationParamsCodec: const StandardMessageCodec(),
         creationParams: creationParams,
         onPlatformViewCreated: _onPlatformViewCreated,
+        gestureRecognizers: _gestureRecognizers,
       );
     } else {
       platformView = AppKitView(
@@ -240,6 +253,7 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
         creationParamsCodec: const StandardMessageCodec(),
         creationParams: creationParams,
         onPlatformViewCreated: _onPlatformViewCreated,
+        gestureRecognizers: _gestureRecognizers,
       );
     }
 
