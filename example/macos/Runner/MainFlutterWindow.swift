@@ -138,6 +138,99 @@ class MainFlutterWindow: NSWindow {
         result(nil)
         return
       }
+      if call.method == "toolbarAX", let self = self, let controller = controller {
+        // What VoiceOver sees of the window toolbar: every accessibility
+        // element above the content view, with its role, label, enabled
+        // state and frame in Flutter coordinates (y negative: above the
+        // Flutter view), plus the geometry of the Flutter view, for the
+        // CNToolbar probe.
+        let view = controller.view
+        func flutterRect(_ screen: NSRect) -> [String: Double] {
+          let inWindow = self.convertFromScreen(screen)
+          let local = view.convert(inWindow, from: nil)
+          let y = view.isFlipped ? local.minY : view.bounds.height - local.maxY
+          return ["x": Double(local.minX), "y": Double(y), "w": Double(local.width), "h": Double(local.height)]
+        }
+        var elements: [[String: Any]] = []
+        func walk(_ element: AnyObject, depth: Int) {
+          guard depth < 14 else { return }
+          let role = element.accessibilityRole?()?.rawValue ?? ""
+          let frame = element.accessibilityFrame?() ?? .zero
+          let inToolbar = self.convertFromScreen(frame).minY >= self.contentLayoutRect.maxY - 1
+          if inToolbar, !role.isEmpty, !["AXGroup", "AXUnknown", "AXImage", "AXStaticText"].contains(role) {
+            elements.append([
+              "role": role,
+              "subrole": element.accessibilitySubrole?()?.rawValue ?? "",
+              "label": element.accessibilityLabel?() ?? "",
+              "title": element.accessibilityTitle?() ?? "",
+              "help": element.accessibilityHelp?() ?? "",
+              "enabled": element.isAccessibilityEnabled?() ?? true,
+              "frame": flutterRect(frame),
+            ])
+          }
+          for child in element.accessibilityChildren?() ?? [] { walk(child as AnyObject, depth: depth + 1) }
+        }
+        walk(self, depth: 0)
+        let content = self.contentView?.frame ?? .zero
+        result([
+          "elements": elements,
+          "window": ["w": Double(self.frame.width), "h": Double(self.frame.height)],
+          "content": ["w": Double(content.width), "h": Double(content.height)],
+          "flutterView": flutterRect(self.convertToScreen(view.convert(view.bounds, to: nil))),
+          "contentLayoutTop": Double(self.frame.height - self.contentLayoutRect.maxY),
+          "title": self.title,
+          "subtitle": self.subtitle,
+          "hasToolbar": self.toolbar != nil,
+          "toolbarItems": self.toolbar?.items.map { $0.itemIdentifier.rawValue } ?? [],
+          "appearance": self.appearance?.name.rawValue ?? "",
+        ])
+        return
+      }
+      if call.method == "debugSplit", let self = self, let controller = controller,
+        let args = call.arguments as? [String: Any]
+      {
+        // Stands in for the split view controller CNTabBarNative installs on
+        // macOS, so the CNToolbar probe can check its sidebar items: a
+        // sidebar item and the Flutter view as the content item.
+        let on = (args["on"] as? Bool) ?? false
+        let frame = self.frame
+        if on, !(self.contentViewController is NSSplitViewController) {
+          let split = NSSplitViewController()
+          let sidebar = NSViewController()
+          sidebar.view = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: 400))
+          let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
+          self.contentViewController = nil
+          // The Flutter view below the toolbar, in the content's safe area.
+          let content = NSViewController()
+          content.view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+          content.addChild(controller)
+          controller.view.translatesAutoresizingMaskIntoConstraints = false
+          content.view.addSubview(controller.view)
+          NSLayoutConstraint.activate([
+            controller.view.topAnchor.constraint(equalTo: content.view.safeAreaLayoutGuide.topAnchor),
+            controller.view.bottomAnchor.constraint(equalTo: content.view.bottomAnchor),
+            controller.view.leadingAnchor.constraint(equalTo: content.view.leadingAnchor),
+            controller.view.trailingAnchor.constraint(equalTo: content.view.trailingAnchor),
+          ])
+          let contentItem = NSSplitViewItem(viewController: content)
+          split.addSplitViewItem(sidebarItem)
+          split.addSplitViewItem(contentItem)
+          self.styleMask.insert(.fullSizeContentView)
+          self.contentViewController = split
+        } else if !on, let split = self.contentViewController as? NSSplitViewController {
+          self.contentViewController = nil
+          for item in split.splitViewItems { split.removeSplitViewItem(item) }
+          controller.removeFromParent()
+          controller.view.removeFromSuperview()
+          controller.view.translatesAutoresizingMaskIntoConstraints = true
+          self.styleMask.remove(.fullSizeContentView)
+          self.contentViewController = controller
+        }
+        self.setFrame(frame, display: true)
+        NotificationCenter.default.post(name: Notification.Name("CNWindowContentDidChange"), object: self)
+        result(nil)
+        return
+      }
       if call.method == "firstResponder", let self = self {
         // The class of the window's first responder, to check who has the
         // keyboard.
