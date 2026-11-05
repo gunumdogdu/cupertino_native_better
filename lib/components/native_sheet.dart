@@ -113,7 +113,20 @@ class CNSheetPage {
 /// placed inside the sheet: an iOS app has a single Flutter view, which
 /// stays behind the sheet.
 ///
-/// iOS 17 and later. Elsewhere [show] does nothing and returns false.
+/// On macOS the sheet is the window's inspector: the panel at the trailing
+/// side of the window, beside the Flutter content (an `NSSplitViewController`
+/// inspector item, shared with the sidebar of `CNTabBarNative`). The pages
+/// are the same: each page's title, buttons and rows, and a segmented
+/// switcher at the top for more than one page (the badge counts follow the
+/// symbols). The events are the same, except `onDetentChanged`: an inspector
+/// has no detents, so `detents`, `initialDetent`, `undimmedDetent`,
+/// `showGrabber` and [setDetent] are ignored. A `dismissible` sheet has a
+/// close button and can be closed by dragging the inspector's divider; both
+/// call `onDismissed`. A sheet that is not dismissible stays until [dismiss].
+/// The Flutter app beside the inspector stays usable.
+///
+/// iOS 17 and later, and macOS. Elsewhere [show] does nothing and returns
+/// false.
 ///
 /// ```dart
 /// await CNNativeSheet.show(
@@ -182,7 +195,11 @@ class CNNativeSheet {
     assert(pages.isNotEmpty && detents.isNotEmpty);
     assert(initialDetent == null || detents.contains(initialDetent));
     assert(undimmedDetent == null || detents.contains(undimmedDetent));
-    if (defaultTargetPlatform != TargetPlatform.iOS || kIsWeb) return false;
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.iOS &&
+            defaultTargetPlatform != TargetPlatform.macOS)) {
+      return false;
+    }
 
     _detents = List.unmodifiable(detents);
     _onDetentChanged = onDetentChanged;
@@ -212,13 +229,22 @@ class CNNativeSheet {
   }
 
   /// Dismisses the sheet.
+  ///
+  /// On macOS this also removes an inspector left by the app before a hot
+  /// restart, which the restarted Dart side does not know about.
   static Future<void> dismiss() async {
-    if (!_shown) return;
-    await _channel.invokeMethod('dismiss');
+    final mac = !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+    if (!_shown && !mac) return;
+    try {
+      await _channel.invokeMethod('dismiss');
+    } on MissingPluginException {
+      // A macOS host without the plugin's native side.
+    }
     _reset();
   }
 
   /// Moves the sheet to [detent], one of the detents it was shown with.
+  /// Ignored on macOS, where the inspector has no detents.
   static Future<void> setDetent(CNSheetDetent detent) async {
     if (!_shown) return;
     final index = _detents.indexOf(detent);

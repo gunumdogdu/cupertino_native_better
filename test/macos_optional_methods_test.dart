@@ -29,15 +29,23 @@ const _macSources =
 const Map<String, Set<String>> _iosOnlyPaths = {};
 
 /// The `'name'` of every `.invokeMethod('name'` (or `invokeMapMethod`) in
-/// [source], and of the components' `_invoke(channel, 'name'` helpers.
+/// [source], and of the components' `_invoke(channel, 'name'` and
+/// `_invoke('name'` helpers.
 Set<String> _requiredCalls(String source) => {
   for (final m in RegExp(
     r"\.invoke(?:Map|List)?Method(?:<[^>]*>)?\(\s*'(\w+)'",
   ).allMatches(source))
     m.group(1)!,
-  for (final m in RegExp(r"_invoke\(\s*\w+,\s*'(\w+)'").allMatches(source))
+  for (final m in RegExp(
+    r"_invoke(?:<[^>]*>)?\(\s*(?:\w+,\s*)?'(\w+)'",
+  ).allMatches(source))
     m.group(1)!,
 };
+
+/// Window-level channels (no platform view) that macOS never opens, with
+/// the reason. `cn_foldable` is iPhone Duo hardware; its Dart side returns
+/// early off iOS.
+const Map<String, String> _iosOnlyChannels = {'cn_foldable': 'iPhone Duo only'};
 
 /// The `'name'` of every `.invokeOptionalMethod('name'` in [source].
 Set<String> _optionalCalls(String source) => {
@@ -225,6 +233,46 @@ void main() {
           'implement these in the macOS view, or send them with '
           'invokeOptionalMethod if macOS cannot have them',
     );
+  });
+
+  test('every window-level channel call is answered on macOS', () {
+    final swift = _swiftFiles();
+    final missing = <String>[];
+    var checked = 0;
+    final sources = [
+      ..._componentFiles(),
+      ...Directory(
+        'lib/utils',
+      ).listSync().whereType<File>().where((f) => f.path.endsWith('.dart')),
+    ];
+    for (final file in sources) {
+      final source = file.readAsStringSync();
+      final channel = RegExp(
+        r"MethodChannel\('(cn_\w+)'\)",
+      ).firstMatch(source)?.group(1);
+      if (channel == null) continue;
+      final handlers = swift
+          .where((f) => f.readAsStringSync().contains('name: "$channel"'))
+          .toList();
+      if (handlers.isEmpty) {
+        expect(
+          _iosOnlyChannels.containsKey(channel),
+          isTrue,
+          reason: '$channel has no macOS handler',
+        );
+        continue;
+      }
+      checked++;
+      for (final m in _requiredCalls(
+        source,
+      ).difference(_swiftCases(handlers))) {
+        missing.add('$channel: $m');
+      }
+    }
+    // cn_alert, cn_action_sheet, cn_context_menu, cn_native_tab_bar and
+    // cn_native_sheet.
+    expect(checked, greaterThanOrEqualTo(5));
+    expect(missing, isEmpty);
   });
 
   group('a native side without the optional methods', () {
