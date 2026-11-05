@@ -94,7 +94,9 @@ class _Issue33SvgTabBarTestState extends State<Issue33SvgTabBarTest> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemYellow.withOpacity(0.15),
+                      color: CupertinoColors.systemYellow.withValues(
+                        alpha: 0.15,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Column(

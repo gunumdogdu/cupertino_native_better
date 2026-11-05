@@ -99,7 +99,9 @@ Future<void> _shot(String name) async {
 Future<void> _open(Widget page) async {
   _nav.currentState!.popUntil((r) => r.isFirst);
   await _wait(600);
-  unawaited(_nav.currentState!.push(CupertinoPageRoute<void>(builder: (_) => page)));
+  unawaited(
+    _nav.currentState!.push(CupertinoPageRoute<void>(builder: (_) => page)),
+  );
   await _wait(1600);
 }
 
@@ -144,145 +146,235 @@ Future<void> _openContextMenuPage() async {
 }
 
 final List<_Step> _steps = [
-  ('alert_two', 'alert value=allow text=[]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'twobutton'));
-    await _shot('alert_two');
-    await _key(_return); // the default action
-  }),
-  ('alert_destructive', 'alert value=cancel text=[]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'destructive'));
-    await _shot('alert_destructive');
-    await _key(_return); // no default: nothing happens
-    await _wait(600);
-    await _key(_escape); // the cancel action
-  }),
-  ('alert_three', 'alert value=cancel text=[]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'threebutton'));
-    await _shot('alert_three');
-    await _key(_escape);
-  }),
-  ('alert_disabled', 'alert value=png text=[]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'disabled'));
-    await _shot('alert_disabled');
-    await _key(_return);
-  }),
-  ('alert_text', 'alert value=save text=[Holiday]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'textfield'));
-    await _shot('alert_text');
-    await _type('Holiday');
-    await _shot('alert_text_typed');
-    await _key(_return);
-  }),
-  ('alert_secure', 'alert value=signin text=[hunter2]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'secure'));
-    await _type('hunter2');
-    await _shot('alert_secure');
-    await _key(_return);
-  }),
-  ('alert_two_fields', 'alert value=continue text=[emir, secret]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'twofields'));
-    await _type('emir');
-    await _key(_tab);
-    await _type('secret');
-    await _shot('alert_two_fields');
-    await _key(_return);
-  }),
-  ('alert_supersede', 'alert value=second text=[]', () async {
-    await _open(const AlertDemoPage(autoScenario: 'supersede'));
-    await _shot('alert_supersede');
-    await _key(_return); // the first call resolved to null
-  }),
-  ('sheet_anchored', 'action_sheet remove', () async {
-    await _open(const ActionSheetDemoPage(autoScenario: 'anchored'));
-    await _shot('sheet_anchored');
-    await _key(_down, times: 3, menu: true);
-    await _shot('sheet_anchored_destructive_highlighted');
-    await _key(_return, menu: true);
-  }),
-  ('sheet_alert', 'action_sheet null', () async {
-    await _open(const ActionSheetDemoPage(autoScenario: 'destructive'));
-    await _shot('sheet_alert');
-    await _key(_escape); // the cancel button
-  }),
-  ('sheet_long', 'action_sheet null', () async {
-    await _open(const ActionSheetDemoPage(autoScenario: 'longlist'));
-    await _shot('sheet_long');
-    await _key(_escape);
-  }),
-  ('sheet_nocancel', null, () async {
-    await _open(const ActionSheetDemoPage(autoScenario: 'nocancel'));
-    await _shot('sheet_nocancel');
-    // No cancel and no default, so no key answers it: the next step's
-    // sheet replaces it, and this call resolves to null.
-  }),
-  ('sheet_anchored_cancel', 'action_sheet null', () async {
-    await _open(const ActionSheetDemoPage(autoScenario: 'anchored'));
-    await _shot('sheet_anchored_again');
-    await _key(_escape, menu: true);
-  }),
-  ('ctx_menu', 'photo [1] Share', () async {
-    await _openContextMenuPage();
-    await _rightClick(ContextMenuDemoPage.photoCardKey);
-    await _shot('ctx_menu');
-    await _key(_down, times: 2, menu: true);
-    await _key(_return, menu: true);
-  }),
-  ('ctx_submenu', 'photo [4, 1] Move to › Family', () async {
-    await _openContextMenuPage();
-    await _rightClick(ContextMenuDemoPage.photoCardKey);
-    await _key(_down, times: 4, menu: true);
-    await _key(_right, menu: true);
-    await _shot('ctx_submenu');
-    await _key(_down, menu: true);
-    await _key(_return, menu: true);
-  }),
-  ('ctx_inline', 'photo [5, 1] Rotate › Rotate right', () async {
-    await _openContextMenuPage();
-    await _rightClick(ContextMenuDemoPage.photoCardKey);
-    await _key(_down, times: 6, menu: true);
-    await _key(_return, menu: true);
-  }),
-  ('ctx_destructive', 'photo [9] Delete', () async {
-    await _openContextMenuPage();
-    await _rightClick(ContextMenuDemoPage.photoCardKey);
-    await _key(_down, times: 8, menu: true);
-    await _shot('ctx_destructive_highlighted');
-    await _key(_return, menu: true);
-  }),
-  ('ctx_cancel', null, () async {
-    await _openContextMenuPage();
-    await _rightClick(ContextMenuDemoPage.photoCardKey);
-    await _key(_escape, menu: true); // no result
-  }),
-  ('ctx_popup_gesture', 'CNPopupGesture onSelected(1)', () async {
-    await _openContextMenuPage();
-    await _rightClick(ContextMenuDemoPage.gestureCardKey);
-    await _shot('ctx_popup_gesture');
-    await _key(_down, times: 2, menu: true);
-    await _key(_return, menu: true);
-  }),
-  ('ctx_background', 'photo [0] Copy', () async {
-    // A right click on the window while another app is in front opens the
-    // menu there, without bringing the app forward, as on any Mac window.
-    await _openContextMenuPage();
-    await _audit.invokeMethod<void>('deactivate');
-    await _wait(800);
-    await _rightClick(ContextMenuDemoPage.photoCardKey, activate: false);
-    await _shot('ctx_background');
-    await _key(_down, menu: true);
-    await _key(_return, menu: true);
-  }),
-  ('ctx_resized', 'photo [0] Copy', () async {
-    await _openContextMenuPage();
-    await _audit.invokeMethod<void>('resize', {'width': 560.0, 'height': 640.0});
-    await _wait(1200);
-    await _rightClick(ContextMenuDemoPage.photoCardKey, dx: 120);
-    await _shot('ctx_resized');
-    await _key(_down, menu: true);
-    await _key(_return, menu: true);
-    await _audit.invokeMethod<void>('resize', {'width': 820.0, 'height': 900.0});
-    await _wait(800);
-  }),
+  (
+    'alert_two',
+    'alert value=allow text=[]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'twobutton'));
+      await _shot('alert_two');
+      await _key(_return); // the default action
+    },
+  ),
+  (
+    'alert_destructive',
+    'alert value=cancel text=[]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'destructive'));
+      await _shot('alert_destructive');
+      await _key(_return); // no default: nothing happens
+      await _wait(600);
+      await _key(_escape); // the cancel action
+    },
+  ),
+  (
+    'alert_three',
+    'alert value=cancel text=[]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'threebutton'));
+      await _shot('alert_three');
+      await _key(_escape);
+    },
+  ),
+  (
+    'alert_disabled',
+    'alert value=png text=[]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'disabled'));
+      await _shot('alert_disabled');
+      await _key(_return);
+    },
+  ),
+  (
+    'alert_text',
+    'alert value=save text=[Holiday]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'textfield'));
+      await _shot('alert_text');
+      await _type('Holiday');
+      await _shot('alert_text_typed');
+      await _key(_return);
+    },
+  ),
+  (
+    'alert_secure',
+    'alert value=signin text=[hunter2]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'secure'));
+      await _type('hunter2');
+      await _shot('alert_secure');
+      await _key(_return);
+    },
+  ),
+  (
+    'alert_two_fields',
+    'alert value=continue text=[emir, secret]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'twofields'));
+      await _type('emir');
+      await _key(_tab);
+      await _type('secret');
+      await _shot('alert_two_fields');
+      await _key(_return);
+    },
+  ),
+  (
+    'alert_supersede',
+    'alert value=second text=[]',
+    () async {
+      await _open(const AlertDemoPage(autoScenario: 'supersede'));
+      await _shot('alert_supersede');
+      await _key(_return); // the first call resolved to null
+    },
+  ),
+  (
+    'sheet_anchored',
+    'action_sheet remove',
+    () async {
+      await _open(const ActionSheetDemoPage(autoScenario: 'anchored'));
+      await _shot('sheet_anchored');
+      await _key(_down, times: 3, menu: true);
+      await _shot('sheet_anchored_destructive_highlighted');
+      await _key(_return, menu: true);
+    },
+  ),
+  (
+    'sheet_alert',
+    'action_sheet null',
+    () async {
+      await _open(const ActionSheetDemoPage(autoScenario: 'destructive'));
+      await _shot('sheet_alert');
+      await _key(_escape); // the cancel button
+    },
+  ),
+  (
+    'sheet_long',
+    'action_sheet null',
+    () async {
+      await _open(const ActionSheetDemoPage(autoScenario: 'longlist'));
+      await _shot('sheet_long');
+      await _key(_escape);
+    },
+  ),
+  (
+    'sheet_nocancel',
+    null,
+    () async {
+      await _open(const ActionSheetDemoPage(autoScenario: 'nocancel'));
+      await _shot('sheet_nocancel');
+      // No cancel and no default, so no key answers it: the next step's
+      // sheet replaces it, and this call resolves to null.
+    },
+  ),
+  (
+    'sheet_anchored_cancel',
+    'action_sheet null',
+    () async {
+      await _open(const ActionSheetDemoPage(autoScenario: 'anchored'));
+      await _shot('sheet_anchored_again');
+      await _key(_escape, menu: true);
+    },
+  ),
+  (
+    'ctx_menu',
+    'photo [1] Share',
+    () async {
+      await _openContextMenuPage();
+      await _rightClick(ContextMenuDemoPage.photoCardKey);
+      await _shot('ctx_menu');
+      await _key(_down, times: 2, menu: true);
+      await _key(_return, menu: true);
+    },
+  ),
+  (
+    'ctx_submenu',
+    'photo [4, 1] Move to › Family',
+    () async {
+      await _openContextMenuPage();
+      await _rightClick(ContextMenuDemoPage.photoCardKey);
+      await _key(_down, times: 4, menu: true);
+      await _key(_right, menu: true);
+      await _shot('ctx_submenu');
+      await _key(_down, menu: true);
+      await _key(_return, menu: true);
+    },
+  ),
+  (
+    'ctx_inline',
+    'photo [5, 1] Rotate › Rotate right',
+    () async {
+      await _openContextMenuPage();
+      await _rightClick(ContextMenuDemoPage.photoCardKey);
+      await _key(_down, times: 6, menu: true);
+      await _key(_return, menu: true);
+    },
+  ),
+  (
+    'ctx_destructive',
+    'photo [9] Delete',
+    () async {
+      await _openContextMenuPage();
+      await _rightClick(ContextMenuDemoPage.photoCardKey);
+      await _key(_down, times: 8, menu: true);
+      await _shot('ctx_destructive_highlighted');
+      await _key(_return, menu: true);
+    },
+  ),
+  (
+    'ctx_cancel',
+    null,
+    () async {
+      await _openContextMenuPage();
+      await _rightClick(ContextMenuDemoPage.photoCardKey);
+      await _key(_escape, menu: true); // no result
+    },
+  ),
+  (
+    'ctx_popup_gesture',
+    'CNPopupGesture onSelected(1)',
+    () async {
+      await _openContextMenuPage();
+      await _rightClick(ContextMenuDemoPage.gestureCardKey);
+      await _shot('ctx_popup_gesture');
+      await _key(_down, times: 2, menu: true);
+      await _key(_return, menu: true);
+    },
+  ),
+  (
+    'ctx_background',
+    'photo [0] Copy',
+    () async {
+      // A right click on the window while another app is in front opens the
+      // menu there, without bringing the app forward, as on any Mac window.
+      await _openContextMenuPage();
+      await _audit.invokeMethod<void>('deactivate');
+      await _wait(800);
+      await _rightClick(ContextMenuDemoPage.photoCardKey, activate: false);
+      await _shot('ctx_background');
+      await _key(_down, menu: true);
+      await _key(_return, menu: true);
+    },
+  ),
+  (
+    'ctx_resized',
+    'photo [0] Copy',
+    () async {
+      await _openContextMenuPage();
+      await _audit.invokeMethod<void>('resize', {
+        'width': 560.0,
+        'height': 640.0,
+      });
+      await _wait(1200);
+      await _rightClick(ContextMenuDemoPage.photoCardKey, dx: 120);
+      await _shot('ctx_resized');
+      await _key(_down, menu: true);
+      await _key(_return, menu: true);
+      await _audit.invokeMethod<void>('resize', {
+        'width': 820.0,
+        'height': 900.0,
+      });
+      await _wait(800);
+    },
+  ),
 ];
 
 /// Every `CNB_RESULT` line printed so far.
@@ -291,8 +383,10 @@ final List<String> _results = <String>[];
 Future<void> _run() async {
   if (const bool.fromEnvironment('TRACE')) {
     HardwareKeyboard.instance.addHandler((event) {
-      debugPrint('CNB_TRACE key ${event.runtimeType} ${event.logicalKey.debugName} '
-          'synth=${event.synthesized}');
+      debugPrint(
+        'CNB_TRACE key ${event.runtimeType} ${event.logicalKey.debugName} '
+        'synth=${event.synthesized}',
+      );
       return false;
     });
     GestureBinding.instance.pointerRouter.addGlobalRoute((event) {
@@ -322,11 +416,14 @@ Future<void> _run() async {
       final before = _results.length;
       await step();
       await _wait(1200);
-      ok = expected == null ||
+      ok =
+          expected == null ||
           _results.skip(before).any((r) => r.endsWith(expected));
     }
     if (!ok) failed.add(name);
   }
-  debugPrint('CNB_SUMMARY failed=${failed.isEmpty ? 'none' : failed.join(',')}');
+  debugPrint(
+    'CNB_SUMMARY failed=${failed.isEmpty ? 'none' : failed.join(',')}',
+  );
   debugPrint('CNB_DONE');
 }

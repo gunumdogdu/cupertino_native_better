@@ -1,24 +1,41 @@
-// This is a basic Flutter integration test.
+// Runs on a device or simulator: the package's widgets build in a real app
+// and answer their platform channels without errors.
 //
-// Since integration tests run in a full Flutter application, they can interact
-// with the host side of a plugin implementation, unlike Dart unit tests.
-//
-// For more information about Flutter integration tests, please see
-// https://flutter.dev/to/integration-testing
+//   flutter test integration_test/plugin_integration_test.dart -d <device>
 
+import 'package:cupertino_native_better/cupertino_native_better.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-
-import 'package:cupertino_native_plus/cupertino_native.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('getPlatformVersion test', (WidgetTester tester) async {
-    final CupertinoNative plugin = CupertinoNative();
-    final String? version = await plugin.getPlatformVersion();
-    // The version string depends on the host platform running the test, so
-    // just assert that some non-empty string is returned.
-    expect(version?.isNotEmpty, true);
+  testWidgets('native controls build and report their changes', (tester) async {
+    var pressed = 0;
+    var on = false;
+    await tester.pumpWidget(
+      CupertinoApp(
+        home: StatefulBuilder(
+          builder: (context, setState) => CupertinoPageScaffold(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CNButton(label: 'Press', onPressed: () => pressed++),
+                  CNSwitch(value: on, onChanged: (v) => setState(() => on = v)),
+                  const CNProgressIndicator(value: 0.4),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle(const Duration(seconds: 1));
+    expect(find.byType(CNButton), findsOneWidget);
+    expect(find.byType(CNSwitch), findsOneWidget);
+    expect(find.byType(CNProgressIndicator), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

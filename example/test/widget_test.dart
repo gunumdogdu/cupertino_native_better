@@ -1,27 +1,19 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// The example's home page builds (Flutter fallbacks on the test host).
 
-import 'package:flutter/material.dart';
+import 'package:cupertino_native_better_example/main.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cupertino_native_example/main.dart';
-
 void main() {
-  testWidgets('Verify Platform version', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that platform version is retrieved.
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) =>
-            widget is Text && widget.data!.startsWith('Running on:'),
-      ),
-      findsOneWidget,
-    );
-  });
+  // Android: every widget takes its Flutter fallback, no platform views.
+  testWidgets(
+    'the example home lists the showcase and the components',
+    (tester) async {
+      await tester.pumpWidget(const MyApp());
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Showcase'), findsWidgets);
+      expect(find.text('Components'), findsWidgets);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 }

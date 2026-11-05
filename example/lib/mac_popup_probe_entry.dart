@@ -144,17 +144,20 @@ final Map<String, bool Function(CNPopupMenuButton)> _menus = {
   'actions': (w) => w.buttonLabel == 'Actions',
   'kinds': (w) => w.buttonLabel == 'Item kinds',
   'layout': (w) => _firstLabel(w) == 'Format',
-  'colored': (w) => w.buttonStyle == CNButtonStyle.bordered &&
-      _firstLabel(w) == 'New File',
+  'colored': (w) =>
+      w.buttonStyle == CNButtonStyle.bordered && _firstLabel(w) == 'New File',
   'custom': (w) => w.buttonCustomIcon != null,
-  'svg': (w) => w.buttonStyle == CNButtonStyle.glass &&
+  'svg': (w) =>
+      w.buttonStyle == CNButtonStyle.glass &&
       _firstLabel(w) == 'Home' &&
       w.buttonImageAsset != null,
-  'colored_svg': (w) => w.buttonStyle == CNButtonStyle.borderedProminent &&
+  'colored_svg': (w) =>
+      w.buttonStyle == CNButtonStyle.borderedProminent &&
       _firstLabel(w) == 'Home',
-  'png': (w) => w.buttonStyle == CNButtonStyle.glass &&
-      _firstLabel(w) == 'Check',
-  'colored_png': (w) => w.buttonStyle == CNButtonStyle.borderedProminent &&
+  'png': (w) =>
+      w.buttonStyle == CNButtonStyle.glass && _firstLabel(w) == 'Check',
+  'colored_png': (w) =>
+      w.buttonStyle == CNButtonStyle.borderedProminent &&
       _firstLabel(w) == 'Check',
   'display': (w) => _firstLabel(w) == 'Clear',
   'files': (w) => _firstLabel(w) == 'Select',
@@ -226,10 +229,10 @@ Future<void> _openMenu(String menu) async {
     // accessibility (`CNB_PRESS x y`, screen points), which works while
     // another app is in front; a click on a window in the background only
     // brings it forward.
-    final screen = await _audit.invokeMapMethod<String, double>(
-      'toScreen',
-      {'x': c.dx, 'y': c.dy},
-    );
+    final screen = await _audit.invokeMapMethod<String, double>('toScreen', {
+      'x': c.dx,
+      'y': c.dy,
+    });
     debugPrint('CNB_PRESS ${screen!['x']} ${screen['y']}');
     await _wait(1800);
     return;
@@ -252,132 +255,225 @@ typedef _Step = (String, List<String>, _Page, Future<void> Function());
 final List<_Step> _steps = [
   // A disabled item is greyed out and cannot be chosen: pressing it through
   // accessibility does nothing, and the arrow keys skip it.
-  ('actions_disabled', <String>[], _Page.demo, () async {
-    await _openMenu('actions');
-    await _shot('actions_menu');
-    await _ax('actions_menu');
-    await _axPress('actions_press_disabled', 'Delete');
-    await _keys([_escape]);
-  }),
-  ('actions_keys', ['popup actions index=3'], _Page.demo, () async {
-    await _openMenu('actions');
-    await _chooseFromEnd(0); // Rename, or Delete if it were enabled
-  }),
-  ('kinds_checked', ['popup kinds index=0', 'popup kinds path=[0]'], _Page.demo,
-      () async {
-    await _openMenu('kinds');
-    await _shot('kinds_menu');
-    await _ax('kinds_menu');
-    await _chooseFromEnd(5);
-  }),
-  ('kinds_unchecked', ['popup kinds index=0', 'popup kinds path=[0]'],
-      _Page.demo, () async {
-    // The last step unchecked the item: the menu shows it so.
-    await _openMenu('kinds');
-    await _ax('kinds_menu_unchecked');
-    await _chooseFromEnd(5);
-  }),
-  ('kinds_disabled', <String>[], _Page.demo, () async {
-    await _openMenu('kinds');
-    await _axPress('kinds_press_disabled', 'Archive');
-    await _keys([_escape]);
-  }),
-  ('kinds_submenu', ['popup kinds index=3', 'popup kinds path=[3, 1]'],
-      _Page.demo, () async {
-    await _openMenu('kinds');
-    await _highlightFromEnd(4); // Move to
-    await _keys([_right]); // opens the submenu
-    await _shot('kinds_submenu');
-    await _ax('kinds_submenu');
-    await _chooseFromEnd(1); // Recents
-  }),
-  ('kinds_svg', ['popup kinds index=4', 'popup kinds path=[4]'], _Page.demo,
-      () async {
-    await _openMenu('kinds');
-    await _chooseFromEnd(3);
-  }),
-  ('kinds_png', ['popup kinds index=5', 'popup kinds path=[5]'], _Page.demo,
-      () async {
-    await _openMenu('kinds');
-    await _chooseFromEnd(2);
-  }),
-  ('kinds_custom', ['popup kinds index=6', 'popup kinds path=[6]'], _Page.demo,
-      () async {
-    await _openMenu('kinds');
-    await _chooseFromEnd(1);
-  }),
-  ('kinds_destructive', ['popup kinds index=8', 'popup kinds path=[8]'],
-      _Page.demo, () async {
-    await _openMenu('kinds');
-    await _highlightFromEnd(0);
-    await _shot('kinds_destructive_highlighted');
-    await _keys([_return]);
-  }),
-  ('layout_inline', ['popup layout path=[1, 1]'], _Page.demo, () async {
-    await _openMenu('layout');
-    await _shot('layout_menu');
-    await _ax('layout_menu');
-    await _chooseFromEnd(3); // Date
-  }),
-  ('layout_keeps', ['popup layout path=[3]'], _Page.demo, () async {
-    // keepsMenuPresented has no AppKit counterpart: the item fires once and
-    // the menu closes, as documented.
-    await _openMenu('layout');
-    await _chooseFromEnd(1); // Zoom in
-    await _ax('layout_after_keeps');
-  }),
-  ('svg', ['popup svg index=1'], _Page.demo, () async {
-    await _openMenu('svg');
-    await _shot('svg_menu');
-    await _chooseFromEnd(2); // Search
-  }),
-  ('png', ['popup png index=3'], _Page.demo, () async {
-    await _openMenu('png');
-    await _shot('png_menu');
-    await _chooseFromEnd(1); // Close
-  }),
-  ('custom', <String>[], _Page.demo, () async {
-    await _openMenu('custom');
-    await _shot('custom_menu');
-    await _keys([_escape]);
-  }),
-  ('colored', <String>[], _Page.demo, () async {
-    await _openMenu('colored');
-    await _shot('colored_menu');
-    await _keys([_escape]);
-  }),
-  ('colored_svg', <String>[], _Page.demo, () async {
-    await _openMenu('colored_svg');
-    await _shot('colored_svg_menu');
-    await _keys([_escape]);
-  }),
-  ('colored_png', <String>[], _Page.demo, () async {
-    await _openMenu('colored_png');
-    await _shot('colored_png_menu');
-    await _keys([_escape]);
-  }),
-  ('display', <String>[], _Page.display, () async {
-    await _openMenu('display');
-    await _shot('display_menu');
-    await _ax('display_menu');
-    await _chooseFromEnd(0); // Tinted
-    await _shot('display_after');
-  }),
-  ('files', <String>[], _Page.files, () async {
-    await _openMenu('files');
-    await _shot('files_menu');
-    await _highlightFromEnd(1); // Sort By
-    await _keys([_right]);
-    await _shot('files_submenu');
-    await _chooseFromEnd(1); // Date
-    await _wait(800);
-    await _openMenu('files');
-    await _highlightFromEnd(1);
-    await _keys([_right]);
-    await _shot('files_submenu_after');
-    await _ax('files_submenu_after');
-    await _keys([_escape, _escape]);
-  }),
+  (
+    'actions_disabled',
+    <String>[],
+    _Page.demo,
+    () async {
+      await _openMenu('actions');
+      await _shot('actions_menu');
+      await _ax('actions_menu');
+      await _axPress('actions_press_disabled', 'Delete');
+      await _keys([_escape]);
+    },
+  ),
+  (
+    'actions_keys',
+    ['popup actions index=3'],
+    _Page.demo,
+    () async {
+      await _openMenu('actions');
+      await _chooseFromEnd(0); // Rename, or Delete if it were enabled
+    },
+  ),
+  (
+    'kinds_checked',
+    ['popup kinds index=0', 'popup kinds path=[0]'],
+    _Page.demo,
+    () async {
+      await _openMenu('kinds');
+      await _shot('kinds_menu');
+      await _ax('kinds_menu');
+      await _chooseFromEnd(5);
+    },
+  ),
+  (
+    'kinds_unchecked',
+    ['popup kinds index=0', 'popup kinds path=[0]'],
+    _Page.demo,
+    () async {
+      // The last step unchecked the item: the menu shows it so.
+      await _openMenu('kinds');
+      await _ax('kinds_menu_unchecked');
+      await _chooseFromEnd(5);
+    },
+  ),
+  (
+    'kinds_disabled',
+    <String>[],
+    _Page.demo,
+    () async {
+      await _openMenu('kinds');
+      await _axPress('kinds_press_disabled', 'Archive');
+      await _keys([_escape]);
+    },
+  ),
+  (
+    'kinds_submenu',
+    ['popup kinds index=3', 'popup kinds path=[3, 1]'],
+    _Page.demo,
+    () async {
+      await _openMenu('kinds');
+      await _highlightFromEnd(4); // Move to
+      await _keys([_right]); // opens the submenu
+      await _shot('kinds_submenu');
+      await _ax('kinds_submenu');
+      await _chooseFromEnd(1); // Recents
+    },
+  ),
+  (
+    'kinds_svg',
+    ['popup kinds index=4', 'popup kinds path=[4]'],
+    _Page.demo,
+    () async {
+      await _openMenu('kinds');
+      await _chooseFromEnd(3);
+    },
+  ),
+  (
+    'kinds_png',
+    ['popup kinds index=5', 'popup kinds path=[5]'],
+    _Page.demo,
+    () async {
+      await _openMenu('kinds');
+      await _chooseFromEnd(2);
+    },
+  ),
+  (
+    'kinds_custom',
+    ['popup kinds index=6', 'popup kinds path=[6]'],
+    _Page.demo,
+    () async {
+      await _openMenu('kinds');
+      await _chooseFromEnd(1);
+    },
+  ),
+  (
+    'kinds_destructive',
+    ['popup kinds index=8', 'popup kinds path=[8]'],
+    _Page.demo,
+    () async {
+      await _openMenu('kinds');
+      await _highlightFromEnd(0);
+      await _shot('kinds_destructive_highlighted');
+      await _keys([_return]);
+    },
+  ),
+  (
+    'layout_inline',
+    ['popup layout path=[1, 1]'],
+    _Page.demo,
+    () async {
+      await _openMenu('layout');
+      await _shot('layout_menu');
+      await _ax('layout_menu');
+      await _chooseFromEnd(3); // Date
+    },
+  ),
+  (
+    'layout_keeps',
+    ['popup layout path=[3]'],
+    _Page.demo,
+    () async {
+      // keepsMenuPresented has no AppKit counterpart: the item fires once and
+      // the menu closes, as documented.
+      await _openMenu('layout');
+      await _chooseFromEnd(1); // Zoom in
+      await _ax('layout_after_keeps');
+    },
+  ),
+  (
+    'svg',
+    ['popup svg index=1'],
+    _Page.demo,
+    () async {
+      await _openMenu('svg');
+      await _shot('svg_menu');
+      await _chooseFromEnd(2); // Search
+    },
+  ),
+  (
+    'png',
+    ['popup png index=3'],
+    _Page.demo,
+    () async {
+      await _openMenu('png');
+      await _shot('png_menu');
+      await _chooseFromEnd(1); // Close
+    },
+  ),
+  (
+    'custom',
+    <String>[],
+    _Page.demo,
+    () async {
+      await _openMenu('custom');
+      await _shot('custom_menu');
+      await _keys([_escape]);
+    },
+  ),
+  (
+    'colored',
+    <String>[],
+    _Page.demo,
+    () async {
+      await _openMenu('colored');
+      await _shot('colored_menu');
+      await _keys([_escape]);
+    },
+  ),
+  (
+    'colored_svg',
+    <String>[],
+    _Page.demo,
+    () async {
+      await _openMenu('colored_svg');
+      await _shot('colored_svg_menu');
+      await _keys([_escape]);
+    },
+  ),
+  (
+    'colored_png',
+    <String>[],
+    _Page.demo,
+    () async {
+      await _openMenu('colored_png');
+      await _shot('colored_png_menu');
+      await _keys([_escape]);
+    },
+  ),
+  (
+    'display',
+    <String>[],
+    _Page.display,
+    () async {
+      await _openMenu('display');
+      await _shot('display_menu');
+      await _ax('display_menu');
+      await _chooseFromEnd(0); // Tinted
+      await _shot('display_after');
+    },
+  ),
+  (
+    'files',
+    <String>[],
+    _Page.files,
+    () async {
+      await _openMenu('files');
+      await _shot('files_menu');
+      await _highlightFromEnd(1); // Sort By
+      await _keys([_right]);
+      await _shot('files_submenu');
+      await _chooseFromEnd(1); // Date
+      await _wait(800);
+      await _openMenu('files');
+      await _highlightFromEnd(1);
+      await _keys([_right]);
+      await _shot('files_submenu_after');
+      await _ax('files_submenu_after');
+      await _keys([_escape, _escape]);
+    },
+  ),
 ];
 
 /// Every `CNB_RESULT` line printed so far.

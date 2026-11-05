@@ -22,12 +22,16 @@ class _BottomNavTestPageState extends State<BottomNavTestPage> {
 
     // Log the tap
     final now = DateTime.now();
-    final timestamp = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final timestamp =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
     setState(() {
       _tapCount++;
       if (isReselect) _reselectCount++;
-      _tapLog.insert(0, '[$timestamp] Tab $index ${isReselect ? "(RESELECT)" : ""}');
+      _tapLog.insert(
+        0,
+        '[$timestamp] Tab $index ${isReselect ? "(RESELECT)" : ""}',
+      );
       if (_tapLog.length > 15) _tapLog.removeLast();
       _currentIndex = index;
     });
@@ -47,14 +51,12 @@ class _BottomNavTestPageState extends State<BottomNavTestPage> {
       child: Column(
         children: [
           // Main content - just switch between widgets
-          Expanded(
-            child: _buildCurrentScreen(),
-          ),
+          Expanded(child: _buildCurrentScreen()),
           // CNTabBar at bottom
           SafeArea(
             top: false,
             child: CNTabBar(
-              iconSize: _iconSize,  // Global icon size for all tabs
+              iconSize: _iconSize, // Global icon size for all tabs
               items: [
                 CNTabBarItem(
                   label: 'Home',
@@ -145,7 +147,7 @@ class _HomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemGreen.withOpacity(0.1),
+              color: CupertinoColors.systemGreen.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -161,7 +163,9 @@ class _HomeScreen extends StatelessWidget {
                   children: [
                     CupertinoButton.filled(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      onPressed: iconSize > 15 ? () => onIconSizeChanged(iconSize - 2) : null,
+                      onPressed: iconSize > 15
+                          ? () => onIconSizeChanged(iconSize - 2)
+                          : null,
                       child: const Text('-', style: TextStyle(fontSize: 20)),
                     ),
                     Padding(
@@ -170,15 +174,26 @@ class _HomeScreen extends StatelessWidget {
                         children: [
                           Text(
                             '${iconSize.toInt()}',
-                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          const Text('pt', style: TextStyle(fontSize: 12, color: CupertinoColors.systemGrey)),
+                          const Text(
+                            'pt',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.systemGrey,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     CupertinoButton.filled(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      onPressed: iconSize < 40 ? () => onIconSizeChanged(iconSize + 2) : null,
+                      onPressed: iconSize < 40
+                          ? () => onIconSizeChanged(iconSize + 2)
+                          : null,
                       child: const Text('+', style: TextStyle(fontSize: 20)),
                     ),
                   ],
@@ -186,7 +201,10 @@ class _HomeScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Text(
                   'Use CNTabBar(iconSize: X) to set icon size',
-                  style: TextStyle(fontSize: 12, color: CupertinoColors.systemGrey),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: CupertinoColors.systemGrey,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -198,7 +216,7 @@ class _HomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.1),
+              color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -230,13 +248,27 @@ class _HomeScreen extends StatelessWidget {
               children: [
                 Column(
                   children: [
-                    Text('$tapCount', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: CupertinoColors.systemBlue)),
+                    Text(
+                      '$tapCount',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: CupertinoColors.systemBlue,
+                      ),
+                    ),
                     const Text('Total Taps', style: TextStyle(fontSize: 12)),
                   ],
                 ),
                 Column(
                   children: [
-                    Text('$reselectCount', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: CupertinoColors.systemOrange)),
+                    Text(
+                      '$reselectCount',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: CupertinoColors.systemOrange,
+                      ),
+                    ),
                     const Text('Reselects', style: TextStyle(fontSize: 12)),
                   ],
                 ),
@@ -255,22 +287,32 @@ class _HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Tap Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Tap Log',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 if (tapLog.isEmpty)
-                  const Text('Tap tabs to see log...', style: TextStyle(color: CupertinoColors.systemGrey))
+                  const Text(
+                    'Tap tabs to see log...',
+                    style: TextStyle(color: CupertinoColors.systemGrey),
+                  )
                 else
-                  ...tapLog.map((log) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      log,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontFamily: 'Menlo',
-                        color: log.contains('RESELECT') ? CupertinoColors.systemOrange : null,
+                  ...tapLog.map(
+                    (log) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        log,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'Menlo',
+                          color: log.contains('RESELECT')
+                              ? CupertinoColors.systemOrange
+                              : null,
+                        ),
                       ),
                     ),
-                  )),
+                  ),
               ],
             ),
           ),
@@ -298,15 +340,20 @@ class _BrowseScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemOrange.withOpacity(0.1),
+              color: CupertinoColors.systemOrange.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Issue #9: Height Clipping Test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  'Issue #9: Height Clipping Test',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 SizedBox(height: 8),
-                Text('Scroll to bottom. Item 20 should be fully visible above tab bar.'),
+                Text(
+                  'Scroll to bottom. Item 20 should be fully visible above tab bar.',
+                ),
               ],
             ),
           ),
@@ -326,17 +373,26 @@ class _BrowseScreen extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemOrange.withOpacity(0.2),
+                      color: CupertinoColors.systemOrange.withValues(
+                        alpha: 0.2,
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Center(child: Text('$i', style: const TextStyle(fontWeight: FontWeight.bold))),
+                    child: Center(
+                      child: Text(
+                        '$i',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       i == 20 ? 'LAST ITEM - Should be visible!' : 'Item $i',
                       style: TextStyle(
-                        fontWeight: i == 20 ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: i == 20
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         color: i == 20 ? CupertinoColors.systemRed : null,
                       ),
                     ),
@@ -360,11 +416,21 @@ class _LibraryScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(CupertinoIcons.book_fill, size: 64, color: CupertinoColors.systemGreen),
+            Icon(
+              CupertinoIcons.book_fill,
+              size: 64,
+              color: CupertinoColors.systemGreen,
+            ),
             const SizedBox(height: 16),
-            const Text('Library', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text(
+              'Library',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            const Text('Screen switches work!', style: TextStyle(color: CupertinoColors.systemGrey)),
+            const Text(
+              'Screen switches work!',
+              style: TextStyle(color: CupertinoColors.systemGrey),
+            ),
           ],
         ),
       ),
@@ -382,11 +448,21 @@ class _ProfileScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(CupertinoIcons.person_fill, size: 64, color: CupertinoColors.systemPurple),
+            Icon(
+              CupertinoIcons.person_fill,
+              size: 64,
+              color: CupertinoColors.systemPurple,
+            ),
             const SizedBox(height: 16),
-            const Text('Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text(
+              'Profile',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            const Text('Screen switches work!', style: TextStyle(color: CupertinoColors.systemGrey)),
+            const Text(
+              'Screen switches work!',
+              style: TextStyle(color: CupertinoColors.systemGrey),
+            ),
           ],
         ),
       ),

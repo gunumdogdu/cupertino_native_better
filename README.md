@@ -1199,6 +1199,10 @@ await CNNativeSheet.dismiss();
 
 ### macOS
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gunumdogdu/cupertino_native_better/main/misc/readme/macos_window_dark.png" width="640" alt="The mail-style macOS window in dark mode: native sidebar, window toolbar with a blue New Message button, a Flutter message list and the native inspector">
+</p>
+
 Since 2.2 a widget whose control exists in AppKit uses it on every supported macOS, 12.0 and later, not only on macOS&nbsp;26. Liquid Glass still needs macOS&nbsp;26: below it, the same widgets keep their AppKit look without glass.
 
 | Widget | On macOS |

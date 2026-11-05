@@ -32,7 +32,7 @@ class _Issue36LiquidGlassModalTestState
   void _showCupertinoSheet() {
     showCupertinoSheet<void>(
       context: context,
-      builder: (ctx) => _SheetBody(
+      scrollableBuilder: (ctx, _) => _SheetBody(
         title: 'showCupertinoSheet',
         onClose: () => Navigator.of(ctx).pop(),
       ),

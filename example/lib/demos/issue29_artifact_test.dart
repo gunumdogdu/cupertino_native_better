@@ -92,9 +92,7 @@ class Issue29ArtifactTestPage extends StatelessWidget {
 
 void _push(BuildContext context, _Entry entry) {
   Navigator.of(context).push(
-    _SlowCupertinoPageRoute(
-      builder: (_) => _SingleWidgetPage(entry: entry),
-    ),
+    _SlowCupertinoPageRoute(builder: (_) => _SingleWidgetPage(entry: entry)),
   );
 }
 

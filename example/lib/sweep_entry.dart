@@ -75,131 +75,123 @@ class _SweepPage extends StatelessWidget {
 
   List<Widget> _pageOne() {
     return <Widget>[
-            _row('glass + label — THE CHANGED SURFACE', <Widget>[
-              CNButton(
-                label: 'Save',
-                config: const CNButtonConfig(style: CNButtonStyle.glass),
-                onPressed: () {},
-              ),
-              CNButton(
-                label: 'Cancel',
-                config: const CNButtonConfig(style: CNButtonStyle.glass),
-                onPressed: () {},
-              ),
-              CNButton(
-                label: 'Tinted',
-                tint: CupertinoColors.systemGreen,
-                config: const CNButtonConfig(style: CNButtonStyle.glass),
-                onPressed: () {},
-              ),
-            ]),
-            _row('glass + icon + label', <Widget>[
-              CNButton(
-                label: 'Share',
-                icon: const CNSymbol('square.and.arrow.up', size: 18),
-                config: const CNButtonConfig(style: CNButtonStyle.glass),
-                onPressed: () {},
-              ),
-              CNButton(
-                label: 'Delete',
-                icon: const CNSymbol('trash', size: 18),
-                config: const CNButtonConfig(style: CNButtonStyle.glass),
-                onPressed: () {},
-              ),
-            ]),
-            _row('glass icon-only (icons were already system-coloured)', <
-              Widget
-            >[
-              CNButton.icon(
-                icon: const CNSymbol('star.fill', size: 20),
-                onPressed: () {},
-              ),
-              CNButton.icon(
-                icon: const CNSymbol('heart.fill', size: 20),
-                onPressed: () {},
-              ),
-              CNButton.icon(
-                icon: const CNSymbol('bell.fill', size: 20),
-                tint: CupertinoColors.systemGreen,
-                onPressed: () {},
-              ),
-            ]),
-            _row('prominentGlass — control, must NOT change', <Widget>[
-              CNButton(
-                label: 'Save',
-                config: const CNButtonConfig(
-                  style: CNButtonStyle.prominentGlass,
-                ),
-                onPressed: () {},
-              ),
-              CNButton.icon(
-                icon: const CNSymbol('star.fill', size: 20),
-                config: const CNButtonConfig(
-                  style: CNButtonStyle.prominentGlass,
-                ),
-                onPressed: () {},
-              ),
-            ]),
-            _row('other styles — controls, must NOT change', <Widget>[
-              CNButton(
-                label: 'plain',
-                config: const CNButtonConfig(style: CNButtonStyle.plain),
-                onPressed: () {},
-              ),
-              CNButton(
-                label: 'tinted',
-                config: const CNButtonConfig(style: CNButtonStyle.tinted),
-                onPressed: () {},
-              ),
-              CNButton(
-                label: 'filled',
-                config: const CNButtonConfig(style: CNButtonStyle.filled),
-                onPressed: () {},
-              ),
-            ]),
+      _row('glass + label — THE CHANGED SURFACE', <Widget>[
+        CNButton(
+          label: 'Save',
+          config: const CNButtonConfig(style: CNButtonStyle.glass),
+          onPressed: () {},
+        ),
+        CNButton(
+          label: 'Cancel',
+          config: const CNButtonConfig(style: CNButtonStyle.glass),
+          onPressed: () {},
+        ),
+        CNButton(
+          label: 'Tinted',
+          tint: CupertinoColors.systemGreen,
+          config: const CNButtonConfig(style: CNButtonStyle.glass),
+          onPressed: () {},
+        ),
+      ]),
+      _row('glass + icon + label', <Widget>[
+        CNButton(
+          label: 'Share',
+          icon: const CNSymbol('square.and.arrow.up', size: 18),
+          config: const CNButtonConfig(style: CNButtonStyle.glass),
+          onPressed: () {},
+        ),
+        CNButton(
+          label: 'Delete',
+          icon: const CNSymbol('trash', size: 18),
+          config: const CNButtonConfig(style: CNButtonStyle.glass),
+          onPressed: () {},
+        ),
+      ]),
+      _row('glass icon-only (icons were already system-coloured)', <Widget>[
+        CNButton.icon(
+          icon: const CNSymbol('star.fill', size: 20),
+          onPressed: () {},
+        ),
+        CNButton.icon(
+          icon: const CNSymbol('heart.fill', size: 20),
+          onPressed: () {},
+        ),
+        CNButton.icon(
+          icon: const CNSymbol('bell.fill', size: 20),
+          tint: CupertinoColors.systemGreen,
+          onPressed: () {},
+        ),
+      ]),
+      _row('prominentGlass — control, must NOT change', <Widget>[
+        CNButton(
+          label: 'Save',
+          config: const CNButtonConfig(style: CNButtonStyle.prominentGlass),
+          onPressed: () {},
+        ),
+        CNButton.icon(
+          icon: const CNSymbol('star.fill', size: 20),
+          config: const CNButtonConfig(style: CNButtonStyle.prominentGlass),
+          onPressed: () {},
+        ),
+      ]),
+      _row('other styles — controls, must NOT change', <Widget>[
+        CNButton(
+          label: 'plain',
+          config: const CNButtonConfig(style: CNButtonStyle.plain),
+          onPressed: () {},
+        ),
+        CNButton(
+          label: 'tinted',
+          config: const CNButtonConfig(style: CNButtonStyle.tinted),
+          onPressed: () {},
+        ),
+        CNButton(
+          label: 'filled',
+          config: const CNButtonConfig(style: CNButtonStyle.filled),
+          onPressed: () {},
+        ),
+      ]),
     ];
   }
 
   List<Widget> _pageTwo() {
     return <Widget>[
-            _row('CNPopupMenuButton, glass + label', <Widget>[
-              CNPopupMenuButton(
-                buttonLabel: 'Options',
-                buttonStyle: CNButtonStyle.glass,
-                items: const <CNPopupMenuEntry>[
-                  CNPopupMenuItem(label: 'One'),
-                  CNPopupMenuItem(label: 'Two'),
-                ],
-                onSelected: (_) {},
-              ),
-              CNPopupMenuButton(
-                buttonLabel: 'Plain',
-                buttonStyle: CNButtonStyle.plain,
-                items: const <CNPopupMenuEntry>[
-                  CNPopupMenuItem(label: 'One'),
-                ],
-                onSelected: (_) {},
-              ),
-            ]),
-            _row('CNGlassButtonGroup', <Widget>[
-              CNGlassButtonGroup(
-                buttons: <CNButtonData>[
-                  CNButtonData.icon(
-                    icon: const CNSymbol('star.fill', size: 20),
-                    onPressed: () {},
-                  ),
-                  CNButtonData.icon(
-                    icon: const CNSymbol('heart.fill', size: 20),
-                    onPressed: () {},
-                  ),
-                  CNButtonData.icon(
-                    icon: const CNSymbol('bell.fill', size: 20),
-                    tint: CupertinoColors.systemGreen,
-                    onPressed: () {},
-                  ),
-                ],
-              ),
-            ]),
+      _row('CNPopupMenuButton, glass + label', <Widget>[
+        CNPopupMenuButton(
+          buttonLabel: 'Options',
+          buttonStyle: CNButtonStyle.glass,
+          items: const <CNPopupMenuEntry>[
+            CNPopupMenuItem(label: 'One'),
+            CNPopupMenuItem(label: 'Two'),
+          ],
+          onSelected: (_) {},
+        ),
+        CNPopupMenuButton(
+          buttonLabel: 'Plain',
+          buttonStyle: CNButtonStyle.plain,
+          items: const <CNPopupMenuEntry>[CNPopupMenuItem(label: 'One')],
+          onSelected: (_) {},
+        ),
+      ]),
+      _row('CNGlassButtonGroup', <Widget>[
+        CNGlassButtonGroup(
+          buttons: <CNButtonData>[
+            CNButtonData.icon(
+              icon: const CNSymbol('star.fill', size: 20),
+              onPressed: () {},
+            ),
+            CNButtonData.icon(
+              icon: const CNSymbol('heart.fill', size: 20),
+              onPressed: () {},
+            ),
+            CNButtonData.icon(
+              icon: const CNSymbol('bell.fill', size: 20),
+              tint: CupertinoColors.systemGreen,
+              onPressed: () {},
+            ),
+          ],
+        ),
+      ]),
     ];
   }
 

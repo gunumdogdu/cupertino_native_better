@@ -66,9 +66,7 @@ class _Issue2ModalShadowTestState extends State<Issue2ModalShadowTest> {
           margin: const EdgeInsets.only(top: 200),
           decoration: BoxDecoration(
             color: CupertinoColors.systemBackground.resolveFrom(ctx),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(16),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: SafeArea(
             top: false,
@@ -153,7 +151,8 @@ class _Issue2ModalShadowTestState extends State<Issue2ModalShadowTest> {
   void _showCupertinoSheet37() {
     Navigator.of(context, rootNavigator: true).push(
       CupertinoSheetRoute<void>(
-        builder: (ctx) => _sheetBody(ctx, 'showCupertinoSheet (full)', null),
+        scrollableBuilder: (ctx, _) =>
+            _sheetBody(ctx, 'showCupertinoSheet (full)', null),
       ),
     );
   }
@@ -201,7 +200,9 @@ class _Issue2ModalShadowTestState extends State<Issue2ModalShadowTest> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemYellow.withOpacity(0.15),
+                      color: CupertinoColors.systemYellow.withValues(
+                        alpha: 0.15,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Column(
@@ -239,7 +240,7 @@ class _Issue2ModalShadowTestState extends State<Issue2ModalShadowTest> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBlue.withOpacity(0.10),
+                      color: CupertinoColors.systemBlue.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(

@@ -80,7 +80,10 @@ class _GlassButtonGroupDemoPageState extends State<GlassButtonGroupDemoPage> {
                   icon: const CNSymbol('arrow.up.arrow.down', size: 18),
                   popupItems: const [
                     CNButtonDataPopupItem(label: 'Date', sfSymbol: 'calendar'),
-                    CNButtonDataPopupItem(label: 'Name', sfSymbol: 'textformat'),
+                    CNButtonDataPopupItem(
+                      label: 'Name',
+                      sfSymbol: 'textformat',
+                    ),
                     CNButtonDataPopupItem(label: 'Size', sfSymbol: 'ruler'),
                   ],
                   onMenuSelected: (i) => _set('Sort by #$i'),

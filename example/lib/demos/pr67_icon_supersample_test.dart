@@ -196,124 +196,134 @@ class _Pr67IconSupersampleTestPageState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 48),
           children: <Widget>[
-            if (!compact) _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Text(
-                    'What to look for',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Every swatch below is the SAME output bitmap, blown up '
-                    'with nearest-neighbour so you see real pixels. If the '
-                    'bug is real, "current" shows blocky staircase edges on '
-                    'the diagonal strokes and the rows below it are smooth.\n\n'
-                    'MAE is the mean alpha error vs a ground-truth render — '
-                    'lower is better. "scan" is the intermediate buffer the '
-                    'renderer walks pixel-by-pixel in Dart to find the ink '
-                    'bounds; that is the cost side of the trade.',
-                    style: TextStyle(fontSize: 13, height: 1.35),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'devicePixelRatio ${dpr.toStringAsFixed(1)}  ·  '
-                    'output ${(_size * dpr).ceil()}x${(_size * dpr).ceil()} px',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: CupertinoColors.systemGrey,
+            if (!compact)
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      'What to look for',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Every swatch below is the SAME output bitmap, blown up '
+                      'with nearest-neighbour so you see real pixels. If the '
+                      'bug is real, "current" shows blocky staircase edges on '
+                      'the diagonal strokes and the rows below it are smooth.\n\n'
+                      'MAE is the mean alpha error vs a ground-truth render — '
+                      'lower is better. "scan" is the intermediate buffer the '
+                      'renderer walks pixel-by-pixel in Dart to find the ink '
+                      'bounds; that is the cost side of the trade.',
+                      style: TextStyle(fontSize: 13, height: 1.35),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'devicePixelRatio ${dpr.toStringAsFixed(1)}  ·  '
+                      'output ${(_size * dpr).ceil()}x${(_size * dpr).ceil()} px',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: CupertinoColors.systemGrey,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
             if (!compact) const SizedBox(height: 12),
-            if (!compact) _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Text(
-                    'Glyph',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _icons.keys.map((String k) {
-                      final bool on = k == _iconKey;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() => _iconKey = k);
-                          _rerender();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: on
-                                ? CupertinoColors.activeBlue
-                                : CupertinoColors.systemGrey5.resolveFrom(
-                                    context,
-                                  ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            k,
-                            style: TextStyle(
-                              fontSize: 13,
+            if (!compact)
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      'Glyph',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _icons.keys.map((String k) {
+                        final bool on = k == _iconKey;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() => _iconKey = k);
+                            _rerender();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
                               color: on
-                                  ? CupertinoColors.white
-                                  : CupertinoColors.label.resolveFrom(context),
+                                  ? CupertinoColors.activeBlue
+                                  : CupertinoColors.systemGrey5.resolveFrom(
+                                      context,
+                                    ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              k,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: on
+                                    ? CupertinoColors.white
+                                    : CupertinoColors.label.resolveFrom(
+                                        context,
+                                      ),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      Text('size ${_size.toStringAsFixed(0)} pt'),
-                      Expanded(
-                        child: CupertinoSlider(
-                          value: _size,
-                          min: 12,
-                          max: 32,
-                          divisions: 20,
-                          onChanged: (double v) => setState(() => _size = v),
-                          onChangeEnd: (_) => _rerender(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: <Widget>[
-                      const Text('backdrop'),
-                      const SizedBox(width: 12),
-                      CupertinoSegmentedControl<bool>(
-                        groupValue: _onBlack,
-                        onValueChanged: (bool v) =>
-                            setState(() => _onBlack = v),
-                        children: const <bool, Widget>{
-                          false: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Text('white'),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: <Widget>[
+                        Text('size ${_size.toStringAsFixed(0)} pt'),
+                        Expanded(
+                          child: CupertinoSlider(
+                            value: _size,
+                            min: 12,
+                            max: 32,
+                            divisions: 20,
+                            onChanged: (double v) => setState(() => _size = v),
+                            onChangeEnd: (_) => _rerender(),
                           ),
-                          true: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Text('black'),
-                          ),
-                        },
-                      ),
-                    ],
-                  ),
-                ],
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: <Widget>[
+                        const Text('backdrop'),
+                        const SizedBox(width: 12),
+                        CupertinoSegmentedControl<bool>(
+                          groupValue: _onBlack,
+                          onValueChanged: (bool v) =>
+                              setState(() => _onBlack = v),
+                          children: const <bool, Widget>{
+                            false: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Text('white'),
+                            ),
+                            true: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Text('black'),
+                            ),
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
             if (!compact) const SizedBox(height: 12),
             if (_busy && _results == null)
               const Padding(
@@ -391,13 +401,12 @@ class _Pr67IconSupersampleTestPageState
                   _stat('filter ${v.fq.name}'),
                   if (r != null) ...<Widget>[
                     _stat('scan ${_fmtCount(r.scannedPixels)} px'),
-                    _stat('render ${(r.renderMicros / 1000).toStringAsFixed(1)} ms'),
+                    _stat(
+                      'render ${(r.renderMicros / 1000).toStringAsFixed(1)} ms',
+                    ),
                   ],
                   if (mae != null)
-                    _stat(
-                      'MAE ${mae.toStringAsFixed(2)}',
-                      strong: true,
-                    ),
+                    _stat('MAE ${mae.toStringAsFixed(2)}', strong: true),
                 ],
               ),
             ),
@@ -430,10 +439,7 @@ class _Pr67IconSupersampleTestPageState
                   0, 0, -1, 0, 255, //
                   0, 0, 0, 1, 0, //
                 ])
-              : const ColorFilter.mode(
-                  Color(0x00000000),
-                  BlendMode.dst,
-                ),
+              : const ColorFilter.mode(Color(0x00000000), BlendMode.dst),
           child: Image.memory(
             r.png,
             width: _swatchSize - 8,
@@ -565,7 +571,9 @@ class Pr67NativeStripPage extends StatelessWidget {
 /// The visual comparison needs eyes on a screen, but the MAE and the cost
 /// numbers don't — this makes them reproducible from a plain `flutter run`
 /// log, on device, at the real device pixel ratio.
-Future<void> pr67PrintReport({List<double> sizes = const <double>[20, 28]}) async {
+Future<void> pr67PrintReport({
+  List<double> sizes = const <double>[20, 28],
+}) async {
   final StringBuffer out = StringBuffer();
   out.writeln('=== PR67-REPORT ===');
   out.writeln(

@@ -8,9 +8,7 @@ class PR24PopupIconColorTestPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('PR #24 Test'),
-      ),
+      navigationBar: const CupertinoNavigationBar(middle: Text('PR #24 Test')),
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -43,8 +41,14 @@ class PR24PopupIconColorTestPage extends StatelessWidget {
                     buttonCustomIcon: CupertinoIcons.gear_alt_fill,
                     buttonCustomIconColor: CupertinoColors.systemRed,
                     items: [
-                      CNPopupMenuItem(label: 'Settings', icon: CNSymbol('gear')),
-                      CNPopupMenuItem(label: 'About', icon: CNSymbol('info.circle')),
+                      CNPopupMenuItem(
+                        label: 'Settings',
+                        icon: CNSymbol('gear'),
+                      ),
+                      CNPopupMenuItem(
+                        label: 'About',
+                        icon: CNSymbol('info.circle'),
+                      ),
                     ],
                     onSelected: (i) => debugPrint('Test2: $i'),
                   ),
@@ -119,8 +123,14 @@ class PR24PopupIconColorTestPage extends StatelessWidget {
                   CNPopupMenuButton.icon(
                     buttonCustomIcon: CupertinoIcons.heart_fill,
                     items: [
-                      CNPopupMenuItem(label: 'Like', icon: CNSymbol('hand.thumbsup')),
-                      CNPopupMenuItem(label: 'Share', icon: CNSymbol('square.and.arrow.up')),
+                      CNPopupMenuItem(
+                        label: 'Like',
+                        icon: CNSymbol('hand.thumbsup'),
+                      ),
+                      CNPopupMenuItem(
+                        label: 'Share',
+                        icon: CNSymbol('square.and.arrow.up'),
+                      ),
                     ],
                     onSelected: (i) => debugPrint('Test5: $i'),
                   ),
@@ -141,11 +151,18 @@ class PR24PopupIconColorTestPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          Text(subtitle,
-              style: const TextStyle(fontSize: 13, color: CupertinoColors.systemGrey)),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.systemGrey,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],

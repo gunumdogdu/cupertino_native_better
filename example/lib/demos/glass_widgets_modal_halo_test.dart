@@ -34,8 +34,6 @@ class GlassWidgetsModalHaloTest extends StatefulWidget {
 class _GlassWidgetsModalHaloTestState extends State<GlassWidgetsModalHaloTest> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _popupSelected = -1;
-  final CNFloatingIslandController _islandController =
-      CNFloatingIslandController();
   String _searchText = '';
 
   // -------- sheet openers --------
@@ -43,7 +41,7 @@ class _GlassWidgetsModalHaloTestState extends State<GlassWidgetsModalHaloTest> {
   void _showCupertinoSheet() {
     showCupertinoSheet<void>(
       context: context,
-      builder: (ctx) => _SheetBody(
+      scrollableBuilder: (ctx, _) => _SheetBody(
         title: 'showCupertinoSheet',
         onClose: () => Navigator.of(ctx).pop(),
       ),

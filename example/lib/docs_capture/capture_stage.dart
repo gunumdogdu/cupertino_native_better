@@ -43,7 +43,9 @@ class _CaptureStageState extends State<CaptureStage> {
     final t = (topLeft.dy * dpr).round();
     final w = (box.size.width * dpr).round();
     final h = (box.size.height * dpr).round();
-    debugPrint('CN_CAPTURE_READY id=${widget.id} rect=$l,$t,$w,$h dpr=$dpr anim_ms=${widget.animMs}');
+    debugPrint(
+      'CN_CAPTURE_READY id=${widget.id} rect=$l,$t,$w,$h dpr=$dpr anim_ms=${widget.animMs}',
+    );
   }
 
   @override

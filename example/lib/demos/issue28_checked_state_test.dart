@@ -32,7 +32,10 @@ class _Issue28CheckedStateTestPageState
               Row(
                 children: [
                   CNPopupMenuButton.icon(
-                    buttonIcon: CNSymbol('arrow.up.arrow.down.circle', size: 20),
+                    buttonIcon: CNSymbol(
+                      'arrow.up.arrow.down.circle',
+                      size: 20,
+                    ),
                     items: [
                       CNPopupMenuItem(
                         label: 'Name',
@@ -94,7 +97,10 @@ class _Issue28CheckedStateTestPageState
               Row(
                 children: [
                   CNPopupMenuButton.icon(
-                    buttonIcon: CNSymbol('line.3.horizontal.decrease.circle', size: 20),
+                    buttonIcon: CNSymbol(
+                      'line.3.horizontal.decrease.circle',
+                      size: 20,
+                    ),
                     items: [
                       CNPopupMenuItem(
                         label: 'Photos',
@@ -121,7 +127,9 @@ class _Issue28CheckedStateTestPageState
                     }),
                   ),
                   const SizedBox(width: 12),
-                  Text('Filters: ${_enabledFilters.map((i) => ['Photos', 'Videos', 'Docs'][i]).join(', ')}'),
+                  Text(
+                    'Filters: ${_enabledFilters.map((i) => ['Photos', 'Videos', 'Docs'][i]).join(', ')}',
+                  ),
                 ],
               ),
             ),
@@ -168,11 +176,18 @@ class _Issue28CheckedStateTestPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          Text(subtitle,
-              style: const TextStyle(fontSize: 13, color: CupertinoColors.systemGrey)),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.systemGrey,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],

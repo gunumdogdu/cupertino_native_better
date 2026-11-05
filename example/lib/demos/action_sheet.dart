@@ -101,9 +101,7 @@ class _ActionSheetDemoPageState extends State<ActionSheetDemoPage> {
       context: context,
       title: 'Unsaved changes',
       message: 'Your draft will be kept until you close the app.',
-      actions: const [
-        CNActionSheetAction(label: 'Discard', value: 'discard'),
-      ],
+      actions: const [CNActionSheetAction(label: 'Discard', value: 'discard')],
       cancelLabel: 'Keep editing',
     );
     _record(choice);
@@ -116,7 +114,11 @@ class _ActionSheetDemoPageState extends State<ActionSheetDemoPage> {
       message: 'PDF export needs a paid plan.',
       actions: const [
         CNActionSheetAction(label: 'Export as PNG', value: 'png'),
-        CNActionSheetAction(label: 'Export as PDF', value: 'pdf', enabled: false),
+        CNActionSheetAction(
+          label: 'Export as PDF',
+          value: 'pdf',
+          enabled: false,
+        ),
       ],
       cancelLabel: 'Cancel',
     );
@@ -201,10 +203,7 @@ class _ActionSheetDemoPageState extends State<ActionSheetDemoPage> {
                   Expanded(
                     child: Text(
                       _lastResult,
-                      style: const TextStyle(
-                        fontFamily: 'Menlo',
-                        fontSize: 13,
-                      ),
+                      style: const TextStyle(fontFamily: 'Menlo', fontSize: 13),
                     ),
                   ),
                 ],

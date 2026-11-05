@@ -49,7 +49,7 @@ class _Issue37AppBarButtonHaloTestState
     // Full-screen iOS 26 Cupertino sheet (rootNavigator → above everything).
     Navigator.of(context, rootNavigator: true).push(
       CupertinoSheetRoute<void>(
-        builder: (ctx) => _SheetBody(
+        scrollableBuilder: (ctx, _) => _SheetBody(
           title: 'showCupertinoSheet (full)',
           onClose: () => Navigator.of(ctx).pop(),
         ),
@@ -146,10 +146,7 @@ class _Issue37AppBarButtonHaloTestState
           activeIcon: CNSymbol('tag.fill'),
         ),
         // The plus tab — no label, same icon for active (per reporter).
-        CNTabBarItem(
-          icon: CNSymbol('plus'),
-          activeIcon: CNSymbol('plus'),
-        ),
+        CNTabBarItem(icon: CNSymbol('plus'), activeIcon: CNSymbol('plus')),
       ],
       iconSize: 18,
       split: true,
@@ -162,25 +159,25 @@ class _Issue37AppBarButtonHaloTestState
   // ── Body content shared by both variants ────────────────────────────────
 
   List<Widget> _instructions() => const [
-        SizedBox(height: 12),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Issue #37 repro — what to look for:\n\n'
-            '1) HALO BLEED (primary): each sheet below opens ABOVE the app '
-            'bar. As the sheet rises, watch the right side where the bell '
-            'button sits. If the bug reproduces, a green/glassy rectangle '
-            'briefly bleeds through the sheet during the open animation. '
-            'The 90% variant lets you observe the top edge AFTER the '
-            'animation settles.\n\n'
-            '2) TAB BAR LABELS (secondary): close any sheet and look at the '
-            'CNTabBar at the bottom. If the labels go blank until you tap '
-            'each tab, that\'s a separate bug worth filing.',
-            style: TextStyle(fontSize: 13),
-          ),
-        ),
-        SizedBox(height: 16),
-      ];
+    SizedBox(height: 12),
+    Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: Text(
+        'Issue #37 repro — what to look for:\n\n'
+        '1) HALO BLEED (primary): each sheet below opens ABOVE the app '
+        'bar. As the sheet rises, watch the right side where the bell '
+        'button sits. If the bug reproduces, a green/glassy rectangle '
+        'briefly bleeds through the sheet during the open animation. '
+        'The 90% variant lets you observe the top edge AFTER the '
+        'animation settles.\n\n'
+        '2) TAB BAR LABELS (secondary): close any sheet and look at the '
+        'CNTabBar at the bottom. If the labels go blank until you tap '
+        'each tab, that\'s a separate bug worth filing.',
+        style: TextStyle(fontSize: 13),
+      ),
+    ),
+    SizedBox(height: 16),
+  ];
 
   Widget _sheetButtons() {
     return Padding(
@@ -249,10 +246,7 @@ class _Issue37AppBarButtonHaloTestState
                 for (var i = 1; i <= 12; i++)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: _filler(
-                      color: Colors.indigo.shade300,
-                      count: i,
-                    ),
+                    child: _filler(color: Colors.indigo.shade300, count: i),
                   ),
                 const SizedBox(height: 32),
               ]),

@@ -159,9 +159,7 @@ class _ContextMenuDemoPageState extends State<ContextMenuDemoPage> {
   @override
   Widget build(BuildContext context) {
     final isMac = defaultTargetPlatform == TargetPlatform.macOS;
-    final gesture = isMac
-        ? 'Right-click (or Control-click)'
-        : 'Long-press';
+    final gesture = isMac ? 'Right-click (or Control-click)' : 'Long-press';
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(middle: Text('Context Menu')),
       child: SafeArea(
@@ -296,7 +294,8 @@ class _ContextMenuDemoPageState extends State<ContextMenuDemoPage> {
                   icon: CNSymbol('square.and.arrow.up', size: 16),
                 ),
               ],
-              onSelected: (index) => _record('CNPopupGesture onSelected($index)'),
+              onSelected: (index) =>
+                  _record('CNPopupGesture onSelected($index)'),
               child: Container(
                 key: ContextMenuDemoPage.gestureCardKey,
                 height: 72,

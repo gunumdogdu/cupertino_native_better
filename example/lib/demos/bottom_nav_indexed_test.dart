@@ -7,7 +7,8 @@ class BottomNavIndexedTestPage extends StatefulWidget {
   const BottomNavIndexedTestPage({super.key});
 
   @override
-  State<BottomNavIndexedTestPage> createState() => _BottomNavIndexedTestPageState();
+  State<BottomNavIndexedTestPage> createState() =>
+      _BottomNavIndexedTestPageState();
 }
 
 class _BottomNavIndexedTestPageState extends State<BottomNavIndexedTestPage> {
@@ -19,12 +20,16 @@ class _BottomNavIndexedTestPageState extends State<BottomNavIndexedTestPage> {
   void _onTabTap(int index) {
     final isReselect = index == _currentIndex;
     final now = DateTime.now();
-    final timestamp = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final timestamp =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
     setState(() {
       _tapCount++;
       if (isReselect) _reselectCount++;
-      _tapLog.insert(0, '[$timestamp] Tab $index ${isReselect ? "(RESELECT)" : ""}');
+      _tapLog.insert(
+        0,
+        '[$timestamp] Tab $index ${isReselect ? "(RESELECT)" : ""}',
+      );
       if (_tapLog.length > 15) _tapLog.removeLast();
       _currentIndex = index;
     });
@@ -58,9 +63,18 @@ class _BottomNavIndexedTestPageState extends State<BottomNavIndexedTestPage> {
                     _tapLog.clear();
                   }),
                 ),
-                const _CounterScreen(title: 'Browse', color: CupertinoColors.systemOrange),
-                const _CounterScreen(title: 'Library', color: CupertinoColors.systemGreen),
-                const _CounterScreen(title: 'Profile', color: CupertinoColors.systemPurple),
+                const _CounterScreen(
+                  title: 'Browse',
+                  color: CupertinoColors.systemOrange,
+                ),
+                const _CounterScreen(
+                  title: 'Library',
+                  color: CupertinoColors.systemGreen,
+                ),
+                const _CounterScreen(
+                  title: 'Profile',
+                  color: CupertinoColors.systemPurple,
+                ),
               ],
             ),
           ),
@@ -68,10 +82,26 @@ class _BottomNavIndexedTestPageState extends State<BottomNavIndexedTestPage> {
             top: false,
             child: CNTabBar(
               items: [
-                CNTabBarItem(label: 'Home', icon: CNSymbol('house'), activeIcon: CNSymbol('house.fill')),
-                CNTabBarItem(label: 'Browse', icon: CNSymbol('square.grid.2x2'), activeIcon: CNSymbol('square.grid.2x2.fill')),
-                CNTabBarItem(label: 'Library', icon: CNSymbol('books.vertical'), activeIcon: CNSymbol('books.vertical.fill')),
-                CNTabBarItem(label: 'Profile', icon: CNSymbol('person'), activeIcon: CNSymbol('person.fill')),
+                CNTabBarItem(
+                  label: 'Home',
+                  icon: CNSymbol('house'),
+                  activeIcon: CNSymbol('house.fill'),
+                ),
+                CNTabBarItem(
+                  label: 'Browse',
+                  icon: CNSymbol('square.grid.2x2'),
+                  activeIcon: CNSymbol('square.grid.2x2.fill'),
+                ),
+                CNTabBarItem(
+                  label: 'Library',
+                  icon: CNSymbol('books.vertical'),
+                  activeIcon: CNSymbol('books.vertical.fill'),
+                ),
+                CNTabBarItem(
+                  label: 'Profile',
+                  icon: CNSymbol('person'),
+                  activeIcon: CNSymbol('person.fill'),
+                ),
               ],
               currentIndex: _currentIndex,
               onTap: _onTabTap,
@@ -105,15 +135,20 @@ class _HomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.1),
+              color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('IndexedStack Version', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(
+                  'IndexedStack Version',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 SizedBox(height: 8),
-                Text('State is PRESERVED when switching tabs. Try incrementing counters on other tabs, then come back.'),
+                Text(
+                  'State is PRESERVED when switching tabs. Try incrementing counters on other tabs, then come back.',
+                ),
               ],
             ),
           ),
@@ -129,13 +164,27 @@ class _HomeScreen extends StatelessWidget {
               children: [
                 Column(
                   children: [
-                    Text('$tapCount', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: CupertinoColors.systemBlue)),
+                    Text(
+                      '$tapCount',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: CupertinoColors.systemBlue,
+                      ),
+                    ),
                     const Text('Total Taps', style: TextStyle(fontSize: 12)),
                   ],
                 ),
                 Column(
                   children: [
-                    Text('$reselectCount', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: CupertinoColors.systemOrange)),
+                    Text(
+                      '$reselectCount',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: CupertinoColors.systemOrange,
+                      ),
+                    ),
                     const Text('Reselects', style: TextStyle(fontSize: 12)),
                   ],
                 ),
@@ -152,27 +201,40 @@ class _HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Tap Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Tap Log',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 if (tapLog.isEmpty)
-                  const Text('Tap tabs to see log...', style: TextStyle(color: CupertinoColors.systemGrey))
+                  const Text(
+                    'Tap tabs to see log...',
+                    style: TextStyle(color: CupertinoColors.systemGrey),
+                  )
                 else
-                  ...tapLog.map((log) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      log,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontFamily: 'Menlo',
-                        color: log.contains('RESELECT') ? CupertinoColors.systemOrange : null,
+                  ...tapLog.map(
+                    (log) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        log,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'Menlo',
+                          color: log.contains('RESELECT')
+                              ? CupertinoColors.systemOrange
+                              : null,
+                        ),
                       ),
                     ),
-                  )),
+                  ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          CupertinoButton.filled(onPressed: onReset, child: const Text('Reset')),
+          CupertinoButton.filled(
+            onPressed: onReset,
+            child: const Text('Reset'),
+          ),
         ],
       ),
     );
@@ -202,14 +264,24 @@ class _CounterScreenState extends State<_CounterScreen> {
           children: [
             Icon(CupertinoIcons.number_circle, size: 64, color: widget.color),
             const SizedBox(height: 16),
-            Text(widget.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(
+              widget.title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 24),
             Text(
               '$_counter',
-              style: TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: widget.color),
+              style: TextStyle(
+                fontSize: 64,
+                fontWeight: FontWeight.bold,
+                color: widget.color,
+              ),
             ),
             const SizedBox(height: 8),
-            const Text('Counter (preserved with IndexedStack)', style: TextStyle(color: CupertinoColors.systemGrey)),
+            const Text(
+              'Counter (preserved with IndexedStack)',
+              style: TextStyle(color: CupertinoColors.systemGrey),
+            ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -232,7 +304,7 @@ class _CounterScreenState extends State<_CounterScreen> {
               padding: const EdgeInsets.all(16),
               margin: const EdgeInsets.symmetric(horizontal: 32),
               decoration: BoxDecoration(
-                color: widget.color.withOpacity(0.1),
+                color: widget.color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(

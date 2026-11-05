@@ -14,9 +14,7 @@ class PR22CustomIconColorTestPage extends StatelessWidget {
     ];
 
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('PR #22 Test'),
-      ),
+      navigationBar: const CupertinoNavigationBar(middle: Text('PR #22 Test')),
       child: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -28,7 +26,7 @@ class PR22CustomIconColorTestPage extends StatelessWidget {
                 children: [
                   CNPopupMenuButton.icon(
                     buttonCustomIcon: CupertinoIcons.ellipsis_circle_fill,
-                    customButtonIconColor: CupertinoColors.systemRed,
+                    buttonCustomIconColor: CupertinoColors.systemRed,
                     items: items,
                     onSelected: (i) => debugPrint('Red icon: $i'),
                   ),
@@ -44,7 +42,7 @@ class PR22CustomIconColorTestPage extends StatelessWidget {
                 children: [
                   CNPopupMenuButton.icon(
                     buttonCustomIcon: CupertinoIcons.gear_alt_fill,
-                    customButtonIconColor: CupertinoColors.systemGreen,
+                    buttonCustomIconColor: CupertinoColors.systemGreen,
                     items: items,
                     onSelected: (i) => debugPrint('Green icon: $i'),
                   ),
@@ -60,7 +58,7 @@ class PR22CustomIconColorTestPage extends StatelessWidget {
                 children: [
                   CNPopupMenuButton.icon(
                     buttonCustomIcon: CupertinoIcons.person_fill,
-                    customButtonIconColor: CupertinoColors.systemBlue,
+                    buttonCustomIconColor: CupertinoColors.systemBlue,
                     items: items,
                     onSelected: (i) => debugPrint('Blue icon: $i'),
                   ),
@@ -129,13 +127,18 @@ class PR22CustomIconColorTestPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          Text(subtitle,
-              style: const TextStyle(
-                  fontSize: 13, color: CupertinoColors.systemGrey)),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.systemGrey,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],

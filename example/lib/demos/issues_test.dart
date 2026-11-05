@@ -22,9 +22,7 @@ class _IssuesTestPageState extends State<IssuesTestPage> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('Issues Test'),
-      ),
+      navigationBar: const CupertinoNavigationBar(middle: Text('Issues Test')),
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.only(bottom: 40),
@@ -56,10 +54,7 @@ class _IssuesTestPageState extends State<IssuesTestPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
@@ -78,22 +73,10 @@ class _IssuesTestPageState extends State<IssuesTestPage> {
 
   Widget _buildIssue3Test() {
     final items = [
-      CNPopupMenuItem(
-        label: '1. First Item',
-        icon: CNSymbol('1.circle'),
-      ),
-      CNPopupMenuItem(
-        label: '2. Second Item',
-        icon: CNSymbol('2.circle'),
-      ),
-      CNPopupMenuItem(
-        label: '3. Third Item',
-        icon: CNSymbol('3.circle'),
-      ),
-      CNPopupMenuItem(
-        label: '4. Fourth Item',
-        icon: CNSymbol('4.circle'),
-      ),
+      CNPopupMenuItem(label: '1. First Item', icon: CNSymbol('1.circle')),
+      CNPopupMenuItem(label: '2. Second Item', icon: CNSymbol('2.circle')),
+      CNPopupMenuItem(label: '3. Third Item', icon: CNSymbol('3.circle')),
+      CNPopupMenuItem(label: '4. Fourth Item', icon: CNSymbol('4.circle')),
     ];
 
     return Column(

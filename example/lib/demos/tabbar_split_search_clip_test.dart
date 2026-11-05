@@ -32,7 +32,7 @@ class _TabBarSplitSearchClipTestState extends State<TabBarSplitSearchClipTest> {
   void _showCupertinoSheet() {
     showCupertinoSheet<void>(
       context: context,
-      builder: (ctx) => _SheetBody(
+      scrollableBuilder: (ctx, _) => _SheetBody(
         title: 'showCupertinoSheet',
         onClose: () => Navigator.of(ctx).pop(),
       ),
@@ -106,7 +106,9 @@ class _TabBarSplitSearchClipTestState extends State<TabBarSplitSearchClipTest> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: CupertinoColors.systemYellow.withOpacity(0.15),
+                        color: CupertinoColors.systemYellow.withValues(
+                          alpha: 0.15,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Column(

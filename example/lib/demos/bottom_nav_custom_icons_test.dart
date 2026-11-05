@@ -38,26 +38,30 @@ class _BottomNavCustomIconsTestPageState
                 CNTabBarItem(
                   label: 'Home',
                   imageAsset: CNImageAsset('assets/icons/home.svg'),
-                  activeImageAsset:
-                      CNImageAsset('assets/icons/home_filled.svg'),
+                  activeImageAsset: CNImageAsset(
+                    'assets/icons/home_filled.svg',
+                  ),
                 ),
                 CNTabBarItem(
                   label: 'Search',
                   imageAsset: CNImageAsset('assets/icons/search.svg'),
-                  activeImageAsset:
-                      CNImageAsset('assets/icons/search-filled.svg'),
+                  activeImageAsset: CNImageAsset(
+                    'assets/icons/search-filled.svg',
+                  ),
                 ),
                 CNTabBarItem(
                   label: 'Chat',
                   imageAsset: CNImageAsset('assets/icons/chat.svg'),
-                  activeImageAsset:
-                      CNImageAsset('assets/icons/chat-filled.svg'),
+                  activeImageAsset: CNImageAsset(
+                    'assets/icons/chat-filled.svg',
+                  ),
                 ),
                 CNTabBarItem(
                   label: 'Profile',
                   imageAsset: CNImageAsset('assets/icons/profile.svg'),
-                  activeImageAsset:
-                      CNImageAsset('assets/icons/profile-filled.svg'),
+                  activeImageAsset: CNImageAsset(
+                    'assets/icons/profile-filled.svg',
+                  ),
                 ),
               ],
               currentIndex: _currentIndex,
@@ -74,11 +78,23 @@ class _BottomNavCustomIconsTestPageState
       case 0:
         return _buildSizeControl();
       case 1:
-        return _buildPlaceholder('Search', CupertinoIcons.search, CupertinoColors.systemOrange);
+        return _buildPlaceholder(
+          'Search',
+          CupertinoIcons.search,
+          CupertinoColors.systemOrange,
+        );
       case 2:
-        return _buildPlaceholder('Chat', CupertinoIcons.chat_bubble_fill, CupertinoColors.systemGreen);
+        return _buildPlaceholder(
+          'Chat',
+          CupertinoIcons.chat_bubble_fill,
+          CupertinoColors.systemGreen,
+        );
       case 3:
-        return _buildPlaceholder('Profile', CupertinoIcons.person_fill, CupertinoColors.systemPurple);
+        return _buildPlaceholder(
+          'Profile',
+          CupertinoIcons.person_fill,
+          CupertinoColors.systemPurple,
+        );
       default:
         return const SizedBox.shrink();
     }
@@ -92,7 +108,7 @@ class _BottomNavCustomIconsTestPageState
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemGreen.withOpacity(0.1),
+              color: CupertinoColors.systemGreen.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -120,12 +136,17 @@ class _BottomNavCustomIconsTestPageState
                           Text(
                             '${_iconSize.toInt()}',
                             style: const TextStyle(
-                                fontSize: 32, fontWeight: FontWeight.bold),
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          const Text('pt',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: CupertinoColors.systemGrey)),
+                          const Text(
+                            'pt',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.systemGrey,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -142,7 +163,9 @@ class _BottomNavCustomIconsTestPageState
                 const Text(
                   'CNTabBar(iconSize: X) with CNImageAsset SVGs',
                   style: TextStyle(
-                      fontSize: 12, color: CupertinoColors.systemGrey),
+                    fontSize: 12,
+                    color: CupertinoColors.systemGrey,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -152,7 +175,7 @@ class _BottomNavCustomIconsTestPageState
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.1),
+              color: CupertinoColors.systemBlue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Column(
@@ -183,12 +206,15 @@ class _BottomNavCustomIconsTestPageState
           children: [
             Icon(icon, size: 64, color: color),
             const SizedBox(height: 16),
-            Text(title,
-                style:
-                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            const Text('Screen switches work!',
-                style: TextStyle(color: CupertinoColors.systemGrey)),
+            const Text(
+              'Screen switches work!',
+              style: TextStyle(color: CupertinoColors.systemGrey),
+            ),
           ],
         ),
       ),

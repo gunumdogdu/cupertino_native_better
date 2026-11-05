@@ -15,9 +15,17 @@ class _PR26TabBarFontTestPageState extends State<PR26TabBarFontTestPage> {
   double? _fontSize;
 
   final _items = [
-    CNTabBarItem(label: 'Home', icon: CNSymbol('house'), activeIcon: CNSymbol('house.fill')),
+    CNTabBarItem(
+      label: 'Home',
+      icon: CNSymbol('house'),
+      activeIcon: CNSymbol('house.fill'),
+    ),
     CNTabBarItem(label: 'Search', icon: CNSymbol('magnifyingglass')),
-    CNTabBarItem(label: 'Profile', icon: CNSymbol('person'), activeIcon: CNSymbol('person.fill')),
+    CNTabBarItem(
+      label: 'Profile',
+      icon: CNSymbol('person'),
+      activeIcon: CNSymbol('person.fill'),
+    ),
   ];
 
   @override
@@ -46,7 +54,10 @@ class _PR26TabBarFontTestPageState extends State<PR26TabBarFontTestPage> {
                   const SizedBox(height: 16),
 
                   // Font family selector
-                  const Text('Font Family:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Font Family:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -63,7 +74,10 @@ class _PR26TabBarFontTestPageState extends State<PR26TabBarFontTestPage> {
                   const SizedBox(height: 24),
 
                   // Font size selector
-                  const Text('Font Size:', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Font Size:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -83,18 +97,35 @@ class _PR26TabBarFontTestPageState extends State<PR26TabBarFontTestPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBackground.resolveFrom(context),
+                      color: CupertinoColors.systemBackground.resolveFrom(
+                        context,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Current font: ${_fontFamily ?? "system"}',
-                            style: const TextStyle(fontSize: 13, fontFamily: 'Menlo')),
-                        Text('Current size: ${_fontSize ?? "default"}',
-                            style: const TextStyle(fontSize: 13, fontFamily: 'Menlo')),
-                        Text('Selected tab: $_tabIndex',
-                            style: const TextStyle(fontSize: 13, fontFamily: 'Menlo')),
+                        Text(
+                          'Current font: ${_fontFamily ?? "system"}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontFamily: 'Menlo',
+                          ),
+                        ),
+                        Text(
+                          'Current size: ${_fontSize ?? "default"}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontFamily: 'Menlo',
+                          ),
+                        ),
+                        Text(
+                          'Selected tab: $_tabIndex',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontFamily: 'Menlo',
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -121,7 +152,9 @@ class _PR26TabBarFontTestPageState extends State<PR26TabBarFontTestPage> {
     final isSelected = _fontFamily == family;
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: isSelected ? CupertinoColors.systemBlue : CupertinoColors.systemGrey5,
+      color: isSelected
+          ? CupertinoColors.systemBlue
+          : CupertinoColors.systemGrey5,
       onPressed: () => setState(() => _fontFamily = family),
       child: Text(
         label,
@@ -137,7 +170,9 @@ class _PR26TabBarFontTestPageState extends State<PR26TabBarFontTestPage> {
     final isSelected = _fontSize == size;
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: isSelected ? CupertinoColors.systemBlue : CupertinoColors.systemGrey5,
+      color: isSelected
+          ? CupertinoColors.systemBlue
+          : CupertinoColors.systemGrey5,
       onPressed: () => setState(() => _fontSize = size),
       child: Text(
         label,

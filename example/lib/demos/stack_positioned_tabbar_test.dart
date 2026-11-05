@@ -37,7 +37,7 @@ class _StackPositionedTabBarTestState extends State<StackPositionedTabBarTest> {
   void _showCupertinoSheet() {
     showCupertinoSheet<void>(
       context: context,
-      builder: (ctx) => _SheetBody(
+      scrollableBuilder: (ctx, _) => _SheetBody(
         title: 'showCupertinoSheet',
         onClose: () => Navigator.of(ctx).pop(),
       ),
@@ -117,7 +117,7 @@ class _StackPositionedTabBarTestState extends State<StackPositionedTabBarTest> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.white.withOpacity(0.9),
+                      color: CupertinoColors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Column(
@@ -165,7 +165,7 @@ class _StackPositionedTabBarTestState extends State<StackPositionedTabBarTest> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.white.withOpacity(0.9),
+                      color: CupertinoColors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(

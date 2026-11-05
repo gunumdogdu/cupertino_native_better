@@ -501,10 +501,7 @@ class _Pr66GlassImageAssetTintTestPageState
             ),
           ],
           SizedBox(height: compact ? 4 : 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: body,
-          ),
+          SingleChildScrollView(scrollDirection: Axis.horizontal, child: body),
         ],
       ),
     );
@@ -640,9 +637,7 @@ Future<Uint8List> _glyphPng(IconData icon, Color color) async {
     px.toInt(),
     px.toInt(),
   );
-  final ByteData? data = await image.toByteData(
-    format: ui.ImageByteFormat.png,
-  );
+  final ByteData? data = await image.toByteData(format: ui.ImageByteFormat.png);
   image.dispose();
   return data!.buffer.asUint8List();
 }
@@ -672,9 +667,7 @@ Future<Uint8List> _multicolourPng() async {
     px.toInt(),
     px.toInt(),
   );
-  final ByteData? data = await image.toByteData(
-    format: ui.ImageByteFormat.png,
-  );
+  final ByteData? data = await image.toByteData(format: ui.ImageByteFormat.png);
   image.dispose();
   return data!.buffer.asUint8List();
 }

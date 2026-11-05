@@ -182,7 +182,7 @@ class _AlbumsPageState extends State<_AlbumsPage> {
             onPressed: () {
               showCupertinoSheet(
                 context: context,
-                builder: (ctx) {
+                scrollableBuilder: (ctx, _) {
                   return Localizations(
                     locale: const Locale('en', 'US'),
                     delegates: const [
@@ -206,7 +206,7 @@ class _AlbumsPageState extends State<_AlbumsPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.15),
+                color: Colors.amber.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Column(
@@ -247,10 +247,7 @@ class _AlbumsPageState extends State<_AlbumsPage> {
               label: 'Albums',
               icon: CNSymbol('rectangle.stack.fill'),
             ),
-            CNTabBarItem(
-              label: 'Profile',
-              icon: CNSymbol('person.fill'),
-            ),
+            CNTabBarItem(label: 'Profile', icon: CNSymbol('person.fill')),
           ],
           currentIndex: _currentIndex,
           onTap: (i) => setState(() => _currentIndex = i),

@@ -101,18 +101,9 @@ class _Issue55PopupMenuDestructiveTestState
       buttonLabel: 'File',
       buttonStyle: CNButtonStyle.bordered,
       items: const [
-        CNPopupMenuItem(
-          label: 'New',
-          icon: CNSymbol('doc.badge.plus'),
-        ),
-        CNPopupMenuItem(
-          label: 'Open…',
-          icon: CNSymbol('folder'),
-        ),
-        CNPopupMenuItem(
-          label: 'Save',
-          icon: CNSymbol('square.and.arrow.down'),
-        ),
+        CNPopupMenuItem(label: 'New', icon: CNSymbol('doc.badge.plus')),
+        CNPopupMenuItem(label: 'Open…', icon: CNSymbol('folder')),
+        CNPopupMenuItem(label: 'Save', icon: CNSymbol('square.and.arrow.down')),
         CNPopupMenuDivider(),
         // The point of this issue — Delete should be visually destructive.
         CNPopupMenuItem(
@@ -131,14 +122,8 @@ class _Issue55PopupMenuDestructiveTestState
       buttonIcon: const CNSymbol('person.crop.circle'),
       buttonStyle: CNButtonStyle.glass,
       items: const [
-        CNPopupMenuItem(
-          label: 'Profile',
-          icon: CNSymbol('person'),
-        ),
-        CNPopupMenuItem(
-          label: 'Settings',
-          icon: CNSymbol('gear'),
-        ),
+        CNPopupMenuItem(label: 'Profile', icon: CNSymbol('person')),
+        CNPopupMenuItem(label: 'Settings', icon: CNSymbol('gear')),
         CNPopupMenuDivider(),
         CNPopupMenuItem(
           label: 'Logout',
@@ -162,18 +147,9 @@ class _Issue55PopupMenuDestructiveTestState
       buttonLabel: 'Actions',
       buttonStyle: CNButtonStyle.tinted,
       items: const [
-        CNPopupMenuItem(
-          label: 'View Details',
-          icon: CNSymbol('info.circle'),
-        ),
-        CNPopupMenuItem(
-          label: 'Edit',
-          icon: CNSymbol('pencil'),
-        ),
-        CNPopupMenuItem(
-          label: 'Archive',
-          icon: CNSymbol('archivebox'),
-        ),
+        CNPopupMenuItem(label: 'View Details', icon: CNSymbol('info.circle')),
+        CNPopupMenuItem(label: 'Edit', icon: CNSymbol('pencil')),
+        CNPopupMenuItem(label: 'Archive', icon: CNSymbol('archivebox')),
         CNPopupMenuDivider(),
         CNPopupMenuItem(
           label: 'Remove from list',

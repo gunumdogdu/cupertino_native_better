@@ -5,8 +5,12 @@ import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'capture_stage.dart';
 
 class StageSpec {
-  const StageSpec({required this.kind, required this.loopMs, required this.build});
-  final String kind;   // 'static' | 'animated'
+  const StageSpec({
+    required this.kind,
+    required this.loopMs,
+    required this.build,
+  });
+  final String kind; // 'static' | 'animated'
   final int loopMs;
   final Widget Function() build;
 }
@@ -147,7 +151,10 @@ final Map<String, StageSpec> kStages = {
         buttonStyle: CNButtonStyle.glass,
         items: const [
           CNPopupMenuItem(label: 'Edit', icon: CNSymbol('pencil')),
-          CNPopupMenuItem(label: 'Share', icon: CNSymbol('square.and.arrow.up')),
+          CNPopupMenuItem(
+            label: 'Share',
+            icon: CNSymbol('square.and.arrow.up'),
+          ),
           CNPopupMenuItem(label: 'Delete', icon: CNSymbol('trash')),
         ],
         onSelected: (_) {},
@@ -217,14 +224,20 @@ final Map<String, StageSpec> kStages = {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(CupertinoIcons.checkmark_circle_fill,
-                color: CupertinoColors.systemGreen, size: 22),
+            Icon(
+              CupertinoIcons.checkmark_circle_fill,
+              color: CupertinoColors.systemGreen,
+              size: 22,
+            ),
             SizedBox(width: 12),
-            Text('Saved to library',
-                style: TextStyle(
-                    color: CupertinoColors.black,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500)),
+            Text(
+              'Saved to library',
+              style: TextStyle(
+                color: CupertinoColors.black,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
@@ -418,14 +431,46 @@ class _NativeTabBarLoopState extends State<_NativeTabBarLoop> {
 
   // The recognizable list contents. "Da" → Daydream, Daylight (clear filter).
   static const List<CNListItem> _items = [
-    CNListItem(title: 'Daydream', subtitle: 'Wallows', leadingSymbol: CNSymbol('music.note')),
-    CNListItem(title: 'Daylight', subtitle: 'David Kushner', leadingSymbol: CNSymbol('music.note')),
-    CNListItem(title: 'Nightfall', subtitle: 'Halsey', leadingSymbol: CNSymbol('music.note')),
-    CNListItem(title: 'Sunset', subtitle: 'The Midnight', leadingSymbol: CNSymbol('music.note')),
-    CNListItem(title: 'Echoes', subtitle: 'Pink Floyd', leadingSymbol: CNSymbol('music.note')),
-    CNListItem(title: 'Wallows', subtitle: 'Wallows', leadingSymbol: CNSymbol('music.note')),
-    CNListItem(title: 'Drive', subtitle: 'Clairo', leadingSymbol: CNSymbol('music.note')),
-    CNListItem(title: 'Ocean', subtitle: 'Lady Wray', leadingSymbol: CNSymbol('music.note')),
+    CNListItem(
+      title: 'Daydream',
+      subtitle: 'Wallows',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
+    CNListItem(
+      title: 'Daylight',
+      subtitle: 'David Kushner',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
+    CNListItem(
+      title: 'Nightfall',
+      subtitle: 'Halsey',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
+    CNListItem(
+      title: 'Sunset',
+      subtitle: 'The Midnight',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
+    CNListItem(
+      title: 'Echoes',
+      subtitle: 'Pink Floyd',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
+    CNListItem(
+      title: 'Wallows',
+      subtitle: 'Wallows',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
+    CNListItem(
+      title: 'Drive',
+      subtitle: 'Clairo',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
+    CNListItem(
+      title: 'Ocean',
+      subtitle: 'Lady Wray',
+      leadingSymbol: CNSymbol('music.note'),
+    ),
   ];
 
   bool _disposed = false;
@@ -437,7 +482,10 @@ class _NativeTabBarLoopState extends State<_NativeTabBarLoop> {
       await CNTabBarNative.enable(
         tabs: const [
           CNTab(title: 'Library', sfSymbol: CNSymbol('music.note.list')),
-          CNTab(title: 'Radio', sfSymbol: CNSymbol('dot.radiowaves.left.and.right')),
+          CNTab(
+            title: 'Radio',
+            sfSymbol: CNSymbol('dot.radiowaves.left.and.right'),
+          ),
           // The search tab — isSearchTab:true + a nativeList that the native
           // search field filters live when nativeSearchFilter is true.
           CNTab(
@@ -585,12 +633,16 @@ class _FloatingIslandLoopState extends State<_FloatingIslandLoop>
             collapsed: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(CupertinoIcons.music_note,
-                    color: CupertinoColors.white, size: 18),
+                Icon(
+                  CupertinoIcons.music_note,
+                  color: CupertinoColors.white,
+                  size: 18,
+                ),
                 SizedBox(width: 8),
-                Text('Now Playing',
-                    style:
-                        TextStyle(color: CupertinoColors.white, fontSize: 14)),
+                Text(
+                  'Now Playing',
+                  style: TextStyle(color: CupertinoColors.white, fontSize: 14),
+                ),
               ],
             ),
             // Fixed-height box matching the card's inner area, with the row
@@ -604,8 +656,11 @@ class _FloatingIslandLoopState extends State<_FloatingIslandLoop>
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Icon(CupertinoIcons.music_note_2,
-                        color: CupertinoColors.white, size: 30),
+                    const Icon(
+                      CupertinoIcons.music_note_2,
+                      color: CupertinoColors.white,
+                      size: 30,
+                    ),
                     const SizedBox(width: 14),
                     _Equalizer(controller: _eq),
                     const SizedBox(width: 16),
@@ -613,16 +668,22 @@ class _FloatingIslandLoopState extends State<_FloatingIslandLoop>
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Daydream',
-                            style: TextStyle(
-                                color: CupertinoColors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
+                        Text(
+                          'Daydream',
+                          style: TextStyle(
+                            color: CupertinoColors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         SizedBox(height: 4),
-                        Text('Wallows',
-                            style: TextStyle(
-                                color: CupertinoColors.systemGrey3,
-                                fontSize: 13)),
+                        Text(
+                          'Wallows',
+                          style: TextStyle(
+                            color: CupertinoColors.systemGrey3,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                   ],

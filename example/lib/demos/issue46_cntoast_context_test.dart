@@ -118,10 +118,9 @@ class _Issue46CNToastContextTestPageState
                 'responding, it means Bug A already fired and the queue is '
                 'stuck.',
                 style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                      fontSize: 13,
-                      color:
-                          CupertinoColors.secondaryLabel.resolveFrom(context),
-                    ),
+                  fontSize: 13,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -129,31 +128,46 @@ class _Issue46CNToastContextTestPageState
               spacing: 8,
               runSpacing: 8,
               children: [
-                _quickTrigger('show', () => CNToast.show(
-                      context: context,
-                      message: 'show',
-                      position: CNToastPosition.bottom,
-                    )),
-                _quickTrigger('success', () => CNToast.success(
-                      context: context,
-                      message: 'success',
-                      position: CNToastPosition.bottom,
-                    )),
-                _quickTrigger('error', () => CNToast.error(
-                      context: context,
-                      message: 'error',
-                      position: CNToastPosition.bottom,
-                    )),
-                _quickTrigger('warning', () => CNToast.warning(
-                      context: context,
-                      message: 'warning',
-                      position: CNToastPosition.bottom,
-                    )),
-                _quickTrigger('info', () => CNToast.info(
-                      context: context,
-                      message: 'info',
-                      position: CNToastPosition.bottom,
-                    )),
+                _quickTrigger(
+                  'show',
+                  () => CNToast.show(
+                    context: context,
+                    message: 'show',
+                    position: CNToastPosition.bottom,
+                  ),
+                ),
+                _quickTrigger(
+                  'success',
+                  () => CNToast.success(
+                    context: context,
+                    message: 'success',
+                    position: CNToastPosition.bottom,
+                  ),
+                ),
+                _quickTrigger(
+                  'error',
+                  () => CNToast.error(
+                    context: context,
+                    message: 'error',
+                    position: CNToastPosition.bottom,
+                  ),
+                ),
+                _quickTrigger(
+                  'warning',
+                  () => CNToast.warning(
+                    context: context,
+                    message: 'warning',
+                    position: CNToastPosition.bottom,
+                  ),
+                ),
+                _quickTrigger(
+                  'info',
+                  () => CNToast.info(
+                    context: context,
+                    message: 'info',
+                    position: CNToastPosition.bottom,
+                  ),
+                ),
                 _quickTrigger('loading (2s)', () async {
                   final h = CNToast.loading(
                     context: context,
@@ -176,8 +190,10 @@ class _Issue46CNToastContextTestPageState
       color: CupertinoColors.systemGrey5,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       onPressed: onPressed,
-      child: Text(label,
-          style: const TextStyle(color: CupertinoColors.label, fontSize: 14)),
+      child: Text(
+        label,
+        style: const TextStyle(color: CupertinoColors.label, fontSize: 14),
+      ),
     );
   }
 
@@ -190,17 +206,20 @@ class _Issue46CNToastContextTestPageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title,
-            style: CupertinoTheme.of(context)
-                .textTheme
-                .navTitleTextStyle
-                .copyWith(fontSize: 16)),
+        Text(
+          title,
+          style: CupertinoTheme.of(
+            context,
+          ).textTheme.navTitleTextStyle.copyWith(fontSize: 16),
+        ),
         const SizedBox(height: 4),
-        Text(subtitle,
-            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                  fontSize: 13,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                )),
+        Text(
+          subtitle,
+          style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+            fontSize: 13,
+            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          ),
+        ),
         const SizedBox(height: 8),
         Align(alignment: Alignment.centerLeft, child: action),
       ],
@@ -254,7 +273,8 @@ class _NestedMaterialAppScenario extends StatelessWidget {
                       position: CNToastPosition.bottom,
                     ),
                     child: const Text(
-                        'CNToast.error (reporter\'s exact message)'),
+                      'CNToast.error (reporter\'s exact message)',
+                    ),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton(

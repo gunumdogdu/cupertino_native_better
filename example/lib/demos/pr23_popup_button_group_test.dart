@@ -35,8 +35,14 @@ class _PR23PopupButtonGroupTestPageState
             CNButtonData.popup(
               icon: CNSymbol('ellipsis'),
               popupItems: [
-                const CNButtonDataPopupItem(label: 'Share', sfSymbol: 'square.and.arrow.up'),
-                const CNButtonDataPopupItem(label: 'Copy', sfSymbol: 'doc.on.doc'),
+                const CNButtonDataPopupItem(
+                  label: 'Share',
+                  sfSymbol: 'square.and.arrow.up',
+                ),
+                const CNButtonDataPopupItem(
+                  label: 'Copy',
+                  sfSymbol: 'doc.on.doc',
+                ),
                 const CNButtonDataPopupItem(label: 'Delete', sfSymbol: 'trash'),
               ],
               onMenuSelected: (i) => _addLog('Nav: popup item $i selected'),
@@ -60,9 +66,18 @@ class _PR23PopupButtonGroupTestPageState
                   CNButtonData.popup(
                     icon: CNSymbol('ellipsis.circle'),
                     popupItems: [
-                      const CNButtonDataPopupItem(label: 'Edit', sfSymbol: 'pencil'),
-                      const CNButtonDataPopupItem(label: 'Duplicate', sfSymbol: 'plus.square.on.square'),
-                      const CNButtonDataPopupItem(label: 'Archive', sfSymbol: 'archivebox'),
+                      const CNButtonDataPopupItem(
+                        label: 'Edit',
+                        sfSymbol: 'pencil',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Duplicate',
+                        sfSymbol: 'plus.square.on.square',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Archive',
+                        sfSymbol: 'archivebox',
+                      ),
                     ],
                     onMenuSelected: (i) => _addLog('Test1: popup item $i'),
                   ),
@@ -77,27 +92,54 @@ class _PR23PopupButtonGroupTestPageState
                   CNButtonData.popup(
                     icon: CNSymbol('textformat'),
                     popupItems: [
-                      const CNButtonDataPopupItem(label: 'Bold', sfSymbol: 'bold'),
-                      const CNButtonDataPopupItem(label: 'Italic', sfSymbol: 'italic'),
-                      const CNButtonDataPopupItem(label: 'Underline', sfSymbol: 'underline'),
+                      const CNButtonDataPopupItem(
+                        label: 'Bold',
+                        sfSymbol: 'bold',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Italic',
+                        sfSymbol: 'italic',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Underline',
+                        sfSymbol: 'underline',
+                      ),
                     ],
                     onMenuSelected: (i) => _addLog('Test2-format: item $i'),
                   ),
                   CNButtonData.popup(
                     icon: CNSymbol('text.alignleft'),
                     popupItems: [
-                      const CNButtonDataPopupItem(label: 'Left', sfSymbol: 'text.alignleft'),
-                      const CNButtonDataPopupItem(label: 'Center', sfSymbol: 'text.aligncenter'),
-                      const CNButtonDataPopupItem(label: 'Right', sfSymbol: 'text.alignright'),
+                      const CNButtonDataPopupItem(
+                        label: 'Left',
+                        sfSymbol: 'text.alignleft',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Center',
+                        sfSymbol: 'text.aligncenter',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Right',
+                        sfSymbol: 'text.alignright',
+                      ),
                     ],
                     onMenuSelected: (i) => _addLog('Test2-align: item $i'),
                   ),
                   CNButtonData.popup(
                     icon: CNSymbol('list.bullet'),
                     popupItems: [
-                      const CNButtonDataPopupItem(label: 'Bullet List', sfSymbol: 'list.bullet'),
-                      const CNButtonDataPopupItem(label: 'Numbered', sfSymbol: 'list.number'),
-                      const CNButtonDataPopupItem(label: 'Checklist', sfSymbol: 'checklist'),
+                      const CNButtonDataPopupItem(
+                        label: 'Bullet List',
+                        sfSymbol: 'list.bullet',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Numbered',
+                        sfSymbol: 'list.number',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Checklist',
+                        sfSymbol: 'checklist',
+                      ),
                     ],
                     onMenuSelected: (i) => _addLog('Test2-list: item $i'),
                   ),
@@ -112,9 +154,18 @@ class _PR23PopupButtonGroupTestPageState
                   CNButtonData.popup(
                     icon: CNSymbol('plus'),
                     popupItems: [
-                      const CNButtonDataPopupItem(label: 'New File', sfSymbol: 'doc.badge.plus'),
-                      const CNButtonDataPopupItem(label: 'New Folder', sfSymbol: 'folder.badge.plus'),
-                      const CNButtonDataPopupItem(label: 'Import', sfSymbol: 'square.and.arrow.down'),
+                      const CNButtonDataPopupItem(
+                        label: 'New File',
+                        sfSymbol: 'doc.badge.plus',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'New Folder',
+                        sfSymbol: 'folder.badge.plus',
+                      ),
+                      const CNButtonDataPopupItem(
+                        label: 'Import',
+                        sfSymbol: 'square.and.arrow.down',
+                      ),
                     ],
                     onMenuSelected: (i) => _addLog('Test3: item $i'),
                   ),
@@ -151,15 +202,23 @@ class _PR23PopupButtonGroupTestPageState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_log.isEmpty)
-                      const Text('Tap buttons to see log...',
-                          style: TextStyle(color: CupertinoColors.systemGrey))
+                      const Text(
+                        'Tap buttons to see log...',
+                        style: TextStyle(color: CupertinoColors.systemGrey),
+                      )
                     else
-                      ..._log.map((l) => Padding(
-                            padding: const EdgeInsets.only(bottom: 3),
-                            child: Text(l,
-                                style: const TextStyle(
-                                    fontSize: 12, fontFamily: 'Menlo')),
-                          )),
+                      ..._log.map(
+                        (l) => Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            l,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontFamily: 'Menlo',
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -176,13 +235,18 @@ class _PR23PopupButtonGroupTestPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          Text(subtitle,
-              style: const TextStyle(
-                  fontSize: 13, color: CupertinoColors.systemGrey)),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.systemGrey,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],
