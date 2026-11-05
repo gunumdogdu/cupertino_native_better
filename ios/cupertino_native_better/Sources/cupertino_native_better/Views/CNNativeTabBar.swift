@@ -154,7 +154,14 @@ final class CNNativeTabBarManager: NSObject {
                 return
             }
             self.store = store
-            host.modalPresentationStyle = .fullScreen
+            // Over, not instead of, the Flutter view: `.fullScreen` takes the
+            // presenter's view out of the window, Flutter then draws no
+            // frames, and a route popped in code never finishes its exit
+            // animation, so the page's dispose (and its disable()) never
+            // runs and the bar stays on screen. The bar is opaque, so the
+            // two look the same.
+            host.modalPresentationStyle = .overFullScreen
+            host.modalPresentationCapturesStatusBarAppearance = true
             self.hostController = host
             presenter.present(host, animated: true)
         }
