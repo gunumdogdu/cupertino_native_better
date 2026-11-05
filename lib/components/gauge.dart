@@ -42,7 +42,8 @@ enum CNGaugeStyle {
   relevancy,
 
   /// A row of stars, one for each whole unit up to `max` (`min` is 0). With
-  /// [CNGauge.onChanged] the user sets the rating.
+  /// [CNGauge.onChanged] the user sets the rating. A fractional value shows
+  /// a half star on iOS; `NSLevelIndicator` rounds it to whole stars.
   rating,
 
   /// A ring that fills up to the value, with the current value label inside.
