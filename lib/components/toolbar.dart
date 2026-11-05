@@ -673,7 +673,7 @@ class _CNToolbarState extends State<CNToolbar> with ModalHideMixin<CNToolbar> {
   final Map<String, String> _nativeText = <String, String>{};
 
   int _generation = 0;
-  ValueListenable<TickerModeData>? _tickerMode;
+  ValueListenable<bool>? _tickerMode;
   bool _shownInWindow = false;
   final Set<CNTabBarSearchController> _controllers =
       <CNTabBarSearchController>{};
@@ -696,7 +696,10 @@ class _CNToolbarState extends State<CNToolbar> with ModalHideMixin<CNToolbar> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_isMac) {
-      final notifier = TickerMode.getValuesNotifier(context);
+      // Newer Flutter deprecates this for `getValuesNotifier`, which older
+      // versions, still supported here, do not have.
+      // ignore: deprecated_member_use
+      final notifier = TickerMode.getNotifier(context);
       if (!identical(notifier, _tickerMode)) {
         _tickerMode?.removeListener(_onTickerModeChanged);
         _tickerMode = notifier;
@@ -732,7 +735,7 @@ class _CNToolbarState extends State<CNToolbar> with ModalHideMixin<CNToolbar> {
   /// A route covered by an opaque page has its tickers muted: its toolbar
   /// leaves the window until the page above it is popped.
   void _onTickerModeChanged() {
-    final visible = _tickerMode?.value.enabled ?? true;
+    final visible = _tickerMode?.value ?? true;
     if (visible == _shownInWindow) return;
     _shownInWindow = visible;
     if (visible) {

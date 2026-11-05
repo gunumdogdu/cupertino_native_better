@@ -32,7 +32,7 @@
 
 ### Checked
 
-Each new control was checked on macOS 27.2 in light and dark, and on the iOS 27 and iOS 26.2 simulators, with real touches on iOS: popover rows, switches, buttons and outside taps; pop-up selection, press-and-drag and scrolling; the editable rating; toolbar segments, menus and badges; the segmented control's press-and-drag. The Swift code was compiled against the iOS 26.0, 26.1, 26.2, 26.4, 26.5, 27.0 and 27.1 SDKs and the macOS 26.5 and 27.2 SDKs, each with its Xcode's Swift version.
+Each new control was checked on macOS 27.2 in light and dark, and on the iOS 27 and iOS 26.2 simulators, with real touches on iOS: popover rows, switches, buttons and outside taps; pop-up selection, press-and-drag and scrolling; the editable rating; toolbar segments, menus and badges; the segmented control's press-and-drag. The Swift code was compiled against the iOS 26.0, 26.1, 26.2, 26.4, 26.5, 27.0 and 27.1 SDKs and the macOS 26.5 and 27.2 SDKs, each with its Xcode's Swift version. The Dart code was analyzed and tested with Flutter 3.38 and 3.44, and every page of the example app was compared with 2.2.1 on macOS, iPhone and iPad.
 
 ## 2.2.1
 
