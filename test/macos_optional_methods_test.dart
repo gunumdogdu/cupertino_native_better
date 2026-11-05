@@ -80,6 +80,21 @@ Map<String, Set<String>> _optionalCallsByChannel() => {
       prefix: _optionalCalls(f.readAsStringSync()),
 };
 
+/// Window-level channels (no platform view): the Dart file that sends on
+/// each and the macOS Swift file that answers it.
+const Map<String, (String, String)> _windowChannels = {
+  'cn_toolbar': ('lib/components/toolbar.dart', 'CNToolbarManager.swift'),
+};
+
+/// The `'name'` of every `_invoke('name'` and `invokeFor(this, 'name'` in
+/// [source]: the calls a window channel's Dart code sends.
+Set<String> _windowCalls(String source) => {
+  for (final m in RegExp(
+    r"(?:_invoke|invokeFor)\((?:this,\s*)?'(\w+)'",
+  ).allMatches(source))
+    m.group(1)!,
+};
+
 /// The view types every channel below mocks, and so the widgets the host
 /// builds.
 const _viewTypes = <String>[
@@ -225,6 +240,24 @@ void main() {
           'implement these in the macOS view, or send them with '
           'invokeOptionalMethod if macOS cannot have them',
     );
+  });
+
+  test('every method sent on a window channel is answered on macOS', () {
+    for (final MapEntry(key: channel, value: (dart, swiftName))
+        in _windowChannels.entries) {
+      final calls = _windowCalls(File(dart).readAsStringSync());
+      expect(calls, isNotEmpty, reason: '$dart sends nothing on $channel');
+      final handlers = _swiftFiles()
+          .where((f) => f.path.endsWith('/$swiftName'))
+          .toList();
+      expect(handlers, hasLength(1), reason: '$swiftName not found');
+      expect(handlers.single.readAsStringSync(), contains('"$channel"'));
+      expect(
+        calls.difference(_swiftCases(handlers)),
+        isEmpty,
+        reason: '$channel: implement these in $swiftName',
+      );
+    }
   });
 
   group('a native side without the optional methods', () {
