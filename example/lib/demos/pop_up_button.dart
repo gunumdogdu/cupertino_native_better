@@ -95,7 +95,7 @@ class _PopUpButtonDemoPageState extends State<PopUpButtonDemoPage> {
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
       children: [
-        SizedBox(width: 112, child: Text(label)),
+        SizedBox(width: 132, child: Text(label, maxLines: 1, softWrap: false)),
         Flexible(child: control),
       ],
     ),
