@@ -17,6 +17,10 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     CNPopoverManager.shared.setup(messenger: registrar.messenger)
     // The window toolbar of CNToolbar (NSToolbar on the Flutter window).
     CNToolbarManager.shared.setup(messenger: registrar.messenger)
+    // The window's split view: CNTabBarNative's sidebar and CNNativeSheet's
+    // inspector around the Flutter content.
+    CNNativeTabBarManager.shared.setup(messenger: registrar.messenger)
+    CNNativeSheetManager.shared.setup(messenger: registrar.messenger)
 
     let sliderFactory = CupertinoSliderViewFactory(messenger: registrar.messenger)
     registrar.register(sliderFactory, withId: "CupertinoNativeSlider")
@@ -65,6 +69,10 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
 
     let gaugeFactory = CupertinoGaugeViewFactory(messenger: registrar.messenger)
     registrar.register(gaugeFactory, withId: "CupertinoNativeGauge")
+
+    // CNSidebar, and CNTabRail on macOS.
+    let sidebarFactory = CNSidebarViewFactory(messenger: registrar.messenger)
+    registrar.register(sidebarFactory, withId: "CNSidebar")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

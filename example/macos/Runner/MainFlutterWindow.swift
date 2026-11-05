@@ -231,6 +231,32 @@ class MainFlutterWindow: NSWindow {
         result(nil)
         return
       }
+      if call.method == "scroll", let self = self, let controller = controller,
+        let args = call.arguments as? [String: Any],
+        let x = args["x"] as? Double, let y = args["y"] as? Double
+      {
+        // Wheel events at a point of the Flutter view (`dy` points each,
+        // `count` of them), sent to this window. An NSEvent made from a
+        // CGEvent has no window, so its location is set to the point in
+        // this window's coordinates (which it then reports as its
+        // locationInWindow) and the window gets it directly.
+        let view = controller.view
+        let local = NSPoint(x: x, y: view.isFlipped ? y : view.bounds.height - y)
+        let point = view.convert(local, to: nil)
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let dy = Int32((args["dy"] as? Int) ?? -12)
+        for _ in 0..<((args["count"] as? Int) ?? 20) {
+          if let cg = CGEvent(
+            scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
+            wheel1: dy, wheel2: 0, wheel3: 0)
+          {
+            cg.location = CGPoint(x: point.x, y: primaryHeight - point.y)
+            if let event = NSEvent(cgEvent: cg) { self.sendEvent(event) }
+          }
+        }
+        result(nil)
+        return
+      }
       if call.method == "firstResponder", let self = self {
         // The class of the window's first responder, to check who has the
         // keyboard.

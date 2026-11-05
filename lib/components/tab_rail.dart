@@ -9,6 +9,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
+import 'sidebar.dart';
 import 'tab_badge.dart';
 import 'tab_bar.dart' show CNTabBarItem;
 
@@ -31,8 +32,11 @@ enum CNTabRailStyle {
 /// horizontal; this widget is its vertical counterpart and takes the same
 /// [CNTabBarItem]s. [CNTabScaffold] switches between the two automatically.
 ///
-/// Native Liquid Glass on iOS 26 and later; a Cupertino-drawn fallback
-/// elsewhere.
+/// Native Liquid Glass on iOS 26 and later. On macOS it is a native sidebar
+/// list, a [CNSidebar]: the [CNTabRailStyle.sidebar] style shows each tab's
+/// icon and label as a sidebar row, the [CNTabRailStyle.rail] style only the
+/// icons (the label is the tooltip and the VoiceOver label). A
+/// Cupertino-drawn fallback elsewhere.
 class CNTabRail extends StatefulWidget {
   /// Creates a vertical tab rail.
   const CNTabRail({
@@ -89,6 +93,9 @@ class _CNTabRailState extends State<CNTabRail> {
       !kIsWeb &&
       defaultTargetPlatform == TargetPlatform.iOS &&
       PlatformVersion.shouldUseNativeGlass;
+
+  bool get _useMacSidebar =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 
   Color? get _tint => widget.tint ?? ThemeHelper.getPrimaryColor(context);
 
@@ -261,6 +268,9 @@ class _CNTabRailState extends State<CNTabRail> {
     final width = rail ? CNTabRail.railWidth : CNTabRail.sidebarWidth;
     final height = rail ? CNTabRail.railHeight(widget.items.length) : null;
 
+    if (_useMacSidebar) {
+      return SizedBox(width: width, height: height, child: _macSidebar(rail));
+    }
     if (!_useNative) {
       return SizedBox(width: width, height: height, child: _fallback(rail));
     }
@@ -280,6 +290,34 @@ class _CNTabRailState extends State<CNTabRail> {
           Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
         },
       ),
+    );
+  }
+
+  /// macOS: the tabs as the rows of a native sidebar, or only their icons
+  /// in the rail style.
+  Widget _macSidebar(bool rail) {
+    return CNSidebar(
+      sections: <CNSidebarSection>[
+        CNSidebarSection(
+          items: <CNSidebarItem>[
+            for (final item in widget.items)
+              CNSidebarItem(
+                title: item.label ?? '',
+                sfSymbol: item.icon,
+                activeSfSymbol: item.activeIcon,
+                customIcon: item.customIcon,
+                activeCustomIcon: item.activeCustomIcon,
+                imageAsset: item.imageAsset,
+                activeImageAsset: item.activeImageAsset,
+                badge: item.badge,
+              ),
+          ],
+        ),
+      ],
+      selectedIndex: widget.currentIndex,
+      onSelected: widget.onTap,
+      tint: widget.tint,
+      iconsOnly: rail,
     );
   }
 

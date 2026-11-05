@@ -44,6 +44,7 @@
 /// - [CNTabRail] - Vertical tab bar (rail or sidebar) for the side of the screen
 /// - [CNTabScaffold] - Tab layout that moves the tabs to the side on iPhone Duo
 /// - [CNToolbar] - Native toolbar: the window toolbar on macOS, a bottom toolbar on iOS
+/// - [CNSidebar] - Native macOS sidebar list (sections, symbols, badges)
 /// - [CNFoldable] - iPhone Duo hinge, vertical bar and fold regions
 /// - [LiquidGlassContainer] - Apply glass effects to any widget
 ///
@@ -80,6 +81,7 @@ export 'components/page_control.dart';
 export 'components/tab_bar.dart';
 export 'components/tab_rail.dart';
 export 'components/tab_scaffold.dart';
+export 'components/sidebar.dart';
 export 'components/foldable.dart';
 export 'components/native_tab_bar.dart';
 export 'components/native_sheet.dart';

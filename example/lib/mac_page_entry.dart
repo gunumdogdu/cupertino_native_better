@@ -14,7 +14,9 @@
 //     prints `MACPAGE_MENU <name>` while its menu is open; BACK=true clicks
 //     the page's back button and prints `MACPAGE_BACK <name> home|stayed`;
 //     SCENARIO=<name> for the alert, action_sheet, context_menu, popover,
-//     toolbar and search_scaffold pages' autoScenario; AUTO=true for the pages that change their values on a
+//     toolbar, search_scaffold and split_window pages' autoScenario,
+//     `launch` for native_tab_bar and native_sheet, `rail` or `scaffold`
+//     for sidebar; AUTO=true for the pages that change their values on a
 //     timer (pop_up_button, gauge); OPEN_POPUP=<n> clicks the n-th
 //     CNPopUpButton of the page, prints `CNB_SHOT <name>_popup_open` while
 //     its menu is open, then `CNB_KEYS 125 36` (Down, Return; POPUP_KEYS=
@@ -68,6 +70,8 @@ import 'demos/tab_bar_demo.dart';
 import 'demos/toolbar.dart';
 import 'demos/search_scaffold.dart';
 import 'demos/native_sheet_demo.dart';
+import 'demos/sidebar_demo.dart';
+import 'demos/split_window_demo.dart';
 import 'demos/bottom_nav_test.dart';
 import 'demos/bottom_nav_indexed_test.dart';
 import 'demos/bottom_nav_custom_icons_test.dart';
@@ -152,6 +156,11 @@ const bool _realClick = bool.fromEnvironment('REALCLICK');
 /// With REALCLICK, clicks the tile's leading CNIcon (an AppKit platform
 /// view) instead of its title.
 const bool _clickIcon = bool.fromEnvironment('CLICKICON');
+
+/// Brings the window to the front before READY without TAP too, so a page
+/// pushed by name (with its SCENARIO) is screenshot fresh: Flutter draws no
+/// frames while its window is hidden behind others.
+const bool _front = bool.fromEnvironment('FRONT');
 const MethodChannel _auditChannel = MethodChannel('cnb_mac_audit');
 
 /// `<width>x<height>` of the window content, e.g. 820x900.
@@ -233,10 +242,24 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   'search_scaffold': (_) => const SearchScaffoldDemoPage(
     autoScenario: _scenario == '' ? null : _scenario,
   ),
-  // Native Tab Bar (iOS 26)
-  'native_tab_bar': (_) => const NativeTabBarDemoPage(),
-  // Native Sheet
-  'native_sheet': (_) => const NativeSheetDemoPage(),
+  // Native Tab Bar (SCENARIO=launch opens it at once)
+  'native_tab_bar': (_) =>
+      NativeTabBarDemoPage(autoLaunch: _scenario == 'launch'),
+  // Native Sheet (SCENARIO=launch opens it at once)
+  'native_sheet': (_) => NativeSheetDemoPage(autoLaunch: _scenario == 'launch'),
+  // Mac Window: CNTabBarNative's sidebar and CNNativeSheet's inspector
+  // (SCENARIO=sidebar|inspector|both|search|checks|stress|resize|restart|
+  // fullscreen, see SplitWindowDemoPage.autoScenario)
+  'split_window': (_) =>
+      SplitWindowDemoPage(autoScenario: _scenario == '' ? null : _scenario),
+  // Sidebar: CNSidebar, CNTabRail, CNTabScaffold (SCENARIO=rail|scaffold)
+  'sidebar': (_) => SidebarDemoPage(
+    initialView: switch (_scenario) {
+      'rail' => 1,
+      'scaffold' => 2,
+      _ => 0,
+    },
+  ),
   // Glass container
   'app_bar': (_) => const AppBarDemoPage(),
   // #2: Modal bottom sheet shadow
@@ -397,6 +420,8 @@ const List<String> macMainPages = <String>[
   'search_scaffold',
   'native_tab_bar',
   'native_sheet',
+  'split_window',
+  'sidebar',
   'app_bar',
   'alert',
 ];
@@ -431,8 +456,10 @@ const Map<String, (String, int)> macPageTitles = <String, (String, int)>{
   'tab_bar': ('Tab Bar', 0),
   'toolbar': ('Toolbar', 0),
   'search_scaffold': ('Search Scaffold', 0),
-  'native_tab_bar': ('Native Tab Bar (iOS 26)', 0),
+  'native_tab_bar': ('Native Tab Bar', 0),
   'native_sheet': ('Native Sheet', 0),
+  'split_window': ('Mac Window', 0),
+  'sidebar': ('Sidebar', 0),
   'app_bar': ('Glass container', 0),
   'issue2_modal_shadow': ('#2: Modal bottom sheet shadow', 0),
   'issue29_transition': ('#29: Transition Artifact', 0),
@@ -595,7 +622,7 @@ Future<void> _drive() async {
       await _scrollPage();
       await Future<void>.delayed(const Duration(milliseconds: 1200));
     }
-    if (_tap || _realClick) {
+    if (_tap || _realClick || _front) {
       // Brings the window to the front and makes it key, so AppKit controls
       // show their active-window look in a screenshot taken now.
       await _auditChannel.invokeMethod<void>('toScreen', <String, double>{

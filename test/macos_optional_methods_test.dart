@@ -29,15 +29,23 @@ const _macSources =
 const Map<String, Set<String>> _iosOnlyPaths = {};
 
 /// The `'name'` of every `.invokeMethod('name'` (or `invokeMapMethod`) in
-/// [source], and of the components' `_invoke(channel, 'name'` helpers.
+/// [source], and of the components' `_invoke(channel, 'name'` and
+/// `_invoke('name'` helpers.
 Set<String> _requiredCalls(String source) => {
   for (final m in RegExp(
     r"\.invoke(?:Map|List)?Method(?:<[^>]*>)?\(\s*'(\w+)'",
   ).allMatches(source))
     m.group(1)!,
-  for (final m in RegExp(r"_invoke\(\s*\w+,\s*'(\w+)'").allMatches(source))
+  for (final m in RegExp(
+    r"_invoke(?:<[^>]*>)?\(\s*(?:\w+,\s*)?'(\w+)'",
+  ).allMatches(source))
     m.group(1)!,
 };
+
+/// Window-level channels (no platform view) that macOS never opens, with
+/// the reason. `cn_foldable` is iPhone Duo hardware; its Dart side returns
+/// early off iOS.
+const Map<String, String> _iosOnlyChannels = {'cn_foldable': 'iPhone Duo only'};
 
 /// The `'name'` of every `.invokeOptionalMethod('name'` in [source].
 Set<String> _optionalCalls(String source) => {
@@ -262,13 +270,8 @@ void main() {
     // Channels with no platform view (alerts, action sheets, menus,
     // popovers): `MethodChannel('cn_…')` in Dart, a manager owning
     // `FlutterMethodChannel(name: "cn_…")` in Swift.
-    const iosOnly = {
-      // CNTabBarNative, CNNativeSheet and CNFoldable return before sending
-      // anything on macOS.
-      'cn_native_tab_bar',
-      'cn_native_sheet',
-      'cn_foldable',
-    };
+    // Channels a platform never uses on macOS (CNFoldable: iPhone Duo).
+    final iosOnly = _iosOnlyChannels.keys.toSet();
     final swift = _swiftFiles();
     final dart = Directory('lib')
         .listSync(recursive: true)
@@ -309,6 +312,8 @@ void main() {
         'cn_action_sheet',
         'cn_context_menu',
         'cn_popover',
+        'cn_native_tab_bar',
+        'cn_native_sheet',
       ]),
     );
     expect(missing, isEmpty);

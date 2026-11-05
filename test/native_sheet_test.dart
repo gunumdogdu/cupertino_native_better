@@ -115,10 +115,62 @@ void main() {
     expect(args['dismissible'], isTrue);
   });
 
-  test('does nothing outside iOS', () async {
+  test('does nothing outside iOS and macOS', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     expect(await CNNativeSheet.show(pages: pages), isFalse);
     expect(calls, isEmpty);
+    expect(CNNativeSheet.isShown, isFalse);
+  });
+
+  test('macOS shows the same pages in the window inspector', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    final events = <String>[];
+    expect(
+      await CNNativeSheet.show(
+        pages: pages,
+        dismissible: true,
+        onPageSelected: (p) => events.add('page $p'),
+        onItemTap: (p, i) => events.add('item $p $i'),
+        onButtonTap: (p, id) => events.add('button $p $id'),
+        onDismissed: () => events.add('dismissed'),
+      ),
+      isTrue,
+    );
+    expect(CNNativeSheet.isShown, isTrue);
+    final args = calls.single.arguments as Map<Object?, Object?>;
+    expect((args['pages'] as List).length, 2);
+    expect(args['dismissible'], isTrue);
+
+    await fromNative('onPageSelected', {'index': 1});
+    await fromNative('onItemTap', {'page': 0, 'index': 0});
+    await fromNative('onButtonTap', {'page': 0, 'id': 'add'});
+    await fromNative('onDismissed');
+    expect(events, ['page 1', 'item 0 0', 'button 0 add', 'dismissed']);
+    expect(CNNativeSheet.isShown, isFalse);
+  });
+
+  test(
+    'macOS: dismiss() reaches the inspector even after a hot restart',
+    () async {
+      // A restarted Dart side has no record of the inspector the window still
+      // shows, so dismiss() asks the native side anyway.
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      expect(CNNativeSheet.isShown, isFalse);
+      await CNNativeSheet.dismiss();
+      expect(calls.map((c) => c.method), ['dismiss']);
+
+      // iOS keeps its guard.
+      calls.clear();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await CNNativeSheet.dismiss();
+      expect(calls, isEmpty);
+    },
+  );
+
+  test('macOS: no window to show it in reports false', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    nativeShows = false;
+    expect(await CNNativeSheet.show(pages: pages), isFalse);
     expect(CNNativeSheet.isShown, isFalse);
   });
 

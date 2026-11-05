@@ -18,6 +18,9 @@ enum MacFlutterWindow {
   /// The view showing Flutter content, or nil when there is none yet.
   static var flutterView: NSView? {
     if let view = registrar?.view { return view }
+    // While the split view is installed the content view controller is the
+    // split view controller; the Flutter view is inside its content item.
+    if let view = MacSplitWindow.shared.flutterContentView { return view }
     let window = NSApp.keyWindow ?? NSApp.mainWindow
     return window?.contentViewController?.view ?? window?.contentView
   }

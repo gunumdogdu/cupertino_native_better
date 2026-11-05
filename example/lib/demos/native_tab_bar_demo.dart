@@ -1,5 +1,6 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 
 /// Test harness for [CNTabBarNative] — exercises every feature:
 /// native-list tabs, a working (filtering) search tab, the bottom accessory,
@@ -204,7 +205,10 @@ class _NativeTabBarDemoPageState extends State<NativeTabBarDemoPage> {
             )
           : null,
       tintColor: _tint,
-      isDark: _dark,
+      // On macOS the sidebar follows the app's theme, like the window.
+      isDark: defaultTargetPlatform == TargetPlatform.macOS
+          ? CupertinoTheme.brightnessOf(context) == Brightness.dark
+          : _dark,
       asRoot: _asRoot,
       sidebarOnWideScreens: widget.sidebarOnWideScreens,
       onDismissed: () => setState(() => _launched = false),
