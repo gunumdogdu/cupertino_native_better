@@ -13,6 +13,8 @@ Six of them held paths from the maintainer's Mac and four were symlinks into it.
 
 These files are no longer committed. Flutter recreates them on `flutter pub get` and `flutter run`. The example app now has Flutter's standard iOS and macOS `.gitignore` files, and the Flutter version pin is in `.fvmrc`.
 
+The example's macOS scheme now includes Flutter's Swift Package Manager pre-action, as the iOS scheme already did. Before, a clone's first macOS build changed the scheme.
+
 The published package no longer includes the example's `ios/Flutter/ephemeral/` folder, one file of which held a machine path.
 
 Thanks to @runoob-coder for #121. It keeps the analyzer out of `build/`, `ios/` and `macos/`, and it led to this fix.
@@ -23,6 +25,12 @@ Every pull request now runs these checks:
 - `flutter analyze` on the package and the example app, `dart format` and `flutter test`;
 - `flutter analyze lib` with Flutter 3.38, so the package keeps working on older Flutter versions;
 - a check that fails if a generated or machine-specific file is committed.
+
+### Checked
+
+- **Fresh clone.** It ran `flutter pub get`, built the example for the iOS simulator and for macOS, and ran `flutter analyze`. `git status` was clean after every step.
+- **Tests and analyzer.** All 531 tests pass. `flutter analyze` is clean with Flutter 3.44, and `flutter analyze lib` is clean with Flutter 3.38.
+- **Dry run.** `flutter pub publish --dry-run` shows 0 warnings; 2.3.0 had 1, for these files.
 
 ## 2.3.0
 
