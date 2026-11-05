@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../style/native_list.dart';
 import '../style/sf_symbol.dart';
+import '../utils/list_item_encoder.dart';
 
 /// A resting height of a [CNNativeSheet].
 ///
@@ -272,22 +273,7 @@ class CNNativeSheet {
     'items': [for (final i in p.items) _itemMap(i)],
   };
 
-  static Map<String, Object?> _itemMap(CNListItem i) {
-    final image = i.leadingImage;
-    return {
-      'title': i.title,
-      if (i.subtitle != null) 'subtitle': i.subtitle,
-      if (i.trailingText != null) 'trailingText': i.trailingText,
-      if (i.leadingSymbol != null) 'leadingSfSymbol': i.leadingSymbol!.name,
-      if (image != null)
-        'leadingImage': {
-          'path': image.assetPath,
-          if (image.imageData != null) 'data': image.imageData,
-          if (image.imageFormat != null) 'format': image.imageFormat,
-        },
-      'showChevron': i.showChevron,
-    };
-  }
+  static Map<String, Object?> _itemMap(CNListItem i) => encodeListItem(i);
 
   static Future<dynamic> _handle(MethodCall call) async {
     final args = call.arguments;
