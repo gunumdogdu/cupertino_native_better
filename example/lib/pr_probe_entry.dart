@@ -88,6 +88,15 @@
 //     (CNStepper, CNColorWell and CNPageControl on one screen, changing on
 //     a timer.)
 //
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=popupbutton
+//     (2.3.0: CNPopUpButton; AUTO=true changes every picker's value every
+//     2 s and prints `CNB_SHOT cycle<n>` for screenshots; SCROLL=<points>
+//     starts the list further down)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=gauge
+//     (2.3.0: CNGauge; AUTO=true moves the value every 2.5 s through the
+//     normal, warning and critical zones and prints `CNB_SHOT gauge<n>`;
+//     SCROLL=<points> as above)
+//
 // PROBE=pr67report additionally dumps the MAE/cost table to the run log.
 
 import 'dart:async';
@@ -132,6 +141,8 @@ import 'demos/color_well.dart';
 import 'demos/page_control.dart';
 import 'demos/native_sheet_demo.dart';
 import 'demos/tab_bar_demo.dart';
+import 'demos/pop_up_button.dart';
+import 'demos/gauge.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -352,6 +363,22 @@ class _ProbeApp extends StatelessWidget {
             : CNSheetDetent.height(double.parse(middle)),
         backgroundFile: bg.isEmpty ? null : bg,
         avatarFiles: avatars.isEmpty ? const [] : avatars.split(','),
+      );
+    }
+    if (_probe == 'popupbutton') {
+      return PopUpButtonDemoPage(
+        autoCycle: _auto,
+        initialScrollOffset: double.parse(
+          const String.fromEnvironment('SCROLL', defaultValue: '0'),
+        ),
+      );
+    }
+    if (_probe == 'gauge') {
+      return GaugeDemoPage(
+        autoCycle: _auto,
+        initialScrollOffset: double.parse(
+          const String.fromEnvironment('SCROLL', defaultValue: '0'),
+        ),
       );
     }
     if (_probe == 'pagecontrol') {

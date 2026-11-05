@@ -14,7 +14,18 @@
 //     prints `MACPAGE_MENU <name>` while its menu is open; BACK=true clicks
 //     the page's back button and prints `MACPAGE_BACK <name> home|stayed`;
 //     SCENARIO=<name> for the alert, action_sheet and context_menu pages'
-//     autoScenario)
+//     autoScenario; AUTO=true for the pages that change their values on a
+//     timer (pop_up_button, gauge); OPEN_POPUP=<n> clicks the n-th
+//     CNPopUpButton of the page, prints `CNB_SHOT <name>_popup_open` while
+//     its menu is open, then `CNB_KEYS 125 36` (Down, Return; POPUP_KEYS=
+//     a comma list of key codes replaces them) to choose the next item and
+//     `CNB_SHOT <name>_popup_picked`; the run script captures the shots and
+//     posts the keys); SCROLL_OVER=<widget type>:<n> has the run script
+//     scroll the page with the pointer over the n-th widget of that type
+//     (`CNB_SCROLL <x> <y> <dy>`, screen points) and prints
+//     `CNB_RESULT scroll_over <type> <points scrolled>`; CLICK_ON=<widget
+//     type>:<n>:<fx> clicks the n-th widget of that type at fraction fx of
+//     its width with an AppKit click and prints `CNB_SHOT <name>_clicked`)
 //
 // It prints `MACPAGE_PUSH <name>` before each push and `MACPAGE_READY <name>`
 // once the page has settled, so a script can screenshot each page. A page
@@ -45,6 +56,8 @@ import 'demos/button.dart';
 import 'demos/search_bar.dart';
 import 'demos/glass_button_group.dart';
 import 'demos/progress_indicator.dart';
+import 'demos/pop_up_button.dart';
+import 'demos/gauge.dart';
 import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
@@ -112,6 +125,14 @@ const int _hold = int.fromEnvironment('HOLD', defaultValue: 4);
 const int _delay = int.fromEnvironment('DELAY', defaultValue: 3);
 const int _scroll = int.fromEnvironment('SCROLL');
 const int _openMenu = int.fromEnvironment('OPEN_MENU', defaultValue: -1);
+const int _openPopUp = int.fromEnvironment('OPEN_POPUP', defaultValue: -1);
+const bool _auto = bool.fromEnvironment('AUTO');
+const String _scrollOver = String.fromEnvironment('SCROLL_OVER');
+const String _clickOn = String.fromEnvironment('CLICK_ON');
+const String _popUpKeys = String.fromEnvironment(
+  'POPUP_KEYS',
+  defaultValue: '125,36',
+);
 
 /// Clicks the open page's navigation bar back button once it is ready and
 /// prints `MACPAGE_BACK <name> home` when that took the app back home.
@@ -189,6 +210,10 @@ final Map<String, WidgetBuilder> macPages = <String, WidgetBuilder>{
   'search_bar': (_) => const SearchBarDemoPage(),
   // Progress Indicator
   'progress_indicator': (_) => const ProgressIndicatorDemoPage(),
+  // Pop-Up Button
+  'pop_up_button': (_) => const PopUpButtonDemoPage(autoCycle: _auto),
+  // Gauge
+  'gauge': (_) => const GaugeDemoPage(autoCycle: _auto),
   // iPhone Duo
   'i_phone_duo': (_) => const IPhoneDuoDemoPage(),
   // Tab Bar
@@ -350,6 +375,8 @@ const List<String> macMainPages = <String>[
   'glass_button_group',
   'search_bar',
   'progress_indicator',
+  'pop_up_button',
+  'gauge',
   'i_phone_duo',
   'tab_bar',
   'native_tab_bar',
@@ -381,6 +408,8 @@ const Map<String, (String, int)> macPageTitles = <String, (String, int)>{
   'glass_button_group': ('Glass Button Group', 0),
   'search_bar': ('Search Bar', 0),
   'progress_indicator': ('Progress Indicator', 0),
+  'pop_up_button': ('Pop-Up Button', 0),
+  'gauge': ('Gauge', 0),
   'i_phone_duo': ('iPhone Duo', 1),
   'tab_bar': ('Tab Bar', 0),
   'native_tab_bar': ('Native Tab Bar (iOS 26)', 0),
@@ -560,6 +589,11 @@ Future<void> _drive() async {
       await _clickPopupMenuButton(_openMenu);
       debugPrint('MACPAGE_MENU $name');
     }
+    if (_openPopUp >= 0) {
+      await _pickWithPopUpButton(name, _openPopUp);
+    }
+    if (_scrollOver.isNotEmpty) await _scrollOverWidget(_scrollOver);
+    if (_clickOn.isNotEmpty) await _clickOnWidget(name, _clickOn);
     if (_back) {
       await _clickBackButton();
       final home = !_navigatorKey.currentState!.canPop();
@@ -630,6 +664,139 @@ Future<void> _clickPopupMenuButton(int index) async {
     'y': center.dy,
   });
   await Future<void>.delayed(const Duration(milliseconds: 1500));
+}
+
+/// The render boxes of the open page's widgets whose type name (without
+/// type arguments) is [type], in tree order.
+List<RenderBox> _widgetBoxes(String type) {
+  final boxes = <RenderBox>[];
+  void visit(Element e) {
+    final name = e.widget.runtimeType.toString().split('<').first;
+    if (name == type && (ModalRoute.of(e)?.isCurrent ?? false)) {
+      final box = e.findRenderObject();
+      if (box is RenderBox && box.attached) boxes.add(box);
+      return;
+    }
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement!.visitChildren(visit);
+  return boxes;
+}
+
+/// Asks the run script to make the app frontmost (`CNB_FRONT`): AppKit
+/// only opens a menu, and draws a window's active look, in the active app,
+/// and another app may hold the focus on a shared screen.
+Future<void> _bringToFront() async {
+  debugPrint('CNB_FRONT');
+  await Future<void>.delayed(const Duration(milliseconds: 1200));
+}
+
+/// SCROLL_OVER: scrolls the page with the pointer over a widget, through
+/// the run script, and reports how far the page moved.
+Future<void> _scrollOverWidget(String spec) async {
+  final parts = spec.split(':');
+  final boxes = _widgetBoxes(parts[0]);
+  final index = int.parse(parts.length > 1 ? parts[1] : '0');
+  if (index >= boxes.length) {
+    debugPrint('MACPAGE_UNKNOWN ${parts[0]} $index of ${boxes.length}');
+    return;
+  }
+  ScrollPosition? position;
+  void visit(Element e) {
+    if (e is StatefulElement &&
+        e.state is ScrollableState &&
+        (e.state as ScrollableState).position.axis == Axis.vertical &&
+        (ModalRoute.of(e)?.isCurrent ?? false)) {
+      position = (e.state as ScrollableState).position;
+    }
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement!.visitChildren(visit);
+  final box = boxes[index];
+  final center = box.localToGlobal(box.size.center(Offset.zero));
+  final before = position?.pixels ?? 0;
+  try {
+    // The audit channel's own scroll, where the Runner has it.
+    final hit = await _auditChannel.invokeMethod<String>(
+      'scroll',
+      <String, double>{'x': center.dx, 'y': center.dy, 'dy': -240},
+    );
+    debugPrint('CNB_RESULT scroll_hit $hit');
+  } on MissingPluginException {
+    // Else the run script posts one (`CNB_SCROLL`, screen points).
+    final screen = await _auditChannel.invokeMapMethod<String, double>(
+      'toScreen',
+      <String, double>{'x': center.dx, 'y': center.dy},
+    );
+    debugPrint('CNB_SCROLL ${screen!['x']} ${screen['y']} -240');
+  }
+  await Future<void>.delayed(const Duration(milliseconds: 2500));
+  final moved = (position?.pixels ?? 0) - before;
+  debugPrint('CNB_RESULT scroll_over ${parts[0]} ${moved.round()}');
+}
+
+/// CLICK_ON: clicks a widget at a fraction of its width.
+Future<void> _clickOnWidget(String name, String spec) async {
+  final parts = spec.split(':');
+  final boxes = _widgetBoxes(parts[0]);
+  final index = int.parse(parts.length > 1 ? parts[1] : '0');
+  final fx = double.parse(parts.length > 2 ? parts[2] : '0.5');
+  if (index >= boxes.length) {
+    debugPrint('MACPAGE_UNKNOWN ${parts[0]} $index of ${boxes.length}');
+    return;
+  }
+  final box = boxes[index];
+  final point = box.localToGlobal(
+    Offset(box.size.width * fx, box.size.height / 2),
+  );
+  await _bringToFront();
+  await _auditChannel.invokeMethod<void>('click', <String, double>{
+    'x': point.dx,
+    'y': point.dy,
+  });
+  await Future<void>.delayed(const Duration(milliseconds: 1500));
+  debugPrint('CNB_SHOT ${name}_clicked');
+  await Future<void>.delayed(const Duration(milliseconds: 1500));
+}
+
+/// OPEN_POPUP: clicks the [index]-th CNPopUpButton of the open page with an
+/// AppKit click, so its menu opens, and has the run script capture it and
+/// choose the next item with the keyboard.
+Future<void> _pickWithPopUpButton(String name, int index) async {
+  final elements = <Element>[];
+  void visit(Element e) {
+    if (e.widget is CNPopUpButton) {
+      if (ModalRoute.of(e)?.isCurrent ?? false) elements.add(e);
+      return;
+    }
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement!.visitChildren(visit);
+  if (index >= elements.length) {
+    debugPrint('MACPAGE_UNKNOWN popup button $index of ${elements.length}');
+    return;
+  }
+  await Scrollable.ensureVisible(elements[index], alignment: 0.3);
+  await WidgetsBinding.instance.endOfFrame;
+  // The platform view follows the scroll a frame later.
+  await Future<void>.delayed(const Duration(milliseconds: 700));
+  final box = elements[index].findRenderObject()! as RenderBox;
+  final center = box.localToGlobal(box.size.center(Offset.zero));
+  await _bringToFront();
+  await _auditChannel.invokeMethod<void>('click', <String, double>{
+    'x': center.dx,
+    'y': center.dy,
+  });
+  await Future<void>.delayed(const Duration(milliseconds: 1500));
+  debugPrint('CNB_SHOT ${name}_popup_open');
+  await Future<void>.delayed(const Duration(milliseconds: 2500));
+  debugPrint('CNB_KEYS ${_popUpKeys.split(',').join(' ')}');
+  await Future<void>.delayed(const Duration(milliseconds: 2000));
+  debugPrint('CNB_SHOT ${name}_popup_picked');
+  await Future<void>.delayed(const Duration(milliseconds: 2000));
 }
 
 /// BACK: clicks the open page's navigation bar back button, with an AppKit
