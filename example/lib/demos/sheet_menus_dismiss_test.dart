@@ -152,6 +152,9 @@ class _TemplatesSheetState extends State<_TemplatesSheet> {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      // Logs the pointer kind: a finger is `touch`; a mouse-driven simulator
+      // click may arrive as another kind and behave differently.
+      onTapDown: (d) => debugPrint('SHEETDISMISS pointer kind ${d.kind}'),
       onTap: () {
         _noteTap('sheet 1 background');
         FocusScope.of(context).unfocus();
@@ -255,6 +258,7 @@ class _GroupSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
+      onTapDown: (d) => debugPrint('SHEETDISMISS pointer kind ${d.kind}'),
       onTap: () => _noteTap('sheet 2 background'),
       child: Container(
         height: MediaQuery.sizeOf(context).height * 0.85,
