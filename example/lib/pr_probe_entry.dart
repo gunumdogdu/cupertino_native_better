@@ -97,6 +97,10 @@
 //     (2.3.0: CNPopUpButton; AUTO=true changes every picker's value every
 //     2 s and prints `CNB_SHOT cycle<n>` for screenshots; SCROLL=<points>
 //     starts the list further down)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue124 \
+//     --dart-define=OBSERVER=true
+//     (#124: glass CNButton with autoHideOnModal: false under a dialog)
+//
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=gauge
 //     (2.3.0: CNGauge; AUTO=true moves the value every 2.5 s through the
 //     normal, warning and critical zones and prints `CNB_SHOT gauge<n>`;
@@ -149,6 +153,7 @@ import 'demos/native_sheet_demo.dart';
 import 'demos/tab_bar_demo.dart';
 import 'demos/pop_up_button.dart';
 import 'demos/gauge.dart';
+import 'demos/issue124_button_dialog_halo_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -238,6 +243,9 @@ class _ProbeApp extends StatelessWidget {
         label: _label,
         autoCycle: true,
       );
+    }
+    if (_probe == 'issue124') {
+      return const Issue124ButtonDialogHaloTestPage();
     }
     if (_probe == 'symboleffects') {
       return const SymbolEffectsProbePage();

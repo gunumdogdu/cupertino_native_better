@@ -52,6 +52,7 @@ import 'demos/issue60_tabbar_labels_after_pop_test.dart';
 import 'demos/issue65_gesture_arena_components_test.dart';
 import 'demos/issue68_tabbar_rapid_taps_test.dart';
 import 'demos/issue76_popup_gesture_test.dart';
+import 'demos/issue124_button_dialog_halo_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
@@ -1029,6 +1030,21 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Issue105TabBarDotBadgeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#124: Button halo under dialog'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('square.dashed', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue124ButtonDialogHaloTestPage(),
                       ),
                     );
                   },
