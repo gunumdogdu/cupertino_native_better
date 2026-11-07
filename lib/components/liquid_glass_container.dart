@@ -44,6 +44,11 @@ class LiquidGlassContainer extends StatefulWidget {
   /// CN-widget. Requires `CNTabBarRouteObserver()` to be registered in the
   /// app's `navigatorObservers`. No effect on iOS < 26 / non-iOS (fallback
   /// path returns the child unchanged).
+  ///
+  /// When false, the native view stays while a modal (a dialog, popup or
+  /// sheet) is up, and its Liquid Glass glow is clipped to the view's bounds
+  /// from the modal's push until its exit animation ends, so no box shows
+  /// around it through the modal's barrier (Issue #124).
   final bool autoHideOnModal;
 
   @override
@@ -51,7 +56,9 @@ class LiquidGlassContainer extends StatefulWidget {
 }
 
 class _LiquidGlassContainerState extends State<LiquidGlassContainer>
-    with ModalHideMixin<LiquidGlassContainer> {
+    with
+        ModalHideMixin<LiquidGlassContainer>,
+        HaloContainmentMixin<LiquidGlassContainer> {
   static const double _macShadowOutset = 12;
 
   @override
@@ -63,8 +70,8 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
   MethodChannel? _channel;
   bool? _lastIsDark;
 
-  // Issue #29 halo containment via setTransitioning.
-  Animation<double>? _secondaryRouteAnim;
+  // Halo containment (Issues #29 and #124) is driven by
+  // HaloContainmentMixin.
 
   bool get _isDark => ThemeHelper.isDark(context);
 
@@ -80,7 +87,6 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
   }
 
@@ -94,35 +100,10 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = null;
     PlatformViewGuard.readyNotifier.removeListener(_onPlatformViewGuardReady);
     _channel?.setMethodCallHandler(null);
     _channel = null;
     super.dispose();
-  }
-
-  void _attachSecondaryRouteAnim() {
-    final route = ModalRoute.of(context);
-    final newAnim = route?.secondaryAnimation;
-    if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
-    _onSecondaryRouteAnimChanged();
-  }
-
-  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
-
-  void _pushContainmentIfNeeded() {
-    final anim = _secondaryRouteAnim;
-    final animating =
-        anim?.status == AnimationStatus.forward ||
-        anim?.status == AnimationStatus.reverse;
-    final active = animating;
-    final ch = _channel;
-    if (ch == null) return;
-    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   void _onPlatformViewGuardReady() {
@@ -240,7 +221,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
       return null;
     });
     _lastIsDark = _isDark;
-    _pushContainmentIfNeeded();
+    resetHaloContainment();
   }
 
   Future<void> _updateConfig() async {

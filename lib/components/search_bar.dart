@@ -11,7 +11,6 @@ import '../utils/optional_method_call.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
-import 'tab_bar.dart' show CNTabBarRouteObserver;
 
 /// Controller for imperatively managing [CNSearchBar] state.
 class CNSearchBarController {
@@ -209,6 +208,11 @@ class CNSearchBar extends StatefulWidget {
   /// CN-widget. Requires `CNTabBarRouteObserver()` to be registered in the
   /// app's `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter
   /// fallback).
+  ///
+  /// When false, the native view stays while a modal (a dialog, popup or
+  /// sheet) is up, and its Liquid Glass glow is clipped to the view's bounds
+  /// from the modal's push until its exit animation ends, so no box shows
+  /// around it through the modal's barrier (Issue #124).
   final bool autoHideOnModal;
 
   /// macOS only: the name under which the field saves its recent searches
@@ -222,7 +226,10 @@ class CNSearchBar extends StatefulWidget {
 }
 
 class _CNSearchBarState extends State<CNSearchBar>
-    with SingleTickerProviderStateMixin, ModalHideMixin<CNSearchBar> {
+    with
+        SingleTickerProviderStateMixin,
+        ModalHideMixin<CNSearchBar>,
+        HaloContainmentMixin<CNSearchBar> {
   @override
   bool get autoHideOnModal => widget.autoHideOnModal;
 
@@ -239,8 +246,8 @@ class _CNSearchBarState extends State<CNSearchBar>
   bool _isExpanded = false;
   String _searchText = '';
 
-  // Issue #29 halo containment via setTransitioning.
-  Animation<double>? _secondaryRouteAnim;
+  // Halo containment (Issues #29 and #124) is driven by
+  // HaloContainmentMixin.
 
   bool? _lastIsDark;
 
@@ -275,15 +282,11 @@ class _CNSearchBarState extends State<CNSearchBar>
     if (_isExpanded) {
       _animationController.value = 1.0;
     }
-
-    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
-    _onAnyModalDepthChanged();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
     _syncMacConfigIfNeeded();
   }
@@ -337,42 +340,11 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = null;
-    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
     _animationController.dispose();
     _textController.dispose();
     _focusNode.dispose();
     _controller._detach();
     super.dispose();
-  }
-
-  void _attachSecondaryRouteAnim() {
-    final route = ModalRoute.of(context);
-    final newAnim = route?.secondaryAnimation;
-    if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
-    _onSecondaryRouteAnimChanged();
-  }
-
-  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
-
-  // Legacy modal-up trigger disabled: ModalHideMixin (maybeHiddenPlaceholder +
-  // native setInteractive) is the supported modern path for modal hiding.
-  // Stub retained so the existing add/removeListener subscription compiles.
-  void _onAnyModalDepthChanged() {}
-
-  void _pushContainmentIfNeeded() {
-    final anim = _secondaryRouteAnim;
-    final animating =
-        anim?.status == AnimationStatus.forward ||
-        anim?.status == AnimationStatus.reverse;
-    final active = animating;
-    final ch = _channel;
-    if (ch == null) return;
-    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   void _onTextChanged() {
@@ -397,7 +369,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     ch.setMethodCallHandler(_onMethodCall);
     _lastIsDark = ThemeHelper.isDark(context);
     if (_usesMacSearchField) _lastMacConfig = _macConfig(context);
-    _pushContainmentIfNeeded();
+    resetHaloContainment();
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {

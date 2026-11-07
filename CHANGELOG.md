@@ -1,3 +1,34 @@
+## 2.3.2
+
+> Patch: `CNTabRail` now changes tabs when you press and slide, and glass widgets with `autoHideOnModal: false` no longer show a box through a dialog's barrier. No API changes.
+
+### Fixed — `CNTabRail`: press and slide to change tabs (#123)
+
+On the system vertical bar (iPhone Duo's outer display, and its inner display in landscape) you can press a tab and slide to another; the selection follows your finger. `CNTabRail`, which `CNTabScaffold` puts in that bar, reacted only to taps.
+
+The rail now works like the system bar:
+- the highlight follows your finger, and the tab under it is selected when you lift your finger;
+- released far from the rail, the press selects nothing;
+- at accessibility text sizes, a long press shows the item in the Large Content Viewer, and lifting your finger selects it.
+
+VoiceOver still reads each tab as a button with its badge and selected state. The sidebar style stays tap-only, like the system sidebar.
+
+### Fixed — a box around glass widgets with `autoHideOnModal: false` under a dialog (#124)
+
+While a dialog faded in over a glass `CNButton` with `autoHideOnModal: false`, a lighter box could show around the button: its Liquid Glass glow, unclipped (the #29 artifact). The glow is clipped to the view while it could show past it, but only during page transitions, and a dialog doesn't start one. With the default `autoHideOnModal: true` the view is removed under a modal, so only widgets that opted out were affected.
+
+For widgets with `autoHideOnModal: false`, the glow now also stays clipped from a modal's push until its exit animation ends. This covers dialogs, popups and sheets. Like `autoHideOnModal`, it needs `CNTabBarRouteObserver()` in `navigatorObservers`.
+
+The fix covers all six widgets that clip their glow, which now share one implementation: `CNButton`, `CNPopupMenuButton`, `CNGlassButtonGroup`, `LiquidGlassContainer`, `CNSearchBar` and `CNFloatingIsland`.
+
+Thanks to @LucasLau00 for both reports. #124 came with the root cause and a fix tested on a device, which this release applies to all six widgets.
+
+### Checked
+- **iPhone Duo simulator (iOS 27.1):** taps, press and slide, hold then slide, release far from the rail, the Large Content Viewer at accessibility text sizes, VoiceOver activation, and taps in the sidebar style.
+- **iOS 26.2 simulator:** the example's new *#124: Button halo under dialog* screen at 10× slow motion. The button dims evenly and looks the same as before at rest. The box itself shows only on a physical device, where the reporter tested the same approach.
+- **Tests:** 23 new tests for the clipping cover all six widgets, dialogs, page transitions and a dialog over a dialog. 554 tests pass.
+- **Analyzer and SDKs:** `flutter analyze` is clean with Flutter 3.44, and `flutter analyze lib` with 3.38. The iOS code compiles against the iOS 26.0 to 27.0 SDKs.
+
 ## 2.3.1
 
 > Patch: the repository and the published package no longer contain files that Flutter, Xcode and FVM generated on the maintainer's machine, and every pull request now runs CI. Nothing changes for apps that use the package: no API, native or visual changes.

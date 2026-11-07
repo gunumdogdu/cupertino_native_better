@@ -16,7 +16,9 @@ import 'tab_bar.dart' show CNTabBarItem;
 /// How [CNTabRail] draws its items.
 enum CNTabRailStyle {
   /// Icons stacked in a vertical Liquid Glass capsule — the look of the iOS
-  /// 27.1 system vertical tab bar.
+  /// 27.1 system vertical tab bar. As on that bar, press and slide to change
+  /// tabs: the highlight follows the finger, and the tab under it is selected
+  /// on release.
   rail,
 
   /// Icon-and-label rows in a glass panel, for wide screens such as the open

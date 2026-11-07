@@ -38,7 +38,7 @@ private final class CNTabRailEmptyView: NSObject, FlutterPlatformView {
 }
 
 @available(iOS 26.0, *)
-final class CNTabRailPlatformView: NSObject, FlutterPlatformView {
+final class CNTabRailPlatformView: NSObject, FlutterPlatformView, UIGestureRecognizerDelegate {
 
     private let container: UIView
     private let channel: FlutterMethodChannel
@@ -75,6 +75,17 @@ final class CNTabRailPlatformView: NSObject, FlutterPlatformView {
             hosted.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
 
+        // Press and slide on the rail (Issue #123), tracked in UIKit rather
+        // than with a SwiftUI gesture so that it runs alongside the Large
+        // Content Viewer's long press (see `gestureRecognizer(_:
+        // shouldRecognizeSimultaneouslyWith:)`).
+        let press = UILongPressGestureRecognizer(target: self, action: #selector(handleRailPress(_:)))
+        press.minimumPressDuration = 0
+        press.allowableMovement = .greatestFiniteMagnitude
+        press.cancelsTouchesInView = false
+        press.delegate = self
+        hosted.addGestureRecognizer(press)
+
         store.onSelect = { [weak self] index in
             self?.channel.invokeMethod("valueChanged", arguments: ["index": index])
         }
@@ -103,10 +114,60 @@ final class CNTabRailPlatformView: NSObject, FlutterPlatformView {
     }
 
     func view() -> UIView { container }
+
+    /// Press and slide, as on the system tab bar: the highlight follows the
+    /// finger from item to item, and the item under it is selected on
+    /// release. A tap is a press without a slide. Released far outside the
+    /// rail, the press selects nothing; cancelled, it selects nothing.
+    @objc private func handleRailPress(_ press: UILongPressGestureRecognizer) {
+        guard let view = press.view else { return }
+        let index = store.railIndex(at: press.location(in: view), in: view.bounds.size)
+        switch press.state {
+        case .began, .changed:
+            if index != store.pressedIndex {
+                withAnimation(.snappy) { store.pressedIndex = index }
+            }
+        case .ended:
+            withAnimation(.snappy) {
+                store.pressedIndex = nil
+                if let index { store.select(index) }
+            }
+        default:
+            withAnimation(.snappy) { store.pressedIndex = nil }
+        }
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        store.style == "rail"
+    }
+
+    /// At accessibility text sizes a long press opens the Large Content
+    /// Viewer. The press keeps tracking meanwhile, so lifting the finger
+    /// selects the item under it, as on the system tab bar.
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        true
+    }
 }
 
 @available(iOS 26.0, *)
 final class CNTabRailStore: ObservableObject {
+
+    /// The rail's metrics, shared by its layout and the press hit-testing.
+    enum Rail {
+        static let item: CGFloat = 44
+        static let spacing: CGFloat = 4
+        static let inset: CGFloat = 5
+        /// How far outside the rail a press can wander and still select;
+        /// released farther away, it selects nothing.
+        static let slop: CGFloat = 44
+        static let width = item + 2 * inset
+        static func height(_ count: Int) -> CGFloat {
+            CGFloat(count) * item + CGFloat(max(count - 1, 0)) * spacing + 2 * inset
+        }
+    }
 
     struct Item: Identifiable {
         let id: Int
@@ -122,7 +183,26 @@ final class CNTabRailStore: ObservableObject {
     @Published var selection = 0
     @Published var tint: Color?
     @Published var style = "rail"
+    /// The rail item under the finger while the rail is pressed, else nil.
+    @Published var pressedIndex: Int?
     var onSelect: ((Int) -> Void)?
+
+    /// The rail item at [point] in a view of [size], which centres the rail
+    /// as the SwiftUI layout does, or nil beyond the slop around the rail.
+    /// Above the first item or below the last, within the slop, it is that
+    /// item.
+    func railIndex(at point: CGPoint, in size: CGSize) -> Int? {
+        let count = items.count
+        guard count > 0 else { return nil }
+        let height = Rail.height(count)
+        let x = point.x - (size.width - Rail.width) / 2
+        let y = point.y - (size.height - height) / 2
+        guard x >= -Rail.slop, x <= Rail.width + Rail.slop,
+              y >= -Rail.slop, y <= height + Rail.slop else { return nil }
+        // Each row owns its item plus half the spacing on either side.
+        let row = ((y - Rail.inset + Rail.spacing / 2) / (Rail.item + Rail.spacing)).rounded(.down)
+        return min(max(Int(row), 0), count - 1)
+    }
 
     func select(_ index: Int) {
         withAnimation(.snappy) { selection = index }
@@ -217,40 +297,43 @@ struct CNTabRailSwiftUI: View {
 
     // MARK: Rail — icons in a vertical glass capsule
 
+    private typealias Rail = CNTabRailStore.Rail
+
     private var rail: some View {
         GlassEffectContainer {
-            VStack(spacing: 4) {
+            VStack(spacing: Rail.spacing) {
                 ForEach(store.items) { item in
                     let selected = item.id == store.selection
-                    Button { store.select(item.id) } label: {
-                        icon(item, selected: selected)
-                            .font(.system(size: 19, weight: .medium))
-                            .frame(width: 44, height: 44)
-                            .foregroundStyle(selected ? accent : Color.primary)
-                            .background {
-                                if selected {
-                                    Capsule()
-                                        .fill(Color.primary.opacity(0.10))
-                                        .matchedGeometryEffect(id: "selection", in: selectionNamespace)
-                                }
+                    // While pressed, the highlight follows the finger.
+                    let highlighted = item.id == (store.pressedIndex ?? store.selection)
+                    icon(item, selected: highlighted)
+                        .font(.system(size: 19, weight: .medium))
+                        .frame(width: Rail.item, height: Rail.item)
+                        .foregroundStyle(highlighted ? accent : Color.primary)
+                        .background {
+                            if highlighted {
+                                Capsule()
+                                    .fill(Color.primary.opacity(0.10))
+                                    .matchedGeometryEffect(id: "selection", in: selectionNamespace)
                             }
-                            .overlay(alignment: .topTrailing) { badge(item.badge).offset(x: 4, y: -2) }
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(item.label)
-                    .accessibilityValue(item.badge)
-                    .accessibilityAddTraits(selected ? [.isSelected] : [])
-                    // Icons keep a fixed size, like the system tab bar's; with
-                    // a large text size, long-pressing shows the item in the
-                    // Large Content Viewer instead.
-                    .accessibilityShowsLargeContentViewer {
-                        icon(item, selected: selected)
-                        Text(item.label)
-                    }
+                        }
+                        .overlay(alignment: .topTrailing) { badge(item.badge).offset(x: 4, y: -2) }
+                        .contentShape(Capsule())
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(item.label)
+                        .accessibilityValue(item.badge)
+                        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
+                        .accessibilityAction { store.select(item.id) }
+                        // Icons keep a fixed size, like the system tab bar's;
+                        // with a large text size, long-pressing shows the item
+                        // in the Large Content Viewer instead.
+                        .accessibilityShowsLargeContentViewer {
+                            icon(item, selected: selected)
+                            Text(item.label)
+                        }
                 }
             }
-            .padding(5)
+            .padding(Rail.inset)
             .glassEffect(.regular.interactive(), in: Capsule())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

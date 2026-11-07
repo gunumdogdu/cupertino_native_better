@@ -178,3 +178,106 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
   /// gesture guard only after the blink source is identified.
   Widget wrapWithModalInteractionGuard(Widget liveChild) => liveChild;
 }
+
+/// Drives the native halo containment (`setTransitioning`) of an iOS 26
+/// Liquid Glass platform view (Issues #29 and #124).
+///
+/// At rest the glass view is unclipped, so it can draw its full soft glow.
+/// While that glow could show past the view's bounds, the native side clips
+/// the view and clears its shadow instead. This mixin turns that
+/// containment on:
+///
+///  * while the host route animates, because a page is pushed over it or
+///    popped off it (#29); and
+///  * while a modal route (a dialog, popup or sheet) is up over a widget
+///    that stays mounted under modals, i.e. with `autoHideOnModal: false`
+///    (#124). A modal doesn't move the host route's secondary animation, so
+///    the first rule never fires for it. With `autoHideOnModal: true` the
+///    widget needs no containment: [ModalHideMixin] removes its platform
+///    view while the modal is up.
+///
+/// The modal rule reads [CNTabBarRouteObserver.anyModalDepth], so like
+/// `autoHideOnModal` it needs a `CNTabBarRouteObserver` in the navigator's
+/// `navigatorObservers`. The observer lowers the depth only after the
+/// modal's exit animation has finished, so containment holds through the
+/// fade-out as well. The depth is listened to directly, not after a frame,
+/// so containment is on before the modal's first frame is drawn.
+///
+/// **Usage.** Mix in after [ModalHideMixin] and call
+/// [resetHaloContainment] from `onPlatformViewCreated`, once
+/// [ModalHideMixin.platformViewChannel] returns the new view's channel. The
+/// native view must handle `setTransitioning` (`{active: bool}`).
+mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
+  Animation<double>? _routeAnimation;
+  bool? _sentContainment;
+
+  /// Whether containment should be on now.
+  bool get isHaloContained {
+    final status = _routeAnimation?.status;
+    final routeAnimating =
+        status == AnimationStatus.forward || status == AnimationStatus.reverse;
+    final modalAbove =
+        !autoHideOnModal &&
+        CNTabBarRouteObserver.anyModalDepth.value > _mountDepth;
+    return routeAnimating || modalAbove;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    CNTabBarRouteObserver.anyModalDepth.addListener(syncHaloContainment);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.secondaryAnimation;
+    if (!identical(animation, _routeAnimation)) {
+      _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+      _routeAnimation = animation;
+      _routeAnimation?.addStatusListener(_onRouteAnimationStatus);
+    }
+    syncHaloContainment();
+  }
+
+  @override
+  void didUpdateWidget(covariant T oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // `autoHideOnModal` may have changed.
+    syncHaloContainment();
+  }
+
+  @override
+  void dispose() {
+    CNTabBarRouteObserver.anyModalDepth.removeListener(syncHaloContainment);
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _routeAnimation = null;
+    super.dispose();
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus _) => syncHaloContainment();
+
+  /// Sends the containment state to the native view if it changed since
+  /// the last send.
+  void syncHaloContainment() {
+    final channel = platformViewChannel;
+    if (!mounted || channel == null) return;
+    final contained = isHaloContained;
+    if (contained == _sentContainment) return;
+    _sentContainment = contained;
+    // Fire-and-forget from a listener. `catchError`, not try/catch, because
+    // the error (e.g. MissingPluginException while the view is recreated)
+    // arrives asynchronously.
+    channel
+        .invokeMethod<void>('setTransitioning', <String, Object?>{
+          'active': contained,
+        })
+        .catchError((Object _) {});
+  }
+
+  /// Sends the current state to a newly created native view.
+  void resetHaloContainment() {
+    _sentContainment = null;
+    syncHaloContainment();
+  }
+}

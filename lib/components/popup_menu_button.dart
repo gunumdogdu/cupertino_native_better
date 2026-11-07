@@ -336,6 +336,11 @@ class CNPopupMenuButton extends StatefulWidget {
   /// CN-widget's pixels leak through a sheet that also contains a CN-widget.
   /// Requires `CNTabBarRouteObserver()` to be registered in the app's
   /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
+  ///
+  /// When false, the native view stays while a modal (a dialog, popup or
+  /// sheet) is up, and its Liquid Glass glow is clipped to the view's bounds
+  /// from the modal's push until its exit animation ends, so no box shows
+  /// around it through the modal's barrier (Issue #124).
   final bool autoHideOnModal;
 
   /// What VoiceOver reads for the button.
@@ -357,7 +362,9 @@ class CNPopupMenuButton extends StatefulWidget {
 }
 
 class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
-    with ModalHideMixin<CNPopupMenuButton> {
+    with
+        ModalHideMixin<CNPopupMenuButton>,
+        HaloContainmentMixin<CNPopupMenuButton> {
   @override
   bool get autoHideOnModal => widget.autoHideOnModal;
 
@@ -381,11 +388,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   /// the last [_renderCustomIcons]. `setItems` sends the submenus' ones again.
   Map<PopupMenuIconKey, Uint8List?> _menuIconBytes = {};
 
-  // Issue #29 halo containment: clip native view while enclosing route is
-  // animating. Modal-up containment is now handled by ModalHideMixin
-  // (maybeHiddenPlaceholder + native setInteractive); the legacy modal trigger
-  // was removed to avoid double-firing visual blink.
-  Animation<double>? _secondaryRouteAnim;
+  // Halo containment (Issues #29 and #124) is driven by
+  // HaloContainmentMixin.
 
   bool get _isDark => ThemeHelper.isDark(context);
   // Regular and clear glass resolve their content foreground from the
@@ -435,41 +439,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
   }
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = null;
     _channel?.setMethodCallHandler(null);
     super.dispose();
-  }
-
-  void _attachSecondaryRouteAnim() {
-    final route = ModalRoute.of(context);
-    final newAnim = route?.secondaryAnimation;
-    if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
-    _onSecondaryRouteAnimChanged();
-  }
-
-  void _onSecondaryRouteAnimChanged() {
-    _pushContainmentIfNeeded();
-  }
-
-  void _pushContainmentIfNeeded() {
-    final anim = _secondaryRouteAnim;
-    final animating =
-        anim?.status == AnimationStatus.forward ||
-        anim?.status == AnimationStatus.reverse;
-    final active = animating;
-    final ch = _channel;
-    if (ch == null) return;
-    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   /// Returns a hide-placeholder wrapped in a LayoutBuilder that reproduces
@@ -822,6 +798,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final ch = MethodChannel('CupertinoNativePopupMenuButton_$id');
     _channel = ch;
     ch.setMethodCallHandler(_onMethodCall);
+    resetHaloContainment();
     _lastTint = resolveColorToArgb(_effectiveTint, context);
     _lastIsDark = _isDark;
     _lastTitle = widget.buttonLabel;

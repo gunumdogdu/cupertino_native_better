@@ -250,6 +250,11 @@ class CNButton extends StatefulWidget {
   /// CNButton's pixels leak through a sheet that also contains a CN-widget.
   /// Requires `CNTabBarRouteObserver()` to be registered in the app's
   /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
+  ///
+  /// When false, the native view stays while a modal (a dialog, popup or
+  /// sheet) is up, and its Liquid Glass glow is clipped to the view's bounds
+  /// from the modal's push until its exit animation ends, so no box shows
+  /// around it through the modal's barrier (Issue #124).
   final bool autoHideOnModal;
 
   /// What VoiceOver reads for the button.
@@ -269,7 +274,8 @@ class CNButton extends StatefulWidget {
   State<CNButton> createState() => _CNButtonState();
 }
 
-class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
+class _CNButtonState extends State<CNButton>
+    with ModalHideMixin<CNButton>, HaloContainmentMixin<CNButton> {
   @override
   bool get autoHideOnModal => widget.autoHideOnModal;
 
@@ -302,21 +308,9 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
   Offset? _downPosition;
   bool _pressed = false;
 
-  // Issue #29: while the enclosing route is animating in/out OR while
-  // any modal/sheet/popup/dialog is presented over it, toggle native-
-  // side halo containment (container + button clipsToBounds + shadow/
-  // background clearing) so the iOS 26 Liquid Glass capsule can't leak
-  // outside the platform view's bounds through the sheet's top edge or
-  // through the incoming/outgoing page snapshot. At rest (no transition,
-  // no modal) the containment is OFF so the capsule can render its full
-  // soft-edge glow and grow with a stretched parent frame.
-  Animation<double>? _secondaryRouteAnim;
-  // NOTE: modal-up containment is no longer driven from this widget. The
-  // ModalHideMixin handles modal up/down via maybeHiddenPlaceholder and
-  // the native `setInteractive` call. The legacy `_modalAbove` trigger was
-  // removed because it double-fired with the mixin and caused a visible
-  // blink/resize. Route-transition containment (Issue #29) is still driven
-  // by the secondaryAnimation listener below.
+  // Halo containment (Issues #29 and #124) is driven by
+  // HaloContainmentMixin: on while the route animates, and while a modal is
+  // up over a button that stays mounted (autoHideOnModal: false).
 
   bool get _isDark => ThemeHelper.isDark(context);
 
@@ -335,8 +329,6 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = null;
     _channel?.setMethodCallHandler(null);
     super.dispose();
   }
@@ -350,39 +342,8 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
     _syncPropsToNativeIfNeeded();
-  }
-
-  void _attachSecondaryRouteAnim() {
-    final route = ModalRoute.of(context);
-    final newAnim = route?.secondaryAnimation;
-    if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
-    _onSecondaryRouteAnimChanged();
-  }
-
-  void _onSecondaryRouteAnimChanged() {
-    final anim = _secondaryRouteAnim;
-    if (anim == null) return;
-    final isAnimating =
-        anim.status == AnimationStatus.forward ||
-        anim.status == AnimationStatus.reverse;
-    _pushContainmentIfNeeded(animating: isAnimating);
-  }
-
-  void _pushContainmentIfNeeded({required bool animating}) {
-    final next = animating;
-    final ch = _channel;
-    if (ch == null) return;
-    // Fire-and-forget: this is called from a sync listener so we can't await.
-    // A sync try/catch CANNOT catch async errors from the returned Future
-    // (e.g. MissingPluginException during hot reload / view recreation),
-    // so use .catchError to swallow them safely.
-    ch.invokeMethod('setTransitioning', {'active': next}).catchError((_) {});
   }
 
   @override
@@ -747,6 +708,7 @@ class _CNButtonState extends State<CNButton> with ModalHideMixin<CNButton> {
     final ch = MethodChannel('CupertinoNativeButton_$id');
     _channel = ch;
     ch.setMethodCallHandler(_onMethodCall);
+    resetHaloContainment();
     // Clear previous intrinsic dimensions when view is recreated
     _intrinsicWidth = null;
     _intrinsicHeight = null;

@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.3.1
+  cupertino_native_better: ^2.3.2
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -224,7 +224,7 @@ Wrap the builder's root child in `CNSheetGeometryProbe` if you need to keep usin
 
 Without one of these, the package falls back to a conservative "hide every CN-widget on this route while any modal is up" behavior — safe, but coarser than needed (e.g. an app-bar CN-button could disappear behind a 30%-height sheet).
 
-Each affected widget also has an `autoHideOnModal: bool = true` constructor parameter so you can opt out per-instance if you ever need the old behavior.
+Each affected widget also has an `autoHideOnModal: bool = true` constructor parameter so you can opt out per-instance if you ever need the old behavior. With `autoHideOnModal: false` the widget stays on screen under a dialog, popup or sheet, and its Liquid Glass glow is clipped to its bounds until the modal has closed, so no box shows around it through the barrier.
 
 ## Components
 
@@ -1119,7 +1119,7 @@ CNTabBarNative.enable(
 );
 ```
 
-**`CNTabScaffold`** does the same for `CNTabBar`, which as a standalone bar never turns vertical on its own. It shows a `CNTabBar` at the bottom, swaps it for a `CNTabRail` in the vertical-bar column whenever iOS uses one, and can show a sidebar on wide screens. The body stays mounted, so folding never resets your page:
+**`CNTabScaffold`** does the same for `CNTabBar`, which as a standalone bar never turns vertical on its own. It shows a `CNTabBar` at the bottom, swaps it for a `CNTabRail` in the vertical-bar column whenever iOS uses one, and can show a sidebar on wide screens. As on the system vertical bar, you can press the rail and slide to another tab. The body stays mounted, so folding never resets your page:
 
 ```dart
 CNFoldableScope( // once, above the app
@@ -1286,7 +1286,7 @@ CNSlider(value: volume, semanticLabel: 'Volume', onChanged: setVolume)
 
 **macOS.** The controls are AppKit controls, so VoiceOver on the Mac reads them as the system's own, and `semanticLabel` names them there too: `CNButton`, `CNPopupMenuButton`, `CNSlider`, `CNSwitch`, `CNSegmentedControl`, `CNStepper`, `CNDatePicker`, `CNColorWell` and `CNProgressIndicator`. A `CNTabBar` badge is read as the tab's help. VoiceOver cannot open a `CNContextMenu` on macOS, because Flutter gives a widget no Show Menu action there; offer the same actions in a visible control too, such as a `CNPopupMenuButton`.
 
-**Dynamic Type.** Button titles follow the system text size. Tab bars, the tab rail and segmented controls keep a fixed size, as they do throughout iOS, and offer the **Large Content Viewer** instead: with a large text size, long-press an item to see it enlarged. `CNTabBar` and `CNTabBarNative` are system tab bars, and `CNTabRail` adopts the viewer as well.
+**Dynamic Type.** Button titles follow the system text size. Tab bars, the tab rail and segmented controls keep a fixed size, as they do throughout iOS, and offer the **Large Content Viewer** instead: with a large text size, long-press an item to see it enlarged. `CNTabBar` and `CNTabBarNative` are system tab bars, and `CNTabRail` adopts the viewer as well: as on the system tab bar, slide to another item and lift your finger to select it.
 
 > **Known Flutter limitation ([flutter/flutter#194389](https://github.com/flutter/flutter/issues/194389)):** VoiceOver *touch exploration* — moving a finger over the screen to find an element — does not reach a native control that shares its area with a scrolling Flutter list, because Flutter's accessibility hit test returns the list first. That covers controls placed inside a `ListView`, and a `CNTabBar` or `CNTabScaffold` bar floating over scrolling content. `CNTabBarNative` is not affected: its tab bar is a real `UITabBarController` outside Flutter's view. Where touch exploration of the tab bar matters, prefer `CNTabBarNative`.
 
@@ -1840,7 +1840,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.3.1
+   cupertino_native_better: ^2.3.2
    ```
 
 2. Update imports:

@@ -104,6 +104,11 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// CN-widgets. Requires `CNTabBarRouteObserver()` to be registered in
   /// the app's `navigatorObservers`. No effect on iOS < 26 / non-iOS
   /// (Flutter fallback).
+  ///
+  /// When false, the native view stays while a modal (a dialog, popup or
+  /// sheet) is up, and its Liquid Glass glow is clipped to the view's bounds
+  /// from the modal's push until its exit animation ends, so no box shows
+  /// around it through the modal's barrier (Issue #124).
   final bool autoHideOnModal;
 
   /// Returns the effective button count (from data or widgets).
@@ -115,7 +120,9 @@ class CNGlassButtonGroup extends StatefulWidget {
 }
 
 class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
-    with ModalHideMixin<CNGlassButtonGroup> {
+    with
+        ModalHideMixin<CNGlassButtonGroup>,
+        HaloContainmentMixin<CNGlassButtonGroup> {
   @override
   bool get autoHideOnModal => widget.autoHideOnModal;
 
@@ -129,12 +136,8 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
   double? _lastSpacingForGlass;
   bool? _lastIsDark;
 
-  // Issue #29 halo containment via setTransitioning.
-  // Driven only by route-transition animations; the modal-up trigger has been
-  // removed in favor of ModalHideMixin (maybeHiddenPlaceholder + native
-  // setInteractive), which handles modal sheets without the visible
-  // clip/shadow blink the legacy trigger caused.
-  Animation<double>? _secondaryRouteAnim;
+  // Halo containment (Issues #29 and #124) is driven by
+  // HaloContainmentMixin.
 
   /// Whether we're using widget mode (backward compatibility).
   bool get _usingWidgets => widget._buttonWidgets != null;
@@ -142,7 +145,6 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
   }
 
@@ -165,36 +167,6 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
   void didUpdateWidget(covariant CNGlassButtonGroup oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncButtonsToNativeIfNeeded();
-  }
-
-  @override
-  void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = null;
-    super.dispose();
-  }
-
-  void _attachSecondaryRouteAnim() {
-    final route = ModalRoute.of(context);
-    final newAnim = route?.secondaryAnimation;
-    if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
-    _onSecondaryRouteAnimChanged();
-  }
-
-  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
-
-  void _pushContainmentIfNeeded() {
-    final anim = _secondaryRouteAnim;
-    final animating =
-        anim?.status == AnimationStatus.forward ||
-        anim?.status == AnimationStatus.reverse;
-    final active = animating;
-    final ch = _channel;
-    if (ch == null) return;
-    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   @override
@@ -395,7 +367,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
     final channel = MethodChannel('CupertinoNativeGlassButtonGroup_$id');
     _channel = channel;
     _lastIsDark = ThemeHelper.isDark(context);
-    _pushContainmentIfNeeded();
+    resetHaloContainment();
     channel.setMethodCallHandler((call) async {
       if (call.method == 'buttonPressed') {
         final args = call.arguments as Map?;

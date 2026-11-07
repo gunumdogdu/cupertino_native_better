@@ -180,6 +180,11 @@ class CNFloatingIsland extends StatefulWidget {
   /// CN-widget's pixels leak through a sheet that also contains a CN-widget.
   /// Requires `CNTabBarRouteObserver()` to be registered in the app's
   /// `navigatorObservers`. No effect on iOS < 26 / non-iOS (Flutter fallback).
+  ///
+  /// When false, the native view stays while a modal (a dialog, popup or
+  /// sheet) is up, and its Liquid Glass glow is clipped to the view's bounds
+  /// from the modal's push until its exit animation ends, so no box shows
+  /// around it through the modal's barrier (Issue #124).
   final bool autoHideOnModal;
 
   @override
@@ -187,7 +192,10 @@ class CNFloatingIsland extends StatefulWidget {
 }
 
 class _CNFloatingIslandState extends State<CNFloatingIsland>
-    with SingleTickerProviderStateMixin, ModalHideMixin<CNFloatingIsland> {
+    with
+        SingleTickerProviderStateMixin,
+        ModalHideMixin<CNFloatingIsland>,
+        HaloContainmentMixin<CNFloatingIsland> {
   @override
   bool get autoHideOnModal => widget.autoHideOnModal;
 
@@ -200,12 +208,8 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   CNFloatingIslandController? _internalController;
   bool _isExpanded = false;
 
-  // Issue #29 halo containment state — toggled via setTransitioning on
-  // the native channel while the enclosing route is animating.
-  // Modal-up containment is now handled exclusively by ModalHideMixin
-  // (maybeHiddenPlaceholder + native setInteractive), so the legacy
-  // modal-depth trigger has been removed to avoid a double-fire blink.
-  Animation<double>? _secondaryRouteAnim;
+  // Halo containment (Issues #29 and #124) is driven by
+  // HaloContainmentMixin.
 
   bool? _lastIsDark;
 
@@ -236,7 +240,6 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _attachSecondaryRouteAnim();
     _syncBrightnessIfNeeded();
   }
 
@@ -253,29 +256,6 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
         // again with the current brightness.
       }
     }
-  }
-
-  void _attachSecondaryRouteAnim() {
-    final route = ModalRoute.of(context);
-    final newAnim = route?.secondaryAnimation;
-    if (identical(newAnim, _secondaryRouteAnim)) return;
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = newAnim;
-    _secondaryRouteAnim?.addListener(_onSecondaryRouteAnimChanged);
-    _onSecondaryRouteAnimChanged();
-  }
-
-  void _onSecondaryRouteAnimChanged() => _pushContainmentIfNeeded();
-
-  void _pushContainmentIfNeeded() {
-    final anim = _secondaryRouteAnim;
-    final animating =
-        anim?.status == AnimationStatus.forward ||
-        anim?.status == AnimationStatus.reverse;
-    final active = animating;
-    final ch = _controller._channel;
-    if (ch == null) return;
-    ch.invokeMethod('setTransitioning', {'active': active}).catchError((_) {});
   }
 
   void _setupAnimations() {
@@ -301,18 +281,9 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
 
   @override
   void dispose() {
-    _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
-    _secondaryRouteAnim = null;
     _animationController.dispose();
     _controller._detach();
     super.dispose();
-  }
-
-  void _onCreationBumpContainment() {
-    // Fire once after the platform view is created so the current
-    // animating/modal state is reflected on native side from the first
-    // frame (before that, the method channel was null).
-    _pushContainmentIfNeeded();
   }
 
   void _onPlatformViewCreated(int id) {
@@ -320,7 +291,7 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
     _controller._attach(ch);
     ch.setMethodCallHandler(_onMethodCall);
     _lastIsDark = ThemeHelper.isDark(context);
-    _onCreationBumpContainment();
+    resetHaloContainment();
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {
