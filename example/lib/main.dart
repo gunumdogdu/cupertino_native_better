@@ -53,6 +53,13 @@ import 'demos/issue65_gesture_arena_components_test.dart';
 import 'demos/issue68_tabbar_rapid_taps_test.dart';
 import 'demos/issue76_popup_gesture_test.dart';
 import 'demos/issue124_button_dialog_halo_test.dart';
+import 'demos/issue126_search_bar_controller_test.dart';
+import 'demos/issue127_popover_present_after_test.dart';
+import 'demos/issue128_floating_island_resize_test.dart';
+import 'demos/issue129_popover_rows_test.dart';
+import 'demos/issue130_icon_replace_color_test.dart';
+import 'demos/issue131_split_tab_action_test.dart';
+import 'demos/issue132_icon_only_tab_bar_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
@@ -1045,6 +1052,114 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue124ButtonDialogHaloTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#126: SearchBar controller'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('magnifyingglass', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue126SearchBarControllerTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#127: Present after popover'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'rectangle.on.rectangle',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue127PopoverPresentAfterTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#128: FloatingIsland resize'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('capsule', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue128FloatingIslandResizeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#129: Popover rows'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'list.bullet.rectangle',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue129PopoverRowsTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#130: Icon replace + colour'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('play.circle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue130IconReplaceColorTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#131: Split tab action'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('square.and.pencil', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue131SplitTabActionTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#132: Icon-only tab bar'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('dock.rectangle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue132IconOnlyTabBarTestPage(),
                       ),
                     );
                   },

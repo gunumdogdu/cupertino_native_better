@@ -100,6 +100,9 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue124 \
 //     --dart-define=OBSERVER=true
 //     (#124: glass CNButton with autoHideOnModal: false under a dialog)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue126
+//     (#126 to #132: the same with issue127 ... issue132; one screen each;
+//     AUTO=true runs the steps of #126 to #130 and prints `CNB_SHOT <step>`)
 //
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=gauge
 //     (2.3.0: CNGauge; AUTO=true moves the value every 2.5 s through the
@@ -154,6 +157,13 @@ import 'demos/tab_bar_demo.dart';
 import 'demos/pop_up_button.dart';
 import 'demos/gauge.dart';
 import 'demos/issue124_button_dialog_halo_test.dart';
+import 'demos/issue126_search_bar_controller_test.dart';
+import 'demos/issue127_popover_present_after_test.dart';
+import 'demos/issue128_floating_island_resize_test.dart';
+import 'demos/issue129_popover_rows_test.dart';
+import 'demos/issue130_icon_replace_color_test.dart';
+import 'demos/issue131_split_tab_action_test.dart';
+import 'demos/issue132_icon_only_tab_bar_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -246,6 +256,27 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue124') {
       return const Issue124ButtonDialogHaloTestPage();
+    }
+    if (_probe == 'issue126') {
+      return const Issue126SearchBarControllerTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue127') {
+      return const Issue127PopoverPresentAfterTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue128') {
+      return const Issue128FloatingIslandResizeTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue129') {
+      return const Issue129PopoverRowsTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue130') {
+      return const Issue130IconReplaceColorTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue131') {
+      return const Issue131SplitTabActionTestPage();
+    }
+    if (_probe == 'issue132') {
+      return const Issue132IconOnlyTabBarTestPage();
     }
     if (_probe == 'symboleffects') {
       return const SymbolEffectsProbePage();
