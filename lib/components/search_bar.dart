@@ -89,7 +89,12 @@ class CNSearchBarController {
 /// elegant iOS-native animation.
 ///
 /// On iOS 26+ it is a SwiftUI search bar with a Liquid Glass background; on
-/// older iOS and on other platforms it is drawn in Flutter.
+/// older iOS and on other platforms it is drawn in Flutter. The [controller]'s
+/// methods work on the iOS bar as on macOS: `setText` and `clear` report the
+/// new text through [onChanged], `expand` and `collapse` through
+/// [onExpandStateChanged] (collapsing also clears the text and ends
+/// editing), and `focus` opens a collapsed bar before it brings up the
+/// keyboard.
 ///
 /// On macOS (every supported version) it is a native `NSSearchField`, which
 /// keeps the keyboard while the user types and hands it back to Flutter when

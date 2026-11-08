@@ -440,25 +440,7 @@ class _CNIconState extends State<CNIcon> {
 
     color = _withDefaultColor(color, mode);
 
-    if (_lastName != name) {
-      final symbolArgs = <String, dynamic>{'name': name};
-
-      // Add imageAsset properties if using imageAsset
-      if (widget.imageAsset != null) {
-        symbolArgs['assetPath'] = widget.imageAsset!.assetPath;
-        symbolArgs['imageData'] = widget.imageAsset!.imageData;
-        // Auto-detect format if not provided
-        symbolArgs['imageFormat'] =
-            widget.imageAsset!.imageFormat ??
-            detectImageFormat(
-              widget.imageAsset!.assetPath,
-              widget.imageAsset!.imageData,
-            );
-      }
-
-      await channel.invokeMethod('setSymbol', symbolArgs);
-      _lastName = name;
-    }
+    final nameChanged = _lastName != name;
 
     // Track if any style properties changed
     bool hasStyleChanges = false;
@@ -509,6 +491,32 @@ class _CNIconState extends State<CNIcon> {
         style['name'] = widget.symbol!.name;
       }
     }
+
+    // A change of symbol and of style in one build goes out as one
+    // `setStyle`, which carries the symbol too: the replace transition then
+    // plays once with the final image. Sent apart, the second rebuild set
+    // the image directly and cut the transition off (#130).
+    final styleCarriesSource =
+        hasStyleChanges && (widget.imageAsset != null || widget.symbol != null);
+    if (nameChanged && !styleCarriesSource) {
+      final symbolArgs = <String, dynamic>{'name': name};
+
+      // Add imageAsset properties if using imageAsset
+      if (widget.imageAsset != null) {
+        symbolArgs['assetPath'] = widget.imageAsset!.assetPath;
+        symbolArgs['imageData'] = widget.imageAsset!.imageData;
+        // Auto-detect format if not provided
+        symbolArgs['imageFormat'] =
+            widget.imageAsset!.imageFormat ??
+            detectImageFormat(
+              widget.imageAsset!.assetPath,
+              widget.imageAsset!.imageData,
+            );
+      }
+
+      await channel.invokeMethod('setSymbol', symbolArgs);
+    }
+    _lastName = name;
 
     if (style.isNotEmpty) {
       await channel.invokeMethod('setStyle', style);

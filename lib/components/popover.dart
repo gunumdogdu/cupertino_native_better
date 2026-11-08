@@ -57,6 +57,7 @@ class CNPopoverRow {
     required this.item,
     this.checked = false,
     this.enabled = true,
+    this.readOnly = false,
   });
 
   /// Returned by [CNPopover.show] when the row is tapped.
@@ -70,6 +71,15 @@ class CNPopoverRow {
 
   /// Whether the row can be tapped. A disabled row is dimmed.
   final bool enabled;
+
+  /// Whether the row only shows information, such as a label and its value
+  /// in [CNListItem.trailingText].
+  ///
+  /// A read-only row is not a button: a tap on it does nothing and keeps
+  /// the popover open, it is drawn at full strength, and VoiceOver reads it
+  /// as text ("Prompt, 1,204") rather than as a button. Its [id] is never
+  /// returned.
+  final bool readOnly;
 }
 
 /// A switch in a [CNPopover].
@@ -651,6 +661,7 @@ Map<String, Object?> debugEncodePopoverContent(CNPopoverContent content) => {
         'id': row.id,
         'checked': row.checked,
         'enabled': row.enabled,
+        if (row.readOnly) 'readOnly': true,
       },
   ],
   'toggles': [
@@ -795,7 +806,9 @@ class _PopoverFallbackState extends State<_PopoverFallback> {
                         trailing: row.checked
                             ? Icon(CupertinoIcons.check_mark, color: tint)
                             : null,
-                        onTap: row.enabled ? () => navigator.pop(row.id) : null,
+                        onTap: row.enabled && !row.readOnly
+                            ? () => navigator.pop(row.id)
+                            : null,
                       ),
                     ),
                   for (final toggle in content.toggles)

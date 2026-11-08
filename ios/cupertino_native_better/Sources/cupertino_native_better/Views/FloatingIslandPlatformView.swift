@@ -108,6 +108,14 @@ class FloatingIslandPlatformView: NSObject, FlutterPlatformView {
                 }
                 result(nil)
 
+            case "setConfig":
+                // Sizes, corner radius, tint, spring and position changed in
+                // Flutter after the island was created (#128).
+                if let args = call.arguments as? [String: Any] {
+                    self.applyConfig(args)
+                }
+                result(nil)
+
             case "setBrightness":
                 if let args = call.arguments as? [String: Any],
                    let isDark = (args["isDark"] as? NSNumber)?.boolValue {
@@ -136,6 +144,24 @@ class FloatingIslandPlatformView: NSObject, FlutterPlatformView {
             default:
                 result(FlutterMethodNotImplemented)
             }
+        }
+    }
+
+    private func applyConfig(_ dict: [String: Any]) {
+        let model = viewModel
+        func number(_ key: String) -> CGFloat? {
+            (dict[key] as? NSNumber).map { CGFloat(truncating: $0) }
+        }
+        if let v = dict["springDamping"] as? NSNumber { model.springDamping = CGFloat(truncating: v) }
+        if let v = dict["springResponse"] as? NSNumber { model.springResponse = CGFloat(truncating: v) }
+        withAnimation(.spring(response: model.springResponse, dampingFraction: model.springDamping)) {
+            if let v = number("collapsedHeight") { model.collapsedHeight = v }
+            model.collapsedWidth = number("collapsedWidth") ?? 160
+            model.expandedHeight = number("expandedHeight") ?? 200
+            model.expandedWidth = number("expandedWidth")
+            if let v = number("cornerRadius") { model.cornerRadius = v }
+            model.tint = (dict["tint"] as? NSNumber).map { Color(uiColor: ImageUtils.colorFromARGB($0.intValue)) }
+            if let v = dict["position"] as? String { model.isTop = v == "top" }
         }
     }
 
@@ -253,7 +279,9 @@ struct FloatingIslandSwiftUI: View {
             } else {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(.clear)
-                    .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                    .glassEffect(
+                        viewModel.tint.map { Glass.regular.tint($0) } ?? .regular,
+                        in: .rect(cornerRadius: cornerRadius))
                     .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
                     .onTapGesture {
                         withAnimation(.spring(response: viewModel.springResponse, dampingFraction: viewModel.springDamping)) {

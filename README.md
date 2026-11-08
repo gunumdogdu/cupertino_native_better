@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.3.2
+  cupertino_native_better: ^2.4.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -370,7 +370,7 @@ CNTabBar(
 )
 ```
 
-On macOS the bar is an `NSSegmentedControl` used as tabs, on every version, with the tabs role on macOS&nbsp;27. Each tab shows its symbol or image (`imageAsset`, SVGs too) and its label, the bar draws badges, and a `searchItem` becomes a trailing search tab that calls `onSearchActiveChanged(true)` instead of `onTap`, so the app shows its own search field. AppKit has no split bar and no item menus, so `split` is ignored and an item with `menuItems` is a plain tab. `tint` colours the selection up to macOS&nbsp;26; the macOS&nbsp;27 tabs role draws its own neutral selection.
+On macOS the bar is an `NSSegmentedControl` used as tabs, on every version, with the tabs role on macOS&nbsp;27. Each tab shows its symbol or image (`imageAsset`, SVGs too) and its label, the bar draws badges, and a `searchItem` becomes a trailing search tab that calls `onSearchActiveChanged(true)` instead of `onTap`, so the app shows its own search field. AppKit has no split bar and no item menus, so `split` is ignored and an item with `menuItems` is a plain tab. Action items (`onPressed`) run without being selected, as on iOS. `tint` colours the selection up to macOS&nbsp;26; the macOS&nbsp;27 tabs role draws its own neutral selection.
 
 An item with `menuItems` opens a native menu instead of becoming the selected tab.
 
@@ -543,6 +543,10 @@ CNButton(key: sortKey, label: 'Sort', onPressed: () async {
   if (id != null) setState(() => sort = id);
 })
 ```
+
+A row with `readOnly: true` only shows information, such as a label and its `trailingText` value: it is not a button, a tap on it keeps the popover open, and VoiceOver reads it as text.
+
+`CNPopover.show` completes once the popover has gone, so the app can present a browser, a share sheet or an alert from its result straight away.
 
 It follows its anchor, and closes when the page changes, on a hot restart and with `CNPopover.dismiss()`. Escape closes it on macOS and Return presses the default button. Flutter widgets cannot go inside it. On Android and the web the same content shows in a Cupertino popup.
 
@@ -872,6 +876,47 @@ assets, not `customIcon`. On the Flutter fallback (iOS < 26, Android, web),
 the menu opens as a `CupertinoActionSheet`, as `CNPopupMenuButton`'s does.
 On the iOS 26 bar with a `searchItem`, and on the native macOS bar, the item
 is a plain tab.
+
+#### Action items
+
+`onPressed` turns an item into an action, such as Compose, that runs and is
+never selected. In a split bar a single action becomes the right-hand capsule,
+as in iOS 26 apps.
+
+```dart
+CNTabBar(
+  split: true,
+  rightCount: 1,
+  items: [
+    const CNTabBarItem(label: 'Inbox', icon: CNSymbol('tray')),
+    const CNTabBarItem(label: 'Archive', icon: CNSymbol('archivebox')),
+    CNTabBarItem(
+      label: 'Compose',
+      icon: const CNSymbol('square.and.pencil'),
+      onPressed: openComposer,
+    ),
+  ],
+  currentIndex: _selectedIndex, // 0 or 1, never the action's index
+  onTap: (index) => setState(() => _selectedIndex = index),
+)
+```
+
+A tap calls `onPressed`, not `onTap`; the selected tab stays as it is and no
+selection highlight shows on the action. VoiceOver reads the action as a
+button. It works the same on macOS and on the Flutter fallback.
+
+#### Names for icon-only tabs
+
+`semanticLabel` is what VoiceOver reads for a tab, in place of its label. It
+names an icon-only tab without showing a title:
+
+```dart
+CNTabBarItem(imageAsset: CNImageAsset('assets/icons/inbox.png'), semanticLabel: 'Inbox')
+```
+
+A bar given a `height` keeps its own, taller height on iOS 26, as a squeezed
+iOS 26 bar puts its labels over its icons. A bar with no labels has nothing
+to squeeze and uses the given `height` on iOS 26 too.
 
 ### Native iOS 26 Tab Bar (CNTabBarNative)
 
@@ -1840,7 +1885,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.3.2
+   cupertino_native_better: ^2.4.0
    ```
 
 2. Update imports:

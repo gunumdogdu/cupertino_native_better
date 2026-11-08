@@ -72,6 +72,12 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
   /// The menu each item opens instead of selecting itself (null for a plain
   /// item), encoded by `encodePopupMenuEntries`.
   private var currentMenus: [[String: Any]?] = []
+  /// `CNTabBarItem.semanticLabel` per item ("" for none): the name VoiceOver
+  /// reads, which an icon-only tab has no other way to get (#132).
+  private var currentSemanticLabels: [String] = []
+  /// The indices of the items that run an action instead of being selected
+  /// (`CNTabBarItem.onPressed`, #131).
+  private var currentActions: Set<Int> = []
   /// The selected item, so a tap on an item with a menu can put it back.
   private var currentIndex: Int = 0
 
@@ -155,6 +161,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
       if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
       self.currentMenus = Self.parseMenus(dict["menus"])
+      self.readItemOptions(dict)
     }
 
     container.backgroundColor = .clear
@@ -533,6 +540,7 @@ channel.setMethodCallHandler { [weak self] call, result in
           }
           let selectedIndex = (args["selectedIndex"] as? NSNumber)?.intValue ?? 0
           self.currentIndex = selectedIndex
+          self.readItemOptions(args)
           self.currentLabels = labels
           self.currentSymbols = symbols
           self.currentActiveSymbols = activeSymbols
@@ -1126,6 +1134,11 @@ channel.setMethodCallHandler { [weak self] call, result in
     }
   }
 
+  private func readItemOptions(_ dict: [String: Any]) {
+    currentSemanticLabels = (dict["semanticLabels"] as? [Any] ?? []).map { ($0 as? String) ?? "" }
+    currentActions = Set((dict["actions"] as? [Any] ?? []).compactMap { ($0 as? NSNumber)?.intValue })
+  }
+
   private static func parseMenus(_ value: Any?) -> [[String: Any]?] {
     return ((value as? [Any]) ?? []).map { $0 as? [String: Any] }
   }
@@ -1149,6 +1162,24 @@ channel.setMethodCallHandler { [weak self] call, result in
         menus[local] = UIMenu(title: "", children: children)
       }
       bar.itemMenus = menus
+
+      // Action items and accessibility names (#131, #132).
+      var actions = Set<Int>()
+      var actionLabels: [Int: String] = [:]
+      for (local, item) in (bar.items ?? []).enumerated() {
+        let index = offset + local
+        let name = index < currentSemanticLabels.count ? currentSemanticLabels[index] : ""
+        item.accessibilityLabel = name.isEmpty ? nil : name
+        if currentActions.contains(index) {
+          actions.insert(local)
+          if let label = name.isEmpty ? item.title : name { actionLabels[local] = label }
+        }
+      }
+      bar.itemActionLabels = actionLabels
+      bar.itemActions = actions
+      bar.onAction = { [weak self] local in
+        self?.channel.invokeMethod("actionPressed", arguments: ["index": offset + local])
+      }
     }
   }
 
@@ -1170,6 +1201,18 @@ channel.setMethodCallHandler { [weak self] call, result in
   }
 
   func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+    // An action item was selected after all: by VoiceOver, by a finger
+    // sliding onto it, or where its button couldn't be placed. Put the
+    // selection back and run the action (#131).
+    if let bar = tabBar as? CNDotTabBar, let items = bar.items,
+       let local = items.firstIndex(of: item), bar.runsAction(at: local) {
+      let index = (bar === tabBarRight ? (tabBarLeft?.items?.count ?? 0) : 0) + local
+      DispatchQueue.main.async { [weak self] in
+        self?.restoreSelection()
+        self?.channel.invokeMethod("actionPressed", arguments: ["index": index])
+      }
+      return
+    }
     // An item with a menu opens it instead of being selected, but the
     // bar's own gestures, which also get its button's touches, select it:
     // put the selection back, report nothing, and open the menu if a

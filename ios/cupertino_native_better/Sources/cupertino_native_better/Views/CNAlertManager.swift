@@ -33,6 +33,9 @@ final class CNAlertManager: NSObject {
     /// callback cannot deliver two results down one `FlutterResult` — the
     /// engine treats a double send as a hard error.
     private var pendingResult: FlutterResult?
+    /// Counts `show` calls, so a call waiting for a leaving controller
+    /// knows when a newer one replaced it.
+    private var generation = 0
 
     /// The alert `pendingResult` belongs to, and the identity every send is
     /// checked against. A superseded alert is torn down rather than left on
@@ -65,6 +68,7 @@ final class CNAlertManager: NSObject {
     // MARK: - Presentation
 
     private func show(config: Config, result: @escaping FlutterResult) {
+        generation &+= 1
         // Resolve the presenter *before* dismissing the alert below.
         // `dismiss(animated:)` does not clear `presentedViewController`
         // synchronously, so a walk performed afterwards can still land on the
@@ -97,11 +101,27 @@ final class CNAlertManager: NSObject {
 
     private func present(config: Config,
                          on presenter: UIViewController?,
-                         result: @escaping FlutterResult) {
+                         result: @escaping FlutterResult,
+                         waits: Int = 3) {
         guard let presenter else {
             result(FlutterError(code: "no_presenter",
                                 message: "No view controller available to present on",
                                 details: nil))
+            return
+        }
+
+        // A controller still on its way out (a popover or a sheet closed a
+        // moment ago) cannot be presented over yet: wait for it to go.
+        if let leaving = presenter.presentedViewController, leaving.isBeingDismissed, waits > 0 {
+            // Pending while it waits, so a newer `show` answers it.
+            pendingResult = result
+            let generation = self.generation
+            Self.afterDismissal(of: leaving) { [weak self] in
+                // A newer `show` took over (and answered this call).
+                guard let self, self.generation == generation else { return }
+                self.pendingResult = nil
+                self.present(config: config, on: presenter, result: result, waits: waits - 1)
+            }
             return
         }
 
@@ -189,6 +209,34 @@ final class CNAlertManager: NSObject {
         // answer the pending call.
         presentedAlert = alert
         presenter.present(alert, animated: true)
+        // UIKit refuses some presentations with only a log line; the call
+        // must not wait for an alert that never appeared.
+        if alert.presentingViewController == nil, presentedAlert === alert {
+            send(nil)
+        }
+    }
+
+    /// Runs [body] once [leaving], a controller on its way out, has gone.
+    /// Presenting from or over it before then is refused by UIKit with only a
+    /// log line (#127). Gives up after about two seconds, so a stuck
+    /// transition still ends in an answer.
+    static func afterDismissal(of leaving: UIViewController, tries: Int = 40,
+                               _ body: @escaping () -> Void) {
+        if let coordinator = leaving.transitionCoordinator {
+            coordinator.animate(alongsideTransition: nil) { _ in
+                DispatchQueue.main.async(execute: body)
+            }
+        } else if tries > 0, leaving.isBeingDismissed {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                if leaving.isBeingDismissed {
+                    afterDismissal(of: leaving, tries: tries - 1, body)
+                } else {
+                    body()
+                }
+            }
+        } else {
+            DispatchQueue.main.async(execute: body)
+        }
     }
 
     /// Delivers `value` to the waiting Dart call exactly once, whichever alert
@@ -230,7 +278,9 @@ final class CNAlertManager: NSObject {
     private func topPresenter(in window: UIWindow?,
                               skipping stale: UIAlertController?) -> UIViewController? {
         guard var vc = window?.rootViewController else { return nil }
-        while let presented = vc.presentedViewController, presented !== stale {
+        // A controller being dismissed cannot present; stop below it.
+        while let presented = vc.presentedViewController, presented !== stale,
+              !presented.isBeingDismissed {
             vc = presented
         }
         return vc

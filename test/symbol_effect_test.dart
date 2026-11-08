@@ -241,7 +241,60 @@ void main() {
           host,
           const CNIcon(symbol: CNSymbol('star', size: 24)),
         );
-        expect(methods(), ['setSymbol', 'setStyle']);
+        // A new symbol and a new size go out as one `setStyle` (#130).
+        expect(methods(), ['setStyle']);
+        debugDefaultTargetPlatformOverride = null;
+      },
+      skip: !(Platform.isMacOS || Platform.isIOS),
+    );
+
+    testWidgets(
+      'a new symbol and colour go out as one setStyle carrying the symbol '
+      '(#130)',
+      (tester) async {
+        final host = await pumpHost(
+          tester,
+          const CNIcon(
+            symbol: CNSymbol('play.fill'),
+            color: Color(0xFF007AFF),
+            replaceTransition: CNSymbolReplaceTransition.replace,
+          ),
+        );
+        await show(
+          tester,
+          host,
+          const CNIcon(
+            symbol: CNSymbol('pause.fill'),
+            color: Color(0xFF8E8E93),
+            replaceTransition: CNSymbolReplaceTransition.replace,
+          ),
+        );
+        expect(methods(), ['setStyle']);
+        final args = calls.last.arguments as Map;
+        expect(args['name'], 'pause.fill');
+        expect(args['iconColor'], 0xFF8E8E93);
+        debugDefaultTargetPlatformOverride = null;
+      },
+      skip: !(Platform.isMacOS || Platform.isIOS),
+    );
+
+    testWidgets(
+      'a new symbol alone still goes out as setSymbol',
+      (tester) async {
+        final host = await pumpHost(
+          tester,
+          const CNIcon(symbol: CNSymbol('play.fill'), color: Color(0xFF007AFF)),
+        );
+        await show(
+          tester,
+          host,
+          const CNIcon(
+            symbol: CNSymbol('pause.fill'),
+            color: Color(0xFF007AFF),
+          ),
+        );
+        expect(methods(), ['setSymbol']);
+        expect((calls.last.arguments as Map)['name'], 'pause.fill');
         debugDefaultTargetPlatformOverride = null;
       },
       skip: !(Platform.isMacOS || Platform.isIOS),

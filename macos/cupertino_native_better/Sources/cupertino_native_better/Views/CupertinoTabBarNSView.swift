@@ -37,6 +37,11 @@ class CupertinoTabBarNSView: NSView {
   private let control: NSSegmentedControl
 
   private var labels: [String] = []
+  /// `CNTabBarItem.semanticLabel` per item ("" for none), read by VoiceOver
+  /// in place of the label (#132).
+  private var semanticLabels: [String] = []
+  /// Items that run an action instead of being selected (#131).
+  private var actions: Set<Int> = []
   private var symbols: [String] = []
   private var activeSymbols: [String] = []
   private var badges: [String] = []
@@ -205,6 +210,8 @@ class CupertinoTabBarNSView: NSView {
 
   private func readItems(_ dict: [String: Any]) {
     labels = (dict["labels"] as? [String]) ?? []
+    semanticLabels = (dict["semanticLabels"] as? [Any] ?? []).map { ($0 as? String) ?? "" }
+    actions = Set((dict["actions"] as? [Any] ?? []).compactMap { ($0 as? NSNumber)?.intValue })
     symbols = (dict["sfSymbols"] as? [String]) ?? []
     activeSymbols = (dict["activeSfSymbols"] as? [String]) ?? []
     badges = (dict["badges"] as? [String]) ?? []
@@ -268,7 +275,8 @@ class CupertinoTabBarNSView: NSView {
   }
 
   private func image(for i: Int, active: Bool) -> NSImage? {
-    let label = i < labels.count ? labels[i] : ""
+    let label = i < semanticLabels.count && !semanticLabels[i].isEmpty
+      ? semanticLabels[i] : (i < labels.count ? labels[i] : "")
     let requested = i < sizes.count ? sizes[i] : nil
     // An image asset wins; the active one on the selected tab, else the
     // plain one for both states.
@@ -359,6 +367,12 @@ class CupertinoTabBarNSView: NSView {
         refreshImages()
         channel.invokeMethod("searchActiveChanged", arguments: ["isActive": true])
       }
+      return
+    }
+    if actions.contains(index) {
+      // An action runs and is never selected: put the selection back.
+      control.selectedSegment = searchActive ? (searchSegment ?? selectedIndex) : selectedIndex
+      channel.invokeMethod("actionPressed", arguments: ["index": index])
       return
     }
     searchActive = false

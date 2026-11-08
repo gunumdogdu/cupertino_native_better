@@ -6,6 +6,10 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
     private let channel: FlutterMethodChannel
     private let hostingController: UIViewController
     private let container: UIView
+    /// State shared with the SwiftUI view, so the controller's methods
+    /// (`setText`, `clear`, `focus`, `unfocus`, `expand`, `collapse`) reach
+    /// it (#126).
+    private let model: CNSearchBarModel
 
     init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
         self.channel = FlutterMethodChannel(
@@ -52,8 +56,22 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["isDark"] as? Bool { isDark = v }
         }
 
+        let model = CNSearchBarModel(
+            expanded: initiallyExpanded || !expandable,
+            expandable: expandable,
+            autofocus: autofocus,
+            onTextChanged: { text in
+                channelRef.invokeMethod("textChanged", arguments: ["text": text])
+            },
+            onExpandStateChanged: { expanded in
+                channelRef.invokeMethod(expanded ? "expanded" : "collapsed", arguments: nil)
+            }
+        )
+        self.model = model
+
         // Create SwiftUI view
         let searchBarView = CNSearchBarSwiftUI(
+            model: model,
             placeholder: placeholder,
             expandable: expandable,
             initiallyExpanded: initiallyExpanded,
@@ -68,14 +86,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             autofocus: autofocus,
             searchIconName: searchIconName,
             clearIconName: clearIconName,
-            onTextChanged: { text in
-                channelRef.invokeMethod("textChanged", arguments: ["text": text])
-            },
             onSubmitted: { text in
                 channelRef.invokeMethod("submitted", arguments: ["text": text])
-            },
-            onExpandStateChanged: { expanded in
-                channelRef.invokeMethod(expanded ? "expanded" : "collapsed", arguments: nil)
             },
             onCancelTapped: {
                 channelRef.invokeMethod("cancelTapped", arguments: nil)
@@ -109,22 +121,33 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         channel.setMethodCallHandler { [weak self] call, result in
             guard let self = self else { result(nil); return }
 
+            let args = call.arguments as? [String: Any]
+            let animated = (args?["animated"] as? NSNumber)?.boolValue ?? true
             switch call.method {
             case "expand":
-                // Handled by SwiftUI state
+                self.model.setExpanded(true, animated: animated)
+                if self.model.autofocus { self.model.requestFocus(true) }
                 result(nil)
             case "collapse":
-                // Handled by SwiftUI state
+                self.model.setExpanded(false, animated: animated)
                 result(nil)
             case "clear":
-                // Handled by SwiftUI state
+                self.model.setText("", notify: true)
                 result(nil)
             case "setText":
-                // Handled by SwiftUI state
+                self.model.setText((args?["text"] as? String) ?? "", notify: true)
+                result(nil)
+            case "textChanged":
+                // Flutter's own copy of the text changed (it clears it when it
+                // collapses the bar): take it over without reporting it back.
+                self.model.setText((args?["text"] as? String) ?? "", notify: false)
                 result(nil)
             case "focus":
+                if !self.model.isExpanded { self.model.setExpanded(true, animated: true) }
+                self.model.requestFocus(true)
                 result(nil)
             case "unfocus":
+                self.model.requestFocus(false)
                 result(nil)
             case "setBrightness":
                 if let args = call.arguments as? [String: Any],
@@ -182,9 +205,86 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
     }
 }
 
+// MARK: - Shared state
+
+/// The search bar's state, owned by the platform view so the controller's
+/// method calls can change it, and observed by [CNSearchBarSwiftUI].
+final class CNSearchBarModel: ObservableObject {
+    @Published var isExpanded: Bool
+    @Published var searchText: String = ""
+    /// Bumped on each `focus`/`unfocus` call; [wantsFocus] says which.
+    @Published var focusToken: Int = 0
+    private(set) var wantsFocus = false
+
+    let expandable: Bool
+    let autofocus: Bool
+    private let onTextChanged: (String) -> Void
+    private let onExpandStateChanged: (Bool) -> Void
+    /// The text Flutter already knows, so a change is reported once and a
+    /// change that came from Flutter is not echoed back.
+    private var reportedText = ""
+
+    init(
+        expanded: Bool,
+        expandable: Bool,
+        autofocus: Bool,
+        onTextChanged: @escaping (String) -> Void,
+        onExpandStateChanged: @escaping (Bool) -> Void
+    ) {
+        self.isExpanded = expanded
+        self.expandable = expandable
+        self.autofocus = autofocus
+        self.onTextChanged = onTextChanged
+        self.onExpandStateChanged = onExpandStateChanged
+    }
+
+    /// Reports [text] to Flutter unless Flutter already has it.
+    func report(_ text: String) {
+        guard text != reportedText else { return }
+        reportedText = text
+        onTextChanged(text)
+    }
+
+    func setText(_ text: String, notify: Bool) {
+        if !notify { reportedText = text }
+        searchText = text
+        if notify { report(text) }
+    }
+
+    func requestFocus(_ focused: Bool) {
+        wantsFocus = focused
+        focusToken &+= 1
+    }
+
+    /// Opens or closes the bar. Closing also clears the text and ends
+    /// editing, as the Cancel button does. A bar that is not [expandable]
+    /// stays open.
+    func setExpanded(_ expanded: Bool, animated: Bool) {
+        guard expanded != isExpanded else { return }
+        if !expanded && !expandable { return }
+        let apply = {
+            self.isExpanded = expanded
+            if !expanded {
+                self.wantsFocus = false
+                self.focusToken &+= 1
+                self.setText("", notify: true)
+            }
+        }
+        if animated {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8), apply)
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction, apply)
+        }
+        onExpandStateChanged(expanded)
+    }
+}
+
 // MARK: - SwiftUI Search Bar View
 
 struct CNSearchBarSwiftUI: View {
+    @ObservedObject var model: CNSearchBarModel
     let placeholder: String
     let expandable: Bool
     let initiallyExpanded: Bool
@@ -200,17 +300,15 @@ struct CNSearchBarSwiftUI: View {
     let searchIconName: String
     let clearIconName: String
 
-    let onTextChanged: (String) -> Void
     let onSubmitted: (String) -> Void
-    let onExpandStateChanged: (Bool) -> Void
     let onCancelTapped: () -> Void
 
-    @State private var isExpanded: Bool
-    @State private var searchText: String = ""
+    private var isExpanded: Bool { model.isExpanded }
     @FocusState private var isFocused: Bool
     @Namespace private var animation
 
     init(
+        model: CNSearchBarModel,
         placeholder: String,
         expandable: Bool,
         initiallyExpanded: Bool,
@@ -225,11 +323,10 @@ struct CNSearchBarSwiftUI: View {
         autofocus: Bool,
         searchIconName: String,
         clearIconName: String,
-        onTextChanged: @escaping (String) -> Void,
         onSubmitted: @escaping (String) -> Void,
-        onExpandStateChanged: @escaping (Bool) -> Void,
         onCancelTapped: @escaping () -> Void
     ) {
+        self.model = model
         self.placeholder = placeholder
         self.expandable = expandable
         self.initiallyExpanded = initiallyExpanded
@@ -244,11 +341,8 @@ struct CNSearchBarSwiftUI: View {
         self.autofocus = autofocus
         self.searchIconName = searchIconName
         self.clearIconName = clearIconName
-        self.onTextChanged = onTextChanged
         self.onSubmitted = onSubmitted
-        self.onExpandStateChanged = onExpandStateChanged
         self.onCancelTapped = onCancelTapped
-        self._isExpanded = State(initialValue: initiallyExpanded || !expandable)
     }
 
     var body: some View {
@@ -263,23 +357,19 @@ struct CNSearchBarSwiftUI: View {
 
                 if isExpanded {
                     // Text field
-                    TextField(placeholder, text: $searchText)
+                    TextField(placeholder, text: $model.searchText)
                         .foregroundColor(textColor ?? .primary)
                         .focused($isFocused)
                         .submitLabel(.search)
                         .onSubmit {
-                            onSubmitted(searchText)
-                        }
-                        .onChange(of: searchText) { newValue in
-                            onTextChanged(newValue)
+                            onSubmitted(model.searchText)
                         }
                         .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
 
                     // Clear button
-                    if !searchText.isEmpty {
+                    if !model.searchText.isEmpty {
                         Button(action: {
-                            searchText = ""
-                            onTextChanged("")
+                            model.setText("", notify: true)
                         }) {
                             Image(systemName: clearIconName)
                                 .font(.system(size: 16))
@@ -297,10 +387,7 @@ struct CNSearchBarSwiftUI: View {
             .contentShape(Capsule())
             .onTapGesture {
                 if !isExpanded && expandable {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isExpanded = true
-                        onExpandStateChanged(true)
-                    }
+                    model.setExpanded(true, animated: true)
                     if autofocus {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             isFocused = true
@@ -312,13 +399,9 @@ struct CNSearchBarSwiftUI: View {
             // Cancel button
             if showCancelButton && isExpanded {
                 Button(action: {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        isExpanded = false
-                        searchText = ""
-                        isFocused = false
-                        onExpandStateChanged(false)
-                        onCancelTapped()
-                    }
+                    isFocused = false
+                    model.setExpanded(false, animated: true)
+                    onCancelTapped()
                 }) {
                     Text(cancelText)
                         .foregroundColor(tint)
@@ -327,7 +410,21 @@ struct CNSearchBarSwiftUI: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
-        .animation(.easeInOut(duration: 0.2), value: searchText.isEmpty)
+        .animation(.easeInOut(duration: 0.2), value: model.searchText.isEmpty)
+        // Typing and every other change of the text reach Flutter once.
+        .onChange(of: model.searchText) { newValue in
+            model.report(newValue)
+        }
+        .onChange(of: model.focusToken) { _ in
+            if model.wantsFocus {
+                // The field may only just have been inserted by an expand.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    if model.wantsFocus && model.isExpanded { isFocused = true }
+                }
+            } else {
+                isFocused = false
+            }
+        }
     }
 
     @ViewBuilder

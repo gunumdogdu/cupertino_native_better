@@ -319,6 +319,9 @@ struct CNPopoverConfig {
     let item: Item
     let checked: Bool
     let enabled: Bool
+    /// Shows information only: not a button, never closes the popover
+    /// (#129).
+    let readOnly: Bool
   }
   struct Toggle {
     let id: String
@@ -355,7 +358,8 @@ struct CNPopoverConfig {
             image: CNPopoverConfig.loadImage(r["leadingImage"] as? [String: Any]),
             chevron: r["showChevron"] as? Bool ?? false),
           checked: r["checked"] as? Bool ?? false,
-          enabled: r["enabled"] as? Bool ?? true)
+          enabled: r["enabled"] as? Bool ?? true,
+          readOnly: r["readOnly"] as? Bool ?? false)
       }
       toggles = (dict["toggles"] as? [[String: Any]] ?? []).map { t in
         Toggle(
@@ -565,14 +569,20 @@ struct CNPopoverBody: View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(content.rows.indices, id: \.self) { i in
         let row = content.rows[i]
-        Button {
-          onRow(row.id)
-        } label: {
+        if row.readOnly {
+          // Static text for VoiceOver: label and value, no button.
           rowLabel(row)
+            .accessibilityAddTraits(row.checked ? .isSelected : [])
+        } else {
+          Button {
+            onRow(row.id)
+          } label: {
+            rowLabel(row)
+          }
+          .buttonStyle(CNPopoverRowStyle())
+          .disabled(!row.enabled)
+          .accessibilityAddTraits(row.checked ? .isSelected : [])
         }
-        .buttonStyle(CNPopoverRowStyle())
-        .disabled(!row.enabled)
-        .accessibilityAddTraits(row.checked ? .isSelected : [])
       }
     }
   }
@@ -590,8 +600,12 @@ struct CNPopoverBody: View {
           .accessibilityHidden(true)
       }
       if anyLeading {
-        leading(row.item)
+        // The column keeps its width in a row without an icon, so every
+        // title starts in one column (#129). A frame on an empty view alone
+        // takes no space.
+        Color.clear
           .frame(width: 18, height: 18)
+          .overlay(leading(row.item).frame(width: 18, height: 18))
       }
       VStack(alignment: .leading, spacing: 1) {
         Text(row.item.title)

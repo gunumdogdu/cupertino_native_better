@@ -215,7 +215,12 @@ final class CNPopoverManager: NSObject, UIPopoverPresentationControllerDelegate 
         store = nil
         isolateObservation = nil
         if dismiss, let host, host.presentingViewController != nil, !host.isBeingDismissed {
-            host.dismiss(animated: true)
+            // Answer once the popover has gone. An app that presents
+            // something from the answer (a browser, a share sheet, an alert)
+            // would otherwise present while UIKit is still dismissing the
+            // popover, and UIKit drops it with only a log line (#127).
+            host.dismiss(animated: true) { result?(value) }
+            return
         }
         result?(value)
     }
@@ -357,6 +362,9 @@ struct CNPopoverConfig {
         let item: CNSheetConfig.Item
         let checked: Bool
         let enabled: Bool
+        /// Shows information only: not a button, never closes the popover
+        /// (#129).
+        let readOnly: Bool
     }
     struct Toggle {
         let id: String
@@ -388,7 +396,8 @@ struct CNPopoverConfig {
                 Row(id: raw["id"] as? String ?? "",
                     item: item,
                     checked: raw["checked"] as? Bool ?? false,
-                    enabled: raw["enabled"] as? Bool ?? true)
+                    enabled: raw["enabled"] as? Bool ?? true,
+                    readOnly: raw["readOnly"] as? Bool ?? false)
             }
             toggles = (dict["toggles"] as? [[String: Any]] ?? []).map { t in
                 Toggle(id: t["id"] as? String ?? "",
@@ -643,14 +652,20 @@ struct CNPopoverBody: View {
                 if i > 0 {
                     Divider().padding(.leading, textInset)
                 }
-                Button {
-                    onRow(row.id)
-                } label: {
+                if row.readOnly {
+                    // Static text for VoiceOver: label and value, no button.
                     rowLabel(row)
+                        .accessibilityAddTraits(row.checked ? .isSelected : [])
+                } else {
+                    Button {
+                        onRow(row.id)
+                    } label: {
+                        rowLabel(row)
+                    }
+                    .buttonStyle(CNPopoverRowStyle())
+                    .disabled(!row.enabled)
+                    .accessibilityAddTraits(row.checked ? .isSelected : [])
                 }
-                .buttonStyle(CNPopoverRowStyle())
-                .disabled(!row.enabled)
-                .accessibilityAddTraits(row.checked ? .isSelected : [])
             }
         }
     }
@@ -670,10 +685,17 @@ struct CNPopoverBody: View {
         let secondary: HierarchicalShapeStyle = row.enabled ? .secondary : .tertiary
         return HStack(spacing: 12) {
             if anyLeading {
-                leading(row.item)
-                    .foregroundStyle(primary)
-                    .opacity(row.item.image != nil && !row.enabled ? 0.4 : 1)
+                // The column keeps its width in a row without an icon, so
+                // every title starts where the separators do (#129). A frame
+                // on an empty view alone takes no space.
+                Color.clear
                     .frame(width: iconSide, height: iconSide)
+                    .overlay(
+                        leading(row.item)
+                            .foregroundStyle(primary)
+                            .opacity(row.item.image != nil && !row.enabled ? 0.4 : 1)
+                            .frame(width: iconSide, height: iconSide)
+                    )
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.item.title)

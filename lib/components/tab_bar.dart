@@ -34,10 +34,36 @@ class CNTabBarItem {
     this.imageAsset,
     this.activeImageAsset,
     this.menuItems,
+    this.semanticLabel,
+    this.onPressed,
   });
 
   /// Optional tab item label.
   final String? label;
+
+  /// The name VoiceOver reads for the tab, in place of [label].
+  ///
+  /// Gives an icon-only tab (no [label]) a name without showing a title:
+  /// `CNTabBarItem(imageAsset: ..., semanticLabel: 'Inbox')` is read as
+  /// "Inbox, tab, 1 of 3". On iOS it is the item's `accessibilityLabel`; on
+  /// macOS the description of the tab's image.
+  final String? semanticLabel;
+
+  /// Makes the item an action, such as Compose or New, instead of a tab.
+  ///
+  /// Tapping the item calls [onPressed]. The item is never selected, the
+  /// selected tab stays as it is, and [CNTabBar.onTap] is not called, so the
+  /// index of an action item is never a valid [CNTabBar.currentIndex]. A
+  /// split bar (`split: true, rightCount: 1`) shows a single action as the
+  /// right-hand capsule, as iOS 26 apps do.
+  ///
+  /// On the iOS 26+ bar a clear button over the item takes the tap before
+  /// the bar can select the item, so no selection highlight shows. When the
+  /// item is reached another way (VoiceOver, or a finger sliding along the
+  /// bar onto it), the bar puts its selection back and calls [onPressed].
+  /// VoiceOver reads the item as a button. The macOS bar and the Flutter
+  /// fallback run the action the same way.
+  final VoidCallback? onPressed;
 
   /// Optional SF Symbol for the item (unselected state).
   /// If both [icon] and [customIcon] are provided, [customIcon] takes precedence.
@@ -385,6 +411,7 @@ class _CNTabBarState extends State<CNTabBar> {
   /// of the items last sent to the native bar.
   String? _paramsImagesKey;
   String? _lastImagesKey;
+  String? _lastItemOptionsKey;
   String? _lastLabelFontFamily;
   double? _lastLabelFontSize;
 
@@ -894,6 +921,7 @@ class _CNTabBarState extends State<CNTabBar> {
       'imageAssetFormats': imageAssetFormats,
       'activeImageAssetFormats': activeImageAssetFormats,
       'menus': ?_encodeMenus(),
+      ..._itemOptions(items),
       'iconScale': capturedDevicePixelRatio,
       'sfSymbolSizes': sizes,
       'sfSymbolColors': colors,
@@ -1055,6 +1083,11 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastBadges = params['badges'] as List<String>;
     _lastIconSize = widget.iconSize;
     _lastImagesKey = _paramsImagesKey;
+    _lastItemOptionsKey = jsonEncode(<String, Object?>{
+      if (params.containsKey('semanticLabels'))
+        'semanticLabels': params['semanticLabels'],
+      if (params.containsKey('actions')) 'actions': params['actions'],
+    });
     _lastSplit = widget.split;
     _lastRightCount = widget.rightCount;
     _lastSplitSpacing = widget.splitSpacing;
@@ -1131,6 +1164,18 @@ class _CNTabBarState extends State<CNTabBar> {
     ];
   }
 
+  /// The accessibility names and action items, sent with the items; empty
+  /// when no item has either, so bars without them send nothing new.
+  static Map<String, Object?> _itemOptions(List<CNTabBarItem> items) => {
+    if (items.any((e) => (e.semanticLabel ?? '').isNotEmpty))
+      'semanticLabels': [for (final e in items) e.semanticLabel ?? ''],
+    if (items.any((e) => e.onPressed != null))
+      'actions': [
+        for (var i = 0; i < items.length; i++)
+          if (items[i].onPressed != null) i,
+      ],
+  };
+
   /// Compares encoded menus: entries carry no callback, so their encoding
   /// tells whether they changed.
   static String? _menusKey(List? menus) =>
@@ -1144,10 +1189,27 @@ class _CNTabBarState extends State<CNTabBar> {
       if (idx != null && path != null && path.isNotEmpty) {
         widget.onMenuSelected?.call(idx, List.unmodifiable(path));
       }
+    } else if (call.method == 'actionPressed') {
+      final args = call.arguments as Map?;
+      final idx = (args?['index'] as num?)?.toInt();
+      if (idx != null && idx >= 0 && idx < widget.items.length) {
+        widget.items[idx].onPressed?.call();
+      }
     } else if (call.method == 'valueChanged') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
-      if (idx != null) {
+      final action = idx != null && idx >= 0 && idx < widget.items.length
+          ? widget.items[idx].onPressed
+          : null;
+      if (action != null) {
+        // A bar that can't keep an action item from being selected (the
+        // bar with a search item): run the action and put the selection
+        // back.
+        action();
+        _channel
+            ?.invokeMethod('setSelectedIndex', {'index': widget.currentIndex})
+            .catchError((_) {});
+      } else if (idx != null) {
         // Always fire onTap, even for reselects (Issue #13 fix)
         widget.onTap(idx);
         _lastIndex = idx;
@@ -1229,13 +1291,17 @@ class _CNTabBarState extends State<CNTabBar> {
       final iconSizeChanged = _lastIconSize != widget.iconSize;
       final imagesKey = _imagesKey(widget.items);
       final imagesChanged = _lastImagesKey != imagesKey;
+      final itemOptions = _itemOptions(widget.items);
+      final itemOptionsKey = jsonEncode(itemOptions);
+      final itemOptionsChanged = _lastItemOptionsKey != itemOptionsKey;
 
       if (badgesChanged &&
           !labelsChanged &&
           !symbolsChanged &&
           !activeSymbolsChanged &&
           !iconSizeChanged &&
-          !imagesChanged) {
+          !imagesChanged &&
+          !itemOptionsChanged) {
         // Only badges changed - use lightweight update. No return: a font or
         // layout change in the same rebuild still has to go out below.
         await ch.invokeMethod('setBadges', {'badges': badges});
@@ -1245,7 +1311,8 @@ class _CNTabBarState extends State<CNTabBar> {
           activeSymbolsChanged ||
           badgesChanged ||
           iconSizeChanged ||
-          imagesChanged) {
+          imagesChanged ||
+          itemOptionsChanged) {
         // Re-render custom icons if items changed
         final iconBytes = await _renderCustomIcons();
         final customIconBytes = iconBytes[0];
@@ -1322,7 +1389,9 @@ class _CNTabBarState extends State<CNTabBar> {
           'iconScale': iconScale,
           'selectedIndex': widget.currentIndex,
           'sfSymbolSizes': sizes,
+          ...itemOptions,
         });
+        _lastItemOptionsKey = itemOptionsKey;
         _lastLabels = labels;
         _lastSymbols = symbols;
         _lastActiveSymbols = activeSymbols;
@@ -1398,10 +1467,15 @@ class _CNTabBarState extends State<CNTabBar> {
   /// same bar out right. So on iOS 26 a bar given a shorter [CNTabBar.height]
   /// keeps its own height, aligned to the bottom of the box, and its
   /// transparent top reaches above it. A taller height is used as it is.
+  ///
+  /// An icon-only bar (no item has a label) has no labels to squeeze, and
+  /// iOS 26 lays it out right at a shorter height, so it is used as it is
+  /// there too (#132).
   bool get _keepsNativeHeight =>
       widget.height != null &&
       defaultTargetPlatform == TargetPlatform.iOS &&
-      PlatformVersion.iosVersion == 26;
+      PlatformVersion.iosVersion == 26 &&
+      widget.items.any((e) => (e.label ?? '').isNotEmpty);
 
   Future<void> _requestIntrinsicSize() async {
     if (widget.height != null && !_keepsNativeHeight) return;
@@ -1424,6 +1498,11 @@ class _CNTabBarState extends State<CNTabBar> {
   /// A tap on the Flutter fallback: an item with [CNTabBarItem.menuItems]
   /// opens its menu as an action sheet instead of being selected.
   Future<void> _onFallbackTap(int index) async {
+    final action = widget.items[index].onPressed;
+    if (action != null) {
+      action();
+      return;
+    }
     final menuItems = widget.items[index].menuItems;
     if (menuItems == null) {
       widget.onTap(index);
@@ -1439,6 +1518,16 @@ class _CNTabBarState extends State<CNTabBar> {
     }
   }
 
+  /// Names an icon-only tab for screen readers ([CNTabBarItem.semanticLabel]).
+  static Widget _withSemanticLabel(CNTabBarItem item, Widget icon) {
+    final name = item.semanticLabel;
+    if (name == null || name.isEmpty) return icon;
+    return Semantics(
+      label: name,
+      child: ExcludeSemantics(child: icon),
+    );
+  }
+
   /// Builds the Flutter fallback for non-iOS 26+ platforms.
   /// Includes search functionality when searchItem is provided.
   Widget _buildFlutterFallback(BuildContext context) {
@@ -1451,8 +1540,14 @@ class _CNTabBarState extends State<CNTabBar> {
         items: [
           for (final item in widget.items)
             BottomNavigationBarItem(
-              icon: _withBadge(item, _buildTabIcon(item, isActive: false)),
-              activeIcon: _withBadge(item, _buildTabIcon(item, isActive: true)),
+              icon: _withSemanticLabel(
+                item,
+                _withBadge(item, _buildTabIcon(item, isActive: false)),
+              ),
+              activeIcon: _withSemanticLabel(
+                item,
+                _withBadge(item, _buildTabIcon(item, isActive: true)),
+              ),
               label: item.label,
             ),
         ],

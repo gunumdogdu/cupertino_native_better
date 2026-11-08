@@ -35,6 +35,59 @@ final class CNDotTabBar: CNLabelFontTabBar {
     return itemMenus[i] != nil
   }
 
+  /// The items that run an action instead of being selected (#131), by item
+  /// index. Each gets a clear button over it that reports the tap through
+  /// [onAction], and the bar's own gestures don't start there, so the item
+  /// is never selected and the selection stays where it was.
+  var itemActions: Set<Int> = [] {
+    didSet { if itemActions != oldValue { setNeedsLayout() } }
+  }
+
+  /// Called with the item index when an action item is tapped.
+  var onAction: ((Int) -> Void)?
+
+  /// What VoiceOver reads for each action item, by item index: its button
+  /// stands in for the item, as a button rather than a tab.
+  var itemActionLabels: [Int: String] = [:] {
+    didSet { if itemActionLabels != oldValue { setNeedsLayout() } }
+  }
+
+  private var actionButtons: [Int: CNTabActionButton] = [:]
+
+  /// Whether item [i] runs an action instead of being selected.
+  func runsAction(at i: Int) -> Bool {
+    return itemActions.contains(i)
+  }
+
+  /// An action item's button takes the touches on it, and the bar's own
+  /// gestures sit those touches out: the iOS 26 bar selects the item under
+  /// the finger from a gesture recognizer of its own, before its button or
+  /// the delegate hear of the touch, and a standalone `UITabBar` can't be
+  /// asked first.
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    if let button = actionButtons.values.first(where: { !$0.isHidden && $0.frame.contains(point) }) {
+      if event?.type == .touches { holdOwnGestures() }
+      return button
+    }
+    return super.hitTest(point, with: event)
+  }
+
+  private var heldGestures: [UIGestureRecognizer] = []
+
+  /// Switches the bar's gesture recognizers off while a touch on an action
+  /// button begins, and on again right after: a recognizer takes part in
+  /// the touches that begin while it is enabled, so they miss only this one.
+  private func holdOwnGestures() {
+    guard heldGestures.isEmpty else { return }
+    heldGestures = (gestureRecognizers ?? []).filter { $0.isEnabled }
+    heldGestures.forEach { $0.isEnabled = false }
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.heldGestures.forEach { $0.isEnabled = true }
+      self.heldGestures = []
+    }
+  }
+
   /// Opens the menu of item [i] unless it's already shown: a finger sliding
   /// along the bar onto the item selects it without touching its button.
   /// When the icons can't be found, the button takes no touches; it is put
@@ -54,6 +107,79 @@ final class CNDotTabBar: CNLabelFontTabBar {
     super.layoutSubviews()
     placeDots()
     placeMenuButtons()
+    placeActionButtons()
+  }
+
+  private func placeActionButtons() {
+    for (i, button) in actionButtons where !itemActions.contains(i) {
+      button.removeFromSuperview()
+      actionButtons[i] = nil
+    }
+    guard !itemActions.isEmpty, let items else { return }
+    let columns = iconColumns()
+    let slots = itemSlots(count: items.count, columns: columns)
+    for i in itemActions where i < items.count {
+      let button = actionButtons[i] ?? {
+        let button = CNTabActionButton(type: .custom)
+        button.addAction(UIAction { [weak self] _ in self?.onAction?(i) }, for: .primaryActionTriggered)
+        // VoiceOver reads the button in place of the item (see
+        // accessibilityElements), as "Compose, button" rather than a tab.
+        button.isAccessibilityElement = true
+        button.accessibilityTraits = .button
+        addSubview(button)
+        actionButtons[i] = button
+        return button
+      }()
+      // Icons not found: no button over the wrong item. A tap then selects
+      // the item, and the delegate runs the action and puts it back.
+      guard columns != nil else {
+        button.isHidden = true
+        continue
+      }
+      button.isHidden = false
+      button.accessibilityLabel = itemActionLabels[i] ?? items[i].title
+      let frame = buttonFrame(in: slots[i])
+      if button.frame != frame { button.frame = frame }
+      if let at = subviews.firstIndex(of: button),
+         subviews[(at + 1)...].contains(where: { !Self.isOverlay($0) && !dots.contains($0) }) {
+        bringSubviewToFront(button)
+      }
+    }
+  }
+
+  /// With action items, VoiceOver gets the bar's own elements except the
+  /// ones under an action button, plus those buttons, in reading order. The
+  /// item's own element would be read as a tab.
+  override var accessibilityElements: [Any]? {
+    get {
+      let buttons = actionButtons.values.filter { !$0.isHidden }
+      guard !buttons.isEmpty else { return super.accessibilityElements }
+      var found: [UIView] = []
+      func walk(_ view: UIView) {
+        for sub in view.subviews where !sub.isHidden && sub.alpha > 0.01 && !Self.isOverlay(sub) {
+          if sub.isAccessibilityElement { found.append(sub) } else { walk(sub) }
+        }
+      }
+      walk(self)
+      let covered = buttons.map { $0.frame }
+      var elements = found.filter { element in
+        let centre = element.convert(CGPoint(x: element.bounds.midX, y: element.bounds.midY), to: self)
+        return !covered.contains { $0.contains(centre) }
+      }
+      elements.append(contentsOf: buttons)
+      let rtl = effectiveUserInterfaceLayoutDirection == .rightToLeft
+      elements.sort {
+        let a = $0.convert($0.bounds, to: self).midX, b = $1.convert($1.bounds, to: self).midX
+        return rtl ? a > b : a < b
+      }
+      return elements
+    }
+    set { super.accessibilityElements = newValue }
+  }
+
+  /// The clear buttons laid over items, which stay above the item's views.
+  private static func isOverlay(_ view: UIView) -> Bool {
+    return view is CNTabMenuButton || view is CNTabActionButton
   }
 
   private func placeMenuButtons() {
@@ -98,7 +224,7 @@ final class CNDotTabBar: CNLabelFontTabBar {
       // count: they take no touches, and moving them up would move them
       // back above the buttons on every layout.
       if let at = subviews.firstIndex(of: button),
-         subviews[(at + 1)...].contains(where: { !($0 is CNTabMenuButton) && !dots.contains($0) }) {
+         subviews[(at + 1)...].contains(where: { !Self.isOverlay($0) && !dots.contains($0) }) {
         bringSubviewToFront(button)
       }
     }
@@ -156,7 +282,7 @@ final class CNDotTabBar: CNLabelFontTabBar {
     }
     // Keep the dots above anything the bar adds later, such as a rebuilt platter.
     if let first = subviews.firstIndex(where: { dots.contains($0) }),
-       subviews[first...].contains(where: { !dots.contains($0) && !($0 is CNTabMenuButton) }) {
+       subviews[first...].contains(where: { !dots.contains($0) && !Self.isOverlay($0) }) {
       dots.forEach(bringSubviewToFront)
     }
   }
@@ -211,6 +337,9 @@ final class CNDotTabBar: CNLabelFontTabBar {
     return effectiveUserInterfaceLayoutDirection == .rightToLeft ? columns.reversed() : columns
   }
 }
+
+/// The clear button over a tab bar item that runs an action (#131).
+final class CNTabActionButton: UIButton {}
 
 /// The clear button over a tab bar item that opens its menu. It tells when
 /// that menu is shown, so the bar leaves it alone meanwhile.

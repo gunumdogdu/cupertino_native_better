@@ -28,6 +28,9 @@ final class CNActionSheetManager: NSObject {
     /// cannot deliver two results down one `FlutterResult` — the engine treats
     /// a double send as a hard error.
     private var pendingResult: FlutterResult?
+    /// Counts `show` calls, so a call waiting for a leaving controller
+    /// knows when a newer one replaced it.
+    private var generation = 0
 
     /// The sheet `pendingResult` belongs to, and the identity every send is
     /// checked against. A superseded sheet is torn down rather than left on
@@ -60,6 +63,7 @@ final class CNActionSheetManager: NSObject {
     // MARK: - Presentation
 
     private func show(config: Config, result: @escaping FlutterResult) {
+        generation &+= 1
         // Resolve the window once. The presenter walk and the anchor's source
         // view have to agree on it: `keyWindow()` picks an arbitrary scene when
         // more than one is foreground-active, which is the normal state for two
@@ -90,6 +94,28 @@ final class CNActionSheetManager: NSObject {
             result(FlutterError(code: "no_presenter",
                                 message: "No view controller available to present on",
                                 details: nil))
+            return
+        }
+        present(config: config, on: presenter, in: window, result: result)
+    }
+
+    private func present(config: Config, on presenter: UIViewController,
+                         in window: UIWindow?, result: @escaping FlutterResult,
+                         waits: Int = 3) {
+        // A controller still on its way out (a popover or a sheet closed a
+        // moment ago, or the sheet replaced above) cannot be presented over
+        // yet: wait for it to go (#127).
+        if let leaving = presenter.presentedViewController, leaving.isBeingDismissed, waits > 0 {
+            // Pending while it waits, so a newer `show` answers it.
+            pendingResult = result
+            let generation = self.generation
+            CNAlertManager.afterDismissal(of: leaving) { [weak self] in
+                // A newer `show` took over (and answered this call).
+                guard let self, self.generation == generation else { return }
+                self.pendingResult = nil
+                self.present(config: config, on: presenter, in: window,
+                             result: result, waits: waits - 1)
+            }
             return
         }
 
@@ -140,6 +166,11 @@ final class CNActionSheetManager: NSObject {
 
         presentedAlert = alert
         presenter.present(alert, animated: true)
+        // UIKit refuses some presentations with only a log line; the call
+        // must not wait for a sheet that never appeared.
+        if alert.presentingViewController == nil, presentedAlert === alert {
+            send(nil)
+        }
     }
 
     /// Anchors the sheet per the iOS 26 rules.
@@ -239,7 +270,9 @@ final class CNActionSheetManager: NSObject {
     private func topPresenter(in window: UIWindow?,
                               skipping stale: UIAlertController?) -> UIViewController? {
         guard var vc = window?.rootViewController else { return nil }
-        while let presented = vc.presentedViewController, presented !== stale {
+        // A controller being dismissed cannot present; stop below it.
+        while let presented = vc.presentedViewController, presented !== stale,
+              !presented.isBeingDismissed {
             vc = presented
         }
         return vc

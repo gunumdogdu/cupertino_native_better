@@ -1,3 +1,58 @@
+## 2.4.0
+
+> Seven reports from @cogwheel0, all fixed or added, plus three bugs found while checking them. New: read-only popover rows, tab bar action items and accessibility names for tabs. Nothing changes for existing code.
+
+### Added — `CNTabBarItem.onPressed`: an item that runs an action (#131)
+
+An item with `onPressed`, such as Compose, runs it and is never selected: the selected tab stays as it is, `onTap` is not called and no selection highlight grows on the item. In a split bar (`split: true, rightCount: 1`) a single action is the right-hand capsule, as in iOS 26 apps. VoiceOver reads it as a button, not a tab.
+
+A standalone `UITabBar` selects an item before it tells anyone, so a clear button over the item now takes the tap, and the bar's own selection gesture sits that touch out. Reached another way (VoiceOver, or a finger sliding along the bar onto it), the bar puts its selection back and runs the action, as items with menus do. The macOS bar and the Flutter fallback run the action without selecting too.
+
+### Added — `CNTabBarItem.semanticLabel`, and `height` for icon-only bars on iOS 26 (#132)
+
+`semanticLabel` is the name VoiceOver reads for a tab, so an icon-only tab gets one without a visible title. On iOS it is the item's `accessibilityLabel`; on macOS the description of the tab's image.
+
+A bar given a shorter `height` keeps its own height on iOS 26, as a squeezed iOS 26 bar puts its labels over its icons. A bar with no labels has nothing to squeeze and now uses the given `height` there too, as on iOS 27: with `height: 89`, the platter is 54 pt instead of about 61 pt.
+
+### Added — `CNPopoverRow.readOnly` (#129)
+
+A read-only row only shows information, such as a label and its `trailingText` value. It is not a button: a tap on it keeps the popover open, it is drawn at full strength, and VoiceOver reads it as text ("Prompt, 1,204") rather than as a button.
+
+### Fixed — `CNSearchBar` controller on iOS (#126)
+
+On the iOS 26 search bar, `setText`, `clear`, `focus` and `unfocus` did nothing, and neither did `expand` and `collapse`. All six now work as they do on macOS: `setText` and `clear` report the new text through `onChanged`, `expand` and `collapse` through `onExpandStateChanged` (collapsing also clears the text and ends editing), and `focus` opens a collapsed bar before it brings up the keyboard. Each change is reported once.
+
+### Fixed — presenting something from a `CNPopover` result (#127)
+
+`CNPopover.show` completed while the popover was still animating away, so an app that opened a browser, a share sheet or an alert from the result did it too early, and UIKit dropped it. The call now completes once the popover has gone.
+
+Found while checking it: `CNAlert.show` and `CNActionSheet.show` could present on a controller that was being dismissed, so the alert never appeared and the call never completed. They now wait for the controller to leave (closing a popover from code and showing an alert at once works), and a presentation UIKit refuses ends the call instead of leaving it waiting.
+
+### Fixed — `CNFloatingIsland` changes after creation (#128)
+
+The sizes (`collapsedHeight`, `collapsedWidth`, `expandedHeight`, `expandedWidth`), `cornerRadius`, `tint` and the spring reached the native island only when it was created. They now update it, animated and without recreating the view. The iOS 26 glass also shows the `tint` now; it ignored it before.
+
+Found while checking it:
+- A change of `isExpanded` by the app never reached the native island; only the controller's `expand()` and `collapse()` did. It now opens and closes the island.
+- `onExpandStateChanged` was called during the parent's build when `isExpanded` changed, so an app that mirrored it with `setState` hit an assertion. It is now called after the frame.
+
+### Fixed — `CNIcon` replace transition with a colour change (#130)
+
+When the symbol and its colour changed in the same build, the replace transition was cut off and the new symbol appeared at once. The change now goes out in one update, so the transition plays and ends on the new symbol in the new colour.
+
+### Fixed — popover separators with mixed icons (#129)
+
+When some rows had a leading icon and others didn't, the rows without one started their text at the edge, left of the separators. Every row now keeps the icon column, so all titles line up with the separators. On macOS too.
+
+Thanks to @cogwheel0 for seven precise reports, each with the cause in the code.
+
+### Checked
+- **iOS 27.0 simulator:** each issue's new screen in the example's Testing list. Search bar controller calls; popover → alert at once, popover closed from code → alert, and popover → popover; floating island size, tint, corners, width and collapse; popover rows (VoiceOver roles and taps); icon replace (25 animated frames on every toggle, as the control); the action item (no change in the bar while Compose runs, tabs still switch) and the tab buttons' VoiceOver names and traits.
+- **iOS 26.2 simulator:** the icon-only bar at `height: 89`, and the action item.
+- **macOS 27:** the action item and the popover rows.
+- **Tests:** 10 new tests; 564 tests pass.
+- **Analyzer and SDKs:** `flutter analyze` is clean with Flutter 3.44, and `flutter analyze lib` with 3.38. The iOS code compiles against the iOS 26.0 and 26.2 SDKs, the macOS code against the macOS 26.5 SDK.
+
 ## 2.3.2
 
 > Patch: `CNTabRail` now changes tabs when you press and slide, and glass widgets with `autoHideOnModal: false` no longer show a box through a dialog's barrier. No API changes.

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/optional_method_call.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
@@ -130,12 +131,18 @@ class CNFloatingIsland extends StatefulWidget {
   final Widget? expanded;
 
   /// Whether the island is currently expanded.
+  ///
+  /// Changing it opens or closes the island, as the controller's `expand`
+  /// and `collapse` do.
   final bool isExpanded;
 
   /// Called when the island is tapped.
   final VoidCallback? onTap;
 
   /// Called when the expand state changes.
+  ///
+  /// A change of [isExpanded] by the parent is reported after the frame, so
+  /// the callback may call `setState`.
   final ValueChanged<bool>? onExpandStateChanged;
 
   /// Position of the floating island.
@@ -213,6 +220,10 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
 
   bool? _lastIsDark;
 
+  /// The options last sent to the native island, so a change of size,
+  /// corner radius, tint or spring reaches it once (#128).
+  Map<String, Object?>? _lastNativeConfig;
+
   CNFloatingIslandController get _controller =>
       widget.controller ??
       (_internalController ??= CNFloatingIslandController());
@@ -270,8 +281,20 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
   void didUpdateWidget(CNFloatingIsland oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.isExpanded != oldWidget.isExpanded) {
-      _setExpanded(widget.isExpanded);
+    if (widget.isExpanded != oldWidget.isExpanded &&
+        widget.isExpanded != _isExpanded) {
+      // The parent changed [CNFloatingIsland.isExpanded]: move the native
+      // island too, and report the change after this build, where the
+      // parent may call setState.
+      _setExpanded(widget.isExpanded, notifyAfterBuild: true);
+      final ch = _controller._channel;
+      if (ch != null) {
+        ch
+            .invokeMethod(widget.isExpanded ? 'expand' : 'collapse', {
+              'animated': true,
+            })
+            .catchError((_) {});
+      }
     }
 
     if (widget.animationDuration != oldWidget.animationDuration) {
@@ -291,6 +314,7 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
     _controller._attach(ch);
     ch.setMethodCallHandler(_onMethodCall);
     _lastIsDark = ThemeHelper.isDark(context);
+    _lastNativeConfig = _nativeConfig(context);
     resetHaloContainment();
   }
 
@@ -309,11 +333,21 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
     return null;
   }
 
-  void _setExpanded(bool expanded) {
+  void _setExpanded(bool expanded, {bool notifyAfterBuild = false}) {
     if (_isExpanded != expanded) {
       setState(() => _isExpanded = expanded);
-      _controller._setExpandedState(expanded);
-      widget.onExpandStateChanged?.call(expanded);
+      if (notifyAfterBuild) {
+        // Called from didUpdateWidget, inside the parent's build: listeners
+        // that call setState would assert there.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _isExpanded != expanded) return;
+          _controller._setExpandedState(expanded);
+          widget.onExpandStateChanged?.call(expanded);
+        });
+      } else {
+        _controller._setExpandedState(expanded);
+        widget.onExpandStateChanged?.call(expanded);
+      }
 
       if (expanded) {
         _animationController.forward();
@@ -359,17 +393,11 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
     }
 
     const viewType = 'CNFloatingIsland';
+    final config = _nativeConfig(context);
+    _syncNativeConfigIfNeeded(config);
     final creationParams = <String, dynamic>{
       'isExpanded': _isExpanded,
-      'position': widget.position.name,
-      'collapsedHeight': widget.collapsedHeight,
-      'collapsedWidth': widget.collapsedWidth,
-      'expandedHeight': widget.expandedHeight,
-      'expandedWidth': widget.expandedWidth,
-      'cornerRadius': _effectiveCornerRadius,
-      'tint': resolveColorToArgb(widget.tint, context),
-      'springDamping': widget.springDamping,
-      'springResponse': widget.springResponse,
+      ...config,
       'isDark': ThemeHelper.isDark(context),
     };
 
@@ -390,6 +418,26 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
         ),
       ),
     );
+  }
+
+  /// The options of the native island that can change after it is created.
+  Map<String, Object?> _nativeConfig(BuildContext context) => <String, Object?>{
+    'position': widget.position.name,
+    'collapsedHeight': widget.collapsedHeight,
+    'collapsedWidth': widget.collapsedWidth,
+    'expandedHeight': widget.expandedHeight,
+    'expandedWidth': widget.expandedWidth,
+    'cornerRadius': _effectiveCornerRadius,
+    'tint': resolveColorToArgb(widget.tint, context),
+    'springDamping': widget.springDamping,
+    'springResponse': widget.springResponse,
+  };
+
+  void _syncNativeConfigIfNeeded(Map<String, Object?> config) {
+    final ch = _controller._channel;
+    if (ch == null || mapEquals(config, _lastNativeConfig)) return;
+    _lastNativeConfig = config;
+    ch.invokeOptionalMethod('setConfig', config).catchError((_) {});
   }
 
   Widget _buildFlutterFloatingIsland(BuildContext context) {
