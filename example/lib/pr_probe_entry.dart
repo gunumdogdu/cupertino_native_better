@@ -103,6 +103,14 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue126
 //     (#126 to #132: the same with issue127 ... issue132; one screen each;
 //     AUTO=true runs the steps of #126 to #130 and prints `CNB_SHOT <step>`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue134 \
+//     --dart-define=OBSERVER=true
+//     (#134 to #138: the same with issue135 ... issue138; AUTO=true runs the
+//     steps of #134 to #136 and prints `CNB_SHOT <step>`; #134 needs
+//     OBSERVER=true; #140 uses PROBE=issue132)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue141
+//     (#141 to #144: the same with issue142 ... issue144; ARABIC=true starts
+//     #142 in Arabic; AUTO=true runs #143 and #144 and prints `CNB_SHOT`)
 //
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=gauge
 //     (2.3.0: CNGauge; AUTO=true moves the value every 2.5 s through the
@@ -164,6 +172,15 @@ import 'demos/issue129_popover_rows_test.dart';
 import 'demos/issue130_icon_replace_color_test.dart';
 import 'demos/issue131_split_tab_action_test.dart';
 import 'demos/issue132_icon_only_tab_bar_test.dart';
+import 'demos/issue134_search_bar_state_test.dart';
+import 'demos/issue135_popover_gauge_failure_test.dart';
+import 'demos/issue136_tab_bar_measure_search_test.dart';
+import 'demos/issue137_slider_seek_test.dart';
+import 'demos/issue138_context_menu_preview_test.dart';
+import 'demos/issue141_popup_menu_button_test.dart';
+import 'demos/issue142_tab_bar_font_rtl_test.dart';
+import 'demos/issue143_segmented_font_labels_test.dart';
+import 'demos/issue144_alert_font_rtl_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -184,6 +201,7 @@ const String _scenario = String.fromEnvironment(
 );
 
 const bool _auto = bool.fromEnvironment('AUTO');
+const bool _arabic = bool.fromEnvironment('ARABIC');
 
 /// Takes the widgets' Flutter fallbacks on an iOS 26+ simulator.
 const bool _fallback = bool.fromEnvironment('FALLBACK');
@@ -277,6 +295,33 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue132') {
       return const Issue132IconOnlyTabBarTestPage();
+    }
+    if (_probe == 'issue134') {
+      return const Issue134SearchBarStateTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue135') {
+      return const Issue135PopoverGaugeFailureTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue136') {
+      return const Issue136TabBarMeasureSearchTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue137') {
+      return const Issue137SliderSeekTestPage();
+    }
+    if (_probe == 'issue138') {
+      return const Issue138ContextMenuPreviewTestPage();
+    }
+    if (_probe == 'issue141') {
+      return const Issue141PopupMenuButtonTestPage();
+    }
+    if (_probe == 'issue142') {
+      return const Issue142TabBarFontRtlTestPage(arabic: _arabic);
+    }
+    if (_probe == 'issue143') {
+      return const Issue143SegmentedFontLabelsTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue144') {
+      return const Issue144AlertFontRtlTestPage(autoCycle: _auto);
     }
     if (_probe == 'symboleffects') {
       return const SymbolEffectsProbePage();

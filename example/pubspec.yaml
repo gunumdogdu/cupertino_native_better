@@ -85,6 +85,18 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
+  # Tajawal (SIL Open Font License, fonts/Tajawal/OFL.txt): a pubspec font
+  # with Latin and Arabic glyphs, for the font and right-to-left screens
+  # (#141 to #144). UIKit doesn't know it; the plugin registers it.
+  fonts:
+    - family: Tajawal
+      fonts:
+        - asset: fonts/Tajawal/Tajawal-Regular.ttf
+        - asset: fonts/Tajawal/Tajawal-Medium.ttf
+          weight: 500
+        - asset: fonts/Tajawal/Tajawal-Bold.ttf
+          weight: 700
+
   # fonts:
   #   - family: Schyler
   #     fonts:

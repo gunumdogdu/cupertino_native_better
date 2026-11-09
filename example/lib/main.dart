@@ -60,6 +60,15 @@ import 'demos/issue129_popover_rows_test.dart';
 import 'demos/issue130_icon_replace_color_test.dart';
 import 'demos/issue131_split_tab_action_test.dart';
 import 'demos/issue132_icon_only_tab_bar_test.dart';
+import 'demos/issue134_search_bar_state_test.dart';
+import 'demos/issue135_popover_gauge_failure_test.dart';
+import 'demos/issue136_tab_bar_measure_search_test.dart';
+import 'demos/issue137_slider_seek_test.dart';
+import 'demos/issue138_context_menu_preview_test.dart';
+import 'demos/issue141_popup_menu_button_test.dart';
+import 'demos/issue142_tab_bar_font_rtl_test.dart';
+import 'demos/issue143_segmented_font_labels_test.dart';
+import 'demos/issue144_alert_font_rtl_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
@@ -1160,6 +1169,145 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Issue132IconOnlyTabBarTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#134: Search bar state'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('magnifyingglass', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue134SearchBarStateTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#135: Popover gauges, failures'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'gauge.with.dots.needle.33percent',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue135PopoverGaugeFailureTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#136: Tab bar measure, search'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('ruler', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue136TabBarMeasureSearchTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#137: Slider tap to seek'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'slider.horizontal.below.rectangle',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue137SliderSeekTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#138: Context menu preview'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('rectangle.stack', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue138ContextMenuPreviewTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#141: Popup menu button'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('ellipsis.circle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue141PopupMenuButtonTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#142: Tab bar font, RTL'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('textformat', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue142TabBarFontRtlTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#143: Segmented font, labels'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('rectangle.split.3x1', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue143SegmentedFontLabelsTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#144: Alert font, RTL'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'exclamationmark.bubble',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue144AlertFontRtlTestPage(),
                       ),
                     );
                   },
