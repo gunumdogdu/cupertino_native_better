@@ -434,6 +434,8 @@ void main() {
       expect(
         received?.arguments,
         debugBuildAlertPayload(
+          // The app's Directionality (#144).
+          rtl: false,
           title: 'Rename',
           message: 'Pick a new name.',
           actions: const [
@@ -721,6 +723,8 @@ void main() {
       expect(
         received?.arguments,
         debugBuildAlertPayload(
+          // The app's Directionality (#144).
+          rtl: false,
           title: 'Rename',
           actions: const [
             CNAlertAction<String>(label: 'Cancel', isCancel: true),

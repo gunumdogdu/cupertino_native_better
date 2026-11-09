@@ -51,6 +51,8 @@ final class MacAlertPresenter {
     buttons: [MacAlertButton],
     textFields: [MacAlertTextField] = [],
     appearance: NSAppearance?,
+    textStyle: [String: Any]? = nil,
+    rtl: Bool? = nil,
     completion: @escaping (Answer?) -> Void
   ) -> Bool {
     dismiss()
@@ -113,13 +115,27 @@ final class MacAlertPresenter {
     }
 
     if let appearance { alert.window.appearance = appearance }
+    // The app's text direction and font (#144), before the alert lays
+    // itself out and again once the sheet is up, as AppKit lays it out anew.
+    let destructive = Set(buttons.filter { $0.role == .destructive }.map { $0.label })
+    let styleAlert: () -> Void = { [weak alert] in
+      guard let alert, let content = alert.window.contentView else { return }
+      CNLayoutDirection.apply(rtl, to: content)
+      if let textStyle {
+        Self.applyTextStyle(textStyle, to: content, alert: alert, destructive: destructive)
+      }
+      if let rtl { Self.alignTexts(rtl, in: content, alert: alert) }
+    }
+    if let content = alert.window.contentView { CNLayoutDirection.apply(rtl, to: content) }
     alert.layout()
+    styleAlert()
     if let first = fields.first {
       alert.window.initialFirstResponder = first
     }
 
     self.alert = alert
     self.completion = completion
+    defer { DispatchQueue.main.async(execute: styleAlert) }
     alert.beginSheetModal(for: window) { [weak self, weak alert] response in
       guard let self, let alert, alert === self.alert else { return }
       let position = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
@@ -130,6 +146,101 @@ final class MacAlertPresenter {
       self.finish(answer)
     }
     return true
+  }
+
+  /// Gives the alert's title, message and buttons the family of `textStyle`
+  /// (`CNAlert.fontFamily` and the part styles), keeping AppKit's sizes and
+  /// weights unless a part overrides them. A destructive button keeps its
+  /// colour.
+  private static func applyTextStyle(_ style: [String: Any], to root: NSView, alert: NSAlert,
+                                     destructive: Set<String>) {
+    let family = (style["fontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    func font(_ base: NSFont?, _ part: [String: Any]?) -> NSFont? {
+      let partFamily = (part?["fontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? family
+      let size = (part?["fontSize"] as? NSNumber).map { CGFloat($0.doubleValue) }
+      let weightValue = (part?["fontWeight"] as? NSNumber)?.intValue
+      guard partFamily != nil || size != nil || weightValue != nil else { return nil }
+      let base = base ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
+      let pointSize = size ?? base.pointSize
+      let traits = base.fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any]
+      let baseWeight = (traits?[.weight] as? NSNumber).map { NSFont.Weight(rawValue: CGFloat($0.doubleValue)) } ?? .regular
+      let weight = weightValue.map { NativeButtonHost.fontWeight($0) } ?? baseWeight
+      if let partFamily, let resolved = CNFontResolver.font(family: partFamily, size: pointSize, weight: weight) {
+        return resolved
+      }
+      return NSFont.systemFont(ofSize: pointSize, weight: weight)
+    }
+    func color(_ part: [String: Any]?) -> NSColor? {
+      (part?["color"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+    }
+    let title = style["title"] as? [String: Any]
+    let message = style["message"] as? [String: Any]
+    let action = style["action"] as? [String: Any]
+    func walk(_ view: NSView) {
+      for sub in view.subviews {
+        if let button = sub as? NSButton, !(sub is NSPopUpButton) {
+          let text = button.title
+          guard !text.isEmpty, alert.buttons.contains(button) else { continue }
+          var attributes: [NSAttributedString.Key: Any] = [:]
+          if let f = font(button.font, action) { attributes[.font] = f }
+          if let c = color(action), !destructive.contains(text) { attributes[.foregroundColor] = c }
+          if !attributes.isEmpty {
+            if attributes[.font] != nil { button.font = attributes[.font] as? NSFont }
+            button.attributedTitle = NSAttributedString(string: text, attributes: attributes)
+          }
+        } else if let field = sub as? NSTextField, !field.isEditable {
+          let part: [String: Any]?
+          if field.stringValue == alert.messageText, !alert.messageText.isEmpty {
+            part = alert.informativeText.isEmpty ? message : title
+          } else if field.stringValue == alert.informativeText, !alert.informativeText.isEmpty {
+            part = message
+          } else {
+            continue
+          }
+          if let f = font(field.font, part) { field.font = f }
+          if let c = color(part) { field.textColor = c }
+          Self.redraw(field)
+        } else {
+          walk(sub)
+        }
+      }
+    }
+    walk(root)
+  }
+
+  /// Aligns the title and message to the reading edge of [rtl]. NSAlert
+  /// lays out by the app's language, which an app that picks its language
+  /// in Dart never sets.
+  private static func alignTexts(_ rtl: Bool, in root: NSView, alert: NSAlert) {
+    func walk(_ view: NSView) {
+      for sub in view.subviews {
+        if let field = sub as? NSTextField, !field.isEditable,
+           !field.stringValue.isEmpty,
+           field.stringValue == alert.messageText || field.stringValue == alert.informativeText {
+          field.alignment = rtl ? .right : .left
+          field.baseWritingDirection = rtl ? .rightToLeft : .leftToRight
+          Self.redraw(field)
+        } else {
+          walk(sub)
+        }
+      }
+    }
+    walk(root)
+  }
+
+  /// Draws [field] again from its font, colour and alignment: on macOS 26 a
+  /// label keeps the text it first laid out until its string is set again.
+  private static func redraw(_ field: NSTextField) {
+    let style = NSMutableParagraphStyle()
+    style.alignment = field.alignment
+    style.baseWritingDirection = field.baseWritingDirection
+    var attributes: [NSAttributedString.Key: Any] = [.paragraphStyle: style]
+    if let font = field.font { attributes[.font] = font }
+    if let color = field.textColor { attributes[.foregroundColor] = color }
+    field.attributedStringValue = NSAttributedString(string: field.stringValue, attributes: attributes)
+    field.invalidateIntrinsicContentSize()
+    field.needsLayout = true
+    field.needsDisplay = true
   }
 
   /// Closes the alert on screen, if any; it answers nil.

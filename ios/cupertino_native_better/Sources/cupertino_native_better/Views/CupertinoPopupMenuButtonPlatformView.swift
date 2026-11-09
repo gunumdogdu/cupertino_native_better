@@ -4,7 +4,7 @@ import UIKit
 class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private let channel: FlutterMethodChannel
   private let container: UIView
-  private let button: UIButton
+  private let button: CNPopupMenuUIButton
   private var currentButtonStyle: String = "automatic"
   private var isRoundButton: Bool = false
   private var isTransitioning: Bool = false
@@ -49,11 +49,22 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var btnIconColor: UIColor? = nil
   private var btnIconMode: String? = nil
   private var btnIconPalette: [UIColor] = []
+  /// The title, kept so an icon change doesn't drop it (#141).
+  private var currentTitle: String? = nil
+  /// `CNPopupMenuButton.imagePlacement` / `imagePadding` for a button with
+  /// both a title and an image (#141).
+  private var imagePlacement: NSDirectionalRectEdge = .leading
+  private var imagePadding: CGFloat? = nil
+  /// `labelFontFamily` / `labelFontSize` / `labelFontWeight` / `labelColor`.
+  private var labelFontFamily: String? = nil
+  private var labelFontSize: CGFloat? = nil
+  private var labelFontWeight: Int? = nil
+  private var labelColor: UIColor? = nil
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativePopupMenuButton_\(viewId)", binaryMessenger: messenger)
     self.container = UIView(frame: frame)
-    self.button = UIButton(type: .system)
+    self.button = CNPopupMenuUIButton(type: .system)
 
     var title: String? = nil
     var semanticLabel: String? = nil
@@ -79,6 +90,18 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
 
     if let dict = args as? [String: Any] {
       if let t = dict["buttonTitle"] as? String { title = t }
+      switch dict["imagePlacement"] as? String {
+      case "trailing": self.imagePlacement = .trailing
+      case "top": self.imagePlacement = .top
+      case "bottom": self.imagePlacement = .bottom
+      default: self.imagePlacement = .leading
+      }
+      if let v = dict["imagePadding"] as? NSNumber { self.imagePadding = CGFloat(v.doubleValue) }
+      if let f = dict["labelFontFamily"] as? String, !f.isEmpty { self.labelFontFamily = f }
+      if let v = dict["labelFontSize"] as? NSNumber, v.doubleValue > 0 { self.labelFontSize = CGFloat(v.doubleValue) }
+      if let v = dict["labelFontWeight"] as? NSNumber { self.labelFontWeight = v.intValue }
+      if let v = dict["labelColor"] as? NSNumber { self.labelColor = Self.colorFromARGB(v.intValue) }
+      if let v = dict["keepsSourceVisible"] as? NSNumber { self.button.keepsSourceVisible = v.boolValue }
       if let label = dict["semanticLabel"] as? String, !label.isEmpty {
         semanticLabel = label
       }
@@ -133,6 +156,10 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
 
     super.init()
 
+    // `onOpened` / `onClosed` (#141).
+    button.onMenuWillShow = { [weak self] in self?.channel.invokeMethod("menuOpened", arguments: nil) }
+    button.onMenuDidHide = { [weak self] in self?.channel.invokeMethod("menuClosed", arguments: nil) }
+
     container.backgroundColor = .clear
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
@@ -171,6 +198,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     self.btnIconMode = buttonIconMode
     if !buttonIconPalette.isEmpty { self.btnIconPalette = buttonIconPalette.map { Self.colorFromARGB($0.intValue) } }
     // Apply content initially
+    currentTitle = title
     setButtonContent(title: title, image: makeButtonIconImage(), iconOnly: (title == nil))
     if #available(iOS 15.0, *), var cfg = button.configuration {
       // Prefer explicit icon mode/color if provided
@@ -191,6 +219,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         // Preserve existing title; just re-apply image
         cfg.image = self.makeButtonIconImage()
         cfg.preferredSymbolConfigurationForImage = self.makeButtonSymbolConfiguration()
+        self.applyContentOptions(to: &cfg)
         btn.configuration = cfg
       }
     }
@@ -289,7 +318,8 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
           if let c = args["buttonIconColor"] as? NSNumber { self.btnIconColor = Self.colorFromARGB(c.intValue) }
           if let m = args["buttonIconRenderingMode"] as? String { self.btnIconMode = m }
           if let pal = args["buttonIconPaletteColors"] as? [NSNumber] { self.btnIconPalette = pal.map { Self.colorFromARGB($0.intValue) } }
-          self.setButtonContent(title: nil, image: self.makeButtonIconImage(), iconOnly: true)
+          self.setButtonContent(title: self.currentTitle, image: self.makeButtonIconImage(),
+                                iconOnly: self.currentTitle == nil)
           if #available(iOS 15.0, *), var cfg = self.button.configuration {
             if let symCfg = self.makeButtonSymbolConfiguration() {
               cfg.preferredSymbolConfigurationForImage = symCfg
@@ -307,7 +337,8 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
       case "setButtonTitle":
         if let args = call.arguments as? [String: Any], let t = args["title"] as? String {
-          self.button.setTitle(t, for: .normal)
+          self.currentTitle = t
+          self.setButtonContent(title: t, image: self.makeButtonIconImage(), iconOnly: false)
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing title", details: nil)) }
       case "setPressed":
@@ -652,6 +683,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       config.title = currentTitle
       config.image = currentImage
       config.preferredSymbolConfigurationForImage = currentSymbolCfg
+      applyContentOptions(to: &config)
       button.configuration = config
     } else {
       button.layer.cornerRadius = round ? 999 : 8
@@ -667,11 +699,37 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     }
   }
 
+  /// The image placement and padding, and the label's font and colour
+  /// (#141), which every configuration the button gets carries.
+  @available(iOS 15.0, *)
+  private func applyContentOptions(to cfg: inout UIButton.Configuration) {
+    cfg.imagePlacement = imagePlacement
+    if let padding = imagePadding { cfg.imagePadding = padding }
+    guard labelFontFamily != nil || labelFontSize != nil || labelFontWeight != nil || labelColor != nil else { return }
+    let family = labelFontFamily, size = labelFontSize, color = labelColor
+    let weight = CNFontResolver.weight(fromFlutterValue: labelFontWeight)
+    cfg.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+      var outgoing = incoming
+      let base = incoming.font ?? UIFont.preferredFont(forTextStyle: .body)
+      let pointSize = size ?? base.pointSize
+      if let family, let font = CNFontResolver.font(family: family, size: pointSize, weight: weight) {
+        outgoing.font = font
+      } else if let weight {
+        outgoing.font = UIFont.systemFont(ofSize: pointSize, weight: weight)
+      } else {
+        outgoing.font = base.withSize(pointSize)
+      }
+      if let color { outgoing.foregroundColor = color }
+      return outgoing
+    }
+  }
+
   private func setButtonContent(title: String?, image: UIImage?, iconOnly: Bool) {
     if #available(iOS 15.0, *) {
       var cfg = button.configuration ?? .plain()
       cfg.title = title
       cfg.image = image
+      applyContentOptions(to: &cfg)
       button.configuration = cfg
     } else {
       button.setTitle(title, for: .normal)
@@ -710,5 +768,72 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         }
       }
     }
+  }
+}
+
+/// The button `CNPopupMenuButton` shows its menu from. It tells when the
+/// menu opens and closes (`onOpened`, `onClosed`), and with
+/// `keepsSourceVisible` UIKit grows the menu out of a clear stand-in at the
+/// button's place instead of out of the button, so the button itself is not
+/// morphed into the menu and back (#141).
+final class CNPopupMenuUIButton: UIButton {
+  var onMenuWillShow: (() -> Void)?
+  var onMenuDidHide: (() -> Void)?
+  var keepsSourceVisible = false
+  private var standIn: UIView?
+
+  private func standInPreview() -> UITargetedPreview? {
+    guard keepsSourceVisible, let superview, window != nil else { return nil }
+    let stand = standIn ?? {
+      let view = UIView()
+      view.backgroundColor = .clear
+      view.isUserInteractionEnabled = false
+      view.isAccessibilityElement = false
+      superview.insertSubview(view, belowSubview: self)
+      standIn = view
+      return view
+    }()
+    stand.frame = frame
+    let parameters = UIPreviewParameters()
+    parameters.backgroundColor = .clear
+    parameters.visiblePath = UIBezierPath(roundedRect: stand.bounds, cornerRadius: min(bounds.width, bounds.height) / 2)
+    return UITargetedPreview(view: stand, parameters: parameters)
+  }
+
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration
+  ) -> UITargetedPreview? {
+    standInPreview() ?? super.contextMenuInteraction(interaction, previewForHighlightingMenuWithConfiguration: configuration)
+  }
+
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    previewForDismissingMenuWithConfiguration configuration: UIContextMenuConfiguration
+  ) -> UITargetedPreview? {
+    standInPreview() ?? super.contextMenuInteraction(interaction, previewForDismissingMenuWithConfiguration: configuration)
+  }
+
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    willDisplayMenuFor configuration: UIContextMenuConfiguration,
+    animator: UIContextMenuInteractionAnimating?
+  ) {
+    super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
+    onMenuWillShow?()
+  }
+
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    willEndFor configuration: UIContextMenuConfiguration,
+    animator: UIContextMenuInteractionAnimating?
+  ) {
+    super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
+    let done = { [weak self] in
+      self?.standIn?.removeFromSuperview()
+      self?.standIn = nil
+      self?.onMenuDidHide?()
+    }
+    if let animator { animator.addCompletion(done) } else { done() }
   }
 }

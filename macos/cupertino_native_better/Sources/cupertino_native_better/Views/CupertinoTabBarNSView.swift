@@ -115,6 +115,8 @@ class CupertinoTabBarNSView: NSView {
 
     control.translatesAutoresizingMaskIntoConstraints = false
     addSubview(control)
+    // Flutter's text direction (#142).
+    CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: control)
     // Natural width, centred; it only shrinks when the bar is narrower.
     let pad = Self.horizontalPadding
     NSLayoutConstraint.activate([
@@ -185,6 +187,9 @@ class CupertinoTabBarNSView: NSView {
         if !searchActive { control.selectedSegment = v }
         refreshImages()
       }
+      result(nil)
+    case "setLayoutDirection":
+      CNLayoutDirection.apply(CNLayoutDirection.read(call.arguments as? [String: Any]), to: control)
       result(nil)
     case "setBrightness":
       if let isDark = (args?["isDark"] as? NSNumber)?.boolValue {
@@ -349,7 +354,8 @@ class CupertinoTabBarNSView: NSView {
 
   private func applyFont() {
     let size = labelFontSize ?? NSFont.systemFontSize(for: control.controlSize)
-    if let family = labelFontFamily, let font = NSFont(name: family, size: size) {
+    // A pubspec font is registered with AppKit the first time (#142).
+    if let family = labelFontFamily, let font = CNFontResolver.font(family: family, size: size) {
       control.font = font
     } else {
       control.font = NSFont.systemFont(ofSize: size)

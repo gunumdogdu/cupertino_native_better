@@ -95,6 +95,9 @@ class CNSlider extends StatefulWidget {
     this.tickValues,
     this.allowsTickValuesOnly = true,
     this.neutralValue,
+    this.onChangeStart,
+    this.onChangeEnd,
+    this.seekOnTap = false,
   }) : assert(
          numberOfTicks == null || tickValues == null,
          'Set numberOfTicks or tickValues, not both',
@@ -116,8 +119,29 @@ class CNSlider extends StatefulWidget {
   /// Whether the control is interactive.
   final bool enabled;
 
-  /// Callback when the value changes due to user interaction.
+  /// Called when the user changes the value, once for each new value.
+  ///
+  /// A touch that ends where the slider already was doesn't call it again
+  /// with the same value.
   final ValueChanged<double> onChanged;
+
+  /// Called when the user starts changing the value, with the value before
+  /// the change, as `Slider.onChangeStart` does.
+  final ValueChanged<double>? onChangeStart;
+
+  /// Called when the user stops changing the value, with the final value.
+  /// A media scrubber can seek here once instead of on every [onChanged].
+  final ValueChanged<double>? onChangeEnd;
+
+  /// Whether a tap on the track moves the value to the tapped point, as a
+  /// media scrubber does (iOS 26+).
+  ///
+  /// `UISlider` only follows a drag, which leaves a
+  /// [CNSliderStyle.thumbless] slider without a way to pick a point. With
+  /// this on, a tap sets the value (snapped to [step]) and calls
+  /// [onChangeStart], [onChanged] and [onChangeEnd]. An `NSSlider` on macOS
+  /// and the Flutter fallbacks move to the clicked or tapped point already.
+  final bool seekOnTap;
 
   /// Optional controller to imperatively interact with the native view.
   final CNSliderController? controller;
@@ -212,6 +236,7 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
   int? _lastTrackTint;
   int? _lastTrackBgTint;
   double? _lastStep;
+  bool? _lastSeekOnTap;
   CNSliderStyle? _lastStyle;
   Map<String, Object>? _lastTrackConfiguration;
   bool get _isDark => ThemeHelper.isDark(context);
@@ -347,6 +372,8 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
               max: widget.max,
               divisions: _fallbackDivisions,
               onChanged: widget.enabled ? _fallbackOnChanged : null,
+              onChangeStart: widget.onChangeStart,
+              onChangeEnd: widget.onChangeEnd,
             ),
           ),
         );
@@ -363,6 +390,8 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
             max: widget.max,
             divisions: _fallbackDivisions,
             onChanged: widget.enabled ? _fallbackOnChanged : null,
+            onChangeStart: widget.onChangeStart,
+            onChangeEnd: widget.onChangeEnd,
             activeColor: _effectiveTrackTint ?? CupertinoColors.activeBlue,
             thumbColor: _effectiveThumbTint ?? CupertinoColors.white,
           ),
@@ -397,6 +426,7 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
         trackBackgroundTint: _effectiveTrackBgTint,
       ),
       if (widget.step != null) 'step': widget.step,
+      if (widget.seekOnTap) 'seekOnTap': true,
       if (widget.style != CNSliderStyle.standard)
         'sliderStyle': widget.style.name,
       ..._trackConfiguration,
@@ -460,13 +490,20 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {
-    if (call.method == 'valueChanged') {
-      final args = call.arguments as Map?;
-      final value = (args?['value'] as num?)?.toDouble();
-      if (value != null) {
-        widget.onChanged(value);
+    final args = call.arguments as Map?;
+    final value = (args?['value'] as num?)?.toDouble();
+    if (value == null) return null;
+    switch (call.method) {
+      case 'valueChanged':
+        // The native views skip a value Flutter already has; this covers a
+        // value that crossed with a `setValue` on its way here (#137).
+        if (value == _lastValue) return null;
         _lastValue = value;
-      }
+        widget.onChanged(value);
+      case 'changeStart':
+        widget.onChangeStart?.call(value);
+      case 'changeEnd':
+        widget.onChangeEnd?.call(value);
     }
     return null;
   }
@@ -483,6 +520,7 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
     _lastTrackTint = resolveColorToArgb(_effectiveTrackTint, context);
     _lastTrackBgTint = resolveColorToArgb(_effectiveTrackBgTint, context);
     _lastStep = widget.step;
+    _lastSeekOnTap = widget.seekOnTap;
     _lastStyle = widget.style;
     _lastTrackConfiguration = _trackConfiguration;
   }
@@ -567,6 +605,13 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
     if (_lastStep != widget.step && widget.step != null) {
       await channel.invokeMethod('setStep', {'step': widget.step});
       _lastStep = widget.step;
+    }
+
+    if (_lastSeekOnTap != widget.seekOnTap) {
+      _lastSeekOnTap = widget.seekOnTap;
+      await channel.invokeOptionalMethod('setSeekOnTap', {
+        'seekOnTap': widget.seekOnTap,
+      });
     }
 
     if (_lastStyle != widget.style) {

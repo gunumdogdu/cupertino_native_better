@@ -91,7 +91,8 @@ final class CNActionSheetManager: NSObject {
       buttons.append(MacAlertButton(label: cancelLabel, role: .cancel, enabled: true, isDefault: false))
     }
     let presented = alerts.present(
-      title: title, message: message, buttons: buttons, appearance: appearance
+      title: title, message: message, buttons: buttons, appearance: appearance,
+      textStyle: args["textStyle"] as? [String: Any], rtl: CNLayoutDirection.read(args)
     ) { answer in
       // The cancel button, and a sheet closed without a button, answer nil.
       guard let index = answer?.button, index < actions.count else {

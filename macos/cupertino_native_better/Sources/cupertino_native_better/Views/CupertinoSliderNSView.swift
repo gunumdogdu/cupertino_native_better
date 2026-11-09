@@ -27,6 +27,12 @@ class CupertinoSliderNSView: NSView {
   private var step: Double?
   private var semanticLabel: String?
   private var tint: NSColor?
+  /// The value Flutter last set or was last told about; a repeat of it is
+  /// not reported again (#137).
+  private var lastReported: Double = 0
+  /// Between the mouse-down and mouse-up of a drag, so `changeStart` and
+  /// `changeEnd` go out once per gesture.
+  private var inGesture = false
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeSlider_\(viewId)", binaryMessenger: messenger)
@@ -56,7 +62,11 @@ class CupertinoSliderNSView: NSView {
       if let style = dict["style"] as? [String: Any] { readTint(style) }
     }
     model.readTrackConfiguration(trackArgs)
+    lastReported = value
     model.onChange = { [weak self] newValue in self?.userChanged(to: newValue) }
+    model.onEditing = { [weak self] editing in
+      if editing { self?.beginGesture() } else { self?.endGesture() }
+    }
 
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
@@ -82,6 +92,7 @@ class CupertinoSliderNSView: NSView {
         if let value = (args?["value"] as? NSNumber)?.doubleValue {
           self.model.value = value
           self.slider.doubleValue = value
+          self.lastReported = value
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing value", details: nil)) }
       case "setRange":
@@ -252,14 +263,41 @@ class CupertinoSliderNSView: NSView {
   @objc private func onSliderChanged(_ sender: NSSlider) {
     let snapped = snap(sender.doubleValue)
     if snapped != sender.doubleValue { sender.doubleValue = snapped }
-    userChanged(to: snapped)
+    // NSSlider tracks the mouse itself; the event that sent the action
+    // tells where in the drag it is.
+    switch NSApp.currentEvent?.type {
+    case .leftMouseDown?, .leftMouseDragged?:
+      beginGesture()
+      userChanged(to: snapped)
+    case .leftMouseUp?:
+      // A click on the knob that did not move sends only the mouse-up.
+      beginGesture()
+      userChanged(to: snapped)
+      endGesture()
+    default:
+      userChanged(to: snapped)
+    }
   }
 
   /// A value the user picked, from either slider. Reported once per change.
   private func userChanged(to value: Double) {
     let snapped = snap(value)
     model.value = snapped
+    guard snapped != lastReported else { return }
+    lastReported = snapped
     channel.invokeMethod("valueChanged", arguments: ["value": snapped])
+  }
+
+  private func beginGesture() {
+    guard !inGesture else { return }
+    inGesture = true
+    channel.invokeMethod("changeStart", arguments: ["value": model.value])
+  }
+
+  private func endGesture() {
+    guard inGesture else { return }
+    inGesture = false
+    channel.invokeMethod("changeEnd", arguments: ["value": model.value])
   }
 
   /// Snaps to `step`, or to the nearest tick value NSSlider cannot snap to

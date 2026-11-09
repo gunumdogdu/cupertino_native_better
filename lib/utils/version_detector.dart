@@ -121,13 +121,15 @@ class PlatformVersion {
   ///
   /// This is true only on iOS 26+ or macOS 26+.
   /// Auto-initializes on first access.
-  static bool get shouldUseNativeGlass => isIOS26OrLater || isMacOS26OrLater;
+  static bool get shouldUseNativeGlass =>
+      !debugForceFallbacks && (isIOS26OrLater || isMacOS26OrLater);
 
   /// Returns true if a widget whose native view is a standard AppKit or UIKit
   /// control should use it: on every supported macOS, where those controls
   /// predate Liquid Glass, and on iOS 26 or later. Styling that needs Liquid
   /// Glass keeps checking [isMacOS26OrLater] / [isIOS26OrLater].
-  static bool get shouldUseNativeControls => isIOS26OrLater || Platform.isMacOS;
+  static bool get shouldUseNativeControls =>
+      !debugForceFallbacks && (isIOS26OrLater || Platform.isMacOS);
 
   /// Alias for [shouldUseNativeGlass].
   static bool get supportsLiquidGlass => shouldUseNativeGlass;
@@ -169,6 +171,22 @@ class PlatformVersion {
     return version >= min;
   }
 
+  /// When true, [shouldUseNativeControls] and [shouldUseNativeGlass] are
+  /// false, so every widget takes its Flutter fallback on any host.
+  ///
+  /// `flutter test` runs on the host machine. On a Mac, [Platform.isMacOS]
+  /// is true, so a widget test that targets iOS still gets the native views
+  /// (macOS draws its standard controls natively on every version), while
+  /// the same test on Linux CI gets the fallbacks. Set this in a test that
+  /// checks a fallback, and [reset] it afterwards:
+  ///
+  /// ```dart
+  /// PlatformVersion.debugForceFallbacks = true;
+  /// addTearDown(PlatformVersion.reset);
+  /// ```
+  @visibleForTesting
+  static bool debugForceFallbacks = false;
+
   /// Pretends the running OS has these major versions, so a test can check
   /// the version gates (e.g. macOS 15, where [shouldUseNativeGlass] is false
   /// but [shouldUseNativeControls] is true). [Platform] itself is not
@@ -180,11 +198,13 @@ class PlatformVersion {
     _isInitialized = true;
   }
 
-  /// Forces a refresh of the cached version (useful for testing).
+  /// Forces a refresh of the cached version and turns
+  /// [debugForceFallbacks] off (useful for testing).
   ///
   /// This should rarely be needed in production code.
   @visibleForTesting
   static void reset() {
+    debugForceFallbacks = false;
     _cachedIOSVersion = null;
     _cachedMacOSVersion = null;
     _isInitialized = false;

@@ -190,7 +190,10 @@ final class CNPopoverManager: NSObject, UIPopoverPresentationControllerDelegate 
         // already presenting something else); the call must not wait for a
         // popover that never appeared.
         if host.presentingViewController == nil, self.host === host {
-            finish(nil, dismiss: false)
+            // An error rather than null, so `throwOnFailure` can tell it
+            // from a dismissal (#135).
+            finish(FlutterError(code: "refused", message: "UIKit did not present the popover", details: nil),
+                   dismiss: false)
         }
     }
 
@@ -206,7 +209,7 @@ final class CNPopoverManager: NSObject, UIPopoverPresentationControllerDelegate 
 
     /// Answers the open popover's call with [value] once, and closes the
     /// popover when [dismiss] is set (it is already gone otherwise).
-    private func finish(_ value: String?, dismiss: Bool) {
+    private func finish(_ value: Any?, dismiss: Bool) {
         let result = pendingResult
         let host = self.host
         pendingResult = nil
@@ -380,9 +383,18 @@ struct CNPopoverConfig {
         /// `plain`, `default`, `destructive` or `cancel`.
         let style: String
     }
+    /// A `CNPopoverGauge`: a labelled bar (#135).
+    struct Gauge {
+        let label: String
+        /// The value as a fraction of the bar, from 0 to 1.
+        let fraction: Double
+        let valueText: String?
+        let tint: Color?
+    }
     struct Content {
         let title: String?
         let message: String?
+        let gauges: [Gauge]
         let rows: [Row]
         var toggles: [Toggle]
         let actions: [Action]
@@ -390,6 +402,12 @@ struct CNPopoverConfig {
         init(dict: [String: Any]) {
             title = (dict["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             message = (dict["message"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            gauges = (dict["gauges"] as? [[String: Any]] ?? []).map { g in
+                Gauge(label: g["label"] as? String ?? "",
+                      fraction: min(1, max(0, (g["fraction"] as? NSNumber)?.doubleValue ?? 0)),
+                      valueText: g["valueText"] as? String,
+                      tint: (g["tint"] as? NSNumber).map { Color(uiColor: ImageUtils.colorFromARGB($0.intValue)) })
+            }
             let rawRows = dict["rows"] as? [[String: Any]] ?? []
             let items = CNSheetConfig.parseItems(rawRows)
             rows = zip(rawRows, items).map { raw, item in
@@ -608,20 +626,27 @@ struct CNPopoverBody: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 14)
                     .padding(.bottom, content.rows.isEmpty && content.toggles.isEmpty
-                             && content.actions.isEmpty ? 14 : 10)
+                             && content.actions.isEmpty && content.gauges.isEmpty ? 14 : 10)
+            }
+            if !content.gauges.isEmpty {
+                if hasHeader { Divider() }
+                gauges
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
             }
             if !content.rows.isEmpty {
-                if hasHeader { Divider() }
+                if hasHeader || !content.gauges.isEmpty { Divider() }
                 rows
             }
             if !content.toggles.isEmpty {
-                if hasHeader || !content.rows.isEmpty { Divider() }
+                if hasHeader || !content.rows.isEmpty || !content.gauges.isEmpty { Divider() }
                 toggles
             }
             if !content.actions.isEmpty {
                 actions
                     .padding(.horizontal, 16)
-                    .padding(.top, hasHeader && content.rows.isEmpty && content.toggles.isEmpty ? 4 : 12)
+                    .padding(.top, hasHeader && content.rows.isEmpty && content.toggles.isEmpty
+                             && content.gauges.isEmpty ? 4 : 12)
                     .padding(.bottom, 14)
             }
         }
@@ -641,6 +666,34 @@ struct CNPopoverBody: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// The gauges: each label and value over its bar, read by VoiceOver as
+    /// one element (#135).
+    private var gauges: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(content.gauges.indices, id: \.self) { i in
+                let gauge = content.gauges[i]
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(gauge.label)
+                        Spacer(minLength: 8)
+                        if let text = gauge.valueText {
+                            Text(text)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                    .font(.subheadline)
+                    ProgressView(value: gauge.fraction)
+                        .tint(gauge.tint ?? tint)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(gauge.label))
+                .accessibilityValue(Text(gauge.valueText
+                    ?? gauge.fraction.formatted(.percent.precision(.fractionLength(0)))))
             }
         }
     }

@@ -2,6 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../style/dialog_text_style.dart';
+import '../utils/dialog_text_style_encoder.dart';
+import '../utils/layout_direction.dart';
 import '../utils/theme_helper.dart';
 import 'bottom_sheet.dart';
 
@@ -152,6 +155,24 @@ class CNActionSheet {
   ///
   /// Apple's Human Interface Guidelines recommend at most four buttons
   /// including cancel. Longer lists work, but scroll.
+  ///
+  /// A sheet that can't be presented returns null by default, as a
+  /// dismissal does. With [throwOnFailure], [show] throws the
+  /// [PlatformException] instead (code `refused` when UIKit didn't present
+  /// it, or `no_presenter`, `no_window`), so the caller can fall back to
+  /// another UI (#135).
+  ///
+  /// [fontFamily] draws the title, the message and the buttons in that
+  /// family, at the sizes and weights the system gives them; [titleStyle],
+  /// [messageStyle] and [actionStyle] override one part (#144). The font
+  /// stays on through a press and while the dialog closes.
+  ///
+  /// [textDirection] lays the dialog out right to left or left to right:
+  /// the title and message align to the matching edge and the buttons
+  /// follow it. Null takes the ambient [Directionality], so an app that picks
+  /// Arabic in Dart gets a right-to-left native dialog (#144). On macOS an
+  /// alert's buttons keep the system font, and the menu shown from an
+  /// `anchorRect` keeps the system's font and direction.
   static Future<T?> show<T>({
     required BuildContext context,
     required List<CNActionSheetAction<T>> actions,
@@ -159,6 +180,12 @@ class CNActionSheet {
     String? message,
     String? cancelLabel,
     Rect? anchorRect,
+    bool throwOnFailure = false,
+    String? fontFamily,
+    CNDialogTextStyle? titleStyle,
+    CNDialogTextStyle? messageStyle,
+    CNDialogTextStyle? actionStyle,
+    TextDirection? textDirection,
   }) {
     assert(
       cancelLabel != null || actions.any((a) => a.enabled),
@@ -184,16 +211,35 @@ class CNActionSheet {
         title: title,
         message: message,
         cancelLabel: cancelLabel,
+        titleStyle: (titleStyle ?? const CNDialogTextStyle()).toTextStyle(
+          fontFamily,
+        ),
+        messageStyle: (messageStyle ?? const CNDialogTextStyle()).toTextStyle(
+          fontFamily,
+        ),
+        actionStyle: (actionStyle ?? const CNDialogTextStyle()).toTextStyle(
+          fontFamily,
+        ),
+        textDirection: textDirection ?? Directionality.maybeOf(context),
       );
     }
 
     return _showNative<T>(
+      textStyle: encodeDialogTextStyle(
+        context,
+        fontFamily: fontFamily,
+        title: titleStyle,
+        message: messageStyle,
+        action: actionStyle,
+      ),
+      rtl: nativeRtl(context, textDirection),
       actions: actions,
       title: title,
       message: message,
       cancelLabel: cancelLabel,
       anchorRect: anchorRect,
       isDark: context.mounted ? ThemeHelper.themeIsDark(context) : null,
+      throwOnFailure: throwOnFailure,
     );
   }
 
@@ -204,6 +250,9 @@ class CNActionSheet {
     required String? cancelLabel,
     required Rect? anchorRect,
     required bool? isDark,
+    required bool throwOnFailure,
+    Map<String, Object?>? textStyle,
+    bool? rtl,
   }) async {
     final payload = debugBuildActionSheetPayload(
       actions: actions,
@@ -212,6 +261,8 @@ class CNActionSheet {
       cancelLabel: cancelLabel,
       anchorRect: anchorRect,
       isDark: isDark,
+      textStyle: textStyle,
+      rtl: rtl,
     );
 
     try {
@@ -219,6 +270,7 @@ class CNActionSheet {
       if (index == null || index < 0 || index >= actions.length) return null;
       return actions[index].value;
     } on PlatformException catch (e) {
+      if (throwOnFailure) rethrow;
       debugPrint(
         '⚠️ [cupertino_native_better] CNActionSheet failed: ${e.code} '
         '${e.message ?? ''}',
@@ -238,33 +290,46 @@ class CNActionSheet {
     required String? title,
     required String? message,
     required String? cancelLabel,
+    TextStyle? titleStyle,
+    TextStyle? messageStyle,
+    TextStyle? actionStyle,
+    TextDirection? textDirection,
   }) {
+    Widget label(String text, bool destructive) => Text(
+      text,
+      style: destructive ? dialogStyleWithoutColor(actionStyle) : actionStyle,
+    );
     return CNBottomSheet.showModalPopup<T>(
       context: context,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: title == null ? null : Text(title),
-        message: message == null ? null : Text(message),
-        actions: [
-          for (final action in actions)
-            CupertinoActionSheetAction(
-              isDestructiveAction: action.isDestructive,
-              onPressed: action.enabled
-                  ? () => Navigator.of(popupContext).pop(action.value)
-                  : () {},
-              child: Opacity(
-                opacity: action.enabled ? 1.0 : 0.4,
-                child: Text(action.label),
+      builder: (popupContext) {
+        final sheet = CupertinoActionSheet(
+          title: title == null ? null : Text(title, style: titleStyle),
+          message: message == null ? null : Text(message, style: messageStyle),
+          actions: [
+            for (final action in actions)
+              CupertinoActionSheetAction(
+                isDestructiveAction: action.isDestructive,
+                onPressed: action.enabled
+                    ? () => Navigator.of(popupContext).pop(action.value)
+                    : () {},
+                child: Opacity(
+                  opacity: action.enabled ? 1.0 : 0.4,
+                  child: label(action.label, action.isDestructive),
+                ),
               ),
-            ),
-        ],
-        cancelButton: cancelLabel == null
-            ? null
-            : CupertinoActionSheetAction(
-                isDefaultAction: true,
-                onPressed: () => Navigator.of(popupContext).pop(),
-                child: Text(cancelLabel),
-              ),
-      ),
+          ],
+          cancelButton: cancelLabel == null
+              ? null
+              : CupertinoActionSheetAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.of(popupContext).pop(),
+                  child: label(cancelLabel, false),
+                ),
+        );
+        return textDirection == null
+            ? sheet
+            : Directionality(textDirection: textDirection, child: sheet);
+      },
     );
   }
 }
@@ -282,12 +347,16 @@ Map<String, Object?> debugBuildActionSheetPayload({
   String? cancelLabel,
   Rect? anchorRect,
   bool? isDark,
+  Map<String, Object?>? textStyle,
+  bool? rtl,
 }) {
   return <String, Object?>{
     'title': title,
     'message': message,
     'cancelLabel': cancelLabel,
     'isDark': ?isDark,
+    'textStyle': ?textStyle,
+    'rtl': ?rtl,
     'actions': [
       for (final action in actions)
         <String, Object?>{

@@ -21,7 +21,8 @@ struct CupertinoSliderView: View {
             SliderTickContentForEach(model.resolvedTickValues, id: \.self) { value in
               SliderTick(value)
             }
-          }
+          },
+          onEditingChanged: { model.onEditing($0) }
         )
       } else {
         plainSlider
@@ -37,9 +38,13 @@ struct CupertinoSliderView: View {
 
   @ViewBuilder private var plainSlider: some View {
     if let s = model.step, s > 0 {
-      Slider(value: model.userValue(snappingToTicks: false), in: model.min...model.max, step: s)
+      Slider(value: model.userValue(snappingToTicks: false), in: model.min...model.max, step: s) {
+        model.onEditing($0)
+      }
     } else {
-      Slider(value: model.userValue(snappingToTicks: false), in: model.min...model.max)
+      Slider(value: model.userValue(snappingToTicks: false), in: model.min...model.max) {
+        model.onEditing($0)
+      }
     }
   }
 }
@@ -59,6 +64,9 @@ class SliderModel: ObservableObject {
   @Published var label: String = ""
   /// Called with each value the user picks.
   var onChange: (Double) -> Void
+  /// Called with true when a drag starts and false when it ends
+  /// (`CNSlider.onChangeStart` / `onChangeEnd`).
+  var onEditing: (Bool) -> Void = { _ in }
 
   init(value: Double, min: Double, max: Double, enabled: Bool, onChange: @escaping (Double) -> Void) {
     self.value = value

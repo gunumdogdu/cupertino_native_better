@@ -69,6 +69,10 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
   private var currentIconSizes: [CGFloat] = [] // Track icon sizes for dynamic height calculation
   private var labelFontFamily: String? = nil
   private var labelFontSize: CGFloat = 0 // 0 means system default (~10pt)
+  /// `CNTabBar.labelFontWeight` / `selectedLabelFontWeight` (Flutter's
+  /// `FontWeight.value`); nil keeps the system's medium and semibold (#142).
+  private var labelFontWeight: Int? = nil
+  private var selectedLabelFontWeight: Int? = nil
   /// The menu each item opens instead of selecting itself (null for a plain
   /// item), encoded by `encodePopupMenuEntries`.
   private var currentMenus: [[String: Any]?] = []
@@ -160,10 +164,15 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     if let dict = args as? [String: Any] {
       if let ff = dict["labelFontFamily"] as? String, !ff.isEmpty { self.labelFontFamily = ff }
       if let fs = dict["labelFontSize"] as? NSNumber, fs.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: fs) }
+      self.labelFontWeight = (dict["labelFontWeight"] as? NSNumber)?.intValue
+      self.selectedLabelFontWeight = (dict["selectedLabelFontWeight"] as? NSNumber)?.intValue
       self.currentMenus = Self.parseMenus(dict["menus"])
       self.readItemOptions(dict)
     }
 
+    // Flutter's text direction (#142): the tab order, badges, menus and
+    // the split halves follow it.
+    CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: container)
     container.backgroundColor = .clear
     // Always clip the container to block the iOS 26 Liquid Glass drop
     // shadow from bleeding over modals (Issue #2). The Liquid Glass
@@ -954,6 +963,10 @@ channel.setMethodCallHandler { [weak self] call, result in
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
+      case "setLayoutDirection":
+        CNLayoutDirection.apply(CNLayoutDirection.read(call.arguments as? [String: Any]), to: self.container)
+        for bar in [self.tabBar, self.tabBarLeft, self.tabBarRight].compactMap({ $0 }) { bar.setNeedsLayout() }
+        result(nil)
       case "setBrightness":
         if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
           if #available(iOS 13.0, *) { self.container.overrideUserInterfaceStyle = isDark ? .dark : .light }
@@ -992,6 +1005,8 @@ channel.setMethodCallHandler { [weak self] call, result in
           let oldRaise = self.iconRaise
           self.labelFontFamily = (args["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
           self.labelFontSize = (args["labelFontSize"] as? NSNumber).map { CGFloat(truncating: $0) } ?? 0
+          self.labelFontWeight = (args["labelFontWeight"] as? NSNumber)?.intValue
+          self.selectedLabelFontWeight = (args["selectedLabelFontWeight"] as? NSNumber)?.intValue
           let raiseDelta = self.iconRaise - oldRaise
           if #available(iOS 13.0, *) {
             let ap = self.makeAppearance()
@@ -1071,9 +1086,9 @@ channel.setMethodCallHandler { [weak self] call, result in
   /// keeps its height and grows the label up into the icon, so half of
   /// this moves the icon up and half moves the label down.
   private var labelExtraHeight: CGFloat {
-    guard labelFontFamily != nil || labelFontSize > 0 else { return 0 }
+    guard hasLabelFont else { return 0 }
     let size = labelFontSize > 0 ? labelFontSize : 10.0
-    let font = labelFontFamily.flatMap { UIFont(name: $0, size: size) } ?? UIFont.systemFont(ofSize: size, weight: .medium)
+    let font = labelFont(size: size, selected: false)
     return max(0, font.lineHeight - UIFont.systemFont(ofSize: 10, weight: .medium).lineHeight)
   }
 
@@ -1111,12 +1126,10 @@ channel.setMethodCallHandler { [weak self] call, result in
   /// Applies the current label font to a UITabBarAppearance.
   @available(iOS 13.0, *)
   private func applyLabelFont(to ap: UITabBarAppearance) {
-    guard labelFontFamily != nil || labelFontSize > 0 else { return }
+    guard hasLabelFont else { return }
     let size = labelFontSize > 0 ? labelFontSize : 10.0
-    let custom = labelFontFamily.flatMap { UIFont(name: $0, size: size) }
-    // The iOS 26 default label is SF Medium, and SF Semibold inside the selection pill.
-    let normal: [NSAttributedString.Key: Any] = [.font: custom ?? UIFont.systemFont(ofSize: size, weight: .medium)]
-    let selected: [NSAttributedString.Key: Any] = [.font: custom ?? UIFont.systemFont(ofSize: size, weight: .semibold)]
+    let normal: [NSAttributedString.Key: Any] = [.font: labelFont(size: size, selected: false)]
+    let selected: [NSAttributedString.Key: Any] = [.font: labelFont(size: size, selected: true)]
     for layout in [ap.stackedLayoutAppearance, ap.inlineLayoutAppearance, ap.compactInlineLayoutAppearance] {
       layout.normal.titleTextAttributes = normal
       layout.selected.titleTextAttributes = selected
@@ -1124,14 +1137,45 @@ channel.setMethodCallHandler { [weak self] call, result in
     // Stacked (icon above label): the label moves down as far as the icon
     // moves up. Inline (side by side, iPad): the label follows the icon up,
     // which there also moves by half of iconRaise.
-    let stacked = UIOffset(horizontal: 0, vertical: labelExtraHeight / 2)
-    let inline = UIOffset(horizontal: 0, vertical: -iconRaise / 2)
+    let stacked = UIOffset(horizontal: 0, vertical: labelExtraHeight / 2 + labelBaselineShift)
+    let inline = UIOffset(horizontal: 0, vertical: -iconRaise / 2 + labelBaselineShift)
     ap.stackedLayoutAppearance.normal.titlePositionAdjustment = stacked
     ap.stackedLayoutAppearance.selected.titlePositionAdjustment = stacked
     for layout in [ap.inlineLayoutAppearance, ap.compactInlineLayoutAppearance] {
       layout.normal.titlePositionAdjustment = inline
       layout.selected.titlePositionAdjustment = inline
     }
+  }
+
+  /// How far a custom family's label moves down to sit where San Francisco's
+  /// would. The bar centres a title's ascent-plus-descent box, so a family
+  /// with a short ascent and a long descent (Tajawal, like many fonts with
+  /// Arabic glyphs: 7.7 and 4.3 pt at 12 pt, against 11.6 and 2.5) drew its
+  /// glyphs about 2.8 pt higher, over the icon (#142). Zero for the system
+  /// font.
+  private var labelBaselineShift: CGFloat {
+    guard labelFontFamily != nil else { return 0 }
+    let size = labelFontSize > 0 ? labelFontSize : 10.0
+    let custom = labelFont(size: size, selected: false)
+    let system = UIFont.systemFont(ofSize: size, weight: .medium)
+    return ((system.ascender + system.descender) - (custom.ascender + custom.descender)) / 2
+  }
+
+  private var hasLabelFont: Bool {
+    labelFontFamily != nil || labelFontSize > 0 || labelFontWeight != nil || selectedLabelFontWeight != nil
+  }
+
+  /// The label font of a normal or a selected tab. The iOS 26 default label
+  /// is SF Medium, and SF Semibold inside the selection pill; a custom family
+  /// gets the same two weights (its nearest faces) unless the app sets them.
+  /// A pubspec font is registered with UIKit the first time (#142).
+  private func labelFont(size: CGFloat, selected: Bool) -> UIFont {
+    let asked = CNFontResolver.weight(fromFlutterValue: selected ? selectedLabelFontWeight : labelFontWeight)
+    let weight = asked ?? (selected ? .semibold : .medium)
+    if let family = labelFontFamily, let font = CNFontResolver.font(family: family, size: size, weight: weight) {
+      return font
+    }
+    return UIFont.systemFont(ofSize: size, weight: weight)
   }
 
   private func readItemOptions(_ dict: [String: Any]) {
@@ -1166,15 +1210,18 @@ channel.setMethodCallHandler { [weak self] call, result in
       // Action items and accessibility names (#131, #132).
       var actions = Set<Int>()
       var actionLabels: [Int: String] = [:]
+      var names: [Int: String] = [:]
       for (local, item) in (bar.items ?? []).enumerated() {
         let index = offset + local
         let name = index < currentSemanticLabels.count ? currentSemanticLabels[index] : ""
         item.accessibilityLabel = name.isEmpty ? nil : name
+        if !name.isEmpty { names[local] = name }
         if currentActions.contains(index) {
           actions.insert(local)
           if let label = name.isEmpty ? item.title : name { actionLabels[local] = label }
         }
       }
+      bar.itemNames = names
       bar.itemActionLabels = actionLabels
       bar.itemActions = actions
       bar.onAction = { [weak self] local in
@@ -1254,11 +1301,11 @@ channel.setMethodCallHandler { [weak self] call, result in
     return ImageUtils.colorFromARGB(argb)
   }
 
-  private static func loadFlutterAsset(_ assetPath: String, size: CGSize? = nil) -> UIImage? {
+  static func loadFlutterAsset(_ assetPath: String, size: CGSize? = nil) -> UIImage? {
     return fitted(ImageUtils.loadFlutterAsset(assetPath, size: size), in: size)
   }
 
-  private static func createImageFromData(_ data: Data, format: String?, scale: CGFloat, size: CGSize? = nil) -> UIImage? {
+  static func createImageFromData(_ data: Data, format: String?, scale: CGFloat, size: CGSize? = nil) -> UIImage? {
     return fitted(ImageUtils.createImageFromData(data, format: format, size: size, scale: scale), in: size)
   }
 

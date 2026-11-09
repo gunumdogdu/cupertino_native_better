@@ -2,6 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../style/dialog_text_style.dart';
+import '../utils/dialog_text_style_encoder.dart';
+import '../utils/layout_direction.dart';
 import '../utils/theme_helper.dart';
 
 /// Channel owned by `CNAlertManager` on the iOS and macOS sides. It carries no
@@ -244,12 +247,35 @@ class CNAlert {
   /// [CNAlertAction.isCancel] (a hard `NSInternalInconsistencyException`), two
   /// with [CNAlertAction.isDefault], and a single action that is both cancel
   /// and destructive.
+  ///
+  /// An alert that can't be presented returns null by default, as a
+  /// dismissal does. With [throwOnFailure], [show] throws the
+  /// [PlatformException] instead (code `refused` when UIKit didn't present
+  /// it, or `no_presenter`, `presenter_busy`, `no_window`), so the caller
+  /// can fall back to another UI (#135).
+  ///
+  /// [fontFamily] draws the title, the message and the buttons in that
+  /// family, at the sizes and weights the system gives them; [titleStyle],
+  /// [messageStyle] and [actionStyle] override one part (#144). The font
+  /// stays on through a press and while the dialog closes.
+  ///
+  /// [textDirection] lays the dialog out right to left or left to right:
+  /// the title and message align to the matching edge and the buttons are
+  /// mirrored. Null takes the ambient [Directionality], so an app that picks
+  /// Arabic in Dart gets a right-to-left native dialog (#144). On macOS the
+  /// buttons keep the system font: AppKit draws an alert's buttons itself.
   static Future<CNAlertResult<T>?> show<T>({
     required BuildContext context,
     required List<CNAlertAction<T>> actions,
     String? title,
     String? message,
     List<CNAlertTextField> textFields = const <CNAlertTextField>[],
+    bool throwOnFailure = false,
+    String? fontFamily,
+    CNDialogTextStyle? titleStyle,
+    CNDialogTextStyle? messageStyle,
+    CNDialogTextStyle? actionStyle,
+    TextDirection? textDirection,
   }) {
     assert(
       actions.isNotEmpty,
@@ -296,10 +322,23 @@ class CNAlert {
         title: title,
         message: message,
         textFields: textFields,
+        fontFamily: fontFamily,
+        titleStyle: titleStyle,
+        messageStyle: messageStyle,
+        actionStyle: actionStyle,
+        textDirection: textDirection,
       );
     }
 
     return _showNative<T>(
+      textStyle: encodeDialogTextStyle(
+        context,
+        fontFamily: fontFamily,
+        title: titleStyle,
+        message: messageStyle,
+        action: actionStyle,
+      ),
+      rtl: nativeRtl(context, textDirection),
       actions: actions,
       title: title,
       message: message,
@@ -308,6 +347,7 @@ class CNAlert {
       // a light alert, as CNActionSheet does. Null when the theme follows the
       // system, so the native alert does too (#118).
       isDark: context.mounted ? ThemeHelper.themeIsDark(context) : null,
+      throwOnFailure: throwOnFailure,
     );
   }
 
@@ -317,6 +357,9 @@ class CNAlert {
     required String? message,
     required List<CNAlertTextField> textFields,
     required bool? isDark,
+    required bool throwOnFailure,
+    Map<String, Object?>? textStyle,
+    bool? rtl,
   }) async {
     final payload = debugBuildAlertPayload(
       actions: actions,
@@ -324,6 +367,8 @@ class CNAlert {
       message: message,
       textFields: textFields,
       isDark: isDark,
+      textStyle: textStyle,
+      rtl: rtl,
     );
 
     try {
@@ -341,6 +386,7 @@ class CNAlert {
         textFields: _decodeTextFields(reply['textFields']),
       );
     } on PlatformException catch (e) {
+      if (throwOnFailure) rethrow;
       debugPrint(
         '⚠️ [cupertino_native_better] CNAlert failed: ${e.code} '
         '${e.message ?? ''}',
@@ -371,17 +417,37 @@ class CNAlert {
     required String? title,
     required String? message,
     required List<CNAlertTextField> textFields,
+    String? fontFamily,
+    CNDialogTextStyle? titleStyle,
+    CNDialogTextStyle? messageStyle,
+    CNDialogTextStyle? actionStyle,
+    TextDirection? textDirection,
   }) {
+    final direction = textDirection ?? Directionality.maybeOf(context);
     return showCupertinoDialog<CNAlertResult<T>>(
       context: context,
       // UIKit parity: a `.alert` has no implicit outside-tap dismissal.
       barrierDismissible: false,
-      builder: (dialogContext) => _CNAlertFallback<T>(
-        title: title,
-        message: message,
-        actions: actions,
-        textFields: textFields,
-      ),
+      builder: (dialogContext) {
+        final dialog = _CNAlertFallback<T>(
+          title: title,
+          message: message,
+          actions: actions,
+          textFields: textFields,
+          titleStyle: (titleStyle ?? const CNDialogTextStyle()).toTextStyle(
+            fontFamily,
+          ),
+          messageStyle: (messageStyle ?? const CNDialogTextStyle()).toTextStyle(
+            fontFamily,
+          ),
+          actionStyle: (actionStyle ?? const CNDialogTextStyle()).toTextStyle(
+            fontFamily,
+          ),
+        );
+        return direction == null
+            ? dialog
+            : Directionality(textDirection: direction, child: dialog);
+      },
     );
   }
 }
@@ -396,12 +462,18 @@ class _CNAlertFallback<T> extends StatefulWidget {
     required this.textFields,
     this.title,
     this.message,
+    this.titleStyle,
+    this.messageStyle,
+    this.actionStyle,
   });
 
   final List<CNAlertAction<T>> actions;
   final List<CNAlertTextField> textFields;
   final String? title;
   final String? message;
+  final TextStyle? titleStyle;
+  final TextStyle? messageStyle;
+  final TextStyle? actionStyle;
 
   @override
   State<_CNAlertFallback<T>> createState() => _CNAlertFallbackState<T>();
@@ -423,7 +495,8 @@ class _CNAlertFallbackState<T> extends State<_CNAlertFallback<T>> {
 
   Widget? _buildContent() {
     final children = <Widget>[
-      if (widget.message != null) Text(widget.message!),
+      if (widget.message != null)
+        Text(widget.message!, style: widget.messageStyle),
       for (var i = 0; i < _controllers.length; i++)
         Padding(
           padding: const EdgeInsets.only(top: 8),
@@ -447,7 +520,9 @@ class _CNAlertFallbackState<T> extends State<_CNAlertFallback<T>> {
   @override
   Widget build(BuildContext context) {
     return CupertinoAlertDialog(
-      title: widget.title == null ? null : Text(widget.title!),
+      title: widget.title == null
+          ? null
+          : Text(widget.title!, style: widget.titleStyle),
       content: _buildContent(),
       actions: [
         for (final action in widget.actions)
@@ -464,6 +539,9 @@ class _CNAlertFallbackState<T> extends State<_CNAlertFallback<T>> {
                     ),
                   )
                 : null,
+            textStyle: action.isDestructive && widget.actionStyle != null
+                ? dialogStyleWithoutColor(widget.actionStyle)
+                : widget.actionStyle,
             child: Text(action.label),
           ),
       ],
@@ -483,11 +561,15 @@ Map<String, Object?> debugBuildAlertPayload({
   String? message,
   List<CNAlertTextField> textFields = const <CNAlertTextField>[],
   bool? isDark,
+  Map<String, Object?>? textStyle,
+  bool? rtl,
 }) {
   return <String, Object?>{
     'title': title,
     'message': message,
     'isDark': ?isDark,
+    'textStyle': ?textStyle,
+    'rtl': ?rtl,
     'actions': [
       for (final action in actions)
         <String, Object?>{

@@ -1,3 +1,88 @@
+## 2.5.0
+
+> Eleven reports, from @cogwheel0 (#134 to #140) and @Ashhad08 (#141 to #144), all fixed or added. New: fonts from `pubspec.yaml` on native views, right to left from Flutter, label styles for popup menu buttons and segmented controls, fonts for alerts and action sheets, a lifted preview for context menus, popover gauges, tap to seek, and a test switch for the Flutter fallbacks. Three behaviour changes, listed at the end.
+
+### Added — fonts from `pubspec.yaml` on native views (#142)
+
+A font family declared under `fonts:` in `pubspec.yaml` is a Flutter asset that UIKit and AppKit don't know, so `labelFontFamily: 'Nunito'` silently fell back to the system font. The native views now find the family in Flutter's font manifest and register its files with the system the first time it is used, then pick the face nearest the weight asked for. It works for `CNTabBar`, `CNButton` (`CNButtonConfig.labelFontFamily`), `CNPopupMenuButton`, `CNSegmentedControl`, `CNAlert` and `CNActionSheet`, on iOS and macOS. A weight now applies together with a family too. A family found nowhere logs one line in debug builds.
+
+### Added — right to left from Flutter (#142, #143, #144)
+
+UIKit lays views out by the app's language, which an app that switches language in Dart never tells it about, so an Arabic app had a left-to-right native tab bar. `CNTabBar`, `CNSegmentedControl`, `CNAlert` and `CNActionSheet` now take the ambient `Directionality` (or their new `textDirection`): the first tab or segment is on the right, badges and split halves are mirrored, and an alert's title and message align right with its buttons mirrored. On macOS the tab bar, the segmented control and the alerts follow it too.
+
+### Added — `CNTabBar.labelFontWeight` and `selectedLabelFontWeight` (#142)
+
+The selected tab can be heavier than the others, as on the system bar: by default a custom family gets the system's medium and semibold (its nearest faces). A family whose glyphs sit higher in their line than San Francisco's (many fonts with Arabic glyphs) is moved down to sit where the system label would, instead of over the icon.
+
+### Added — label style and label updates for `CNSegmentedControl` (#143)
+
+`labelFontFamily`, `labelFontSize`, `labelFontWeight`, `labelColor`, `selectedLabelFontFamily`, `selectedLabelFontWeight` and `selectedLabelColor` style the segment titles of that control only, and change without recreating it. New `labels` or `sfSymbols` now reach the control in place, keeping the selected segment, so a language switch updates the titles. On macOS a segmented control has one font for all segments and no title colours, so there the family, size and weight apply to every segment.
+
+### Added — fonts and direction for `CNAlert` and `CNActionSheet` (#144)
+
+`fontFamily` draws the title, the message and the buttons in that family at the sizes and weights the system gives them (the preferred button stays bold, a destructive one red); `titleStyle`, `messageStyle` and `actionStyle` (`CNDialogTextStyle`) override a part's family, size, weight or colour. The font stays on while a button is pressed and while the dialog closes. `textDirection` sets the direction, by default the ambient `Directionality`. On macOS the title and message take the font and the direction and the buttons are mirrored; AppKit draws an alert's buttons itself, so they keep the system font. The Flutter fallbacks take the same styles.
+
+### Added — `CNPopupMenuButton`: icon with label, label style, callbacks (#141)
+
+- A text button can show `buttonIcon`, `buttonCustomIcon` or `buttonImageAsset` next to its label, placed by `imagePlacement` (leading, trailing, top, bottom) with `imagePadding`. An SF Symbol at the default size takes the label's size.
+- `labelFontFamily`, `labelFontSize`, `labelFontWeight` and `labelColor` style the label. A native menu has no font setting, so the menu's items keep the system font.
+- `onOpened` and `onClosed` are called each time the menu shows and closes, with or without a choice; the fallback sheet calls them too.
+- `keepsSourceVisible` (iOS 26+) leaves the button out of the menu's morph: the menu grows out of a clear stand-in at the button's place, so the button is not hidden into the menu and is there again the moment the menu closes. The menu still opens over the button's place.
+
+### Added — `CNContextMenu.showsPreview` (#138)
+
+On iOS, a long press lifts a picture of the child above the dimmed screen with the menu beside it, as a system context menu does in Photos or Messages, and settles it back when the menu closes. A menu opened from code is a button menu, which UIKit never shows with a preview, so a clear native view with a `UIContextMenuInteraction` is laid over the child; a tap still reaches the child. Each such region is a platform view. `previewCornerRadius` matches the child's corners.
+
+### Added — popover gauges, and failures you can tell from a dismissal (#135)
+
+- `CNPopoverContent.gauges` (`CNPopoverGauge`) shows labelled native bars under the message, such as storage used: the label and a value text over a SwiftUI `ProgressView`, read by VoiceOver as one element.
+- A popover that can't be shown returned null, like a cancel. With `throwOnFailure: true`, `CNPopover.show` throws a `PlatformException` instead (`no_anchor`, `refused` when UIKit didn't present it, or the native code), so the app can fall back to another UI. `CNAlert.show` and `CNActionSheet.show` take the same option. Without it nothing changes.
+
+### Added — `CNSlider` tap to seek, `onChangeStart` and `onChangeEnd` (#137)
+
+- `seekOnTap: true` (iOS 26+) moves the value to a tapped point, as a media scrubber does; a thumbless slider had no way to pick a point.
+- `onChangeStart` and `onChangeEnd` are called when a drag or a tap starts and ends, on iOS, macOS and the fallbacks, so a scrubber can seek once when the finger lifts.
+
+### Added — `PlatformVersion.debugForceFallbacks` (#139)
+
+`flutter test` runs on the host machine, and on a Mac a test that targets iOS still got the native views. Set this in a test that checks a fallback, and `PlatformVersion.reset()` afterwards.
+
+### Fixed — `CNSearchBar` (#134)
+
+- The iOS 26 bar is created again after a modal (`autoHideOnModal`), and came back empty and collapsed while the app still filtered by the old query. It now comes back with its text and expanded state, on macOS too.
+- New `textCapitalization`, `autocorrect` and `keyboardType`; the fallback field takes them too.
+- VoiceOver read the clear button as "Close", the name of its symbol. It now reads `clearButtonSemanticLabel`, by default the localized "Clear".
+- `searchIcon` and `clearIcon` were drawn at 16 pt whatever their `CNSymbol.size`. They now take it, and follow Dynamic Type like the field's text.
+- Cancel on a bar with `expandable: false` left the text in the field. It now clears it and reports `""`.
+
+### Fixed — `CNSlider` repeats the value (#137)
+
+A touch that ended without moving sent the value the slider already had to `onChanged`, so an app that seeks there seeked to where it already was. A value the app already has is no longer reported.
+
+### Fixed — `CNTabBar` height and the bar with a search tab (#136)
+
+- A bar created with a `height` that later became null never measured itself and stayed at the 50 pt fallback. It now measures itself again when `height` changes.
+- The bar with a `searchItem` drew only SF Symbols and labels. Its items now show image assets, custom icons, icon sizes, badges (dots too) and names as on a bar without search, its search tab draws `CNTabBarSearchItem.icon`, `activeIcon` and the style's icon size and colours, and `activateSearch()` shows the search tab selected.
+- The docs said the search tab expands into a search field. On iOS 26 it is the system search tab at the end of the bar, which reports that search is active so the app can show its own search UI; for the system search field in the tab bar, use `CNTabBarNative`.
+
+### Fixed — `CNTabBarItem.semanticLabel` on iOS 27 (#140)
+
+iOS 27.1 no longer copies a tab item's accessibility label to the tab buttons VoiceOver reads, so icon-only tabs were unnamed again. The bar now names its tab buttons itself after each layout, the selection lens's copies too.
+
+Thanks to @cogwheel0 and @Ashhad08 for detailed reports, each with the cause in the code.
+
+### Behaviour changes
+- **Direction:** the native tab bar, segmented control, alerts and action sheets now follow Flutter's `Directionality`, not the system's language. They differ only in an app whose Flutter direction and system direction differ; pass `textDirection` to keep a fixed one.
+- **`CNSearchBar.textCapitalization` defaults to none**, as for the system search fields and the Flutter fallback. The native field capitalized sentences before.
+- **`CNPopupMenuButton.isIconButton`** is now true only for the round button of `CNPopupMenuButton.icon`; a text button with an icon is not one.
+
+### Checked
+- **iOS 27.0 simulator:** each issue's new screen in the example's Testing list. The search bar after a dialog (text and expansion kept), the 24 pt icon and Cancel; popover gauges and a refused popover; the bar's height after `height` goes to null (60 to 97 pt) and the search bar's images, badges, icon and `activateSearch()`; tap to seek (one change, with start and end); the context menu's lifted preview (choice and taps on the child); the popup menu button's icon with label, Tajawal label, callbacks and `keepsSourceVisible` (a recording shows no frames without the button when the menu closes, against six without it); the tab bar in Tajawal and in Arabic; the segmented control's labels switching to Arabic in place; the alert in Tajawal and right to left, through a press and its closing.
+- **iOS 27.1 simulator (iPhone Duo):** the tab buttons' VoiceOver names, unnamed without the fix and named with it.
+- **macOS 27:** the segmented control's labels switching to Arabic in place, right to left, and the alert in Tajawal and right to left (title and message; buttons mirrored).
+- **Tests:** 14 new tests; 579 tests pass.
+- **Analyzer and SDKs:** `flutter analyze` is clean with Flutter 3.44, and `flutter analyze lib` with 3.38. The iOS code compiles against the iOS 26.0 and 26.2 SDKs, the macOS code against the macOS 26.5 SDK.
+
 ## 2.4.0
 
 > Seven reports from @cogwheel0, all fixed or added, plus three bugs found while checking them. New: read-only popover rows, tab bar action items and accessibility names for tabs. Nothing changes for existing code.

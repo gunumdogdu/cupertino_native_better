@@ -17,6 +17,9 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
   private var defaultIconPalette: [UIColor] = []
   private var defaultIconRenderingMode: String? = nil
   private var defaultIconGradientEnabled: Bool = false
+  /// `CNSegmentedControl.labelFontFamily` and the rest of the label style,
+  /// as Dart sends it in `labelStyle` (#143).
+  private var labelStyle: [String: Any] = [:]
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeSegmentedControl_\(viewId)", binaryMessenger: messenger)
@@ -35,21 +38,7 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
       if let v = dict["semanticLabel"] as? String, !v.isEmpty { semanticLabel = v }
       if let arr = dict["labels"] as? [String] { labels = arr }
       if let arr = dict["sfSymbols"] as? [String] { sfSymbols = arr }
-      if let sizes = dict["sfSymbolSizes"] as? [NSNumber] {
-        self.perSymbolSizes = sizes.map { CGFloat(truncating: $0) }
-      }
-      if let colors = dict["sfSymbolColors"] as? [NSNumber] {
-        self.perSymbolColors = colors.map { Self.colorFromARGB($0.intValue) }
-      }
-      if let palettes = dict["sfSymbolPaletteColors"] as? [[NSNumber]] {
-        self.perSymbolPalettes = palettes.map { $0.map { Self.colorFromARGB($0.intValue) } }
-      }
-      if let modes = dict["sfSymbolRenderingModes"] as? [String?] {
-        self.perSymbolModes = modes
-      }
-      if let gradients = dict["sfSymbolGradientEnabled"] as? [NSNumber?] {
-        self.perSymbolGradientEnabled = gradients
-      }
+      if let style = dict["labelStyle"] as? [String: Any] { self.labelStyle = style }
       if let v = dict["selectedIndex"] as? NSNumber { selectedIndex = v.intValue }
       if let v = dict["enabled"] as? NSNumber { enabled = v.boolValue }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
@@ -64,7 +53,10 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
     }
 
     super.init()
+    if let dict = args as? [String: Any] { readSymbolOptions(dict) }
 
+    // Flutter's text direction (#142): the segment order follows it.
+    CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: container)
     container.backgroundColor = .clear
     if #available(iOS 13.0, *) {
       container.overrideUserInterfaceStyle = isDark ? .dark : .light
@@ -73,6 +65,7 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
     self.labels = labels
     self.symbols = sfSymbols
     rebuildSegments()
+    applyLabelStyle()
     control.selectedSegmentIndex = selectedIndex
     control.isEnabled = enabled
     if #available(iOS 13.0, *), let c = tint { control.selectedSegmentTintColor = c }
@@ -131,6 +124,26 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
           }
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
+      case "setItems":
+        // New labels or symbols, e.g. after a language switch (#143): the
+        // segments are built again in place, keeping the selection.
+        let args = call.arguments as? [String: Any] ?? [:]
+        self.labels = (args["labels"] as? [String]) ?? []
+        self.symbols = (args["sfSymbols"] as? [String]) ?? []
+        self.readSymbolOptions(args)
+        let selected = (args["selectedIndex"] as? NSNumber)?.intValue ?? self.control.selectedSegmentIndex
+        self.rebuildSegments()
+        self.control.selectedSegmentIndex = selected < self.control.numberOfSegments ? selected : UISegmentedControl.noSegment
+        self.control.invalidateIntrinsicContentSize()
+        result(nil)
+      case "setLabelStyle":
+        self.labelStyle = (call.arguments as? [String: Any]) ?? [:]
+        self.applyLabelStyle()
+        self.control.invalidateIntrinsicContentSize()
+        result(nil)
+      case "setLayoutDirection":
+        CNLayoutDirection.apply(CNLayoutDirection.read(call.arguments as? [String: Any]), to: self.container)
+        result(nil)
       case "setSemanticLabel":
         let label = (call.arguments as? [String: Any])?["label"] as? String
         self.applySemanticLabel((label?.isEmpty ?? true) ? nil : label)
@@ -168,6 +181,52 @@ class CupertinoSegmentedControlPlatformView: NSObject, FlutterPlatformView {
 
   @objc private func onChanged(_ sender: UISegmentedControl) {
     channel.invokeMethod("valueChanged", arguments: ["index": sender.selectedSegmentIndex])
+  }
+
+  /// The per-symbol options, from creation params or `setItems`.
+  private func readSymbolOptions(_ dict: [String: Any]) {
+    perSymbolSizes = ((dict["sfSymbolSizes"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { CGFloat(truncating: $0) } }
+    perSymbolColors = ((dict["sfSymbolColors"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { Self.colorFromARGB($0.intValue) } }
+    perSymbolPalettes = ((dict["sfSymbolPaletteColors"] as? [[NSNumber]]) ?? []).map { $0.map { Self.colorFromARGB($0.intValue) } }
+    perSymbolModes = ((dict["sfSymbolRenderingModes"] as? [Any]) ?? []).map { $0 as? String }
+    perSymbolGradientEnabled = ((dict["sfSymbolGradientEnabled"] as? [Any]) ?? []).map { $0 as? NSNumber }
+  }
+
+  /// The label style on this control only, for its normal and selected
+  /// segments (#143). A font is set only when a family, size or weight is;
+  /// otherwise the segments keep the system font and only take the colours.
+  private func applyLabelStyle() {
+    let style = labelStyle
+    func int(_ key: String) -> Int? { (style[key] as? NSNumber)?.intValue }
+    let family = (style["fontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    let selectedFamily = (style["selectedFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? family
+    let size = (style["fontSize"] as? NSNumber).map { CGFloat($0.doubleValue) }
+    let weight = CNFontResolver.weight(fromFlutterValue: int("fontWeight"))
+    let selectedWeight = CNFontResolver.weight(fromFlutterValue: int("selectedFontWeight"))
+    let color = int("color").map(Self.colorFromARGB)
+    let selectedColor = int("selectedColor").map(Self.colorFromARGB) ?? color
+
+    func font(_ family: String?, _ weight: UIFont.Weight?, fallback: UIFont.Weight) -> UIFont? {
+      guard family != nil || size != nil || weight != nil else { return nil }
+      let pointSize = size ?? 13
+      if let family, let resolved = CNFontResolver.font(family: family, size: pointSize, weight: weight ?? fallback) {
+        return resolved
+      }
+      return UIFont.systemFont(ofSize: pointSize, weight: weight ?? fallback)
+    }
+    var normal: [NSAttributedString.Key: Any] = [:]
+    var selected: [NSAttributedString.Key: Any] = [:]
+    // The system draws the selected segment's title heavier.
+    if let f = font(family, weight, fallback: .regular) { normal[.font] = f }
+    let emphasized: UIFont.Weight = weight.map { $0 > .semibold ? $0 : .semibold } ?? .semibold
+    if let f = font(selectedFamily, selectedWeight, fallback: emphasized) ?? font(family, weight, fallback: emphasized) {
+      selected[.font] = f
+    }
+    if let color { normal[.foregroundColor] = color }
+    if let selectedColor { selected[.foregroundColor] = selectedColor }
+    control.setTitleTextAttributes(normal.isEmpty ? nil : normal, for: .normal)
+    control.setTitleTextAttributes(selected.isEmpty ? nil : selected, for: .selected)
+    control.setTitleTextAttributes(selected.isEmpty ? nil : selected, for: [.selected, .highlighted])
   }
 
   // Use shared utility functions

@@ -427,6 +427,8 @@ void main() {
       expect(
         received?.arguments,
         debugBuildActionSheetPayload(
+          // The app's Directionality (#144).
+          rtl: false,
           actions: const [
             CNActionSheetAction<String>(label: 'Share', value: 'share'),
             CNActionSheetAction<String>(

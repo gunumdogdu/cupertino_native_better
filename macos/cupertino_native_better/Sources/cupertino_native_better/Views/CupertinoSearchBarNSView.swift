@@ -47,6 +47,8 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     var clearIconName = "xmark.circle.fill"
     var isDark = false
     var recentsAutosaveName: String? = nil
+    var expanded: Bool? = nil
+    var text = ""
 
     if let dict = args as? [String: Any] {
       if let v = dict["placeholder"] as? String { placeholder = v }
@@ -62,10 +64,14 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
       if let v = dict["clearIconName"] as? String, !v.isEmpty { clearIconName = v }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
       if let v = dict["recentsAutosaveName"] as? String, !v.isEmpty { recentsAutosaveName = v }
+      if let v = dict["expanded"] as? NSNumber { expanded = v.boolValue }
+      if let v = dict["text"] as? String { text = v }
     }
 
     self.expandable = expandable
-    self.isExpanded = initiallyExpanded || !expandable
+    // A view created again (after a modal) opens as the bar was, with its
+    // text (#134).
+    self.isExpanded = (expanded ?? initiallyExpanded) || !expandable
     self.autofocus = autofocus
     self.collapsedWidth = collapsedWidth
     self.tint = tint
@@ -112,6 +118,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     addSubview(collapsedButton)
 
     applyExpandedState(animated: false)
+    if !text.isEmpty { setText(text, notify: false) }
 
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }

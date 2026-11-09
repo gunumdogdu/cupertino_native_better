@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.4.0
+  cupertino_native_better: ^2.5.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -259,6 +259,33 @@ CNSegmentedControl(
   labels: const ['Light', 'Dark', 'Automatic'],
   selectedIndex: _appearance,
   onValueChanged: (i) => setState(() => _appearance = i),
+)
+```
+
+A media scrubber can seek on a tap and only once the finger lifts (2.5):
+
+```dart
+CNSlider(
+  style: CNSliderStyle.thumbless,
+  value: _position,
+  seekOnTap: true, // a tap moves the value to the tapped point
+  onChanged: (v) => setState(() => _position = v),
+  onChangeEnd: seekTo, // once, when the drag or tap ends
+)
+```
+
+The segment titles take a font of their own, on that control only, and new
+`labels` update it in place, so a language switch changes the titles without
+recreating it. It follows Flutter's `Directionality` too (2.5):
+
+```dart
+CNSegmentedControl(
+  labels: arabic ? const ['الكل', 'غير مقروء'] : const ['All', 'Unread'],
+  selectedIndex: _filter,
+  onValueChanged: (i) => setState(() => _filter = i),
+  labelFontFamily: 'Tajawal', // a pubspec.yaml font
+  selectedLabelFontWeight: FontWeight.w700,
+  selectedLabelColor: CupertinoColors.systemIndigo,
 )
 ```
 
@@ -477,6 +504,27 @@ final result = await CNAlert.show<String>(
 );
 ```
 
+`fontFamily` draws the title, the message and the buttons in your font, at
+the sizes and weights the system gives them, and `titleStyle`,
+`messageStyle` and `actionStyle` override a part. The dialog follows
+Flutter's `Directionality` (or `textDirection`), so in an Arabic app the
+title and message align right and the buttons are mirrored. With
+`throwOnFailure: true` a dialog that can't be presented throws a
+`PlatformException` instead of returning `null` like a dismissal (2.5).
+
+```dart
+await CNAlert.show<String>(
+  context: context,
+  title: 'حذف الملاحظة؟',
+  fontFamily: 'Tajawal', // a pubspec.yaml font
+  titleStyle: const CNDialogTextStyle(fontWeight: FontWeight.w800),
+  actions: const [
+    CNAlertAction(label: 'إلغاء', isCancel: true),
+    CNAlertAction(label: 'حذف', value: 'delete', isDestructive: true),
+  ],
+);
+```
+
 On macOS, with the same API, `CNAlert` is an `NSAlert` sheet on the window: the default action answers Return, the cancel action Escape, destructive actions are marked, and text fields (secure ones too) sit in the alert. `CNActionSheet` is an `NSMenu` that drops down from `anchorRect`, or an `NSAlert` sheet when there is no anchor; closing the menu resolves to `null`.
 
 ### Context menu
@@ -500,7 +548,14 @@ CNContextMenu(
 )
 ```
 
-The child keeps its own gestures, so a button inside it still takes taps. On iOS the menu opens as a button's menu does, from the point you pressed, without a lifted preview of the child. Below iOS&nbsp;17.4, and on Android and the web, the menu is a `CupertinoActionSheet`. To open it from code, give it a `GlobalKey<CNContextMenuState>` and call `showMenu()`.
+On iOS, `showsPreview: true` lifts a picture of the child above the dimmed
+screen with the menu beside it, as Photos or Messages do, and settles it back
+when the menu closes (2.5). It lays a clear native view with a
+`UIContextMenuInteraction` over the child (a tap still reaches the child), so
+each such region is a platform view; `previewCornerRadius` matches the child's
+corners.
+
+The child keeps its own gestures, so a button inside it still takes taps. On iOS, without `showsPreview`, the menu opens as a button's menu does, from the point you pressed, without a lifted preview of the child. Below iOS&nbsp;17.4, and on Android and the web, the menu is a `CupertinoActionSheet`. To open it from code, give it a `GlobalKey<CNContextMenuState>` and call `showMenu()`.
 
 ### Progress indicator
 
@@ -547,6 +602,20 @@ CNButton(key: sortKey, label: 'Sort', onPressed: () async {
 A row with `readOnly: true` only shows information, such as a label and its `trailingText` value: it is not a button, a tap on it keeps the popover open, and VoiceOver reads it as text.
 
 `CNPopover.show` completes once the popover has gone, so the app can present a browser, a share sheet or an alert from its result straight away.
+
+`gauges` adds labelled native bars under the message, such as storage used, and `throwOnFailure: true` makes `show` throw a `PlatformException` when the popover can't be shown, instead of returning `null` as for a dismissal (2.5):
+
+```dart
+await CNPopover.show(
+  context: context,
+  anchorKey: storageKey,
+  throwOnFailure: true,
+  content: const CNPopoverContent(
+    title: 'iCloud',
+    gauges: [CNPopoverGauge(label: 'Storage', value: 42, max: 128, valueText: '42 GB of 128 GB')],
+  ),
+);
+```
 
 It follows its anchor, and closes when the page changes, on a hot restart and with `CNPopover.dismiss()`. Escape closes it on macOS and Return presses the default button. Flutter widgets cannot go inside it. On Android and the web the same content shows in a Cupertino popup.
 
@@ -662,6 +731,8 @@ CNSearchBar(
   onSubmitted: search,
 )
 ```
+
+`textCapitalization`, `autocorrect` and `keyboardType` set the keyboard (search fields don't capitalize by default), `clearButtonSemanticLabel` names the clear button for VoiceOver, and the icons take their `CNSymbol.size` and follow Dynamic Type. A bar created again after a modal keeps its text and expanded state (2.5).
 
 A Mac search field has no Cancel button beside it, so on macOS `showCancelButton` and `cancelText` are not used. Escape clears the text; a second Escape ends the search, closes an expandable bar, calls `onCancelTap` and gives the keyboard back to Flutter. An expandable bar works like a toolbar's search button, and `tint` colours the magnifying glass and the insertion point.
 
@@ -820,8 +891,10 @@ CNTabBar(
   ],
   currentIndex: _selectedIndex,
   onTap: (index) => setState(() => _selectedIndex = index),
-  labelFontFamily: 'Avenir Next', // any font registered with iOS
+  labelFontFamily: 'Nunito', // a pubspec.yaml font works as it is (2.5)
   labelFontSize: 11,
+  labelFontWeight: FontWeight.w500, // the other tabs
+  selectedLabelFontWeight: FontWeight.w700, // the selected tab
 )
 ```
 
@@ -833,6 +906,12 @@ it matters, say what is new in the tab's label. `labelFontFamily` and
 restores the native label (1.8.3). A taller label moves the icon up to keep
 clear of it, and a title wider than a narrow tab (the lone tab in split mode)
 shrinks to fit.
+
+A family declared under `fonts:` in `pubspec.yaml` is registered with the
+system the first time a native view uses it, and the weight picks its nearest
+face; this holds for every widget that takes a font name (2.5). The bar also
+takes Flutter's `Directionality` (or `textDirection`): in an Arabic app the
+first tab is on the right, with its badge and the split halves mirrored.
 
 #### Items that open a menu
 
@@ -1099,7 +1178,12 @@ int itemIndex)`, `onSearchChanged(String query)`, `onAccessoryTap()`, `onDismiss
 
 ### Tab Bar with iOS 26 Search Tab
 
-The `CNTabBar` supports iOS 26's native search tab feature with animated expansion:
+`CNTabBar` can end with a search tab. On iOS 26 it is the system search tab,
+the last tab of the bar: tapping it (or `activateSearch()`) selects it and
+reports `onSearchActiveChanged(true)`, and the app shows its own search UI
+(the bar has no search field of its own; for the system search field in the
+tab bar, use `CNTabBarNative`). Below iOS 26 the Flutter bar expands the
+search button into a field, which the search style below shapes:
 
 ```dart
 CNTabBar(
@@ -1529,6 +1613,31 @@ CNPopupMenuButton.icon(
 )
 ```
 
+#### Icon with label, label style and callbacks
+
+A text button can show an icon next to its label, its label can take your font,
+and `onOpened` / `onClosed` tell when the menu shows and closes, with or
+without a choice. `keepsSourceVisible` (iOS 26) leaves the button out of the
+menu's morph, so it is there again the moment the menu closes (2.5).
+
+```dart
+CNPopupMenuButton(
+  buttonLabel: 'Sort',
+  buttonIcon: const CNSymbol('chevron.down'),
+  imagePlacement: CNImagePlacement.trailing,
+  labelFontFamily: 'Nunito', // a pubspec.yaml font
+  labelFontWeight: FontWeight.w600,
+  shrinkWrap: true,
+  items: sortItems,
+  onSelected: (i) {},
+  onOpened: () => analytics.log('sort_menu_opened'),
+  onClosed: () {},
+)
+```
+
+A native menu has no font setting, so the menu's item titles keep the system
+font.
+
 #### Subtitles and submenus
 
 `subtitle` adds a second line under an item's label. `CNPopupMenuSubmenu` opens a nested menu, and can itself contain submenus. On iOS they are the system's `UIAction.subtitle` and nested `UIMenu`; on macOS `NSMenuItem.subtitle` (macOS 14.4+) and `NSMenuItem.submenu`; the `CupertinoActionSheet` fallback shows the subtitle as a smaller line and opens each submenu as a second sheet.
@@ -1869,6 +1978,14 @@ print('iOS version: ${PlatformVersion.iosVersion}');
 print('macOS version: ${PlatformVersion.macOSVersion}');
 ```
 
+`flutter test` runs on the host, so on a Mac a widget test that targets iOS
+gets the native views. To test a Flutter fallback on any host (2.5):
+
+```dart
+PlatformVersion.debugForceFallbacks = true;
+addTearDown(PlatformVersion.reset);
+```
+
 ## Requirements
 
 - **Flutter**: >= 3.3.0
@@ -1885,7 +2002,7 @@ print('macOS version: ${PlatformVersion.macOSVersion}');
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.4.0
+   cupertino_native_better: ^2.5.0
    ```
 
 2. Update imports:

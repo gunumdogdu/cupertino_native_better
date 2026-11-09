@@ -3,11 +3,16 @@ import 'sf_symbol.dart';
 
 /// Configuration for a search tab in [CNTabBar].
 ///
-/// When provided to [CNTabBar.searchItem], this creates a dedicated search tab
-/// that follows iOS 26's native behavior:
-/// - Appears as a separate floating circular button on the right
-/// - Expands into a full search bar when tapped
-/// - Collapses other tabs to icon-only mode during search
+/// When provided to [CNTabBar.searchItem], this adds a dedicated search tab:
+/// - On iOS 26+ it is the system search tab (`UITabBarItem` with the
+///   `.search` system item), the last tab of the bar. Tapping it (or
+///   `CNTabBarSearchController.activateSearch()`)
+///   selects it and calls [onSearchActiveChanged] with true. The bar has no
+///   search field of its own, so the app shows its search UI (for example a
+///   `CNSearchBar`) while search is active. For the system search field in
+///   the tab bar, use `CNTabBarNative`.
+/// - Below iOS 26 the Flutter bar expands the button into a search field and
+///   collapses the other tabs to icon-only mode during search.
 ///
 /// Example:
 /// ```dart

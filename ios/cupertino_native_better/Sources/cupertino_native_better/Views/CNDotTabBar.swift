@@ -108,6 +108,53 @@ final class CNDotTabBar: CNLabelFontTabBar {
     placeDots()
     placeMenuButtons()
     placeActionButtons()
+    applyItemNames()
+  }
+
+  /// `CNTabBarItem.semanticLabel` by item index: what VoiceOver reads for
+  /// the tab. The item carries it as its `accessibilityLabel`, but the
+  /// elements VoiceOver reads are the bar's tab buttons, and iOS 27.2 no
+  /// longer copies the item's label to them (#140). So the bar names its
+  /// buttons itself after each layout, as UIKit builds them again.
+  var itemNames: [Int: String] = [:] {
+    didSet { if itemNames != oldValue { setNeedsLayout() } }
+  }
+
+  /// The buttons this bar named, so a name that goes away is taken off.
+  private let namedButtons = NSHashTable<UIView>.weakObjects()
+
+  /// Names each tab button after its item. The buttons are found as the
+  /// accessibility elements with the button trait, grouped by the view that
+  /// holds them: the content and the selection lens each hold one button per
+  /// item, in item order from left to right.
+  private func applyItemNames() {
+    guard let items, !itemNames.isEmpty || namedButtons.count > 0 else { return }
+    var groups: [(holder: UIView, buttons: [UIView])] = []
+    func walk(_ view: UIView) {
+      var buttons: [UIView] = []
+      for sub in view.subviews where !Self.isOverlay(sub) && !dots.contains(sub) {
+        if sub.isAccessibilityElement, sub.accessibilityTraits.contains(.button) {
+          buttons.append(sub)
+        } else {
+          walk(sub)
+        }
+      }
+      if !buttons.isEmpty { groups.append((view, buttons)) }
+    }
+    walk(self)
+    let rtl = effectiveUserInterfaceLayoutDirection == .rightToLeft
+    for group in groups where group.buttons.count == items.count {
+      let ordered = group.buttons.sorted { rtl ? $0.frame.midX > $1.frame.midX : $0.frame.midX < $1.frame.midX }
+      for (i, button) in ordered.enumerated() {
+        if let name = itemNames[i], !name.isEmpty {
+          if button.accessibilityLabel != name { button.accessibilityLabel = name }
+          namedButtons.add(button)
+        } else if namedButtons.contains(button) {
+          button.accessibilityLabel = nil
+          namedButtons.remove(button)
+        }
+      }
+    }
   }
 
   private func placeActionButtons() {

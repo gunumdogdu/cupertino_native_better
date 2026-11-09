@@ -17,6 +17,7 @@ import '../utils/route_changes.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/optional_method_call.dart';
+import '../utils/layout_direction.dart';
 import 'icon.dart';
 import 'popup_menu_button.dart';
 import 'tab_badge.dart';
@@ -132,9 +133,9 @@ class CNTabBarItem {
 /// each tab showing its symbol and label, centred at its natural width.
 /// Below iOS 26 and on other platforms it is a [CupertinoTabBar].
 ///
-/// On iOS 26+, supports a dedicated search tab that follows Apple's native
-/// behavior: appearing as a floating circular button that expands into a
-/// full search bar when tapped.
+/// On iOS 26+, supports a dedicated search tab: the system search tab at
+/// the end of the bar, which reports when search becomes active, so the app
+/// can show its search UI (see [searchItem]).
 ///
 /// Example with search:
 /// ```dart
@@ -175,6 +176,9 @@ class CNTabBar extends StatefulWidget {
     this.searchController,
     this.labelFontFamily,
     this.labelFontSize,
+    this.labelFontWeight,
+    this.selectedLabelFontWeight,
+    this.textDirection,
     this.autoHideOnModal = true,
     this.autoHideOnPageTransition = true,
     this.onMenuSelected,
@@ -217,8 +221,9 @@ class CNTabBar extends StatefulWidget {
   /// This follows Apple's HIG guidelines for organizing related tab functions
   /// into logical groups with clear visual separation.
   ///
-  /// Note: When [searchItem] is provided, split mode is automatically enabled
-  /// with the search tab appearing as a floating button on the right.
+  /// Note: With a [searchItem], the iOS 26+ bar is one bar whose last tab is
+  /// the search tab, and [split] is ignored; the Flutter fallback below
+  /// iOS 26 puts the search button on the right.
   ///
   /// macOS has no split tab bar; there the tabs stay in one control.
   final bool split;
@@ -231,8 +236,7 @@ class CNTabBar extends StatefulWidget {
   /// On iOS 26+, the right group gets at least 100 pt, so a single item stays
   /// a circle with its label instead of a narrow pill.
   ///
-  /// Note: When [searchItem] is provided, this value is ignored as the
-  /// search tab automatically becomes the right-side floating element.
+  /// Note: ignored with a [searchItem] (see [split]).
   final int rightCount; // how many trailing items to pin right when split
 
   /// When true, centers the split groups more tightly.
@@ -246,13 +250,16 @@ class CNTabBar extends StatefulWidget {
 
   /// Optional search tab configuration.
   ///
-  /// When provided, adds a dedicated search tab that follows iOS 26's native
-  /// behavior:
-  /// - Appears as a separate floating circular button on the right
-  /// - Expands into a full search bar when tapped
-  /// - Collapses other tabs during search
+  /// When provided, adds a dedicated search tab. On iOS 26+ it is the system
+  /// search tab, the last tab of the bar; tapping it, or
+  /// [searchController]'s `activateSearch()`, selects it and calls
+  /// `onSearchActiveChanged(true)`. The bar shows no search field itself, so
+  /// the app shows its own search UI while search is active; for the system
+  /// search field in the tab bar, use `CNTabBarNative`. Its items show their
+  /// images, badges and names as on a bar without search.
   ///
-  /// On iOS < 26, the search behavior is simulated using Flutter widgets.
+  /// On iOS < 26, the Flutter bar expands the search button into a search
+  /// field and collapses the other tabs.
   /// On macOS the search tab is a trailing tab with the search symbol and
   /// label; selecting it reports [CNTabBarSearchItem.onSearchActiveChanged]
   /// (true) instead of [onTap], as the iOS 26 search tab does, and the app
@@ -269,8 +276,10 @@ class CNTabBar extends StatefulWidget {
 
   /// Optional custom font family for tab bar item labels.
   ///
-  /// The font must be registered in the app's `Info.plist` (iOS) or as a Flutter
-  /// font asset. When null, the system default tab bar label font is used.
+  /// A font declared under `fonts:` in `pubspec.yaml` works as it is: the
+  /// native bar registers it with the system the first time (#142). A font
+  /// listed in the app's `Info.plist` (`UIAppFonts`) or a system family
+  /// works too. When null, the system default tab bar label font is used.
   ///
   /// Example:
   /// ```dart
@@ -292,6 +301,21 @@ class CNTabBar extends StatefulWidget {
   /// [searchItem] is set. When null, the system default size is used
   /// (approximately 10pt on iOS).
   final double? labelFontSize;
+
+  /// The weight of the labels of the tabs that are not selected. Null keeps
+  /// the system's medium (with [labelFontFamily], the family's nearest face).
+  final FontWeight? labelFontWeight;
+
+  /// The weight of the selected tab's label. Null keeps the system's
+  /// semibold, so the selected tab stands out as on the system bar.
+  final FontWeight? selectedLabelFontWeight;
+
+  /// The direction the native bar lays its tabs out in: the first tab on the
+  /// right for [TextDirection.rtl], with its badges, menus and split halves
+  /// mirrored. Null takes the ambient [Directionality], so an app that
+  /// switches to Arabic in Dart gets a right-to-left native bar as it gets a
+  /// right-to-left fallback bar (#142).
+  final TextDirection? textDirection;
 
   /// Whether the tab bar automatically hides itself while a modal/sheet is
   /// presented over its route.
@@ -414,6 +438,9 @@ class _CNTabBarState extends State<CNTabBar> {
   String? _lastItemOptionsKey;
   String? _lastLabelFontFamily;
   double? _lastLabelFontSize;
+  int? _lastLabelFontWeight;
+  int? _lastSelectedLabelFontWeight;
+  bool? _lastRtl;
 
   // Search state
   bool _isSearchActive = false;
@@ -552,6 +579,10 @@ class _CNTabBarState extends State<CNTabBar> {
       _creationParams = null;
       _scheduleNativePreparation();
     }
+    // A bar given a height doesn't measure itself; when the height goes
+    // back to null (or changes while iOS 26 keeps its own height) it needs
+    // its own size again (#136).
+    if (oldWidget.height != widget.height) _requestIntrinsicSize();
     _syncPropsToNativeIfNeeded();
   }
 
@@ -837,6 +868,7 @@ class _CNTabBarState extends State<CNTabBar> {
     // Capture all context-derived values
     final capturedDevicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final capturedIsDark = _isDark;
+    final capturedRtl = nativeRtl(context, widget.textDirection);
     final capturedStyle = encodeStyle(context, tint: _effectiveTint);
     final capturedBackgroundColor = resolveColorToArgb(
       widget.backgroundColor,
@@ -930,6 +962,11 @@ class _CNTabBarState extends State<CNTabBar> {
       if (widget.labelFontFamily != null)
         'labelFontFamily': widget.labelFontFamily,
       if (widget.labelFontSize != null) 'labelFontSize': widget.labelFontSize,
+      if (widget.labelFontWeight != null)
+        'labelFontWeight': widget.labelFontWeight!.value,
+      if (widget.selectedLabelFontWeight != null)
+        'selectedLabelFontWeight': widget.selectedLabelFontWeight!.value,
+      'rtl': ?capturedRtl,
       'split': _hasSearch ? true : widget.split,
       'rightCount': widget.rightCount,
       'splitSpacing': widget.splitSpacing,
@@ -1093,6 +1130,9 @@ class _CNTabBarState extends State<CNTabBar> {
     _lastSplitSpacing = widget.splitSpacing;
     _lastLabelFontFamily = params['labelFontFamily'] as String?;
     _lastLabelFontSize = params['labelFontSize'] as double?;
+    _lastLabelFontWeight = params['labelFontWeight'] as int?;
+    _lastSelectedLabelFontWeight = params['selectedLabelFontWeight'] as int?;
+    _lastRtl = params['rtl'] as bool?;
     _lastMenusKey = _menusKey(params['menus'] as List?);
     _syncBrightnessIfNeeded();
     _syncPropsToNativeIfNeeded();
@@ -1238,6 +1278,15 @@ class _CNTabBarState extends State<CNTabBar> {
     final ch = _channel;
     if (ch == null) return;
     // Capture theme-dependent values before awaiting
+    final rtl = nativeRtl(context, widget.textDirection);
+    if (rtl != _lastRtl && rtl != null) {
+      _lastRtl = rtl;
+      unawaited(
+        ch
+            .invokeOptionalMethod('setLayoutDirection', {'rtl': rtl})
+            .catchError((_) {}),
+      );
+    }
     final idx = widget.currentIndex;
     final tint = resolveColorToArgb(_effectiveTint, context);
     final bg = resolveColorToArgb(widget.backgroundColor, context);
@@ -1404,15 +1453,24 @@ class _CNTabBarState extends State<CNTabBar> {
 
       // Font updates
       if (_lastLabelFontFamily != widget.labelFontFamily ||
-          _lastLabelFontSize != widget.labelFontSize) {
+          _lastLabelFontSize != widget.labelFontSize ||
+          _lastLabelFontWeight != widget.labelFontWeight?.value ||
+          _lastSelectedLabelFontWeight !=
+              widget.selectedLabelFontWeight?.value) {
         await ch.invokeMethod('setFont', {
           if (widget.labelFontFamily != null)
             'labelFontFamily': widget.labelFontFamily,
           if (widget.labelFontSize != null)
             'labelFontSize': widget.labelFontSize,
+          if (widget.labelFontWeight != null)
+            'labelFontWeight': widget.labelFontWeight!.value,
+          if (widget.selectedLabelFontWeight != null)
+            'selectedLabelFontWeight': widget.selectedLabelFontWeight!.value,
         });
         _lastLabelFontFamily = widget.labelFontFamily;
         _lastLabelFontSize = widget.labelFontSize;
+        _lastLabelFontWeight = widget.labelFontWeight?.value;
+        _lastSelectedLabelFontWeight = widget.selectedLabelFontWeight?.value;
         // Another label size changes the bar's size: the macOS bar's width
         // follows its labels.
         _requestIntrinsicSize();
@@ -1567,6 +1625,7 @@ class _CNTabBarState extends State<CNTabBar> {
               tabLabelTextStyle: TextStyle(
                 fontFamily: widget.labelFontFamily,
                 fontSize: widget.labelFontSize ?? 10.0,
+                fontWeight: widget.labelFontWeight,
               ),
             ),
           ),

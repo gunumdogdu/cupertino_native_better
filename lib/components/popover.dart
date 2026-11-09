@@ -167,8 +167,49 @@ class CNPopoverAction {
   final CNPopoverActionStyle style;
 }
 
-/// What a [CNPopover] shows, top to bottom: [title] and [message], [rows],
-/// [toggles], then [actions] as buttons.
+/// A labelled bar in a [CNPopover] that shows how full something is, such
+/// as storage used or a quota (#135).
+///
+/// It is drawn natively, as a SwiftUI `ProgressView`, with [label] on the
+/// left and [valueText] on the right above the bar. VoiceOver reads the
+/// label and the value ([valueText], or the fraction as a percentage).
+@immutable
+class CNPopoverGauge {
+  /// Creates a gauge for [value] between [min] and [max].
+  const CNPopoverGauge({
+    required this.label,
+    required this.value,
+    this.min = 0,
+    this.max = 1,
+    this.valueText,
+    this.tint,
+  }) : assert(max > min, 'A CNPopoverGauge needs max > min.');
+
+  /// What the bar measures, e.g. `'Storage'`.
+  final String label;
+
+  /// The current value, between [min] and [max] (clamped when outside).
+  final double value;
+
+  /// The value of an empty bar.
+  final double min;
+
+  /// The value of a full bar.
+  final double max;
+
+  /// The value as text, e.g. `'42 GB of 128 GB'` or `'42%'`. Null shows no
+  /// text, and VoiceOver reads the fraction as a percentage.
+  final String? valueText;
+
+  /// The colour of the filled part. Null uses the popover's tint.
+  final Color? tint;
+
+  /// [value] as a fraction of the bar, from 0 to 1.
+  double get fraction => ((value - min) / (max - min)).clamp(0.0, 1.0);
+}
+
+/// What a [CNPopover] shows, top to bottom: [title] and [message], [gauges],
+/// [rows], [toggles], then [actions] as buttons.
 ///
 /// Every part is optional, but a popover needs at least one.
 @immutable
@@ -177,6 +218,7 @@ class CNPopoverContent {
   const CNPopoverContent({
     this.title,
     this.message,
+    this.gauges = const [],
     this.rows = const [],
     this.toggles = const [],
     this.actions = const [],
@@ -187,6 +229,9 @@ class CNPopoverContent {
 
   /// Text under the title, in the secondary colour.
   final String? message;
+
+  /// Labelled bars under the message, e.g. storage used.
+  final List<CNPopoverGauge> gauges;
 
   /// Rows that close the popover and return their id when tapped.
   final List<CNPopoverRow> rows;
@@ -201,6 +246,7 @@ class CNPopoverContent {
   bool get isEmpty =>
       (title ?? '').isEmpty &&
       (message ?? '').isEmpty &&
+      gauges.isEmpty &&
       rows.isEmpty &&
       toggles.isEmpty &&
       actions.isEmpty;
@@ -316,6 +362,14 @@ class CNPopover {
   /// A popover that is already open closes first, and its own [show]
   /// returns null. The popover follows the theme's brightness, or the
   /// system's when the theme sets none.
+  ///
+  /// A popover that can't be shown also returns null by default: the anchor
+  /// isn't laid out, there is no view to present it from, or UIKit refuses
+  /// the presentation. With [throwOnFailure], [show] throws a
+  /// [PlatformException] instead, so the caller can tell a failure from a
+  /// dismissal and fall back to another UI (#135). Its code is `no_anchor`,
+  /// `refused` (UIKit didn't present it), or the native side's own code,
+  /// such as `no_view` or `no_presenter`.
   static Future<String?> show({
     required BuildContext context,
     required CNPopoverContent content,
@@ -325,6 +379,7 @@ class CNPopover {
     double? width,
     Color? tint,
     void Function(String id, bool value)? onToggleChanged,
+    bool throwOnFailure = false,
   }) async {
     assert(
       anchorKey == null || anchorRect == null,
@@ -351,6 +406,12 @@ class CNPopover {
         : null;
     final rect = anchorRect ?? _globalRect(anchorContext!);
     if (rect == null) {
+      if (throwOnFailure) {
+        throw PlatformException(
+          code: 'no_anchor',
+          message: 'CNPopover: the anchor is not laid out.',
+        );
+      }
       debugPrint(
         '⚠️ [cupertino_native_better] CNPopover: the anchor is not laid out.',
       );
@@ -385,6 +446,7 @@ class CNPopover {
       width: width,
       tint: resolveColorToArgb(tint, context),
       isDark: ThemeHelper.themeIsDark(context),
+      context: context,
     );
     _watch(session);
 
@@ -393,6 +455,7 @@ class CNPopover {
     try {
       chosen = await _channel.invokeMethod<String>('show', payload);
     } on PlatformException catch (e) {
+      if (throwOnFailure) rethrow;
       debugPrint(
         '⚠️ [cupertino_native_better] CNPopover failed: ${e.code} '
         '${e.message ?? ''}',
@@ -433,7 +496,7 @@ class CNPopover {
     try {
       await _channel.invokeMethod<void>('update', {
         'session': session.id,
-        'content': debugEncodePopoverContent(content),
+        'content': debugEncodePopoverContent(content, context: session.anchor),
       });
     } on MissingPluginException {
       // Nothing native to update.
@@ -651,9 +714,25 @@ String _actionStyleName(CNPopoverActionStyle style) => switch (style) {
 /// Exposed for tests: it is the contract shared with `CNPopoverManager.swift`
 /// on both platforms.
 @visibleForTesting
-Map<String, Object?> debugEncodePopoverContent(CNPopoverContent content) => {
+Map<String, Object?> debugEncodePopoverContent(
+  CNPopoverContent content, {
+  BuildContext? context,
+}) => {
   if ((content.title ?? '').isNotEmpty) 'title': content.title,
   if ((content.message ?? '').isNotEmpty) 'message': content.message,
+  if (content.gauges.isNotEmpty)
+    'gauges': [
+      for (final gauge in content.gauges)
+        {
+          'label': gauge.label,
+          'fraction': gauge.fraction,
+          if (gauge.valueText != null) 'valueText': gauge.valueText,
+          if (gauge.tint != null)
+            'tint': context != null && context.mounted
+                ? resolveColorToArgb(gauge.tint, context)
+                : gauge.tint!.toARGB32(),
+        },
+    ],
   'rows': [
     for (final row in content.rows)
       {
@@ -698,11 +777,12 @@ Map<String, Object?> debugBuildPopoverPayload({
   double? width,
   int? tint,
   bool? isDark,
+  BuildContext? context,
 }) => {
   'session': session,
   'anchor': _rectMap(anchor),
   'edge': edge,
-  'content': debugEncodePopoverContent(content),
+  'content': debugEncodePopoverContent(content, context: context),
   'width': ?width,
   'tint': ?tint,
   'isDark': ?isDark,
@@ -792,6 +872,8 @@ class _PopoverFallbackState extends State<_PopoverFallback> {
                         style: TextStyle(fontSize: 15, color: secondary),
                       ),
                     ),
+                  for (final gauge in content.gauges)
+                    _FallbackGauge(gauge: gauge, tint: gauge.tint ?? tint),
                   for (final row in content.rows)
                     Semantics(
                       selected: row.checked,
@@ -872,5 +954,58 @@ class _PopoverFallbackState extends State<_PopoverFallback> {
       case CNPopoverActionStyle.cancel:
         return CupertinoButton(onPressed: onPressed, child: label);
     }
+  }
+}
+
+/// A [CNPopoverGauge] in the fallback popup: the label and value over a bar.
+class _FallbackGauge extends StatelessWidget {
+  const _FallbackGauge({required this.gauge, required this.tint});
+
+  final CNPopoverGauge gauge;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final track = CupertinoColors.systemFill.resolveFrom(context);
+    final percent = '${(gauge.fraction * 100).round()}%';
+    return Semantics(
+      label: gauge.label,
+      value: gauge.valueText ?? percent,
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(gauge.label)),
+                if (gauge.valueText != null)
+                  Text(gauge.valueText!, style: TextStyle(color: secondary)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                height: 4,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(color: track),
+                    FractionallySizedBox(
+                      alignment: AlignmentDirectional.centerStart,
+                      widthFactor: gauge.fraction,
+                      child: ColoredBox(color: tint),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

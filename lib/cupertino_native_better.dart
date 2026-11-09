@@ -113,6 +113,7 @@ export 'style/sf_symbol.dart';
 export 'style/symbol_effect.dart';
 export 'style/native_list.dart';
 export 'style/image_placement.dart';
+export 'style/dialog_text_style.dart';
 export 'style/control_size.dart';
 export 'style/glass_effect.dart';
 export 'style/spotlight_mode.dart';

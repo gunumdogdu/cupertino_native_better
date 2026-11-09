@@ -673,9 +673,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       let pointSize = size ?? baseFont.pointSize
       let uiWeight = Self.uiFontWeight(fromFlutterValue: weight)
       let resolvedFont: UIFont
-      if let f = family {
-        let descriptor = UIFontDescriptor(name: f, size: pointSize)
-        resolvedFont = UIFont(descriptor: descriptor, size: pointSize)
+      // A pubspec font is registered with UIKit the first time, and the
+      // weight picks the family's nearest face (#142).
+      if let f = family, let font = CNFontResolver.font(family: f, size: pointSize, weight: uiWeight) {
+        resolvedFont = font
       } else if let w = uiWeight {
         resolvedFont = UIFont.systemFont(ofSize: pointSize, weight: w)
       } else {

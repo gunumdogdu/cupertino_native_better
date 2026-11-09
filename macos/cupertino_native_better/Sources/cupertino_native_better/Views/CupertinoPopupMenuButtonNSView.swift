@@ -43,6 +43,13 @@ class CupertinoPopupMenuButtonNSView: NSView {
       $0.expectedHeight = (dict["height"] as? NSNumber).map { CGFloat(truncating: $0) }
         ?? ((dict["round"] as? NSNumber)?.boolValue == true ? 44 : 32)
       $0.accessibilityText = (dict["semanticLabel"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+      // A title with an icon, and the label's style (#141).
+      $0.imagePlacement = (dict["imagePlacement"] as? String) ?? "leading"
+      $0.imagePadding = (dict["imagePadding"] as? NSNumber).map { CGFloat(truncating: $0) }
+      $0.labelFontFamily = (dict["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+      $0.labelFontSize = (dict["labelFontSize"] as? NSNumber).map { CGFloat(truncating: $0) }
+      $0.labelFontWeight = (dict["labelFontWeight"] as? NSNumber)?.intValue
+      $0.labelColor = (dict["labelColor"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
     }
     rebuildMenu()
 
@@ -130,7 +137,11 @@ class CupertinoPopupMenuButtonNSView: NSView {
     popupMenu.appearance = effectiveAppearance
     // Below the button, aligned to its leading edge, as a pull-down menu.
     let location = NSPoint(x: 0, y: sender.isFlipped ? sender.bounds.height + 4 : -4)
+    // The menu is modal: popUp returns once it has closed (`onOpened`,
+    // `onClosed`, #141).
+    channel.invokeMethod("menuOpened", arguments: nil)
     popupMenu.popUp(positioning: nil, at: location, in: sender)
+    channel.invokeMethod("menuClosed", arguments: nil)
   }
 
   private func rebuildMenu() {

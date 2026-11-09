@@ -36,24 +36,7 @@ Future<List<int>?> showNativeContextMenu(
     return showPopupMenuFallbackSheet(context, items);
   }
 
-  // Rendered custom icons and resolved image assets, as CNPopupMenuButton
-  // sends them.
-  final iconBytes = <PopupMenuIconKey, Uint8List?>{};
-  final assetPaths = Map<CNPopupMenuEntry, String>.identity();
-  for (final e in walkPopupMenuEntries(items)) {
-    final key = popupMenuIconKey(e);
-    if (key != null && !iconBytes.containsKey(key)) {
-      iconBytes[key] = await iconDataToImageBytes(
-        key.icon,
-        size: key.size,
-        color: key.color,
-      );
-    }
-    final asset = popupMenuEntryVisual(e)?.imageAsset;
-    if (asset != null && asset.assetPath.isNotEmpty) {
-      assetPaths[e] = await resolveAssetPathForPixelRatio(asset.assetPath);
-    }
-  }
+  final (iconBytes, assetPaths) = await _menuVisuals(items);
   if (!context.mounted) return null;
 
   final payload = debugBuildContextMenuPayload(
@@ -85,6 +68,46 @@ Future<List<int>?> showNativeContextMenu(
     if (!context.mounted) return null;
     return showPopupMenuFallbackSheet(context, items);
   }
+}
+
+/// Rendered custom icons and resolved image assets of [items], as
+/// CNPopupMenuButton sends them.
+Future<(Map<PopupMenuIconKey, Uint8List?>, Map<CNPopupMenuEntry, String>)>
+_menuVisuals(List<CNPopupMenuEntry> items) async {
+  final iconBytes = <PopupMenuIconKey, Uint8List?>{};
+  final assetPaths = Map<CNPopupMenuEntry, String>.identity();
+  for (final e in walkPopupMenuEntries(items)) {
+    final key = popupMenuIconKey(e);
+    if (key != null && !iconBytes.containsKey(key)) {
+      iconBytes[key] = await iconDataToImageBytes(
+        key.icon,
+        size: key.size,
+        color: key.color,
+      );
+    }
+    final asset = popupMenuEntryVisual(e)?.imageAsset;
+    if (asset != null && asset.assetPath.isNotEmpty) {
+      assetPaths[e] = await resolveAssetPathForPixelRatio(asset.assetPath);
+    }
+  }
+  return (iconBytes, assetPaths);
+}
+
+/// [items] encoded for a native menu, icons included, or null when
+/// [context] is gone by the time the icons are drawn. Used by the
+/// `CNContextMenu` preview view, which builds its menu natively.
+Future<Map<String, Object?>?> encodeNativeContextMenu(
+  BuildContext context,
+  List<CNPopupMenuEntry> items,
+) async {
+  final (iconBytes, assetPaths) = await _menuVisuals(items);
+  if (!context.mounted) return null;
+  return encodePopupMenuEntries(
+    items,
+    resolveColor: (c) => resolveColorToArgb(c, context),
+    customIconBytes: iconBytes,
+    assetPaths: assetPaths,
+  );
 }
 
 /// Closes a native context menu that is open, which then answers null.

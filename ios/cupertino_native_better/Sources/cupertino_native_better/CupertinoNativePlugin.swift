@@ -87,6 +87,10 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
 
     // Setup the context menu presenter (UIMenu from a point, no platform view)
     CNContextMenuManager.shared.setup(messenger: registrar.messenger())
+    // CNContextMenu(showsPreview: true): a context menu interaction over the
+    // child, which lifts its preview (#138)
+    registrar.register(CNContextMenuPreviewViewFactory(messenger: registrar.messenger()),
+                       withId: "CNContextMenuPreview")
 
     // Setup the popover presenter (UIKit popover with SwiftUI content)
     CNPopoverManager.shared.setup(messenger: registrar.messenger())

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../style/button_style.dart';
+import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -199,6 +200,10 @@ class CNPopupMenuSubmenu extends CNPopupMenuEntry {
 /// On iOS/macOS this embeds a native popup button and shows a native menu.
 class CNPopupMenuButton extends StatefulWidget {
   /// Creates a text-labeled popup menu button.
+  ///
+  /// Give it a [buttonIcon], [buttonCustomIcon] or [buttonImageAsset] as
+  /// well to show the icon next to the label, placed by [imagePlacement]
+  /// (#141).
   const CNPopupMenuButton({
     super.key,
     required this.buttonLabel,
@@ -212,11 +217,20 @@ class CNPopupMenuButton extends StatefulWidget {
     this.preserveTopToBottomOrder = false,
     this.autoHideOnModal = true,
     this.semanticLabel,
-  }) : buttonIcon = null,
-       buttonCustomIcon = null,
-       buttonCustomIconColor = null,
-       buttonImageAsset = null,
-       width = null,
+    this.buttonIcon,
+    this.buttonCustomIcon,
+    this.buttonCustomIconColor,
+    this.buttonImageAsset,
+    this.imagePlacement = CNImagePlacement.leading,
+    this.imagePadding,
+    this.labelFontFamily,
+    this.labelFontSize,
+    this.labelFontWeight,
+    this.labelColor,
+    this.keepsSourceVisible = false,
+    this.onOpened,
+    this.onClosed,
+  }) : width = null,
        round = false,
        assert(
          onSelected != null || onPathSelected != null,
@@ -239,7 +253,16 @@ class CNPopupMenuButton extends StatefulWidget {
     this.preserveTopToBottomOrder = false,
     this.autoHideOnModal = true,
     this.semanticLabel,
+    this.keepsSourceVisible = false,
+    this.onOpened,
+    this.onClosed,
   }) : buttonLabel = null,
+       imagePlacement = CNImagePlacement.leading,
+       imagePadding = null,
+       labelFontFamily = null,
+       labelFontSize = null,
+       labelFontWeight = null,
+       labelColor = null,
        round = true,
        width = size,
        height = size,
@@ -257,11 +280,13 @@ class CNPopupMenuButton extends StatefulWidget {
     );
   }
 
-  /// Text for the button (null when using [buttonIcon]).
+  /// Text for the button (null for the round icon button).
   final String? buttonLabel; // null in icon mode
-  /// Icon for the button (non-null in icon mode).
+  /// Icon for the button: the round button's icon, or shown next to
+  /// [buttonLabel].
   /// Priority: [buttonImageAsset] > [buttonCustomIcon] > [buttonIcon]
-  final CNSymbol? buttonIcon; // non-null in icon mode
+  final CNSymbol? buttonIcon;
+
   /// Optional custom icon from CupertinoIcons, Icons, or any IconData for the button.
   /// If provided, this takes precedence over [buttonIcon] but not [buttonImageAsset].
   final IconData? buttonCustomIcon;
@@ -282,6 +307,51 @@ class CNPopupMenuButton extends StatefulWidget {
 
   /// Whether this is the round icon variant.
   final bool round; // internal: text=false, icon=true
+
+  /// Where the icon goes relative to [buttonLabel] when the button has both
+  /// (iOS 15+; on macOS the button's image position).
+  final CNImagePlacement imagePlacement;
+
+  /// The gap between the icon and [buttonLabel], in points. Null keeps the
+  /// system's.
+  final double? imagePadding;
+
+  /// The font family of [buttonLabel], e.g. a font declared under `fonts:`
+  /// in `pubspec.yaml`, which the package registers with the system the
+  /// first time it is used. Null keeps the system font. The menu's own item
+  /// titles always use the system font: a native menu has no font setting.
+  final String? labelFontFamily;
+
+  /// The size of [buttonLabel], in points. Null keeps the system's.
+  final double? labelFontSize;
+
+  /// The weight of [buttonLabel], also applied with [labelFontFamily] (the
+  /// family's nearest face).
+  final FontWeight? labelFontWeight;
+
+  /// The colour of [buttonLabel]. Null keeps the button style's.
+  final Color? labelColor;
+
+  /// iOS 26+: whether the button is left out of the menu's morph.
+  ///
+  /// By default the system morphs the button into its menu: the button
+  /// disappears as the menu grows out of it and morphs back in when the
+  /// menu closes. With this on, the menu grows out of a clear stand-in at
+  /// the button's place instead, so the button is never hidden by the morph
+  /// and is simply there again the moment the menu closes. The menu still
+  /// opens at the button's place, so while it is up it covers the part of
+  /// the button under it. macOS menus never hide their button.
+  final bool keepsSourceVisible;
+
+  /// Called each time the menu is about to show, as
+  /// `PopupMenuButton.onOpened` is.
+  final VoidCallback? onOpened;
+
+  /// Called each time the menu has closed, whether or not an item was
+  /// chosen. A choice is reported to [onSelected] / [onPathSelected] as
+  /// well, around the same moment.
+  final VoidCallback? onClosed;
+
   /// Entries that populate the popup menu.
   final List<CNPopupMenuEntry> items;
 
@@ -351,8 +421,11 @@ class CNPopupMenuButton extends StatefulWidget {
   /// on every icon-only button.
   final String? semanticLabel;
 
-  /// Whether this instance is configured as an icon button variant.
-  bool get isIconButton =>
+  /// Whether this is the round, icon-only variant ([CNPopupMenuButton.icon]).
+  bool get isIconButton => round;
+
+  /// Whether the button shows an icon, alone or next to its label.
+  bool get _hasButtonImage =>
       buttonIcon != null ||
       buttonCustomIcon != null ||
       buttonImageAsset != null;
@@ -623,6 +696,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
           widget.buttonIcon?.color,
       context,
     );
+    final capturedLabelColor = resolveColorToArgb(widget.labelColor, context);
     final capturedButtonPaletteColors = widget.buttonIcon?.paletteColors
         ?.map((c) => resolveColorToArgb(c, context))
         .toList();
@@ -681,8 +755,14 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
             ),
       },
       if (widget.buttonIcon != null) 'buttonIconName': widget.buttonIcon!.name,
-      'buttonIconSize':
-          widget.buttonImageAsset?.size ?? widget.buttonIcon?.size ?? 20.0,
+      // Next to a label, an SF Symbol at the default size takes the label's
+      // size, as UIKit sizes a titled button's symbol.
+      'buttonIconSize': ?(widget.isIconButton
+          ? widget.buttonImageAsset?.size ?? widget.buttonIcon?.size ?? 20.0
+          : widget.buttonImageAsset?.size ??
+                (widget.buttonIcon?.size == 24.0
+                    ? null
+                    : widget.buttonIcon?.size)),
       if (capturedButtonIconColor != null)
         'buttonIconColor': capturedButtonIconColor,
       if (widget.isIconButton) 'round': true,
@@ -698,6 +778,17 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       if (widget.buttonIcon?.gradient != null)
         'buttonIconGradientEnabled': widget.buttonIcon!.gradient,
       'preserveTopToBottomOrder': widget.preserveTopToBottomOrder,
+      if (widget.buttonLabel != null && widget._hasButtonImage) ...{
+        'imagePlacement': widget.imagePlacement.name,
+        if (widget.imagePadding != null) 'imagePadding': widget.imagePadding,
+      },
+      if (widget.labelFontFamily != null)
+        'labelFontFamily': widget.labelFontFamily,
+      if (widget.labelFontSize != null) 'labelFontSize': widget.labelFontSize,
+      if (widget.labelFontWeight != null)
+        'labelFontWeight': widget.labelFontWeight!.value,
+      'labelColor': ?capturedLabelColor,
+      if (widget.keepsSourceVisible) 'keepsSourceVisible': true,
     };
 
     // Create a comprehensive key that includes all parameters affecting platform view creation
@@ -721,6 +812,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       '${widget.width}_'
       '${widget.tint?.toARGB32()}_'
       '${widget.buttonCustomIconColor?.toARGB32()}_'
+      '${widget.imagePlacement.name}_${widget.imagePadding}_'
+      '${widget.labelFontFamily}_${widget.labelFontSize}_'
+      '${widget.labelFontWeight?.value}_${widget.labelColor?.toARGB32()}_'
+      '${widget.keepsSourceVisible}_'
       '$_isDark',
     );
 
@@ -813,7 +908,11 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {
-    if (call.method == 'itemSelected') {
+    if (call.method == 'menuOpened') {
+      widget.onOpened?.call();
+    } else if (call.method == 'menuClosed') {
+      widget.onClosed?.call();
+    } else if (call.method == 'itemSelected') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
       final path = (args?['path'] as List?)
@@ -868,7 +967,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       _requestIntrinsicSize();
     }
 
-    if (widget.isIconButton) {
+    if (widget._hasButtonImage) {
       final iconName = preIconName;
       final iconSize = preIconSize;
       final iconColor = preIconColor;
@@ -999,11 +1098,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
             ? const EdgeInsets.all(4)
             : const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         onPressed: () async {
+          widget.onOpened?.call();
           final path = await showPopupMenuFallbackSheet(
             context,
             widget.items,
             title: widget.buttonLabel,
           );
+          widget.onClosed?.call();
           if (path != null) _dispatchSelection(path);
         },
         child: widget.isIconButton
@@ -1014,8 +1115,37 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
                       color: widget.buttonIcon!.color,
                     )
                   : const SizedBox.shrink())
-            : Text(widget.buttonLabel ?? ''),
+            : _fallbackLabel(),
       ),
     );
+  }
+
+  /// The fallback's label, with the icon next to it and the label style.
+  Widget _fallbackLabel() {
+    final text = Text(
+      widget.buttonLabel ?? '',
+      style: TextStyle(
+        fontFamily: widget.labelFontFamily,
+        fontSize: widget.labelFontSize,
+        fontWeight: widget.labelFontWeight,
+        color: widget.labelColor,
+      ),
+    );
+    final symbol = widget.buttonIcon;
+    if (symbol == null) return text;
+    final icon = CNIcon(symbol: symbol, size: symbol.size, color: symbol.color);
+    final gap = widget.imagePadding ?? 6;
+    final vertical =
+        widget.imagePlacement == CNImagePlacement.top ||
+        widget.imagePlacement == CNImagePlacement.bottom;
+    final first =
+        widget.imagePlacement == CNImagePlacement.leading ||
+        widget.imagePlacement == CNImagePlacement.top;
+    final children = first
+        ? <Widget>[icon, SizedBox(width: gap, height: gap), text]
+        : <Widget>[text, SizedBox(width: gap, height: gap), icon];
+    return vertical
+        ? Column(mainAxisSize: MainAxisSize.min, children: children)
+        : Row(mainAxisSize: MainAxisSize.min, children: children);
   }
 }

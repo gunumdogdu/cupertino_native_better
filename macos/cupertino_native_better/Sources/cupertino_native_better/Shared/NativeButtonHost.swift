@@ -367,7 +367,10 @@ final class NativeButtonHost: NSView {
   private var labelFont: NSFont? {
     guard labelFontSize != nil || labelFontFamily != nil || labelFontWeight != nil else { return nil }
     let size = labelFontSize ?? NSFont.systemFontSize(for: button.controlSize)
-    if let family = labelFontFamily, let font = NSFont(name: family, size: size) {
+    // A pubspec font is registered with AppKit the first time (#142).
+    if let family = labelFontFamily,
+       let font = CNFontResolver.font(family: family, size: size,
+                                      weight: labelFontWeight.map { Self.fontWeight($0) }) {
       return font
     }
     return NSFont.systemFont(ofSize: size, weight: Self.fontWeight(labelFontWeight))

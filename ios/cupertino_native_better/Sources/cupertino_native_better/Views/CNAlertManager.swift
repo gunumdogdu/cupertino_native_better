@@ -150,9 +150,14 @@ final class CNAlertManager: NSObject {
 
         pendingResult = result
 
-        let alert = UIAlertController(title: config.title,
-                                      message: config.message,
-                                      preferredStyle: .alert)
+        let alert = CNStyledAlertController(title: config.title,
+                                            message: config.message,
+                                            preferredStyle: .alert)
+        // The app's font and text direction (#144).
+        alert.textStyle = config.textStyle
+        alert.destructiveTitles = Set(config.actions.filter { $0.style == .destructive }.map { $0.label })
+        alert.rtl = config.rtl
+        CNLayoutDirection.apply(config.rtl, to: alert)
         // Follow the app's theme rather than the window's.
         if let isDark = config.isDark {
             alert.overrideUserInterfaceStyle = isDark ? .dark : .light
@@ -212,7 +217,9 @@ final class CNAlertManager: NSObject {
         // UIKit refuses some presentations with only a log line; the call
         // must not wait for an alert that never appeared.
         if alert.presentingViewController == nil, presentedAlert === alert {
-            send(nil)
+            // An error rather than null, so `throwOnFailure` can tell it
+            // from a dismissal (#135).
+            fail(FlutterError(code: "refused", message: "UIKit did not present the alert", details: nil))
         }
     }
 
@@ -247,6 +254,14 @@ final class CNAlertManager: NSObject {
         pendingResult = nil
         presentedAlert = nil
         result(value)
+    }
+
+    /// Answers the waiting Dart call with [error]: the alert never appeared.
+    private func fail(_ error: FlutterError) {
+        guard let result = pendingResult else { return }
+        pendingResult = nil
+        presentedAlert = nil
+        result(error)
     }
 
     /// Delivers `value` only while `alert` is still the alert the pending call
@@ -308,11 +323,15 @@ final class CNAlertManager: NSObject {
         let actions: [Action]
         let textFields: [TextField]
         let isDark: Bool?
+        let textStyle: CNDialogTextStyle?
+        let rtl: Bool?
 
         init(args: [String: Any]) {
             title = args["title"] as? String
             message = args["message"] as? String
             isDark = args["isDark"] as? Bool
+            textStyle = CNDialogTextStyle(args["textStyle"])
+            rtl = CNLayoutDirection.read(args)
 
             let rawActions = args["actions"] as? [[String: Any]] ?? []
             actions = rawActions.map { entry in

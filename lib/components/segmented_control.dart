@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../style/sf_symbol.dart';
+import '../utils/layout_direction.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
 import '../utils/version_detector.dart';
@@ -38,6 +39,14 @@ class CNSegmentedControl extends StatefulWidget {
     this.iconRenderingMode,
     this.autoHideOnModal = true,
     this.semanticLabel,
+    this.labelFontFamily,
+    this.labelFontSize,
+    this.labelFontWeight,
+    this.labelColor,
+    this.selectedLabelFontFamily,
+    this.selectedLabelFontWeight,
+    this.selectedLabelColor,
+    this.textDirection,
   });
 
   /// Segment labels to display, in order.
@@ -93,6 +102,36 @@ class CNSegmentedControl extends StatefulWidget {
   /// text as its visible label.
   final String? semanticLabel;
 
+  /// The font family of the segment titles, e.g. a font declared under
+  /// `fonts:` in `pubspec.yaml`, which the package registers with the
+  /// system the first time it is used (#143). It applies to this control
+  /// only, and changes reach the control without recreating it.
+  final String? labelFontFamily;
+
+  /// The size of the segment titles, in points (about 13 by default).
+  final double? labelFontSize;
+
+  /// The weight of the titles of the segments that are not selected.
+  final FontWeight? labelFontWeight;
+
+  /// The colour of the titles of the segments that are not selected.
+  final Color? labelColor;
+
+  /// The font family of the selected segment's title. Null uses
+  /// [labelFontFamily].
+  final String? selectedLabelFontFamily;
+
+  /// The weight of the selected segment's title. Null draws it semibold (or
+  /// [labelFontWeight] when that is heavier), as the system does.
+  final FontWeight? selectedLabelFontWeight;
+
+  /// The colour of the selected segment's title. Null uses [labelColor].
+  final Color? selectedLabelColor;
+
+  /// The direction the segments are laid out in: the first on the right for
+  /// [TextDirection.rtl]. Null takes the ambient [Directionality] (#142).
+  final TextDirection? textDirection;
+
   @override
   State<CNSegmentedControl> createState() => _CNSegmentedControlState();
 }
@@ -113,6 +152,9 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
   int? _lastTint;
   String? _lastSemanticLabel;
   double? _intrinsicWidth;
+  String? _lastItemsKey;
+  Map<String, Object>? _lastLabelStyle;
+  bool? _lastRtl;
 
   bool get _isDark => ThemeHelper.isDark(context);
 
@@ -143,6 +185,8 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncBrightnessIfNeeded();
+    // A new Directionality or text scale.
+    _syncPropsToNativeIfNeeded();
   }
 
   @override
@@ -167,7 +211,10 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
             ),
             children: {
               for (var i = 0; i < widget.labels.length; i++)
-                i: Text(widget.labels[i]),
+                i: Text(
+                  widget.labels[i],
+                  style: _fallbackLabelStyle(i == widget.selectedIndex),
+                ),
             },
             groupValue: widget.selectedIndex,
             onValueChanged: widget.enabled
@@ -193,7 +240,9 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
 
     const viewType = 'CupertinoNativeSegmentedControl';
     final creationParams = <String, dynamic>{
-      'labels': widget.labels,
+      ..._itemParams(context),
+      if (_labelStyle(context).isNotEmpty) 'labelStyle': _labelStyle(context),
+      'rtl': ?nativeRtl(context, widget.textDirection),
       'selectedIndex': widget.selectedIndex,
       'enabled': widget.enabled,
       if (widget.semanticLabel != null) 'semanticLabel': widget.semanticLabel,
@@ -212,30 +261,6 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
           if (widget.iconRenderingMode != null)
             'iconRenderingMode': widget.iconRenderingMode!.name,
         }),
-      if (widget.sfSymbols != null)
-        'sfSymbols': widget.sfSymbols!.map((e) => e.name).toList(),
-      if (widget.sfSymbols != null)
-        'sfSymbolSizes': widget.sfSymbols!.map((e) => e.size).toList(),
-      if (widget.sfSymbols != null)
-        'sfSymbolColors': widget.sfSymbols!
-            .map((e) => resolveColorToArgb(e.color, context))
-            .toList(),
-      if (widget.sfSymbols != null)
-        'sfSymbolPaletteColors': widget.sfSymbols!
-            .map(
-              (e) => (e.paletteColors ?? [])
-                  .map((c) => resolveColorToArgb(c, context))
-                  .toList(),
-            )
-            .toList(),
-      if (widget.sfSymbols != null)
-        'sfSymbolRenderingModes': widget.sfSymbols!
-            .map((e) => e.mode?.name)
-            .toList(),
-      if (widget.sfSymbols != null)
-        'sfSymbolGradientEnabled': widget.sfSymbols!
-            .map((e) => e.gradient)
-            .toList(),
     };
 
     Widget platformView;
@@ -300,7 +325,74 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
     return null;
   }
 
+  /// The labels and symbols, as created and as `setItems` sends them.
+  Map<String, dynamic> _itemParams(BuildContext context) => <String, dynamic>{
+    'labels': widget.labels,
+    if (widget.sfSymbols != null) ...{
+      'sfSymbols': widget.sfSymbols!.map((e) => e.name).toList(),
+      'sfSymbolSizes': widget.sfSymbols!.map((e) => e.size).toList(),
+      'sfSymbolColors': widget.sfSymbols!
+          .map((e) => resolveColorToArgb(e.color, context))
+          .toList(),
+      'sfSymbolPaletteColors': widget.sfSymbols!
+          .map(
+            (e) => (e.paletteColors ?? [])
+                .map((c) => resolveColorToArgb(c, context))
+                .toList(),
+          )
+          .toList(),
+      'sfSymbolRenderingModes': widget.sfSymbols!
+          .map((e) => e.mode?.name)
+          .toList(),
+      'sfSymbolGradientEnabled': widget.sfSymbols!
+          .map((e) => e.gradient)
+          .toList(),
+    },
+  };
+
+  /// What decides whether the items changed: their labels and symbols.
+  String _itemsKey(BuildContext context) => _itemParams(context).toString();
+
+  /// The label style the native control takes (#143); empty for none.
+  Map<String, Object> _labelStyle(BuildContext context) => <String, Object>{
+    'fontFamily': ?widget.labelFontFamily,
+    'fontSize': ?widget.labelFontSize,
+    'fontWeight': ?widget.labelFontWeight?.value,
+    'color': ?resolveColorToArgb(widget.labelColor, context),
+    'selectedFontFamily': ?widget.selectedLabelFontFamily,
+    'selectedFontWeight': ?widget.selectedLabelFontWeight?.value,
+    'selectedColor': ?resolveColorToArgb(widget.selectedLabelColor, context),
+  };
+
+  /// The label style of the fallback control's titles.
+  TextStyle? _fallbackLabelStyle(bool selected) {
+    final family = selected
+        ? widget.selectedLabelFontFamily ?? widget.labelFontFamily
+        : widget.labelFontFamily;
+    final weight = selected
+        ? widget.selectedLabelFontWeight ?? widget.labelFontWeight
+        : widget.labelFontWeight;
+    final color = selected
+        ? widget.selectedLabelColor ?? widget.labelColor
+        : widget.labelColor;
+    if (family == null &&
+        weight == null &&
+        color == null &&
+        widget.labelFontSize == null) {
+      return null;
+    }
+    return TextStyle(
+      fontFamily: family,
+      fontSize: widget.labelFontSize,
+      fontWeight: weight,
+      color: color,
+    );
+  }
+
   void _cacheCurrentProps() {
+    _lastItemsKey = _itemsKey(context);
+    _lastLabelStyle = _labelStyle(context);
+    _lastRtl = nativeRtl(context, widget.textDirection);
     _lastSelected = widget.selectedIndex;
     _lastEnabled = widget.enabled;
     _lastIsDark = _isDark;
@@ -320,6 +412,30 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
     if (channel == null) return;
 
     final tint = resolveColorToArgb(widget.color, context);
+    final itemsKey = _itemsKey(context);
+    final items = _itemParams(context);
+    final labelStyle = _labelStyle(context);
+    final rtl = nativeRtl(context, widget.textDirection);
+
+    if (_lastItemsKey != itemsKey) {
+      // Labels changed after creation, e.g. on a language switch (#143).
+      _lastItemsKey = itemsKey;
+      _lastSelected = widget.selectedIndex;
+      await channel.invokeOptionalMethod('setItems', {
+        ...items,
+        'selectedIndex': widget.selectedIndex,
+      });
+      _requestIntrinsicSize();
+    }
+    if (!mapEquals(_lastLabelStyle, labelStyle)) {
+      _lastLabelStyle = labelStyle;
+      await channel.invokeOptionalMethod('setLabelStyle', labelStyle);
+      _requestIntrinsicSize();
+    }
+    if (_lastRtl != rtl && rtl != null) {
+      _lastRtl = rtl;
+      await channel.invokeOptionalMethod('setLayoutDirection', {'rtl': rtl});
+    }
 
     if (_lastEnabled != widget.enabled) {
       await channel.invokeMethod('setEnabled', {'enabled': widget.enabled});

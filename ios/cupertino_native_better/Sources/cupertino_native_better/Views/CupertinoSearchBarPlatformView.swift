@@ -37,6 +37,12 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var searchIconName = "magnifyingglass"
         var clearIconName = "xmark.circle.fill"
         var isDark = false
+        var expanded: Bool? = nil
+        var text = ""
+        var keyboard = CNSearchKeyboard()
+        var searchIconSize: CGFloat? = nil
+        var clearIconSize: CGFloat? = nil
+        var clearButtonLabel = "Clear"
 
         if let dict = args as? [String: Any] {
             if let v = dict["placeholder"] as? String { placeholder = v }
@@ -54,10 +60,17 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["searchIconName"] as? String { searchIconName = v }
             if let v = dict["clearIconName"] as? String { clearIconName = v }
             if let v = dict["isDark"] as? Bool { isDark = v }
+            if let v = dict["expanded"] as? Bool { expanded = v }
+            if let v = dict["text"] as? String { text = v }
+            keyboard = CNSearchKeyboard(dict)
+            if let v = dict["searchIconSize"] as? NSNumber, v.doubleValue > 0 { searchIconSize = CGFloat(v.doubleValue) }
+            if let v = dict["clearIconSize"] as? NSNumber, v.doubleValue > 0 { clearIconSize = CGFloat(v.doubleValue) }
+            if let v = dict["clearButtonLabel"] as? String, !v.isEmpty { clearButtonLabel = v }
         }
 
         let model = CNSearchBarModel(
-            expanded: initiallyExpanded || !expandable,
+            // A view created again (after a modal) opens as the bar was.
+            expanded: (expanded ?? initiallyExpanded) || !expandable,
             expandable: expandable,
             autofocus: autofocus,
             onTextChanged: { text in
@@ -68,6 +81,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             }
         )
         self.model = model
+        // ...and with its text, which Flutter already has (#134).
+        if !text.isEmpty { model.setText(text, notify: false) }
 
         // Create SwiftUI view
         let searchBarView = CNSearchBarSwiftUI(
@@ -86,6 +101,10 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             autofocus: autofocus,
             searchIconName: searchIconName,
             clearIconName: clearIconName,
+            searchIconSize: searchIconSize,
+            clearIconSize: clearIconSize,
+            clearButtonLabel: clearButtonLabel,
+            keyboard: keyboard,
             onSubmitted: { text in
                 channelRef.invokeMethod("submitted", arguments: ["text": text])
             },
@@ -299,6 +318,12 @@ struct CNSearchBarSwiftUI: View {
     let autofocus: Bool
     let searchIconName: String
     let clearIconName: String
+    let clearButtonLabel: String
+    let keyboard: CNSearchKeyboard
+    /// The icons' sizes at the default text size; they follow Dynamic Type
+    /// like the field's text (#134).
+    @ScaledMetric(relativeTo: .body) private var searchIconSize: CGFloat = 16
+    @ScaledMetric(relativeTo: .body) private var clearIconSize: CGFloat = 16
 
     let onSubmitted: (String) -> Void
     let onCancelTapped: () -> Void
@@ -323,6 +348,10 @@ struct CNSearchBarSwiftUI: View {
         autofocus: Bool,
         searchIconName: String,
         clearIconName: String,
+        searchIconSize: CGFloat?,
+        clearIconSize: CGFloat?,
+        clearButtonLabel: String,
+        keyboard: CNSearchKeyboard,
         onSubmitted: @escaping (String) -> Void,
         onCancelTapped: @escaping () -> Void
     ) {
@@ -341,6 +370,10 @@ struct CNSearchBarSwiftUI: View {
         self.autofocus = autofocus
         self.searchIconName = searchIconName
         self.clearIconName = clearIconName
+        self._searchIconSize = ScaledMetric(wrappedValue: searchIconSize ?? 16, relativeTo: .body)
+        self._clearIconSize = ScaledMetric(wrappedValue: clearIconSize ?? 16, relativeTo: .body)
+        self.clearButtonLabel = clearButtonLabel
+        self.keyboard = keyboard
         self.onSubmitted = onSubmitted
         self.onCancelTapped = onCancelTapped
     }
@@ -351,7 +384,7 @@ struct CNSearchBarSwiftUI: View {
             HStack(spacing: 8) {
                 // Search icon
                 Image(systemName: searchIconName)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: searchIconSize, weight: .medium))
                     .foregroundColor(tint)
                     .matchedGeometryEffect(id: "searchIcon", in: animation)
 
@@ -361,6 +394,9 @@ struct CNSearchBarSwiftUI: View {
                         .foregroundColor(textColor ?? .primary)
                         .focused($isFocused)
                         .submitLabel(.search)
+                        .textInputAutocapitalization(keyboard.capitalization)
+                        .autocorrectionDisabled(!keyboard.autocorrect)
+                        .keyboardType(keyboard.type)
                         .onSubmit {
                             onSubmitted(model.searchText)
                         }
@@ -372,9 +408,12 @@ struct CNSearchBarSwiftUI: View {
                             model.setText("", notify: true)
                         }) {
                             Image(systemName: clearIconName)
-                                .font(.system(size: 16))
+                                .font(.system(size: clearIconSize))
                                 .foregroundColor(placeholderColor ?? .secondary)
                         }
+                        // Without a label VoiceOver reads the symbol's name,
+                        // "Close" (#134).
+                        .accessibilityLabel(Text(clearButtonLabel))
                         .transition(.opacity.combined(with: .scale))
                     }
                 }
@@ -400,7 +439,13 @@ struct CNSearchBarSwiftUI: View {
             if showCancelButton && isExpanded {
                 Button(action: {
                     isFocused = false
-                    model.setExpanded(false, animated: true)
+                    if expandable {
+                        model.setExpanded(false, animated: true)
+                    } else {
+                        // A bar that stays open still ends the search, as a
+                        // search controller's Cancel does (#134).
+                        model.setText("", notify: true)
+                    }
                     onCancelTapped()
                 }) {
                     Text(cancelText)
@@ -440,6 +485,43 @@ struct CNSearchBarSwiftUI: View {
             } else {
                 Color(.systemGray6)
             }
+        }
+    }
+}
+
+// MARK: - Keyboard
+
+/// `CNSearchBar.textCapitalization`, `autocorrect` and `keyboardType`, mapped
+/// as Flutter's own text fields map them to UIKit.
+struct CNSearchKeyboard {
+    var capitalization: TextInputAutocapitalization = .never
+    var autocorrect = true
+    var type: UIKeyboardType = .default
+
+    init() {}
+
+    init(_ dict: [String: Any]) {
+        switch dict["textCapitalization"] as? String {
+        case "words": capitalization = .words
+        case "sentences": capitalization = .sentences
+        case "characters": capitalization = .characters
+        default: capitalization = .never
+        }
+        autocorrect = (dict["autocorrect"] as? Bool) ?? true
+        let decimal = (dict["keyboardDecimal"] as? Bool) ?? false
+        let signed = (dict["keyboardSigned"] as? Bool) ?? false
+        switch dict["keyboardType"] as? String {
+        case "TextInputType.number":
+            type = signed ? .numbersAndPunctuation : (decimal ? .decimalPad : .numberPad)
+        case "TextInputType.phone": type = .phonePad
+        case "TextInputType.datetime": type = .numbersAndPunctuation
+        case "TextInputType.emailAddress": type = .emailAddress
+        case "TextInputType.url": type = .URL
+        case "TextInputType.visiblePassword": type = .asciiCapable
+        case "TextInputType.name": type = .namePhonePad
+        case "TextInputType.twitter": type = .twitter
+        case "TextInputType.webSearch": type = .webSearch
+        default: type = .default
         }
     }
 }

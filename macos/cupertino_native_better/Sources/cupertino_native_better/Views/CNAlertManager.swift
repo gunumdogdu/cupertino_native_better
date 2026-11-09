@@ -105,7 +105,9 @@ final class CNAlertManager: NSObject {
       message: args["message"] as? String,
       buttons: buttons,
       textFields: fields,
-      appearance: MacFlutterWindow.appearance(isDark: args["isDark"] as? Bool)
+      appearance: MacFlutterWindow.appearance(isDark: args["isDark"] as? Bool),
+      textStyle: args["textStyle"] as? [String: Any],
+      rtl: CNLayoutDirection.read(args)
     ) { answer in
       guard let answer else {
         result(nil)

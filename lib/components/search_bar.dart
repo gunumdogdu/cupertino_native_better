@@ -147,6 +147,10 @@ class CNSearchBar extends StatefulWidget {
     this.clearIcon,
     this.autoHideOnModal = true,
     this.recentsAutosaveName,
+    this.textCapitalization = TextCapitalization.none,
+    this.autocorrect = true,
+    this.keyboardType = TextInputType.text,
+    this.clearButtonSemanticLabel,
   });
 
   /// Placeholder text shown when the search field is empty.
@@ -201,10 +205,33 @@ class CNSearchBar extends StatefulWidget {
   final CNSearchBarController? controller;
 
   /// Custom search icon (defaults to magnifyingglass SF Symbol).
+  ///
+  /// On iOS 26+ the icon is drawn at [CNSymbol.size] (16 pt by default) at
+  /// the default text size, and grows and shrinks with Dynamic Type like the
+  /// field's text.
   final CNSymbol? searchIcon;
 
-  /// Custom clear icon (defaults to xmark.circle.fill SF Symbol).
+  /// Custom clear icon (defaults to xmark.circle.fill SF Symbol), sized like
+  /// [searchIcon].
   final CNSymbol? clearIcon;
+
+  /// Whether the keyboard capitalizes what the user types. Defaults to none,
+  /// as for the system search fields, so a query such as a username isn't
+  /// capitalized.
+  final TextCapitalization textCapitalization;
+
+  /// Whether the keyboard corrects what the user types. Turn it off for a
+  /// query such as a file name or a command.
+  final bool autocorrect;
+
+  /// The keyboard shown for the field, e.g. [TextInputType.emailAddress] or
+  /// [TextInputType.number] (iOS; the macOS field takes typing from the
+  /// hardware keyboard).
+  final TextInputType keyboardType;
+
+  /// What VoiceOver reads for the button that clears the text. Defaults to
+  /// the localized "Clear" of [CupertinoLocalizations.clearButtonLabel].
+  final String? clearButtonSemanticLabel;
 
   /// When true (default), destroys the native search bar's PlatformView while
   /// a modal sheet is presented above this widget's host route. Fixes the
@@ -493,8 +520,39 @@ class _CNSearchBarState extends State<CNSearchBar>
     'autofocus': widget.autofocus,
     'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
     'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
+    if (widget.searchIcon?.size != null)
+      'searchIconSize': widget.searchIcon!.size,
+    if (widget.clearIcon?.size != null) 'clearIconSize': widget.clearIcon!.size,
+    'clearButtonLabel': _clearButtonLabel(context),
+    ..._keyboardParams,
+    // The view is created again after a modal (autoHideOnModal) or a move
+    // in the tree: it starts with the text and the expanded state the bar
+    // has now, not the initial ones (#134).
+    'expanded': _isExpanded,
+    if (_searchText.isNotEmpty) 'text': _searchText,
     'isDark': ThemeHelper.isDark(context),
   };
+
+  String _clearButtonLabel(BuildContext context) =>
+      widget.clearButtonSemanticLabel ??
+      Localizations.of<CupertinoLocalizations>(
+        context,
+        CupertinoLocalizations,
+      )?.clearButtonLabel ??
+      'Clear';
+
+  /// [CNSearchBar.textCapitalization], [CNSearchBar.autocorrect] and
+  /// [CNSearchBar.keyboardType] for the native field.
+  Map<String, Object> get _keyboardParams {
+    final type = widget.keyboardType.toJson();
+    return <String, Object>{
+      'textCapitalization': widget.textCapitalization.name,
+      'autocorrect': widget.autocorrect,
+      'keyboardType': type['name'] as String,
+      if (type['decimal'] == true) 'keyboardDecimal': true,
+      if (type['signed'] == true) 'keyboardSigned': true,
+    };
+  }
 
   /// macOS: an `NSSearchField` as wide as the parent allows (the window
   /// when the parent is unbounded), or a [CNSearchBar.collapsedWidth] wide
@@ -568,6 +626,18 @@ class _CNSearchBarState extends State<CNSearchBar>
     if (hidden != null) return hidden;
 
     final platformView = UiKitView(
+      // The keyboard options, icon sizes and clear-button name are set when
+      // the view is created; a change creates it again, with its text.
+      key: ValueKey<Object>(
+        Object.hash(
+          widget.textCapitalization,
+          widget.autocorrect,
+          widget.keyboardType,
+          widget.searchIcon?.size,
+          widget.clearIcon?.size,
+          _clearButtonLabel(context),
+        ),
+      ),
       viewType: 'CNSearchBar',
       creationParams: _creationParams(context),
       creationParamsCodec: const StandardMessageCodec(),
@@ -681,17 +751,28 @@ class _CNSearchBarState extends State<CNSearchBar>
                                           decoration: null,
                                           padding: EdgeInsets.zero,
                                           onSubmitted: _onSubmitted,
+                                          textCapitalization:
+                                              widget.textCapitalization,
+                                          autocorrect: widget.autocorrect,
+                                          keyboardType: widget.keyboardType,
+                                          textInputAction:
+                                              TextInputAction.search,
                                         ),
                                       ),
                                     ),
                                   ),
                                   if (_searchText.isNotEmpty)
-                                    GestureDetector(
-                                      onTap: _onClear,
-                                      child: Icon(
-                                        CupertinoIcons.xmark_circle_fill,
-                                        size: 18,
-                                        color: effectivePlaceholderColor,
+                                    Semantics(
+                                      button: true,
+                                      label: _clearButtonLabel(context),
+                                      excludeSemantics: true,
+                                      child: GestureDetector(
+                                        onTap: _onClear,
+                                        child: Icon(
+                                          CupertinoIcons.xmark_circle_fill,
+                                          size: 18,
+                                          color: effectivePlaceholderColor,
+                                        ),
                                       ),
                                     ),
                                 ],

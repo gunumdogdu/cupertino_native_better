@@ -7,18 +7,25 @@ import UIKit
 class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBarDelegate {
     private let channel: FlutterMethodChannel
     private let container: UIView
-    private var tabBar: UITabBar?
+    private var tabBar: CNDotTabBar?
 
     // State
-    private var currentLabels: [String] = []
-    private var currentSymbols: [String] = []
-    private var currentActiveSymbols: [String] = []
-    private var currentBadgeCounts: [Int?] = []
+    /// The items, read as the plain bar reads them: images, sizes, badges
+    /// and names (#136).
+    private var content = CNTabItemContent()
     private var selectedIndex: Int = 0
     private var tintColor: UIColor?
     private var unselectedTintColor: UIColor?
     private var searchPlaceholder: String = "Search"
     private var searchLabel: String = "Search"
+    /// `CNTabBarSearchItem.icon` / `activeIcon`; the system search item's
+    /// own magnifying glass when they are the default.
+    private var searchSymbol: String = "magnifyingglass"
+    private var searchActiveSymbol: String = "magnifyingglass"
+    /// `CNTabBarSearchStyle.iconSize`, `iconColor` and `activeIconColor`.
+    private var searchIconSize: CGFloat?
+    private var searchIconColor: UIColor?
+    private var searchActiveIconColor: UIColor?
 
     // Search tab is always the last item
     private var searchItemIndex: Int = -1
@@ -31,12 +38,7 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
 
         // Parse creation params
         if let dict = args as? [String: Any] {
-            currentLabels = (dict["labels"] as? [String]) ?? []
-            currentSymbols = (dict["sfSymbols"] as? [String]) ?? []
-            currentActiveSymbols = (dict["activeSfSymbols"] as? [String]) ?? []
-            if let badgeData = dict["badgeCounts"] as? [NSNumber?] {
-                currentBadgeCounts = badgeData.map { $0?.intValue }
-            }
+            content = CNTabItemContent(dict)
             if let v = dict["selectedIndex"] as? NSNumber {
                 selectedIndex = v.intValue
             }
@@ -53,8 +55,23 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
             }
             searchPlaceholder = (dict["searchPlaceholder"] as? String) ?? "Search"
             searchLabel = (dict["searchLabel"] as? String) ?? "Search"
+            searchSymbol = (dict["searchSymbol"] as? String) ?? "magnifyingglass"
+            searchActiveSymbol = (dict["searchActiveSymbol"] as? String) ?? searchSymbol
+            if let style = dict["searchStyle"] as? [String: Any] {
+                if let n = style["iconSize"] as? NSNumber, n.doubleValue > 0 {
+                    searchIconSize = CGFloat(n.doubleValue)
+                }
+                if let n = style["iconColor"] as? NSNumber {
+                    searchIconColor = ImageUtils.colorFromARGB(n.intValue)
+                }
+                if let n = style["activeIconColor"] as? NSNumber {
+                    searchActiveIconColor = ImageUtils.colorFromARGB(n.intValue)
+                }
+            }
         }
 
+        // Flutter's text direction (#142).
+        CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: container)
         container.backgroundColor = .clear
         container.isOpaque = false
         // This view is iOS 26+ only and uses the Liquid Glass tab bar where
@@ -75,8 +92,10 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
     }
 
     private func setupUI() {
-        // Create native UITabBar - gets liquid glass morphing effect on iOS 26+
-        let bar = UITabBar(frame: .zero)
+        // Create native UITabBar - gets liquid glass morphing effect on iOS 26+.
+        // A CNDotTabBar draws dot badges and names the tab buttons for
+        // VoiceOver, as the plain bar does.
+        let bar = CNDotTabBar(frame: .zero)
         tabBar = bar
         bar.delegate = self
         bar.translatesAutoresizingMaskIntoConstraints = false
@@ -127,54 +146,67 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
 
     private func buildTabItems() -> [UITabBarItem] {
         var items: [UITabBarItem] = []
-        let count = max(currentLabels.count, currentSymbols.count)
+        var names: [Int: String] = [:]
 
-        for i in 0..<count {
-            let title = i < currentLabels.count ? currentLabels[i] : nil
-            let symbol = i < currentSymbols.count ? currentSymbols[i] : "circle"
-            let activeSymbol = i < currentActiveSymbols.count && !currentActiveSymbols[i].isEmpty
-                ? currentActiveSymbols[i] : symbol
-            let badgeCount = i < currentBadgeCounts.count ? currentBadgeCounts[i] : nil
-
-            var image: UIImage? = nil
-            var selectedImage: UIImage? = nil
-
-            // iOS 26+: Use different rendering modes for selected/unselected
-            if let unselTint = unselectedTintColor {
-                // Unselected: Apply custom color
-                if let originalImage = UIImage(systemName: symbol) {
-                    image = originalImage.withTintColor(unselTint, renderingMode: .alwaysOriginal)
-                }
-            } else {
-                // No custom color - use template mode to respect theme
-                image = UIImage(systemName: symbol)?.withRenderingMode(.alwaysTemplate)
-            }
-
-            // Selected: Use template rendering so tintColor applies
-            selectedImage = UIImage(systemName: activeSymbol)?.withRenderingMode(.alwaysTemplate)
-
-            let item = UITabBarItem(title: title, image: image, selectedImage: selectedImage)
+        for i in 0..<content.count {
+            let (image, selected) = content.images(at: i)
+            let item = UITabBarItem(
+                title: content.title(at: i),
+                image: unselectedImage(image),
+                // Selected: template rendering, so the bar's tint applies.
+                selectedImage: selected
+            )
             item.tag = i
-
-            // Set badge value if provided
-            if let count = badgeCount, count > 0 {
-                item.badgeValue = count > 99 ? "99+" : String(count)
-            } else {
-                item.badgeValue = nil
+            CupertinoTabBarPlatformView.applyBadge(content.badge(at: i), to: item)
+            if let name = content.semanticLabel(at: i) {
+                item.accessibilityLabel = name
+                names[i] = name
             }
-
             items.append(item)
         }
 
-        // Add search tab using UITabBarSystemItem.search for native iOS 26 liquid glass styling
+        // The search tab is the system search item, which iOS 26 draws as a
+        // separate glass button.
         let searchItem = UITabBarItem(tabBarSystemItem: .search, tag: 9999)
         if !searchLabel.isEmpty {
             searchItem.title = searchLabel
         }
+        applySearchIcon(to: searchItem)
         items.append(searchItem)
         searchItemIndex = items.count - 1
 
+        tabBar?.itemNames = names
         return items
+    }
+
+    /// iOS 26 ignores `unselectedItemTintColor`, so an unselected template
+    /// image (an SF Symbol or a custom icon) carries the colour itself. Images
+    /// drawn in their own colours stay as they are.
+    private func unselectedImage(_ image: UIImage?) -> UIImage? {
+        guard let image else { return nil }
+        guard let tint = unselectedTintColor, image.renderingMode != .alwaysOriginal else { return image }
+        return image.withTintColor(tint, renderingMode: .alwaysOriginal)
+    }
+
+    /// `CNTabBarSearchItem.icon` / `activeIcon` and the search style's icon
+    /// size and colours, set on the system search item. With none of them
+    /// set, the item keeps the system's own magnifying glass.
+    private func applySearchIcon(to item: UITabBarItem) {
+        let custom = searchSymbol != "magnifyingglass" || searchActiveSymbol != searchSymbol
+            || searchIconSize != nil || searchIconColor != nil || searchActiveIconColor != nil
+        guard custom else { return }
+        let config = searchIconSize.map { UIImage.SymbolConfiguration(pointSize: $0) }
+        func symbol(_ name: String, _ color: UIColor?) -> UIImage? {
+            let base = config.flatMap { UIImage(systemName: name, withConfiguration: $0) } ?? UIImage(systemName: name)
+            guard let color else { return base?.withRenderingMode(.alwaysTemplate) }
+            return base?.withTintColor(color, renderingMode: .alwaysOriginal)
+        }
+        if let image = symbol(searchSymbol, searchIconColor ?? unselectedTintColor) {
+            item.image = image
+        }
+        if let image = symbol(searchActiveSymbol, searchActiveIconColor) {
+            item.selectedImage = image
+        }
     }
 
     private func setupMethodChannel() {
@@ -199,6 +231,8 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
                     if idx != self.searchItemIndex {
                         bar.selectedItem = items[idx]
                         self.selectedIndex = idx
+                    } else {
+                        self.selectSearchTab()
                     }
                     result(nil)
                 } else {
@@ -206,7 +240,9 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
                 }
 
             case "activateSearch":
-                // Notify Flutter to show search UI
+                // Opened from code (a button, a shortcut): the search tab is
+                // shown selected, as after a tap on it (#136).
+                self.selectSearchTab()
                 self.channel.invokeMethod("searchActiveChanged", arguments: ["isActive": true])
                 result(nil)
 
@@ -224,6 +260,10 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
 
             case "setSearchText":
                 // Search text is handled by Flutter
+                result(nil)
+
+            case "setLayoutDirection":
+                CNLayoutDirection.apply(CNLayoutDirection.read(call.arguments as? [String: Any]), to: self.container)
                 result(nil)
 
             case "setBrightness":
@@ -256,14 +296,10 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
 
             case "setItems":
                 if let args = call.arguments as? [String: Any] {
-                    self.currentLabels = (args["labels"] as? [String]) ?? []
-                    self.currentSymbols = (args["sfSymbols"] as? [String]) ?? []
-                    self.currentActiveSymbols = (args["activeSfSymbols"] as? [String]) ?? []
-                    if let badgeData = args["badgeCounts"] as? [NSNumber?] {
-                        self.currentBadgeCounts = badgeData.map { $0?.intValue }
-                    }
-
+                    let searchSelected = self.isSearchSelected
+                    self.content = CNTabItemContent(args)
                     self.tabBar?.items = self.buildTabItems()
+                    if searchSelected { self.selectSearchTab() }
 
                     if let idx = (args["selectedIndex"] as? NSNumber)?.intValue,
                        let bar = self.tabBar,
@@ -277,31 +313,20 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
                     result(FlutterError(code: "bad_args", message: "Missing items", details: nil))
                 }
 
-            case "setBadgeCounts":
-                if let args = call.arguments as? [String: Any],
-                   let badgeData = args["badgeCounts"] as? [NSNumber?] {
-                    let badgeCounts = badgeData.map { $0?.intValue }
-                    self.currentBadgeCounts = badgeCounts
-
-                    // Update existing tab bar items
-                    if let bar = self.tabBar, let items = bar.items {
-                        for (index, item) in items.enumerated() {
-                            if index < badgeCounts.count {
-                                let count = badgeCounts[index]
-                                if let count = count, count > 0 {
-                                    item.badgeValue = count > 99 ? "99+" : String(count)
-                                } else {
-                                    item.badgeValue = nil
-                                }
-                            }
-                        }
+            case "setBadges":
+                // `CNTabBarItem.badge` changed alone.
+                if let badges = (call.arguments as? [String: Any])?["badges"] as? [Any] {
+                    self.content.badges = badges.map { ($0 as? String) ?? "" }
+                    for (index, item) in (self.tabBar?.items ?? []).enumerated() where index != self.searchItemIndex {
+                        CupertinoTabBarPlatformView.applyBadge(self.content.badge(at: index), to: item)
                     }
-                    result(nil)
-                } else {
-                    result(FlutterError(code: "bad_args", message: "Missing badge counts", details: nil))
+                    self.tabBar?.setNeedsLayout()
                 }
+                result(nil)
 
-            case "refresh", "setLabels", "setSfSymbols", "setBadges", "setLayout":
+            // Menus open from a plain tab only, and this bar keeps the
+            // system font.
+            case "refresh", "setLabels", "setSfSymbols", "setLayout", "setMenus", "setFont":
                 result(nil)
 
             default:
@@ -320,9 +345,22 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
         bar.items = buildTabItems()
 
         // Restore selection
-        if let items = bar.items, currentSelectedIndex < items.count, currentSelectedIndex != searchItemIndex {
+        if let items = bar.items, currentSelectedIndex < items.count {
             bar.selectedItem = items[currentSelectedIndex]
         }
+    }
+
+    private var isSearchSelected: Bool {
+        guard let bar = tabBar, let selected = bar.selectedItem else { return false }
+        return selected.tag == 9999
+    }
+
+    /// Shows the search tab as selected; `deactivateSearch` puts the
+    /// previous tab back.
+    private func selectSearchTab() {
+        guard let bar = tabBar, let items = bar.items,
+              searchItemIndex >= 0, searchItemIndex < items.count else { return }
+        bar.selectedItem = items[searchItemIndex]
     }
 
     deinit {
@@ -340,9 +378,7 @@ class CupertinoTabBarSearchPlatformView: NSObject, FlutterPlatformView, UITabBar
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         // Check if search item was tapped
         if item.tag == 9999 {
-            // Don't restore previous selection - let search tab stay selected
-            // This matches adaptive_platform_ui behavior
-            // Notify Flutter search was activated
+            // The search tab stays selected while search is active.
             channel.invokeMethod("searchActiveChanged", arguments: ["isActive": true])
             return
         }

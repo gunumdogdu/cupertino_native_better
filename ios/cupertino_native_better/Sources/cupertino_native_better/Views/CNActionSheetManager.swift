@@ -121,9 +121,14 @@ final class CNActionSheetManager: NSObject {
 
         pendingResult = result
 
-        let alert = UIAlertController(title: config.title,
-                                      message: config.message,
-                                      preferredStyle: .actionSheet)
+        let alert = CNStyledAlertController(title: config.title,
+                                            message: config.message,
+                                            preferredStyle: .actionSheet)
+        // The app's font and text direction (#144).
+        alert.textStyle = config.textStyle
+        alert.destructiveTitles = Set(config.actions.filter { $0.destructive }.map { $0.label })
+        alert.rtl = config.rtl
+        CNLayoutDirection.apply(config.rtl, to: alert)
         // The sheet takes the window's traits, which follow the system
         // appearance, not the Flutter theme. Pin it to the app's theme.
         if let isDark = config.isDark {
@@ -169,7 +174,9 @@ final class CNActionSheetManager: NSObject {
         // UIKit refuses some presentations with only a log line; the call
         // must not wait for a sheet that never appeared.
         if alert.presentingViewController == nil, presentedAlert === alert {
-            send(nil)
+            // An error rather than null, so `throwOnFailure` can tell it
+            // from a dismissal (#135).
+            fail(FlutterError(code: "refused", message: "UIKit did not present the action sheet", details: nil))
         }
     }
 
@@ -240,6 +247,14 @@ final class CNActionSheetManager: NSObject {
         result(value)
     }
 
+    /// Answers the waiting Dart call with [error]: the sheet never appeared.
+    private func fail(_ error: FlutterError) {
+        guard let result = pendingResult else { return }
+        pendingResult = nil
+        presentedAlert = nil
+        result(error)
+    }
+
     /// Delivers `value` only while `alert` is still the sheet the pending call
     /// belongs to. A handler from a superseded sheet, or from one whose alert
     /// has already been released, is dropped rather than answering a call that
@@ -303,12 +318,16 @@ final class CNActionSheetManager: NSObject {
         let actions: [Action]
         let anchorRect: CGRect?
         let isDark: Bool?
+        let textStyle: CNDialogTextStyle?
+        let rtl: Bool?
 
         init(args: [String: Any]) {
             title = args["title"] as? String
             message = args["message"] as? String
             cancelLabel = args["cancelLabel"] as? String
             isDark = args["isDark"] as? Bool
+            textStyle = CNDialogTextStyle(args["textStyle"])
+            rtl = CNLayoutDirection.read(args)
 
             let raw = args["actions"] as? [[String: Any]] ?? []
             actions = raw.map { entry in

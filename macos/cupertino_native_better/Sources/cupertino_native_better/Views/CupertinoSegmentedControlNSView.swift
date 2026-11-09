@@ -39,12 +39,7 @@ class CupertinoSegmentedControlNSView: NSView {
     if let dict = args as? [String: Any] {
       if let arr = dict["labels"] as? [String] { labels = arr }
       if let arr = dict["sfSymbols"] as? [String] { symbols = arr }
-      perSymbolSizes = ((dict["sfSymbolSizes"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { CGFloat(truncating: $0) } }
-      perSymbolColors = ((dict["sfSymbolColors"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { Self.colorFromARGB($0.intValue) } }
-      perSymbolPalettes = ((dict["sfSymbolPaletteColors"] as? [Any]) ?? []).map {
-        (($0 as? [Any]) ?? []).compactMap { ($0 as? NSNumber).map { Self.colorFromARGB($0.intValue) } }
-      }
-      perSymbolModes = ((dict["sfSymbolRenderingModes"] as? [Any]) ?? []).map { $0 as? String }
+      readSymbolOptions(dict)
       if let v = dict["selectedIndex"] as? NSNumber { selectedIndex = v.intValue }
       if let v = dict["enabled"] as? NSNumber { enabled = v.boolValue }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
@@ -71,6 +66,8 @@ class CupertinoSegmentedControlNSView: NSView {
 
     control.target = self
     control.action = #selector(onChanged(_:))
+    applyLabelStyle((args as? [String: Any])?["labelStyle"] as? [String: Any] ?? [:])
+    CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: control)
 
     addSubview(control)
     control.translatesAutoresizingMaskIntoConstraints = false
@@ -108,6 +105,23 @@ class CupertinoSegmentedControlNSView: NSView {
           self.configureSegments()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing style", details: nil)) }
+      case "setItems":
+        // New labels or symbols, e.g. after a language switch (#143).
+        let dict = args ?? [:]
+        self.labels = (dict["labels"] as? [String]) ?? []
+        self.symbols = (dict["sfSymbols"] as? [String]) ?? []
+        self.readSymbolOptions(dict)
+        let selected = (dict["selectedIndex"] as? NSNumber)?.intValue ?? self.control.selectedSegment
+        self.control.segmentCount = max(self.labels.count, self.symbols.count)
+        self.control.selectedSegment = selected < self.control.segmentCount ? selected : -1
+        self.configureSegments()
+        result(nil)
+      case "setLabelStyle":
+        self.applyLabelStyle(args ?? [:])
+        result(nil)
+      case "setLayoutDirection":
+        CNLayoutDirection.apply(CNLayoutDirection.read(args), to: self.control)
+        result(nil)
       case "setSemanticLabel":
         let label = args?["label"] as? String
         self.control.setAccessibilityLabel((label?.isEmpty ?? true) ? nil : label)
@@ -126,6 +140,37 @@ class CupertinoSegmentedControlNSView: NSView {
   }
 
   required init?(coder: NSCoder) { return nil }
+
+  private func readSymbolOptions(_ dict: [String: Any]) {
+    perSymbolSizes = ((dict["sfSymbolSizes"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { CGFloat(truncating: $0) } }
+    perSymbolColors = ((dict["sfSymbolColors"] as? [Any]) ?? []).map { ($0 as? NSNumber).map { Self.colorFromARGB($0.intValue) } }
+    perSymbolPalettes = ((dict["sfSymbolPaletteColors"] as? [Any]) ?? []).map {
+      (($0 as? [Any]) ?? []).compactMap { ($0 as? NSNumber).map { Self.colorFromARGB($0.intValue) } }
+    }
+    perSymbolModes = ((dict["sfSymbolRenderingModes"] as? [Any]) ?? []).map { $0 as? String }
+  }
+
+  /// The label font (#143). An `NSSegmentedControl` has one font for all
+  /// its segments and no title colour, so the selected segment's own
+  /// family, weight and the colours stay iOS-only.
+  private func applyLabelStyle(_ style: [String: Any]) {
+    let family = (style["fontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    let size = (style["fontSize"] as? NSNumber).map { CGFloat($0.doubleValue) }
+    let weightValue = (style["fontWeight"] as? NSNumber)?.intValue
+    guard family != nil || size != nil || weightValue != nil else {
+      control.font = NSFont.systemFont(ofSize: NSFont.systemFontSize(for: control.controlSize))
+      invalidateIntrinsicContentSize()
+      return
+    }
+    let pointSize = size ?? NSFont.systemFontSize(for: control.controlSize)
+    let weight = weightValue.map { NativeButtonHost.fontWeight($0) }
+    if let family, let font = CNFontResolver.font(family: family, size: pointSize, weight: weight) {
+      control.font = font
+    } else {
+      control.font = NSFont.systemFont(ofSize: pointSize, weight: weight ?? .regular)
+    }
+    invalidateIntrinsicContentSize()
+  }
 
   private func readIconStyle(_ style: [String: Any]) {
     if let s = style["iconSize"] as? NSNumber { defaultIconSize = CGFloat(truncating: s) }
