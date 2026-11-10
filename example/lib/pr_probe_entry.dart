@@ -111,6 +111,9 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue141
 //     (#141 to #144: the same with issue142 ... issue144; ARABIC=true starts
 //     #142 in Arabic; AUTO=true runs #143 and #144 and prints `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue146
+//     (#146 and #147, the latter as issue147; AUTO=true pushes and pops the
+//     page over the rail / changes the sort label, printing `CNB_SHOT`)
 //
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=gauge
 //     (2.3.0: CNGauge; AUTO=true moves the value every 2.5 s through the
@@ -181,6 +184,8 @@ import 'demos/issue141_popup_menu_button_test.dart';
 import 'demos/issue142_tab_bar_font_rtl_test.dart';
 import 'demos/issue143_segmented_font_labels_test.dart';
 import 'demos/issue144_alert_font_rtl_test.dart';
+import 'demos/issue146_tab_rail_pushed_page_test.dart';
+import 'demos/issue147_popup_label_change_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -322,6 +327,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue144') {
       return const Issue144AlertFontRtlTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue146') {
+      return const Issue146TabRailPushedPageTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue147') {
+      return const Issue147PopupLabelChangeTestPage(autoCycle: _auto);
     }
     if (_probe == 'symboleffects') {
       return const SymbolEffectsProbePage();

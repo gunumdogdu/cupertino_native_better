@@ -69,6 +69,8 @@ import 'demos/issue141_popup_menu_button_test.dart';
 import 'demos/issue142_tab_bar_font_rtl_test.dart';
 import 'demos/issue143_segmented_font_labels_test.dart';
 import 'demos/issue144_alert_font_rtl_test.dart';
+import 'demos/issue146_tab_rail_pushed_page_test.dart';
+import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
@@ -1308,6 +1310,36 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Issue144AlertFontRtlTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#146: Tab rail under a pushed page'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('sidebar.left', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue146TabRailPushedPageTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#147: Popup label change'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('arrow.up.arrow.down', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue147PopupLabelChangeTestPage(),
                       ),
                     );
                   },
