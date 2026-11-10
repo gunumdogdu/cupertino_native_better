@@ -1,3 +1,21 @@
+## 2.5.1
+
+> Two fixes: `CNTabRail` under a pushed page (#146), and `CNPopupMenuButton` label changes (#147). New: `CNTabRail.autoHideOnPageTransition` and `autoHideOnModal`, on by default.
+
+### Fixed — `CNTabRail` under a pushed page and under modals (#146)
+
+The rail had none of the page and modal handling the other glass widgets have, so while a page was pushed over the rail's page, its glass edge was drawn over the incoming page. The rail now stops drawing while its page is pushed over, popped back to or covered by another page, as `CNTabBar` does (`autoHideOnPageTransition`, on by default): its platform view stays alive, so it is there again at once after the pop, but it draws nothing and takes no touches meanwhile. Under a modal its platform view is removed and created again afterwards (`autoHideOnModal`, on by default), and with either option off its glass is clipped to its own box while it could show. `CNTabScaffold`'s rail gets this too.
+
+### Fixed — `CNPopupMenuButton` label changes (#147)
+
+A new `buttonLabel` (or a new item label) created the native button again: it vanished for a frame and its row jumped through several widths. The label now changes in place, and the button is measured again once. Found while checking it: measured in place, a configuration button's width followed its old title, so a longer label wrapped onto two lines; it is now measured at its natural width. While a button is first prepared, its space keeps the width it will take.
+
+Thanks to @LucasLau00 and @Ashhad08 for the reports.
+
+### Checked
+- **iPhone Duo simulator, iOS 27.1:** the rail during a push and a pop (recorded: no glass over the incoming page, against the edge lines drawn before), the rail back after the pop; the results header changing its sort label four times ("Save" takes one position per change, none in between, and no label wraps).
+- **Tests:** 3 new tests; 582 tests pass.
+
 ## 2.5.0
 
 > Eleven reports, from @cogwheel0 (#134 to #140) and @Ashhad08 (#141 to #144), all fixed or added. New: fonts from `pubspec.yaml` on native views, right to left from Flutter, label styles for popup menu buttons and segmented controls, fonts for alerts and action sheets, a lifted preview for context menus, popover gauges, tap to seek, and a test switch for the Flutter fallbacks. Three behaviour changes, listed at the end.

@@ -263,8 +263,13 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         self.applyTransitionContainment(active)
         result(nil)
       case "getIntrinsicSize":
-        let size = self.button.intrinsicContentSize
-        result(["width": Double(size.width), "height": Double(size.height)])
+        // At an unlimited width: `intrinsicContentSize` wraps a
+        // configuration button's title to the width it has now, so a longer
+        // title set in place came back narrower each time and wrapped (#147).
+        self.button.layoutIfNeeded()
+        let unlimited = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        let size = self.button.sizeThatFits(unlimited)
+        result(["width": Double(ceil(size.width)), "height": Double(ceil(size.height))])
       case "setItems":
         if let args = call.arguments as? [String: Any] {
           self.labels = (args["labels"] as? [String]) ?? []

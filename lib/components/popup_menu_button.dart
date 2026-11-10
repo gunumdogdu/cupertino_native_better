@@ -527,6 +527,29 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   /// LayoutBuilder so the slot has identical dimensions whether or not the
   /// native platform view is currently mounted (prevents surrounding text
   /// from creeping into the slot during the hide/show transition).
+  /// The width the live button takes under [constraints], as
+  /// [_buildNativePopupMenu] lays it out; null fills the bounded width.
+  double? _liveWidth(BoxConstraints constraints) {
+    if (widget.isIconButton) return widget.width ?? widget.height;
+    final preferIntrinsic = widget.shrinkWrap || !constraints.hasBoundedWidth;
+    return preferIntrinsic ? (_intrinsicWidth ?? 80.0) : null;
+  }
+
+  /// What shows while the native button is prepared: the size the live
+  /// button will take, so the row around it doesn't jump (#147).
+  Widget _loadingPlaceholder() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = _liveWidth(constraints);
+        return SizedBox(
+          height: widget.height,
+          width:
+              width ?? (constraints.hasBoundedWidth ? constraints.maxWidth : 0),
+        );
+      },
+    );
+  }
+
   Widget? _maybeHiddenWithLiveDimensions() {
     // Probe with widget-level dimensions: if not hidden, return null so the
     // caller proceeds with the normal build.
@@ -617,7 +640,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         future: _renderCustomIcons(context),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return SizedBox(height: widget.height, width: widget.width);
+            return _loadingPlaceholder();
           }
           return FutureBuilder<Widget>(
             future: _buildNativePopupMenu(
@@ -626,7 +649,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
             ),
             builder: (context, widgetSnapshot) {
               if (!widgetSnapshot.hasData) {
-                return SizedBox(height: widget.height, width: widget.width);
+                return _loadingPlaceholder();
               }
               return widgetSnapshot.data!;
             },
@@ -639,7 +662,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       future: _buildNativePopupMenu(context, customIconData: null),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return SizedBox(height: widget.height, width: widget.width);
+          return _loadingPlaceholder();
         }
         return snapshot.data!;
       },
@@ -792,13 +815,17 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     };
 
     // Create a comprehensive key that includes all parameters affecting platform view creation
+    // The labels are left out: `setButtonTitle` and `setItems` change them
+    // in place. With them in the key, a new label created the native button
+    // again, so it vanished for a frame and its row jumped (#147). Icons
+    // stay in: `setItems` doesn't carry the menu's custom icons.
     final buttonIconKey =
-        '${widget.buttonLabel}_${widget.buttonIcon?.name}_${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}';
+        '${widget.round}_${widget.buttonIcon?.name}_${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}';
     final itemsKey = walkPopupMenuEntries(widget.items)
         .map((e) {
           final v = popupMenuEntryVisual(e);
           if (v != null) {
-            return '${v.label}_${v.icon?.name}_${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}';
+            return '${v.icon?.name}_${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}';
           }
           return 'divider';
         })

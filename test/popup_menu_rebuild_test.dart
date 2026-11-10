@@ -28,10 +28,11 @@ List<CNPopupMenuEntry> _items(int build) => [
 ];
 
 class _Host extends StatefulWidget {
-  const _Host({super.key, required this.labelFollowsBuild});
+  const _Host({super.key, required this.recreatesView});
 
-  /// Puts the build count in `buttonLabel`, which recreates the native view.
-  final bool labelFollowsBuild;
+  /// Changes `height` with the build count, which recreates the native view.
+  /// (A new `buttonLabel` no longer does: it is set in place, #147.)
+  final bool recreatesView;
 
   @override
   State<_Host> createState() => _HostState();
@@ -46,7 +47,8 @@ class _HostState extends State<_Host> {
   Widget build(BuildContext context) => CupertinoApp(
     home: Center(
       child: CNPopupMenuButton(
-        buttonLabel: widget.labelFollowsBuild ? 'Menu $builds' : 'Menu',
+        buttonLabel: 'Menu',
+        height: widget.recreatesView ? 32.0 + builds : 32.0,
         items: _items(builds),
         onPathSelected: (_) {},
       ),
@@ -121,7 +123,7 @@ void main() {
       (tester) async {
         mockNative(tester);
         final host = GlobalKey<_HostState>();
-        await tester.pumpWidget(_Host(key: host, labelFollowsBuild: false));
+        await tester.pumpWidget(_Host(key: host, recreatesView: false));
         await settle(tester);
         expect(created, hasLength(1));
 
@@ -144,14 +146,18 @@ void main() {
       (tester) async {
         mockNative(tester);
         final host = GlobalKey<_HostState>();
-        await tester.pumpWidget(_Host(key: host, labelFollowsBuild: true));
+        await tester.pumpWidget(_Host(key: host, recreatesView: true));
         await settle(tester);
         expect(created, hasLength(1));
 
         host.currentState!.rebuild();
         await settle(tester);
 
-        expect(created, hasLength(2), reason: 'buttonLabel recreates the view');
+        expect(
+          created,
+          hasLength(2),
+          reason: 'a new height recreates the view',
+        );
         final params = created.last;
         expect(params['customIconBytes'], [isA<Uint8List>(), null]);
         final share = (params['submenus'] as List)[1] as Map;

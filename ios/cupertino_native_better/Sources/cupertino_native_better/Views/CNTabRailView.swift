@@ -107,6 +107,21 @@ final class CNTabRailPlatformView: NSObject, FlutterPlatformView, UIGestureRecog
                     self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
                 }
                 result(nil)
+            case "setTransitioning":
+                // Halo containment (#146, Issue #29): while the rail's page
+                // is pushed over, or a modal is up over a rail that stays,
+                // its glass is clipped to its own box, so its edge and
+                // shadow don't show over the page coming in.
+                let active = (args["active"] as? NSNumber)?.boolValue ?? false
+                self.container.clipsToBounds = active
+                self.hostingController.view.clipsToBounds = active
+                self.container.layer.shadowOpacity = 0
+                result(nil)
+            case "setInteractive":
+                // No touches while a modal is above the rail's route.
+                let interactive = (args["interactive"] as? NSNumber)?.boolValue ?? true
+                self.container.isUserInteractionEnabled = interactive
+                result(nil)
             default:
                 result(FlutterMethodNotImplemented)
             }

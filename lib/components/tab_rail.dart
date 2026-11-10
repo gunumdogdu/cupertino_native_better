@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/modal_hide_mixin.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
@@ -48,6 +49,8 @@ class CNTabRail extends StatefulWidget {
     required this.onTap,
     this.style = CNTabRailStyle.rail,
     this.tint,
+    this.autoHideOnPageTransition = true,
+    this.autoHideOnModal = true,
   });
 
   /// The tabs. SF Symbols (`icon` / `activeIcon`), custom icons, image assets
@@ -68,6 +71,21 @@ class CNTabRail extends StatefulWidget {
   /// Colour of the selected tab. Defaults to the theme's primary colour.
   final Color? tint;
 
+  /// When true (default), the native rail is not drawn while its page is
+  /// pushed over, popped back to, or covered by another page, as
+  /// `CNTabBar.autoHideOnPageTransition` does (#146). Its platform view
+  /// stays alive, so it is there again at once, but it draws nothing over
+  /// the incoming page and takes no touches meanwhile. Off, its glass is
+  /// clipped to its own box during the transition instead.
+  final bool autoHideOnPageTransition;
+
+  /// When true (default), the rail's platform view is removed while a modal
+  /// (a dialog, popup or sheet) covers it, and created again when it closes,
+  /// as the other glass widgets do (#146, Issue #53). Off, the rail stays
+  /// and its glass is clipped to its own box while the modal is up. Needs
+  /// `CNTabBarRouteObserver()` in the navigator's `navigatorObservers`.
+  final bool autoHideOnModal;
+
   /// Width of the [CNTabRailStyle.rail] style.
   static const double railWidth = 54;
 
@@ -82,7 +100,20 @@ class CNTabRail extends StatefulWidget {
   State<CNTabRail> createState() => _CNTabRailState();
 }
 
-class _CNTabRailState extends State<CNTabRail> {
+class _CNTabRailState extends State<CNTabRail>
+    with ModalHideMixin<CNTabRail>, HaloContainmentMixin<CNTabRail> {
+  @override
+  bool get autoHideOnModal => widget.autoHideOnModal;
+
+  @override
+  MethodChannel? get platformViewChannel => _channel;
+
+  /// The host route's secondary animation: running while a page is pushed
+  /// over the rail's page or popped back to it, and complete while one
+  /// covers it.
+  Animation<double>? _secondaryRouteAnim;
+  bool _coveredByPage = false;
+
   MethodChannel? _channel;
   Map<String, Object?>? _creationParams;
   int _generation = 0;
@@ -105,7 +136,24 @@ class _CNTabRailState extends State<CNTabRail> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_useNative && _creationParams == null) _prepare();
+    _attachSecondaryRouteAnim();
     _syncStyle();
+  }
+
+  void _attachSecondaryRouteAnim() {
+    final animation = ModalRoute.of(context)?.secondaryAnimation;
+    if (identical(animation, _secondaryRouteAnim)) return;
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteStatus);
+    _secondaryRouteAnim = animation;
+    _secondaryRouteAnim?.addStatusListener(_onSecondaryRouteStatus);
+    _onSecondaryRouteStatus(animation?.status ?? AnimationStatus.dismissed);
+  }
+
+  void _onSecondaryRouteStatus(AnimationStatus status) {
+    final covered = status != AnimationStatus.dismissed;
+    if (covered != _coveredByPage && mounted) {
+      setState(() => _coveredByPage = covered);
+    }
   }
 
   @override
@@ -135,6 +183,7 @@ class _CNTabRailState extends State<CNTabRail> {
 
   @override
   void dispose() {
+    _secondaryRouteAnim?.removeStatusListener(_onSecondaryRouteStatus);
     _channel?.setMethodCallHandler(null);
     super.dispose();
   }
@@ -245,6 +294,7 @@ class _CNTabRailState extends State<CNTabRail> {
   void _onCreated(int id) {
     final channel = MethodChannel('CNTabRail_$id');
     _channel = channel;
+    resetHaloContainment();
     _lastStyle = _style();
     channel.setMethodCallHandler((call) async {
       if (call.method == 'valueChanged') {
@@ -278,20 +328,34 @@ class _CNTabRailState extends State<CNTabRail> {
     }
     final params = _creationParams;
     if (params == null) return SizedBox(width: width, height: height);
+    // A modal over the rail removes its platform view (#146, Issue #53).
+    final hidden = maybeHiddenPlaceholder(width: width, height: height);
+    if (hidden != null) return hidden;
+    final platformView = UiKitView(
+      viewType: 'CNTabRail',
+      creationParams: params,
+      creationParamsCodec: const StandardMessageCodec(),
+      onPlatformViewCreated: _onCreated,
+      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+        // Same as CNTabBar (Issue #62): claim every pointer so the rail
+        // gets its taps even under an ancestor's recognizer.
+        Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
+      },
+    );
     return SizedBox(
       width: width,
       height: height,
-      child: UiKitView(
-        viewType: 'CNTabRail',
-        creationParams: params,
-        creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: _onCreated,
-        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-          // Same as CNTabBar (Issue #62): claim every pointer so the rail
-          // gets its taps even under an ancestor's recognizer.
-          Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
-        },
-      ),
+      // While a page is pushed over the rail's page, popped back or covers
+      // it, the platform view is not drawn and takes no touches (#146). The
+      // IndexedStack keeps it alive, so it isn't created again afterwards
+      // (as CNTabBar does, Issue #35).
+      child: widget.autoHideOnPageTransition
+          ? IndexedStack(
+              index: _coveredByPage ? 0 : 1,
+              sizing: StackFit.expand,
+              children: <Widget>[const SizedBox.shrink(), platformView],
+            )
+          : platformView,
     );
   }
 
