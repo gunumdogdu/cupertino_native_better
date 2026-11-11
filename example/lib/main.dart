@@ -73,6 +73,8 @@ import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/issue149_glass_button_under_sheet_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
+import 'demos/issue153_button_label_color_light_dark_test.dart';
+import 'demos/issue154_button_label_width_padding_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
@@ -1375,6 +1377,39 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue151ThumblessSliderSeekTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#153: Button label colour light/dark'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'circle.lefthalf.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue153ButtonLabelColorLightDarkTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#154: Button label width and padding'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('textformat.size', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue154ButtonLabelWidthPaddingTestPage(),
                       ),
                     );
                   },

@@ -118,6 +118,9 @@
 //     --dart-define=OBSERVER=true
 //     (#149; AUTO=true opens and closes each sheet, printing `CNB_SHOT`;
 //     #151 is issue151, tapped by hand)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue154
+//     (#153 and #154, the former as issue153; AUTO=true flips #153's third
+//     row / steps #154's counter and remounts it, printing `CNB_SHOT`)
 //
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=gauge
 //     (2.3.0: CNGauge; AUTO=true moves the value every 2.5 s through the
@@ -192,6 +195,8 @@ import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/issue149_glass_button_under_sheet_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
+import 'demos/issue153_button_label_color_light_dark_test.dart';
+import 'demos/issue154_button_label_width_padding_test.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -345,6 +350,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();
+    }
+    if (_probe == 'issue153') {
+      return const Issue153ButtonLabelColorLightDarkTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue154') {
+      return const Issue154ButtonLabelWidthPaddingTestPage(autoCycle: _auto);
     }
     if (_probe == 'symboleffects') {
       return const SymbolEffectsProbePage();
