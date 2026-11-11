@@ -99,7 +99,8 @@
 //     starts the list further down)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue124 \
 //     --dart-define=OBSERVER=true
-//     (#124: glass CNButton with autoHideOnModal: false under a dialog)
+//     (#124: glass CNButton with autoHideOnModal: false under a dialog;
+//     AUTO=true opens each dialog, SLOW=true in slow motion)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue126
 //     (#126 to #132: the same with issue127 ... issue132; one screen each;
 //     AUTO=true runs the steps of #126 to #130 and prints `CNB_SHOT <step>`)
@@ -118,6 +119,14 @@
 //     --dart-define=OBSERVER=true
 //     (#149; AUTO=true opens and closes each sheet, printing `CNB_SHOT`;
 //     #151 is issue151, tapped by hand)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue156
+//     --dart-define=OBSERVER=true
+//     (#156: a glass button under a sheet built like a sheet package's, and
+//     a dialog away from it; AUTO=true opens each, printing `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
+//     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
+//     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
+//     CNTabScaffold's bottomScrollEdgeEffect, NOEFFECT=true without it)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue154
 //     (#153 and #154, the former as issue153; AUTO=true flips #153's third
 //     row / steps #154's counter and remounts it, printing `CNB_SHOT`)
@@ -194,9 +203,11 @@ import 'demos/issue144_alert_font_rtl_test.dart';
 import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/issue149_glass_button_under_sheet_test.dart';
+import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
+import 'demos/scroll_edge_effect.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
@@ -348,11 +359,23 @@ class _ProbeApp extends StatelessWidget {
     if (_probe == 'issue149') {
       return const Issue149GlassButtonUnderSheetTestPage(autoCycle: _auto);
     }
+    if (_probe == 'issue156') {
+      return const Issue156GlassButtonPackageSheetTestPage(autoCycle: _auto);
+    }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();
     }
     if (_probe == 'issue153') {
       return const Issue153ButtonLabelColorLightDarkTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'edgetabs') {
+      return const ScrollEdgeEffectTabsDemoPage(
+        autoCycle: _auto,
+        effect: !bool.fromEnvironment('NOEFFECT'),
+      );
+    }
+    if (_probe == 'edge') {
+      return const ScrollEdgeEffectDemoPage(autoCycle: _auto);
     }
     if (_probe == 'issue154') {
       return const Issue154ButtonLabelWidthPaddingTestPage(autoCycle: _auto);

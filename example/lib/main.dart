@@ -20,6 +20,7 @@ import 'demos/glass_button_group.dart';
 import 'demos/progress_indicator.dart';
 import 'demos/pop_up_button.dart';
 import 'demos/gauge.dart';
+import 'demos/scroll_edge_effect.dart';
 import 'demos/overlay_test.dart';
 import 'demos/app_bar.dart';
 import 'demos/issues_test.dart';
@@ -72,6 +73,7 @@ import 'demos/issue144_alert_font_rtl_test.dart';
 import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/issue149_glass_button_under_sheet_test.dart';
+import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -603,6 +605,23 @@ class HomePage extends StatelessWidget {
                   onTap: () {
                     Navigator.of(context).push(
                       CupertinoPageRoute(builder: (_) => const GaugeDemoPage()),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('Scroll edge effect'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'square.topthird.inset.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const ScrollEdgeEffectDemoPage(),
+                      ),
                     );
                   },
                 ),
@@ -1359,6 +1378,24 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue149GlassButtonUnderSheetTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#156: Glass button under a package sheet'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'rectangle.bottomhalf.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue156GlassButtonPackageSheetTestPage(),
                       ),
                     );
                   },

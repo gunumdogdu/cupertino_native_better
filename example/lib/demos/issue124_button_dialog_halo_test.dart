@@ -71,6 +71,8 @@ class _Issue124ButtonDialogHaloTestPageState
 
   Future<void> _run() async {
     await Future<void>.delayed(const Duration(seconds: 4));
+    // SLOW=true: the dialogs fade in and out in slow motion.
+    if (const bool.fromEnvironment('SLOW') && mounted) _setSlow(true);
     for (final kind in _DialogKind.values) {
       if (!mounted) return;
       setState(() => _kind = kind);
