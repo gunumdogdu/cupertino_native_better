@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.5.1
+  cupertino_native_better: ^2.5.2
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -195,36 +195,24 @@ controller.closed.whenComplete(CNTabBarRouteObserver.markAnyModalInactive);
 
 > Without the observer registered, widgets still render fine — but the dynamic z-order/halo containment never engages, and you may see glass bleeding through modals.
 
-### Recommended Setup: present bottom sheets via `CNBottomSheet`
+### Bottom sheets, popups and dialogs
 
-Adding to the observer above, **v1.5.1** adds a second piece of the modal-coordination story to fix the PlatformView z-order bleed between CN-widgets on the host page and CN-widgets *inside* a presented sheet (Issue #53).
+The observer above also keeps CN-widgets right under modals (Issues #53, #124, #149):
 
-When a bottom sheet covers a CN-widget, the package now destroys the host-page widget's PlatformView (with a same-size placeholder reserving the layout slot) while the sheet is up, then recreates it on dismiss. For this to be **position-aware** — only the widgets actually behind the sheet hide, not the entire route — the sheet has to publish its on-screen rect each frame.
+- **A sheet over a CN-widget removes it.** While a bottom sheet, popup or dialog covers a CN-widget on the page below, the widget's platform view is removed (a same-size placeholder keeps its space) and created again when the modal has gone, so it can't bleed through the sheet. This is **position-aware**: only the widgets the sheet actually covers are removed, so an app-bar button stays up under a 40%-high sheet.
+- **Widgets that stay keep their glass.** A CN-widget the sheet doesn't cover stays up, dimmed by the barrier like the rest of the page, with its full Liquid Glass. Its glow is clipped to its bounds only while it could show through: while the modal fades in or out or is dragged, and while the sheet is within reach of the glow.
 
-**Option A — drop-in wrappers (recommended):**
-
-```dart
-CNBottomSheet.show(context: context, builder: (ctx) => MySheet());
-CNBottomSheet.showCupertino(context: context, builder: (ctx) => MySheet());
-CNBottomSheet.showModalPopup(context: context, builder: (ctx) => MySheet());
-```
-
-`CNBottomSheet` mirrors Flutter's standard sheet APIs and injects a `CNSheetGeometryProbe` automatically.
-
-**Option B — wrap your own sheet manually:**
+The observer measures where the sheet is from what the modal route paints, after every frame while it is up, so this works with `showModalBottomSheet`, `showCupertinoModalPopup`, `showDialog`, `CNBottomSheet` and sheet packages alike. For a sheet that isn't a route (`Scaffold.showBottomSheet`), wrap its content in `CNSheetGeometryProbe`, which publishes its rect, and call `CNTabBarRouteObserver.markAnyModalActive()` / `markAnyModalInactive()` around it:
 
 ```dart
-showModalBottomSheet(
-  context: context,
-  builder: (ctx) => CNSheetGeometryProbe(child: MySheet()),
+final controller = Scaffold.of(context).showBottomSheet(
+  (ctx) => CNSheetGeometryProbe(child: MySheet()),
 );
+CNTabBarRouteObserver.markAnyModalActive();
+controller.closed.whenComplete(CNTabBarRouteObserver.markAnyModalInactive);
 ```
 
-Wrap the builder's root child in `CNSheetGeometryProbe` if you need to keep using the framework's `showModalBottomSheet` / `showCupertinoModalPopup` directly (e.g. for advanced configuration not yet exposed on `CNBottomSheet`).
-
-Without one of these, the package falls back to a conservative "hide every CN-widget on this route while any modal is up" behavior — safe, but coarser than needed (e.g. an app-bar CN-button could disappear behind a 30%-height sheet).
-
-Each affected widget also has an `autoHideOnModal: bool = true` constructor parameter so you can opt out per-instance if you ever need the old behavior. With `autoHideOnModal: false` the widget stays on screen under a dialog, popup or sheet, and its Liquid Glass glow is clipped to its bounds until the modal has closed, so no box shows around it through the barrier.
+Each affected widget has an `autoHideOnModal: bool = true` parameter. With `autoHideOnModal: false` the widget stays up even under a sheet that covers it, its glow clipped to its bounds while the sheet is over or near it.
 
 ## Components
 
@@ -2002,7 +1990,7 @@ addTearDown(PlatformVersion.reset);
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.5.1
+   cupertino_native_better: ^2.5.2
    ```
 
 2. Update imports:

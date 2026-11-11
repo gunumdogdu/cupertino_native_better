@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 
 import 'tab_bar.dart' show CNTabBarRouteObserver;
 
-/// Drop-in wrappers for Flutter's modal sheets that opt the CN-widget
-/// family into **position-aware hide-on-modal** behavior.
+/// Drop-in wrappers for Flutter's modal sheets that publish the sheet's
+/// frame for **position-aware hide-on-modal** behavior.
 ///
 /// **What it does.** When you open a sheet with `CNBottomSheet.show` (or
 /// `CNBottomSheet.showCupertino`), a tiny invisible probe is injected into
@@ -14,28 +14,20 @@ import 'tab_bar.dart' show CNTabBarRouteObserver;
 /// rect each frame and publishes it to [CNTabBarRouteObserver.topModalRect].
 /// Any CN-widget on the host page consuming `ModalHideMixin` then only
 /// destroys its native PlatformView IF its own rect geometrically
-/// intersects that published sheet rect.
+/// intersects that published sheet rect (Issue #53).
 ///
-/// **Why this matters.** Without geometry, every CN-widget on the host
-/// page has to assume the worst and destroy itself while any sheet is up
-/// (the only way to keep the iOS hybrid-composition bleed bug from
-/// triggering — Issue #53). That's fine for sheets that cover most of the
-/// screen, but for a small 30% sheet it wastefully destroys widgets in
-/// your AppBar that are clearly not behind it. The geometry probe gives
-/// each CN-widget a way to ask "am I actually behind the sheet?" and only
-/// hide when the answer is yes.
+/// **Not required since 2.5.2.** `CNTabBarRouteObserver` now measures what
+/// any modal route paints ([CNTabBarRouteObserver.routeModalRect]), so
+/// sheets opened with the framework's `showModalBottomSheet`,
+/// `showCupertinoModalPopup` or a sheet package are position-aware too
+/// (#149). A published rect still takes precedence, and the probe remains
+/// the way to describe a sheet that isn't a route.
 ///
 /// **API parity.** Every parameter of `showModalBottomSheet` /
 /// `showCupertinoSheet` is forwarded unchanged. Your `builder` receives a
 /// regular `BuildContext` and can return any Flutter widget tree you
 /// want — exactly like the underlying APIs. The probe is invisible: it
 /// neither adds UI nor changes layout.
-///
-/// **Fallback for raw sheets.** If you use raw `showModalBottomSheet`
-/// instead of `CNBottomSheet.show`, `topModalRect` stays null and
-/// `ModalHideMixin` falls back to destroying every CN-widget on the host
-/// page (safe but blunt). Migrate your sheet call sites to `CNBottomSheet`
-/// to get position-aware behavior.
 class CNBottomSheet {
   CNBottomSheet._();
 

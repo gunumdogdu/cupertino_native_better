@@ -6,11 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Halo containment (`setTransitioning`) of the iOS 26 glass widgets.
 ///
-/// #29: on while the host route animates. #124: also on while a dialog (any
-/// modal route) is up over a widget with `autoHideOnModal: false`, from the
-/// push until the dialog's exit animation has finished. A widget with the
-/// default `autoHideOnModal: true` is removed under the dialog instead, so
-/// it never needs containment for it.
+/// #29: on while the host route animates. #124: also on while a modal route
+/// over a mounted widget animates, and while its dialog or sheet is up over
+/// the widget, from the push until the exit animation has finished. #149:
+/// with the sheet elsewhere, the widget keeps its full glass while the sheet
+/// is at rest, and a widget with the default `autoHideOnModal: true` stays
+/// mounted (a sheet over it removes it).
 
 /// The method channel prefix of each glass widget's native view.
 const List<String> _prefixes = <String>[
@@ -96,6 +97,7 @@ void main() {
     WidgetTester tester,
     Widget child, {
     bool observer = true,
+    Alignment alignment = Alignment.center,
   }) async {
     await tester.pumpWidget(
       CupertinoApp(
@@ -104,7 +106,10 @@ void main() {
           if (observer) CNTabBarRouteObserver(),
         ],
         home: CupertinoPageScaffold(
-          child: Center(child: SizedBox(width: 200, height: 60, child: child)),
+          child: Align(
+            alignment: alignment,
+            child: SizedBox(width: 200, height: 60, child: child),
+          ),
         ),
       ),
     );
@@ -128,6 +133,14 @@ void main() {
       context: navigator.currentContext!,
       builder: (_) =>
           CupertinoAlertDialog(title: const Text('Dialog'), content: content),
+    );
+  }
+
+  /// A 200 pt sheet at the bottom of the 800 by 600 test screen.
+  void openBottomSheet() {
+    showCupertinoModalPopup<void>(
+      context: navigator.currentContext!,
+      builder: (_) => Container(height: 200, color: const Color(0xFFFFFFFF)),
     );
   }
 
@@ -177,7 +190,8 @@ void main() {
       );
 
       testWidgets(
-        'default autoHideOnModal never turns containment on for a dialog',
+        'default autoHideOnModal: a dialog over it removes the view, and the '
+        'view it gets back is not contained',
         (tester) async {
           mockNative(tester);
           await pumpHost(tester, entry.value(true));
@@ -185,18 +199,63 @@ void main() {
 
           await openDialog(tester);
           await tester.pumpAndSettle();
+          expect(
+            find.byType(UiKitView),
+            findsNothing,
+            reason: 'removed under the dialog',
+          );
           navigator.currentState!.pop();
           await tester.pumpAndSettle();
+          // LiquidGlassContainer waits before its platform view.
+          await tester.pump(const Duration(milliseconds: 600));
+          await tester.pumpAndSettle();
 
-          expect(
-            all(),
-            isNot(contains(true)),
-            reason: 'the view is removed under the dialog instead',
-          );
+          expect(find.byType(UiKitView), findsOneWidget);
+          expect(sent[sent.keys.last]!.last, isFalse);
           await finish(tester);
         },
         skip: !PlatformVersion.shouldUseNativeGlass,
       );
+
+      for (final autoHide in <bool>[true, false]) {
+        testWidgets(
+          'autoHideOnModal: $autoHide, a sheet away from it: stays mounted, '
+          'contained only while the sheet moves (#149)',
+          (tester) async {
+            mockNative(tester);
+            await pumpHost(
+              tester,
+              entry.value(autoHide),
+              alignment: Alignment.topCenter,
+            );
+            final name = sent.keys.single;
+            clear();
+
+            openBottomSheet();
+            await tester.pump();
+            expect(sent[name], <bool>[true], reason: 'as the sheet slides in');
+            await tester.pumpAndSettle();
+            expect(sent[name], <bool>[
+              true,
+              false,
+            ], reason: 'full glass while the sheet is up elsewhere');
+            expect(
+              find.byType(UiKitView),
+              findsOneWidget,
+              reason: 'not removed',
+            );
+
+            navigator.currentState!.pop();
+            await tester.pump();
+            expect(sent[name], <bool>[true, false, true], reason: 'leaving');
+            await tester.pumpAndSettle();
+            expect(sent[name], <bool>[true, false, true, false]);
+            expect(sent.keys, <String>[name], reason: 'the same view');
+            await finish(tester);
+          },
+          skip: !PlatformVersion.shouldUseNativeGlass,
+        );
+      }
 
       testWidgets('a page pushed over it turns containment on only while it '
           'animates (#29)', (tester) async {

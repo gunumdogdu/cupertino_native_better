@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
@@ -18,6 +19,7 @@ import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/optional_method_call.dart';
 import '../utils/layout_direction.dart';
+import '../utils/modal_geometry.dart';
 import 'icon.dart';
 import 'popup_menu_button.dart';
 import 'tab_badge.dart';
@@ -2130,10 +2132,8 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   /// get destroyed, instead of every CN-widget on the host page).
   ///
   /// Published by the probe widget injected by `CNBottomSheet.show` (or
-  /// `CNBottomSheet.showCupertino`). Sheets opened via raw
-  /// `showModalBottomSheet`/`showCupertinoSheet` leave this null and the
-  /// mixin falls back to the safe "destroy everything" behavior — still
-  /// bleed-free, just not position-aware.
+  /// `CNBottomSheet.showCupertino`), or a `CNSheetGeometryProbe`. Without
+  /// one, [routeModalRect] (measured from the modal route) is used.
   static final ValueNotifier<Rect?> _topModalRect = ValueNotifier<Rect?>(null);
 
   /// Read-only listenable of the live top-modal sheet rect (see
@@ -2144,6 +2144,106 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   /// to clear (probe dispose).
   static void publishTopModalRect(Rect? rect) {
     _topModalRect.value = rect;
+  }
+
+  /// What the top modal route paints (its sheet, popup or dialog, without
+  /// the barrier), measured from its render tree after every frame while it
+  /// is up, for any API that opened it (#149). [Rect.zero] when it paints
+  /// nothing, null when no modal is up or its bounds can't be told.
+  /// [topModalRect], published by a sheet's own probe, takes precedence.
+  static final ValueNotifier<Rect?> _routeModalRect = ValueNotifier<Rect?>(
+    null,
+  );
+
+  /// Read-only listenable of the measured top modal rect (see
+  /// [_routeModalRect]).
+  static ValueListenable<Rect?> get routeModalRect => _routeModalRect;
+
+  /// The top modal's bounds: the published [topModalRect], else the
+  /// measured [routeModalRect]; null when unknown.
+  static Rect? get modalRect => _topModalRect.value ?? _routeModalRect.value;
+
+  /// True while a modal route animates: it is entering, leaving, or being
+  /// dragged. Glass widgets under it contain their halo then (#124), and
+  /// keep their full glass once it is at rest (#149).
+  static final ValueNotifier<bool> _modalAnimating = ValueNotifier<bool>(false);
+
+  /// Read-only listenable of [_modalAnimating].
+  static ValueListenable<bool> get modalAnimating => _modalAnimating;
+
+  /// The modal routes counted in [anyModalDepth], oldest first, until their
+  /// exit animation has finished.
+  static final List<Route<dynamic>> _trackedModals = <Route<dynamic>>[];
+  static final Map<Route<dynamic>, AnimationStatusListener> _statusListeners =
+      <Route<dynamic>, AnimationStatusListener>{};
+  static final Set<Route<dynamic>> _animatingModals = <Route<dynamic>>{};
+  static bool _measureArmed = false;
+
+  static bool _isMoving(AnimationStatus status) =>
+      status == AnimationStatus.forward || status == AnimationStatus.reverse;
+
+  static void _trackModal(Route<dynamic> route) {
+    if (_trackedModals.contains(route)) return;
+    final animation = route is TransitionRoute ? route.animation : null;
+    if (animation != null && animation.status == AnimationStatus.dismissed) {
+      return;
+    }
+    _trackedModals.add(route);
+    if (animation != null) {
+      void onStatus(AnimationStatus status) {
+        if (status == AnimationStatus.dismissed) {
+          _untrackModal(route);
+        } else {
+          _setModalAnimating(route, _isMoving(status));
+        }
+      }
+
+      animation.addStatusListener(onStatus);
+      _statusListeners[route] = onStatus;
+      _setModalAnimating(route, _isMoving(animation.status));
+    }
+    _armModalMeasure();
+  }
+
+  static void _untrackModal(Route<dynamic> route) {
+    if (!_trackedModals.remove(route)) return;
+    final listener = _statusListeners.remove(route);
+    if (listener != null && route is TransitionRoute) {
+      route.animation?.removeStatusListener(listener);
+    }
+    _setModalAnimating(route, false);
+    // The rect is cleared after the next frame, not here: the depth drops
+    // after this, and an unknown rect in between reads as "covered".
+    _armModalMeasure();
+  }
+
+  static void _setModalAnimating(Route<dynamic> route, bool moving) {
+    if (moving) {
+      _animatingModals.add(route);
+    } else {
+      _animatingModals.remove(route);
+    }
+    _modalAnimating.value = _animatingModals.isNotEmpty;
+  }
+
+  /// Measures the top modal after the next frame, and again after each
+  /// frame while one is up. Frames come only while something changes, so
+  /// a modal at rest costs nothing.
+  static void _armModalMeasure() {
+    if (_measureArmed) return;
+    _measureArmed = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _measureArmed = false;
+      if (_trackedModals.isEmpty) {
+        _routeModalRect.value = null;
+        return;
+      }
+      final top = _trackedModals.last;
+      _routeModalRect.value = top is ModalRoute
+          ? modalRouteContentRect(top)
+          : null;
+      _armModalMeasure();
+    });
   }
 
   /// Heuristic for "is this route a full-screen-ish sheet that should
@@ -2185,6 +2285,8 @@ class CNTabBarRouteObserver extends NavigatorObserver {
       _modalDepth.value = _modalDepth.value + 1;
     }
     if (_isAnyModal(route)) {
+      // Tracked first, so listeners of the depth see it animating.
+      _trackModal(route);
       _anyModalDepth.value = _anyModalDepth.value + 1;
     }
   }
@@ -2207,6 +2309,7 @@ class CNTabBarRouteObserver extends NavigatorObserver {
       if (deferAnyModal) {
         _decrementAnyModalWhenDismissed(route);
       } else {
+        _untrackModal(route);
         final next = _anyModalDepth.value - 1;
         _anyModalDepth.value = next < 0 ? 0 : next;
       }

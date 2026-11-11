@@ -334,9 +334,14 @@ class CupertinoSliderPlatformView: NSObject, FlutterPlatformView {
     let track = slider.trackRect(forBounds: bounds)
     var lo = track.minX
     var hi = track.maxX
+    // A thumbless slider still reports a thumb rect (37 pt wide on iOS 27),
+    // although it draws none: measuring between its centres pushed taps
+    // towards the ends of the track (#151).
+    var thumbless = false
+    if #available(iOS 26.0, *) { thumbless = slider.sliderStyle == .thumbless }
     let thumbAtMin = slider.thumbRect(forBounds: bounds, trackRect: track, value: minValue)
     let thumbAtMax = slider.thumbRect(forBounds: bounds, trackRect: track, value: maxValue)
-    if thumbAtMin.width > 1, thumbAtMax.midX - thumbAtMin.midX > 1 {
+    if !thumbless, thumbAtMin.width > 1, thumbAtMax.midX - thumbAtMin.midX > 1 {
       lo = thumbAtMin.midX
       hi = thumbAtMax.midX
     }

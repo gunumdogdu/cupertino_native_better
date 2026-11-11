@@ -17,16 +17,16 @@ import '../components/tab_bar.dart' show CNTabBarRouteObserver;
 /// **The fix.** Remove host-page PlatformViews while a sheet is up. To
 /// avoid pointlessly destroying widgets that are nowhere near the sheet
 /// (e.g. an `AppBar` button while a 30%-tall sheet is open), this mixin
-/// is **position-aware** when the sheet publishes its geometric rect via
-/// [CNTabBarRouteObserver.topModalRect].
+/// is **position-aware**: only a widget whose rect the sheet covers is
+/// removed ([CNTabBarRouteObserver.modalRect]).
 ///
-/// **How geometry is published.** Sheets opened with `CNBottomSheet.show`
-/// inject a small probe widget into the sheet builder; the probe writes
-/// the sheet's live global rect to `topModalRect` every frame (covers
-/// drag-to-dismiss correctly). For sheets opened with raw
-/// `showModalBottomSheet` / `showCupertinoSheet` (no probe), the rect
-/// stays `null` and the mixin falls back to "destroy everything" — the
-/// safe behavior that still kills the bleed.
+/// **Where the sheet is.** `CNTabBarRouteObserver` measures what the top
+/// modal route paints (its sheet, popup or dialog, not its barrier) after
+/// every frame, whichever API opened it (#149). Sheets opened with
+/// `CNBottomSheet`, or wrapped in `CNSheetGeometryProbe`, publish their
+/// rect themselves ([CNTabBarRouteObserver.topModalRect]), which takes
+/// precedence. When neither is known, the mixin falls back to "destroy
+/// everything", the safe behavior that still kills the bleed.
 ///
 /// **Mount-depth gate.** Widgets that are themselves rendered INSIDE a
 /// sheet (e.g. a `CNSwitch` in the sheet's body) must not self-destroy.
@@ -82,39 +82,51 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
     _modalUp = _computeShouldHide();
     CNTabBarRouteObserver.anyModalDepth.addListener(_onModalStateChanged);
     CNTabBarRouteObserver.topModalRect.addListener(_onModalStateChanged);
+    CNTabBarRouteObserver.routeModalRect.addListener(_onModalStateChanged);
   }
 
   @override
   void dispose() {
     CNTabBarRouteObserver.anyModalDepth.removeListener(_onModalStateChanged);
     CNTabBarRouteObserver.topModalRect.removeListener(_onModalStateChanged);
+    CNTabBarRouteObserver.routeModalRect.removeListener(_onModalStateChanged);
     super.dispose();
   }
 
   /// True iff a modal newer than this widget's host route is up AND either
-  /// the sheet's geometric rect isn't known (safe fallback: hide) OR this
-  /// widget's own rect intersects the sheet's published rect.
+  /// the sheet's rect isn't known (safe fallback: hide) OR this widget's own
+  /// rect intersects it.
   bool _computeShouldHide() {
     final depth = CNTabBarRouteObserver.anyModalDepth.value;
     if (depth <= _mountDepth) return false;
-    final sheetRect = CNTabBarRouteObserver.topModalRect.value;
+    final sheetRect = CNTabBarRouteObserver.modalRect;
     if (sheetRect == null) {
-      // No probe published — sheet geometry unknown. Fall back to the safe
-      // "destroy everything" behavior so the bleed bug stays fixed.
+      // Sheet geometry unknown. Fall back to the safe "destroy everything"
+      // behavior so the bleed bug stays fixed.
       return true;
     }
-    final ro = context.findRenderObject();
-    if (ro is! RenderBox || !ro.hasSize) {
-      // Can't measure (early frame, detached) — be safe, destroy.
-      return true;
-    }
-    final myRect = ro.localToGlobal(Offset.zero) & ro.size;
+    final myRect = _globalRect();
+    // Can't measure (early frame, detached): be safe, destroy.
+    if (myRect == null) return true;
     return myRect.overlaps(sheetRect);
+  }
+
+  /// This widget's global bounds, or null before it is laid out.
+  Rect? _globalRect() {
+    final ro = context.findRenderObject();
+    if (ro is! RenderBox || !ro.attached || !ro.hasSize) return null;
+    return MatrixUtils.transformRect(
+      ro.getTransformTo(null),
+      Offset.zero & ro.size,
+    );
   }
 
   void _onModalStateChanged() {
     if (!mounted) return;
-    // Schedule on post-frame so [_computeShouldHide] sees the latest layout.
+    // Schedule on post-frame so [_computeShouldHide] sees the latest layout,
+    // and make sure that frame comes: the last rect of an animation arrives
+    // after its last frame.
+    WidgetsBinding.instance.ensureVisualUpdate();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final newAbove = CNTabBarRouteObserver.anyModalDepth.value > _mountDepth;
@@ -189,19 +201,24 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
 ///
 ///  * while the host route animates, because a page is pushed over it or
 ///    popped off it (#29); and
-///  * while a modal route (a dialog, popup or sheet) is up over a widget
-///    that stays mounted under modals, i.e. with `autoHideOnModal: false`
-///    (#124). A modal doesn't move the host route's secondary animation, so
-///    the first rule never fires for it. With `autoHideOnModal: true` the
-///    widget needs no containment: [ModalHideMixin] removes its platform
-///    view while the modal is up.
+///  * while a modal route (a dialog, popup or sheet) over a widget that
+///    stays mounted animates: as it fades in or out, or is dragged (#124).
+///    A modal doesn't move the host route's secondary animation, so the
+///    first rule never fires for it; and
+///  * while the modal's sheet, popup or dialog is up within reach of the
+///    widget's glow, or its bounds aren't known, so the glow isn't drawn
+///    over it.
 ///
-/// The modal rule reads [CNTabBarRouteObserver.anyModalDepth], so like
-/// `autoHideOnModal` it needs a `CNTabBarRouteObserver` in the navigator's
-/// `navigatorObservers`. The observer lowers the depth only after the
-/// modal's exit animation has finished, so containment holds through the
-/// fade-out as well. The depth is listened to directly, not after a frame,
-/// so containment is on before the modal's first frame is drawn.
+/// Under a modal at rest whose sheet is elsewhere, the widget keeps its full
+/// glass, dimmed by the barrier like the rest of the page (#149). A widget
+/// that [ModalHideMixin] removed while the modal is up needs nothing.
+///
+/// The modal rules read [CNTabBarRouteObserver.anyModalDepth],
+/// [CNTabBarRouteObserver.modalAnimating] and
+/// [CNTabBarRouteObserver.modalRect], so like `autoHideOnModal` they need a
+/// `CNTabBarRouteObserver` in the navigator's `navigatorObservers`. They are
+/// listened to directly, not after a frame, so containment is on before the
+/// modal's first frame is drawn and stays on through its exit animation.
 ///
 /// **Usage.** Mix in after [ModalHideMixin] and call
 /// [resetHaloContainment] from `onPlatformViewCreated`, once
@@ -211,21 +228,32 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
   Animation<double>? _routeAnimation;
   bool? _sentContainment;
 
+  /// How far past its bounds the glass can draw its glow and shadow.
+  static const double _haloReach = 24;
+
   /// Whether containment should be on now.
   bool get isHaloContained {
     final status = _routeAnimation?.status;
-    final routeAnimating =
-        status == AnimationStatus.forward || status == AnimationStatus.reverse;
-    final modalAbove =
-        !autoHideOnModal &&
-        CNTabBarRouteObserver.anyModalDepth.value > _mountDepth;
-    return routeAnimating || modalAbove;
+    if (status == AnimationStatus.forward ||
+        status == AnimationStatus.reverse) {
+      return true;
+    }
+    final modalAbove = CNTabBarRouteObserver.anyModalDepth.value > _mountDepth;
+    if (!modalAbove || isHiddenForModal) return false;
+    if (CNTabBarRouteObserver.modalAnimating.value) return true;
+    final sheet = CNTabBarRouteObserver.modalRect;
+    final mine = _globalRect();
+    if (sheet == null || mine == null) return true;
+    return mine.inflate(_haloReach).overlaps(sheet);
   }
 
   @override
   void initState() {
     super.initState();
     CNTabBarRouteObserver.anyModalDepth.addListener(syncHaloContainment);
+    CNTabBarRouteObserver.modalAnimating.addListener(syncHaloContainment);
+    CNTabBarRouteObserver.topModalRect.addListener(syncHaloContainment);
+    CNTabBarRouteObserver.routeModalRect.addListener(syncHaloContainment);
   }
 
   @override
@@ -250,6 +278,9 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
   @override
   void dispose() {
     CNTabBarRouteObserver.anyModalDepth.removeListener(syncHaloContainment);
+    CNTabBarRouteObserver.modalAnimating.removeListener(syncHaloContainment);
+    CNTabBarRouteObserver.topModalRect.removeListener(syncHaloContainment);
+    CNTabBarRouteObserver.routeModalRect.removeListener(syncHaloContainment);
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
     _routeAnimation = null;
     super.dispose();

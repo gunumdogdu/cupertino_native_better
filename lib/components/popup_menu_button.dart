@@ -454,6 +454,38 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   int? _lastIconColor;
   double? _intrinsicWidth;
   CNButtonStyle? _lastStyle;
+
+  /// Whether the last layout sized the button to its label (shrink-wrapped
+  /// or in an unbounded row), so a new label changes its width.
+  bool _sizedToLabel = false;
+
+  /// The width the last layout gave a label-sized button.
+  double? _laidOutLabelWidth;
+
+  /// Widths measured natively, by everything that sets the size (see
+  /// [_sizeKey]), so a button built again with a label it had before (a row
+  /// rebuilt, a label set back) takes its width from the first frame (#147).
+  static final Map<String, double> _measuredWidths = <String, double>{};
+
+  /// The [_measuredWidths] key for [label] with the current options.
+  String _sizeKey(String? label) =>
+      '${_viewKeyString()}|${MediaQuery.maybeTextScalerOf(context)?.scale(17)}'
+      '|$label';
+
+  double? _measuredWidth(String? label) => _measuredWidths[_sizeKey(label)];
+
+  void _rememberWidth(String key, double width) {
+    _measuredWidths.remove(key);
+    _measuredWidths[key] = width;
+    if (_measuredWidths.length > 128) {
+      _measuredWidths.remove(_measuredWidths.keys.first);
+    }
+  }
+
+  /// The width a label-sized button takes: measured for this label, else the
+  /// last measured one, else 80 until the first measurement.
+  double get _labelWidth =>
+      _measuredWidth(widget.buttonLabel) ?? _intrinsicWidth ?? 80.0;
   Offset? _downPosition;
   bool _pressed = false;
 
@@ -532,7 +564,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   double? _liveWidth(BoxConstraints constraints) {
     if (widget.isIconButton) return widget.width ?? widget.height;
     final preferIntrinsic = widget.shrinkWrap || !constraints.hasBoundedWidth;
-    return preferIntrinsic ? (_intrinsicWidth ?? 80.0) : null;
+    return preferIntrinsic ? _labelWidth : null;
   }
 
   /// What shows while the native button is prepared: the size the live
@@ -567,8 +599,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
           // Fixed circle size for icon buttons (matches live build).
           width = widget.width ?? widget.height;
         } else if (preferIntrinsic) {
-          // Match the live build's intrinsic-width fallback (80.0).
-          width = _intrinsicWidth ?? 80.0;
+          // Match the live build's label width.
+          width = _labelWidth;
         } else if (hasBoundedWidth && constraints.maxWidth.isFinite) {
           // Live build passes null width so SizedBox fills the parent's
           // bounded width. Mirror that explicitly so the placeholder reserves
@@ -814,59 +846,41 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       if (widget.keepsSourceVisible) 'keepsSourceVisible': true,
     };
 
-    // Create a comprehensive key that includes all parameters affecting platform view creation
-    // The labels are left out: `setButtonTitle` and `setItems` change them
-    // in place. With them in the key, a new label created the native button
-    // again, so it vanished for a frame and its row jumped (#147). Icons
-    // stay in: `setItems` doesn't carry the menu's custom icons.
-    final buttonIconKey =
-        '${widget.round}_${widget.buttonIcon?.name}_${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}';
-    final itemsKey = walkPopupMenuEntries(widget.items)
-        .map((e) {
-          final v = popupMenuEntryVisual(e);
-          if (v != null) {
-            return '${v.icon?.name}_${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}';
-          }
-          return 'divider';
-        })
-        .join('|');
-    final viewKey = ValueKey(
-      'popupMenu_'
-      '$buttonIconKey|'
-      '$itemsKey|'
-      '${widget.buttonStyle.name}_'
-      '${widget.height}_'
-      '${widget.width}_'
-      '${widget.tint?.toARGB32()}_'
-      '${widget.buttonCustomIconColor?.toARGB32()}_'
-      '${widget.imagePlacement.name}_${widget.imagePadding}_'
-      '${widget.labelFontFamily}_${widget.labelFontSize}_'
-      '${widget.labelFontWeight?.value}_${widget.labelColor?.toARGB32()}_'
-      '${widget.keepsSourceVisible}_'
-      '$_isDark',
-    );
+    final viewKey = ValueKey(_viewKeyString());
 
-    final platformView = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            key: viewKey,
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-            },
-          )
-        : AppKitView(
-            key: viewKey,
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-            },
-          );
+    // A label-sized button that hasn't been measured with this label yet is
+    // created hidden, and shown once Flutter has laid out the measured
+    // width: created visible, its first frame was at the placeholder width,
+    // with the title wrapped (#147). The parameters only count when the
+    // view is created.
+    final measured = _measuredWidth(widget.buttonLabel) != null;
+    Widget platformView(bool sizedToLabel) {
+      final params = <String, dynamic>{
+        ...creationParams,
+        if (sizedToLabel && !measured) 'hiddenUntilSized': true,
+      };
+      return defaultTargetPlatform == TargetPlatform.iOS
+          ? UiKitView(
+              key: viewKey,
+              viewType: viewType,
+              creationParams: params,
+              creationParamsCodec: const StandardMessageCodec(),
+              onPlatformViewCreated: _onCreated,
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+              },
+            )
+          : AppKitView(
+              key: viewKey,
+              viewType: viewType,
+              creationParams: params,
+              creationParamsCodec: const StandardMessageCodec(),
+              onPlatformViewCreated: _onCreated,
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+              },
+            );
+    }
 
     return wrapWithModalInteractionGuard(
       LayoutBuilder(
@@ -879,8 +893,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
             // Fixed circle size for icon buttons
             width = widget.width ?? widget.height;
           } else if (preferIntrinsic) {
-            width = _intrinsicWidth ?? 80.0;
+            width = _labelWidth;
           }
+          _sizedToLabel = !widget.isIconButton && preferIntrinsic;
+          _laidOutLabelWidth = _sizedToLabel ? width : null;
           return Listener(
             onPointerDown: (e) {
               _downPosition = e.position;
@@ -907,13 +923,45 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
               child: SizedBox(
                 height: widget.height,
                 width: width,
-                child: platformView,
+                child: platformView(_sizedToLabel),
               ),
             ),
           );
         },
       ),
     );
+  }
+
+  /// The platform view's key: every parameter that needs a new native
+  /// button. The labels are left out: `setButtonTitle` and `setItems` change
+  /// them in place. With them in the key, a new label created the native
+  /// button again, so it vanished for a frame and its row jumped (#147).
+  /// Icons stay in: `setItems` doesn't carry the menu's custom icons.
+  String _viewKeyString() {
+    final buttonIconKey =
+        '${widget.round}_${widget.buttonIcon?.name}_${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}';
+    final itemsKey = walkPopupMenuEntries(widget.items)
+        .map((e) {
+          final v = popupMenuEntryVisual(e);
+          if (v != null) {
+            return '${v.icon?.name}_${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}';
+          }
+          return 'divider';
+        })
+        .join('|');
+    return 'popupMenu_'
+        '$buttonIconKey|'
+        '$itemsKey|'
+        '${widget.buttonStyle.name}_'
+        '${widget.height}_'
+        '${widget.width}_'
+        '${widget.tint?.toARGB32()}_'
+        '${widget.buttonCustomIconColor?.toARGB32()}_'
+        '${widget.imagePlacement.name}_${widget.imagePadding}_'
+        '${widget.labelFontFamily}_${widget.labelFontSize}_'
+        '${widget.labelFontWeight?.value}_${widget.labelColor?.toARGB32()}_'
+        '${widget.keepsSourceVisible}_'
+        '$_isDark';
   }
 
   void _onCreated(int id) {
@@ -929,9 +977,9 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     _lastIconSize = widget.buttonIcon?.size;
     _lastIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
     _lastStyle = widget.buttonStyle;
-    if (!widget.isIconButton) {
-      _requestIntrinsicSize();
-    }
+    if (widget.isIconButton) return;
+    final key = _sizeKey(widget.buttonLabel);
+    _requestIntrinsicSize(ch, key, reveal: true);
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {
@@ -950,16 +998,68 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     return null;
   }
 
-  Future<void> _requestIntrinsicSize() async {
-    final ch = _channel;
-    if (ch == null) return;
+  /// Measures the native button and lays out its width. With [reveal], also
+  /// shows a button created hidden, in the frame that gives it that width.
+  Future<void> _requestIntrinsicSize(
+    MethodChannel ch,
+    String key, {
+    bool reveal = false,
+  }) async {
+    double? w;
     try {
       final size = await ch.invokeMethod<Map>('getIntrinsicSize');
-      final w = (size?['width'] as num?)?.toDouble();
-      if (w != null && mounted) {
-        setState(() => _intrinsicWidth = w);
-      }
+      w = (size?['width'] as num?)?.toDouble();
     } catch (_) {}
+    if (!mounted || !identical(ch, _channel)) return;
+    if (w != null) _rememberWidth(key, w);
+    final resize =
+        w != null &&
+        _sizedToLabel &&
+        (w - (_laidOutLabelWidth ?? w)).abs() > 0.5;
+    if (reveal) {
+      ch
+          .invokeMethod<void>('reveal', {if (resize) 'atWidth': w})
+          .catchError((Object _) {});
+    }
+    if (w != null && w != _intrinsicWidth) {
+      setState(() => _intrinsicWidth = w);
+    }
+  }
+
+  /// Sets a new label. A label-sized button is measured with it first, and
+  /// the native side sets it in the layout pass that applies the new width,
+  /// so the title is never drawn at the old width, wrapped (#147).
+  Future<void> _setTitle(MethodChannel ch, String title) async {
+    if (!_sizedToLabel) {
+      await ch.invokeMethod('setButtonTitle', {'title': title});
+      return;
+    }
+    final key = _sizeKey(title);
+    var w = _measuredWidths[key];
+    if (w == null) {
+      try {
+        final size = await ch.invokeMethod<Map>('measureTitle', {
+          'title': title,
+        });
+        w = (size?['width'] as num?)?.toDouble();
+      } on MissingPluginException {
+        w = null;
+      }
+      if (!mounted || !identical(ch, _channel)) return;
+    }
+    if (w == null) {
+      await ch.invokeMethod('setButtonTitle', {'title': title});
+      if (mounted) _requestIntrinsicSize(ch, key);
+      return;
+    }
+    _rememberWidth(key, w);
+    final resize = (w - (_laidOutLabelWidth ?? w)).abs() > 0.5;
+    final applied = ch.invokeMethod('setButtonTitle', {
+      'title': title,
+      if (resize) 'atWidth': w,
+    });
+    if (w != _intrinsicWidth) setState(() => _intrinsicWidth = w);
+    await applied;
   }
 
   Future<void> _syncPropsToNativeIfNeeded() async {
@@ -989,9 +1089,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       _lastStyle = widget.buttonStyle;
     }
     if (_lastTitle != widget.buttonLabel && widget.buttonLabel != null) {
-      await ch.invokeMethod('setButtonTitle', {'title': widget.buttonLabel});
       _lastTitle = widget.buttonLabel;
-      _requestIntrinsicSize();
+      await _setTitle(ch, widget.buttonLabel!);
     }
 
     if (widget._hasButtonImage) {

@@ -3,7 +3,7 @@ import UIKit
 
 class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private let channel: FlutterMethodChannel
-  private let container: UIView
+  private let container: CNLayoutReportingView
   private let button: CNPopupMenuUIButton
   private var currentButtonStyle: String = "automatic"
   private var isRoundButton: Bool = false
@@ -60,10 +60,14 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var labelFontSize: CGFloat? = nil
   private var labelFontWeight: Int? = nil
   private var labelColor: UIColor? = nil
+  /// Changes held until the view has a given width: a new title with the
+  /// width it needs, or the first appearance at the measured width (#147).
+  private var widthActions: [(id: Int, width: CGFloat, run: () -> Void)] = []
+  private var nextWidthActionId = 0
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativePopupMenuButton_\(viewId)", binaryMessenger: messenger)
-    self.container = UIView(frame: frame)
+    self.container = CNLayoutReportingView(frame: frame)
     self.button = CNPopupMenuUIButton(type: .system)
 
     var title: String? = nil
@@ -87,8 +91,10 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     var buttonIconMode: String? = nil
     var buttonIconPalette: [NSNumber] = []
     var buttonCustomIconBytes: Data? = nil
+    var hiddenUntilSized = false
 
     if let dict = args as? [String: Any] {
+      hiddenUntilSized = (dict["hiddenUntilSized"] as? NSNumber)?.boolValue ?? false
       if let t = dict["buttonTitle"] as? String { title = t }
       switch dict["imagePlacement"] as? String {
       case "trailing": self.imagePlacement = .trailing
@@ -161,6 +167,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     button.onMenuDidHide = { [weak self] in self?.channel.invokeMethod("menuClosed", arguments: nil) }
 
     container.backgroundColor = .clear
+    container.onLayout = { [weak self] in self?.runDueWidthActions() }
+    // Not measured yet: shown by `reveal` once Flutter has given the view
+    // the measured width, so the first frame isn't at a placeholder width
+    // with the title wrapped (#147).
+    if hiddenUntilSized { button.alpha = 0 }
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     button.translatesAutoresizingMaskIntoConstraints = false
@@ -270,6 +281,18 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         let unlimited = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         let size = self.button.sizeThatFits(unlimited)
         result(["width": Double(ceil(size.width)), "height": Double(ceil(size.height))])
+      case "measureTitle":
+        // The size the button would take with this title, without showing
+        // it, so Flutter can lay out the new width first (#147).
+        let t = (call.arguments as? [String: Any])?["title"] as? String
+        let size = self.measuredSize(title: t)
+        result(["width": Double(ceil(size.width)), "height": Double(ceil(size.height))])
+      case "reveal":
+        let width = ((call.arguments as? [String: Any])?["atWidth"] as? NSNumber).map { CGFloat(truncating: $0) }
+        self.whenWidth(width) { [weak self] in
+          self?.button.alpha = 1
+          result(nil)
+        }
       case "setItems":
         if let args = call.arguments as? [String: Any] {
           self.labels = (args["labels"] as? [String]) ?? []
@@ -342,9 +365,17 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
       case "setButtonTitle":
         if let args = call.arguments as? [String: Any], let t = args["title"] as? String {
-          self.currentTitle = t
-          self.setButtonContent(title: t, image: self.makeButtonIconImage(), iconOnly: false)
-          result(nil)
+          // With `atWidth`, in the layout pass that gives the view that
+          // width: set before it, the title was drawn for a frame at the
+          // old width and wrapped (#147).
+          let width = (args["atWidth"] as? NSNumber).map { CGFloat(truncating: $0) }
+          self.whenWidth(width) { [weak self] in
+            guard let self = self else { result(nil); return }
+            self.currentTitle = t
+            self.setButtonContent(title: t, image: self.makeButtonIconImage(), iconOnly: false)
+            self.button.layoutIfNeeded()
+            result(nil)
+          }
         } else { result(FlutterError(code: "bad_args", message: "Missing title", details: nil)) }
       case "setPressed":
         if let args = call.arguments as? [String: Any], let p = args["pressed"] as? NSNumber {
@@ -366,6 +397,51 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   }
 
   func view() -> UIView { container }
+
+  /// The button's size with `title`, measured on a copy of its
+  /// configuration.
+  private func measuredSize(title: String?) -> CGSize {
+    let unlimited = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+    guard #available(iOS 15.0, *), var cfg = button.configuration else {
+      return button.sizeThatFits(unlimited)
+    }
+    cfg.title = title
+    let probe = UIButton(configuration: cfg)
+    probe.tintColor = button.tintColor
+    return probe.sizeThatFits(unlimited)
+  }
+
+  /// Runs `action` once the view is `width` wide: now if it is (or `width`
+  /// is nil), otherwise in the layout pass that resizes it, so the change
+  /// and the new width reach the screen in the same frame. Runs anyway
+  /// after 0.3 s, in case that width never comes.
+  private func whenWidth(_ width: CGFloat?, _ action: @escaping () -> Void) {
+    guard let width = width, abs(container.bounds.width - width) > 0.5 else {
+      action()
+      return
+    }
+    nextWidthActionId += 1
+    let id = nextWidthActionId
+    widthActions.append((id: id, width: width, run: action))
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+      guard let self = self, let index = self.widthActions.firstIndex(where: { $0.id == id }) else { return }
+      self.runWidthActions(through: index)
+    }
+  }
+
+  /// Runs the held actions up to the newest one the current width is due
+  /// for, in order (an older title is set before a newer one replaces it).
+  private func runDueWidthActions() {
+    let width = container.bounds.width
+    guard let index = widthActions.lastIndex(where: { abs($0.width - width) <= 0.5 }) else { return }
+    runWidthActions(through: index)
+  }
+
+  private func runWidthActions(through index: Int) {
+    let due = widthActions[0...index]
+    widthActions.removeFirst(index + 1)
+    for entry in due { entry.run() }
+  }
 
   private func _cnSetInteractiveRecursive(_ view: UIView?, _ interactive: Bool) {
     guard let view = view else { return }
@@ -840,5 +916,16 @@ final class CNPopupMenuUIButton: UIButton {
       self?.onMenuDidHide?()
     }
     if let animator { animator.addCompletion(done) } else { done() }
+  }
+}
+
+/// The popup menu button's container: reports each layout pass, so a change
+/// held for a new width lands in the pass that applies the width (#147).
+final class CNLayoutReportingView: UIView {
+  var onLayout: (() -> Void)?
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    onLayout?()
   }
 }

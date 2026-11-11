@@ -1,3 +1,28 @@
+## 2.5.2
+
+> Three fixes: glass widgets under bottom sheets (#149), the `CNPopupMenuButton` label frame left over from 2.5.1 (#147), and tap to seek on a thumbless `CNSlider` (#151).
+
+### Fixed — glass widgets under bottom sheets, whichever API opened them (#149)
+
+Only sheets opened through `CNBottomSheet` told the CN-widgets where they were, so with `showModalBottomSheet`, `showCupertinoModalPopup` or a sheet package every glass widget on the page disappeared while the sheet was up, wherever it was, and one with `autoHideOnModal: false` was clipped flat for as long as the sheet was up. `CNTabBarRouteObserver` now measures where the sheet, popup or dialog of any modal route is, after every frame while it is up. A widget the sheet covers is removed as before. One it doesn't cover stays up with its full Liquid Glass, dimmed by the barrier like the rest of the page. Its glow is clipped only while the modal fades in or out or is dragged (#124), or while the sheet is within reach of it. `CNSheetGeometryProbe` is now only needed for a sheet that isn't a route.
+
+### Fixed — `CNPopupMenuButton` label drawn at the wrong width for a frame (#147)
+
+Since 2.5.1 a new label changes in place, but it reached the screen one frame before the new width, so a longer label wrapped onto two lines for that frame. A new button also showed one frame at the 80 pt placeholder width ("New / est"). The new label is now measured first and set in the same layout pass that applies its width. A button that hasn't been measured yet stays hidden until it has its measured width. Measured widths are remembered, so a button built again with a label it had before (a row rebuilt while a list reloads) takes its width from its first frame. The same applies on macOS.
+
+### Fixed — tap to seek on a thumbless `CNSlider` (#151)
+
+`seekOnTap` mapped a tap between the thumb's centres at the minimum and the maximum, and a thumbless slider still reports a thumb about 37 pt wide although it draws none, so taps landed too far towards the ends (75% of an 88 pt slider gave 0.93). A thumbless slider now maps taps across its track.
+
+Thanks to @Ashhad08 and @cogwheel0 for the reports and their precise traces.
+
+### Checked
+- **iPhone 17 Pro Max simulator, iOS 26.2:** the results header from #147 recorded through four label changes and three rebuilds of the row (no frame with a wrapped label or a placeholder width; a rebuilt row keeps its place); glass close buttons under `showModalBottomSheet`, `showCupertinoModalPopup` and `CNBottomSheet.showModalPopup` (both stay up with their shadow; before, one disappeared and the other was flat).
+- **iPhone Duo simulator, iOS 27.1:** the same sheets recorded frame by frame, with and without the old clipping: no box around unclipped glass under the barrier as a sheet fades in, rests or leaves, and none around the #124 dialogs.
+- **iPhone 17 simulator, iOS 27.0:** tap mapping of thumbless sliders of 88 and 240 pt (25%, 50% and 75% map to 0.25, 0.50 and 0.75; a slider with a thumb is unchanged).
+- **macOS:** the #147 header through the same label changes and rebuilds.
+- **Tests:** 4 new tests and 14 more containment cases; 600 tests pass.
+
 ## 2.5.1
 
 > Two fixes: `CNTabRail` under a pushed page (#146), and `CNPopupMenuButton` label changes (#147). New: `CNTabRail.autoHideOnPageTransition` and `autoHideOnModal`, on by default.

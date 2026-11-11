@@ -13,6 +13,10 @@ class CupertinoPopupMenuButtonNSView: NSView {
   private var rootLevel: [String: Any] = [:]
   private var icon = IconSource()
   private var isInteractive = true
+  /// Changes held until the view has a given width: a new title with the
+  /// width it needs, or the first appearance at the measured width (#147).
+  private var widthActions: [(id: Int, width: CGFloat, run: () -> Void)] = []
+  private var nextWidthActionId = 0
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativePopupMenuButton_\(viewId)", binaryMessenger: messenger)
@@ -52,6 +56,9 @@ class CupertinoPopupMenuButtonNSView: NSView {
       $0.labelColor = (dict["labelColor"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
     }
     rebuildMenu()
+    // Not measured yet: shown by `reveal` once Flutter has given the view
+    // the measured width (#147).
+    if (dict["hiddenUntilSized"] as? NSNumber)?.boolValue == true { host.alphaValue = 0 }
 
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
@@ -60,6 +67,11 @@ class CupertinoPopupMenuButtonNSView: NSView {
   }
 
   required init?(coder: NSCoder) { return nil }
+
+  override func setFrameSize(_ newSize: NSSize) {
+    super.setFrameSize(newSize)
+    runDueWidthActions()
+  }
 
   override func hitTest(_ point: NSPoint) -> NSView? {
     guard isInteractive else { return nil }
@@ -72,6 +84,20 @@ class CupertinoPopupMenuButtonNSView: NSView {
     case "getIntrinsicSize":
       let s = host.preferredSize()
       result(["width": Double(s.width), "height": Double(s.height)])
+    case "measureTitle":
+      // The size the button would take with this title, without showing
+      // it, so Flutter can lay out the new width first (#147).
+      let current = host.title
+      host.title = args?["title"] as? String
+      let s = host.preferredSize()
+      host.title = current
+      result(["width": Double(s.width), "height": Double(s.height)])
+    case "reveal":
+      let width = (args?["atWidth"] as? NSNumber).map { CGFloat(truncating: $0) }
+      whenWidth(width) { [weak self] in
+        self?.host.alphaValue = 1
+        result(nil)
+      }
     case "setItems":
       guard let args = args else {
         result(FlutterError(code: "bad_args", message: "Missing items", details: nil)); return
@@ -112,8 +138,13 @@ class CupertinoPopupMenuButtonNSView: NSView {
       guard let t = args?["title"] as? String else {
         result(FlutterError(code: "bad_args", message: "Missing title", details: nil)); return
       }
-      host.title = t
-      result(nil)
+      // With `atWidth`, once the view has that width, so the title isn't
+      // drawn for a frame at the old width (#147).
+      let width = (args?["atWidth"] as? NSNumber).map { CGFloat(truncating: $0) }
+      whenWidth(width) { [weak self] in
+        self?.host.title = t
+        result(nil)
+      }
     case "setSemanticLabel":
       let label = args?["label"] as? String
       host.accessibilityText = (label?.isEmpty ?? true) ? nil : label
@@ -130,6 +161,37 @@ class CupertinoPopupMenuButtonNSView: NSView {
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+
+  /// Runs `action` once the view is `width` wide: now if it is (or `width`
+  /// is nil), otherwise when Flutter resizes it. Runs anyway after 0.3 s,
+  /// in case that width never comes.
+  private func whenWidth(_ width: CGFloat?, _ action: @escaping () -> Void) {
+    guard let width = width, abs(bounds.width - width) > 0.5 else {
+      action()
+      return
+    }
+    nextWidthActionId += 1
+    let id = nextWidthActionId
+    widthActions.append((id: id, width: width, run: action))
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+      guard let self = self, let index = self.widthActions.firstIndex(where: { $0.id == id }) else { return }
+      self.runWidthActions(through: index)
+    }
+  }
+
+  /// Runs the held actions up to the newest one the current width is due
+  /// for, in order.
+  private func runDueWidthActions() {
+    let width = bounds.width
+    guard let index = widthActions.lastIndex(where: { abs($0.width - width) <= 0.5 }) else { return }
+    runWidthActions(through: index)
+  }
+
+  private func runWidthActions(through index: Int) {
+    let due = widthActions[0...index]
+    widthActions.removeFirst(index + 1)
+    for entry in due { entry.run() }
   }
 
   @objc private func onButtonPressed(_ sender: NSButton) {
