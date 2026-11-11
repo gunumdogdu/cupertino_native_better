@@ -71,6 +71,8 @@ import 'demos/issue143_segmented_font_labels_test.dart';
 import 'demos/issue144_alert_font_rtl_test.dart';
 import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
+import 'demos/issue149_glass_button_under_sheet_test.dart';
+import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/pr64_liquid_glass_safe_area_test.dart';
 import 'demos/pr66_glass_image_asset_tint_test.dart';
 import 'demos/pr67_icon_supersample_test.dart';
@@ -1340,6 +1342,39 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue147PopupLabelChangeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#149: Glass button under a sheet'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('xmark.circle', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue149GlassButtonUnderSheetTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#151: Thumbless slider seek'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'slider.horizontal.below.rectangle',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue151ThumblessSliderSeekTestPage(),
                       ),
                     );
                   },

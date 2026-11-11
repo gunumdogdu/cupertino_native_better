@@ -46,7 +46,10 @@ import 'package:flutter/scheduler.dart' show timeDilation;
 /// *Dialog* picks the route: Material `showDialog` (the reporter's case) or
 /// `showCupertinoDialog`. Both are `PopupRoute`s, so both should reproduce.
 class Issue124ButtonDialogHaloTestPage extends StatefulWidget {
-  const Issue124ButtonDialogHaloTestPage({super.key});
+  const Issue124ButtonDialogHaloTestPage({super.key, this.autoCycle = false});
+
+  /// Opens and closes each dialog kind, printing `CNB_SHOT <step>`.
+  final bool autoCycle;
 
   @override
   State<Issue124ButtonDialogHaloTestPage> createState() =>
@@ -59,6 +62,27 @@ class _Issue124ButtonDialogHaloTestPageState
     extends State<Issue124ButtonDialogHaloTestPage> {
   bool _slow = false;
   _DialogKind _kind = _DialogKind.material;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoCycle) _run();
+  }
+
+  Future<void> _run() async {
+    await Future<void>.delayed(const Duration(seconds: 4));
+    for (final kind in _DialogKind.values) {
+      if (!mounted) return;
+      setState(() => _kind = kind);
+      _openDialog();
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      debugPrint('CNB_SHOT 124-${kind.name}-up');
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+    }
+    debugPrint('CNB_SHOT 124-done');
+  }
 
   @override
   void dispose() {

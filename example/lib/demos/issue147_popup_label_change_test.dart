@@ -26,6 +26,19 @@ import 'package:flutter/cupertino.dart';
 ///    gone for a frame) and back, through intermediate widths.
 ///  * **Fixed:** "Save" moves once per change, by the width difference
 ///    between the old and the new label.
+///
+/// ### Follow-up (2.5.1)
+///
+/// The reporter then found one frame per change where the new label is
+/// laid out at the old width, so "Price (high)" wraps onto two lines, and
+/// on a fresh mount one frame at the 80 pt fallback width ("New / est").
+/// "Remount" swaps the row for a placeholder and back (AUTO does it three
+/// times after the label changes, printing `CNB_SHOT 147-remount<n>`).
+/// Record the screen and step through the frames around each change:
+///
+///  * **Bug:** one frame with the label on two lines, at a change and at a
+///    remount.
+///  * **Fixed:** the label is on one line in every frame.
 class Issue147PopupLabelChangeTestPage extends StatefulWidget {
   const Issue147PopupLabelChangeTestPage({super.key, this.autoCycle = false});
 
@@ -38,12 +51,20 @@ class Issue147PopupLabelChangeTestPage extends StatefulWidget {
       _Issue147PopupLabelChangeTestPageState();
 }
 
-const _sorts = ['Newest', 'Oldest', 'Price (high)', 'Price (low)', 'Name'];
+const _sorts = [
+  'Newest',
+  'Oldest',
+  'Price (high)',
+  'Price (low)',
+  'Name',
+  'Recently viewed',
+];
 
 class _Issue147PopupLabelChangeTestPageState
     extends State<Issue147PopupLabelChangeTestPage> {
   final GlobalKey _saveKey = GlobalKey();
   int _selected = 0;
+  bool _rowShown = true;
   double? _saveX;
   final List<String> _positions = <String>[];
 
@@ -74,11 +95,26 @@ class _Issue147PopupLabelChangeTestPageState
     await Future<void>.delayed(const Duration(seconds: 4));
     for (var i = 1; i <= 4; i++) {
       if (!mounted) return;
-      setState(() => _selected = i % _sorts.length);
+      setState(() => _selected = i % 5);
       await Future<void>.delayed(const Duration(milliseconds: 1500));
     }
     debugPrint('CNB_147 save x positions: ${_positions.join(' ')}');
     debugPrint('CNB_SHOT 147-done');
+    for (var i = 1; i <= 3; i++) {
+      if (!mounted) return;
+      setState(() => _rowShown = false);
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      setState(() {
+        _rowShown = true;
+        // The last remount comes back with a label not measured before.
+        if (i == 3) _selected = 5;
+      });
+      debugPrint('CNB_SHOT 147-remount$i');
+      await Future<void>.delayed(const Duration(milliseconds: 1400));
+    }
+    debugPrint('CNB_147 save x positions: ${_positions.join(' ')}');
+    debugPrint('CNB_SHOT 147-remount-done');
   }
 
   @override
@@ -91,49 +127,67 @@ class _Issue147PopupLabelChangeTestPageState
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
+            if (!_rowShown)
+              const SizedBox(
+                height: 56,
+                child: Center(child: CupertinoActivityIndicator()),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '1,234 results',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    Text(
+                      'Save',
+                      key: _saveKey,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: CupertinoColors.systemIndigo,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    CNPopupMenuButton(
+                      buttonLabel: _sorts[_selected],
+                      buttonCustomIcon: CupertinoIcons.arrow_up_arrow_down,
+                      buttonCustomIconColor: CupertinoColors.systemIndigo,
+                      imagePadding: 4,
+                      labelFontSize: 16,
+                      labelFontWeight: FontWeight.w700,
+                      labelColor: CupertinoColors.systemIndigo,
+                      height: 24,
+                      shrinkWrap: true,
+                      buttonStyle: CNButtonStyle.plain,
+                      keepsSourceVisible: true,
+                      autoHideOnModal: false,
+                      items: [
+                        for (var i = 0; i < _sorts.length; i++)
+                          CNPopupMenuItem(
+                            label: _sorts[i],
+                            checked: i == _selected,
+                          ),
+                      ],
+                      onSelected: (i) => setState(() => _selected = i),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      '1,234 results',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  Text(
-                    'Save',
-                    key: _saveKey,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: CupertinoColors.systemIndigo,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  CNPopupMenuButton(
-                    buttonLabel: _sorts[_selected],
-                    buttonCustomIcon: CupertinoIcons.arrow_up_arrow_down,
-                    buttonCustomIconColor: CupertinoColors.systemIndigo,
-                    imagePadding: 4,
-                    labelFontSize: 16,
-                    labelFontWeight: FontWeight.w700,
-                    labelColor: CupertinoColors.systemIndigo,
-                    height: 24,
-                    shrinkWrap: true,
-                    buttonStyle: CNButtonStyle.plain,
-                    keepsSourceVisible: true,
-                    autoHideOnModal: false,
-                    items: [
-                      for (var i = 0; i < _sorts.length; i++)
-                        CNPopupMenuItem(
-                          label: _sorts[i],
-                          checked: i == _selected,
-                        ),
-                    ],
-                    onSelected: (i) => setState(() => _selected = i),
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: () async {
+                  setState(() => _rowShown = false);
+                  await Future<void>.delayed(const Duration(milliseconds: 600));
+                  if (mounted) setState(() => _rowShown = true);
+                },
+                child: const Text('Remount the row'),
               ),
             ),
             Padding(
