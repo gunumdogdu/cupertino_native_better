@@ -1,3 +1,35 @@
+## 2.6.0
+
+> `CNButton` labels that change often (#154) and label colours for light and dark glass (#153). New: `CNButtonConfig.animateSizeChanges`, `labelColorLight` and `labelColorDark` (also on `CNPopupMenuButton`). Fixed: vertical padding, and a tint or style change that dropped the label's font and padding.
+
+### Fixed — a new label drawn for a frame at the old width (#154)
+
+With `shrinkWrap: true`, a new label was shown at once inside the old width, so a wider one was truncated for a frame ("8/…"), and the width followed a frame later. A new button also started at an 80 pt placeholder. The new label is now measured first and set in the layout pass that gives the button its width, as `CNPopupMenuButton` does since 2.5.2. A button that hasn't been measured yet stays hidden until it has its size, and measured sizes are remembered, so a button built again with a label it had before starts at its size. The same applies on macOS. `CNPopupMenuButton` now also holds a new label for a width change of less than half a point, which could still wrap it for a frame.
+
+### New — `animateSizeChanges` (#154)
+
+`CNButtonConfig(animateSizeChanges: true)` eases the button to its new size instead of jumping (`sizeAnimationDuration`, 200 ms by default, and `sizeAnimationCurve`, `Curves.easeOut`). The new label shows at once and stays whole while the glass grows around it. On macOS, a wider label waits until the button is wide enough for it.
+
+### Fixed — vertical padding (#154)
+
+Only the horizontal values of `CNButtonConfig.padding` reached the UIKit button. The top and bottom values now apply to a button with a label, and its height grows to fit the label and that padding (at least `minHeight`, or 44). A side left at 0 keeps the style's inset, as before. On macOS the padded height is used as well, and a horizontal padding smaller than the bezel's own inset no longer truncates the label.
+
+### New — label colours for light and dark glass (#153)
+
+`labelColor` is one colour on light and on dark glass. `labelColorLight` and `labelColorDark` set one colour each, and the label switches with the glass, as the default label does when Liquid Glass takes a light or dark appearance from what is behind it. A side without its own colour keeps `labelColor`, else the style's. `CNButton` and `CNPopupMenuButton` both take the pair. On macOS the glass keeps the window's appearance, so the pair follows light and dark mode.
+
+### Fixed — a tint or style change dropped the label style
+
+Changing `CNButton.tint` or its style rebuilt the button's configuration without the label's font, line break and image placement, or its padding: a 14 pt label went back to 17 pt and could wrap onto two lines. They are now kept.
+
+Thanks to @Ashhad08 for both reports and their frame-by-frame traces.
+
+### Checked
+- **iPhone 17 Pro Max simulator, iOS 26.2:** a shrink-wrapped counter recorded through two cycles of labels and three rebuilds, with and without `animateSizeChanges` (no frame with a truncated label or at the old width; the animated one eases); vertical padding 4 and 20; a tint change keeps a 14 pt label; badges with `labelColorLight` / `labelColorDark` and a popup menu button on dark, light and switching backgrounds (the light side is the exact colour set, the dark side too, switching with the glass); the #147 header unchanged.
+- **iPhone 17 simulator, iOS 27.0:** the same counter recordings and screens.
+- **macOS:** vertical padding, the tint change and the label colours.
+- **Tests:** 8 new tests; 608 tests pass.
+
 ## 2.5.2
 
 > Three fixes: glass widgets under bottom sheets (#149), the `CNPopupMenuButton` label frame left over from 2.5.1 (#147), and tap to seek on a thumbless `CNSlider` (#151).

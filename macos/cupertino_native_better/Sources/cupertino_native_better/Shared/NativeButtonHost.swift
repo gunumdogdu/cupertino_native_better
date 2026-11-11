@@ -47,10 +47,18 @@ final class NativeButtonHost: NSView {
   /// Horizontal padding around the content, from `CNButtonConfig.padding`.
   var paddingLeft: CGFloat?
   var paddingRight: CGFloat?
+  /// Vertical padding around a title, from `CNButtonConfig.padding`: the
+  /// preferred height grows to fit the title and it (#154).
+  var paddingTop: CGFloat?
+  var paddingBottom: CGFloat?
 
   // MARK: Label style (CNButtonConfig.label*)
 
   var labelColor: NSColor? { didSet { needsContentUpdate() } }
+  /// The title colour in a light and in a dark appearance (#153); either one
+  /// takes the place of `labelColor` in that appearance.
+  var labelColorLight: NSColor? { didSet { needsContentUpdate() } }
+  var labelColorDark: NSColor? { didSet { needsContentUpdate() } }
   var labelFontSize: CGFloat? { didSet { needsContentUpdate() } }
   var labelFontFamily: String? { didSet { needsContentUpdate() } }
   /// Flutter's `FontWeight.value` (100–900).
@@ -331,8 +339,26 @@ final class NativeButtonHost: NSView {
     let text = iconOnly ? "" : (title ?? "")
     let font = labelFont
     let color = labelColor ?? styleForeground
-    if !text.isEmpty, font != nil || color != nil || (imagePadding ?? 0) > 0 {
-      let color = color ?? bezelForeground
+    let sided = labelColorLight != nil || labelColorDark != nil
+    if !text.isEmpty, font != nil || color != nil || sided || (imagePadding ?? 0) > 0 {
+      var color = color ?? bezelForeground
+      if sided {
+        // A dynamic colour, so each side follows the appearance the button
+        // draws in. A side without its own colour keeps `labelColor`, else
+        // the style's.
+        let light = labelColorLight
+        let dark = labelColorDark
+        let fallback = color ?? .labelColor
+        color = NSColor(name: nil) { appearance in
+          let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+          if let side = isDark ? dark : light { return side }
+          var resolved = fallback
+          appearance.performAsCurrentDrawingAppearance {
+            resolved = NSColor(cgColor: fallback.cgColor) ?? fallback
+          }
+          return resolved
+        }
+      }
       var attributes: [NSAttributedString.Key: Any] = [:]
       attributes[.font] = font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize(for: button.controlSize))
       if let color = color {
@@ -418,8 +444,24 @@ final class NativeButtonHost: NSView {
           content += img.size.width + 4
         }
       }
-      width = max(content + (paddingLeft ?? 0) + (paddingRight ?? 0), height)
+      // Never narrower than the bezel needs for its title: below its own
+      // inset, a small padding truncated the title.
+      width = max(content + (paddingLeft ?? 0) + (paddingRight ?? 0), height, natural.width)
     }
-    return CGSize(width: ceil(width), height: natural.height)
+    var preferredHeight = natural.height
+    if paddingTop != nil || paddingBottom != nil {
+      var content: CGFloat = 0
+      let title = button.attributedTitle
+      if title.length > 0 { content = ceil(title.size().height) }
+      if let img = button.image, button.imagePosition != .noImage {
+        if button.imagePosition == .imageAbove || button.imagePosition == .imageBelow {
+          content += img.size.height + 4
+        } else {
+          content = max(content, img.size.height)
+        }
+      }
+      preferredHeight = max(natural.height, content + (paddingTop ?? 0) + (paddingBottom ?? 0))
+    }
+    return CGSize(width: ceil(width), height: ceil(preferredHeight))
   }
 }

@@ -4,7 +4,7 @@ import SwiftUI
 
 class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   private let channel: FlutterMethodChannel
-  private let container: UIView
+  private let container: CNLayoutReportingView
   private var button: UIButton?
   private var hostingController: UIHostingController<AnyView>?
   private var badgeView: UIView?
@@ -25,11 +25,32 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   private var labelFontFamily: String? = nil
   private var labelFontSize: CGFloat? = nil
   private var labelColor: UIColor? = nil
+  /// The label colour on light and on dark glass (#153); either one takes
+  /// the place of [labelColor] in that appearance.
+  private var labelColorLight: UIColor? = nil
+  private var labelColorDark: UIColor? = nil
   private var labelFontWeight: Int? = nil  // Flutter FontWeight.value (0..8)
+  /// `CNButtonConfig.padding`, by side; nil keeps the style's own inset.
+  /// The vertical ones apply to a button with a title (#154).
+  private var horizontalPadding: CGFloat? = nil
+  private var verticalPaddingTop: CGFloat? = nil
+  private var verticalPaddingBottom: CGFloat? = nil
+  private var hasTitle = false
+  /// The style's own content insets, from its fresh configuration.
+  private var styleInsets: NSDirectionalEdgeInsets? = nil
+  /// While Flutter animates the width (`animateSizeChanges`), the leading and
+  /// trailing insets give way so a new title that is wider than the view
+  /// shows whole, not truncated, until the view reaches its width (#154).
+  private var keepsTitleWhole = false
+  private var titleSqueeze: CGFloat = 0
+  /// Changes held until the view has a given size: a new title with the size
+  /// it needs, or the first appearance at the measured size (#154).
+  private var sizeActions: [(id: Int, width: CGFloat?, height: CGFloat?, run: () -> Void)] = []
+  private var nextSizeActionId = 0
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeButton_\(viewId)", binaryMessenger: messenger)
-    self.container = UIView(frame: frame)
+    self.container = CNLayoutReportingView(frame: frame)
     self.button = UIButton(type: .system)
 
     var title: String? = nil
@@ -63,6 +84,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     var glassEffectInteractive: Bool = false
     var badgeCount: Int? = nil
     var interaction: Bool = true
+    var hiddenUntilSized = false
 
     if let dict = args as? [String: Any] {
       if let t = dict["buttonTitle"] as? String { title = t }
@@ -107,13 +129,21 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let f = dict["labelFontFamily"] as? String, !f.isEmpty { self.labelFontFamily = f }
       if let s = dict["labelFontSize"] as? NSNumber, s.doubleValue > 0 { self.labelFontSize = CGFloat(truncating: s) }
       if let c = dict["labelColor"] as? NSNumber { self.labelColor = Self.colorFromARGB(c.intValue) }
+      if let c = dict["labelColorLight"] as? NSNumber { self.labelColorLight = Self.colorFromARGB(c.intValue) }
+      if let c = dict["labelColorDark"] as? NSNumber { self.labelColorDark = Self.colorFromARGB(c.intValue) }
       if let w = dict["labelFontWeight"] as? NSNumber { self.labelFontWeight = w.intValue }
+      hiddenUntilSized = (dict["hiddenUntilSized"] as? NSNumber)?.boolValue ?? false
+      self.keepsTitleWhole = (dict["keepsTitleWhole"] as? NSNumber)?.boolValue ?? false
     }
 
     super.init()
 
     self.isInteractive = interaction
     container.backgroundColor = .clear
+    container.onLayout = { [weak self] in
+      self?.fitTitleToWidth()
+      self?.runDueSizeActions()
+    }
     if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
 
     // Create final image first (needed for both SwiftUI and UIKit paths)
@@ -265,6 +295,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         uiButton.bottomAnchor.constraint(equalTo: container.bottomAnchor),
       ])
       
+      if hiddenUntilSized { uiButton.alpha = 0 }
+      self.hasTitle = title != nil
+      self.verticalPaddingTop = paddingTop ?? paddingVertical
+      self.verticalPaddingBottom = paddingBottom ?? paddingVertical
       applyButtonStyle(buttonStyle: buttonStyle, round: makeRound)
       currentButtonStyle = buttonStyle
       uiButton.isEnabled = enabled
@@ -353,14 +387,28 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
         self.applyTransitionContainment(active)
         result(nil)
+      case "measureTitle":
+        // The size the button would take with this title, without showing
+        // it, so Flutter can lay out the new size first (#154).
+        let t = (call.arguments as? [String: Any])?["title"] as? String
+        // A SwiftUI button reports the same estimate as getIntrinsicSize.
+        let size = self.usesSwiftUI ? CGSize(width: 80, height: 32) : self.measuredSize(title: t)
+        result(["width": Double(size.width), "height": Double(size.height)])
+      case "reveal":
+        let args = call.arguments as? [String: Any]
+        self.whenSize(Self.cgFloat(args?["atWidth"]), Self.cgFloat(args?["atHeight"])) { [weak self] in
+          self?.button?.alpha = 1
+          self?.hostingController?.view.alpha = 1
+          result(nil)
+        }
       case "getIntrinsicSize":
         if usesSwiftUI {
           // For SwiftUI buttons, return estimated size
           // In a real implementation, you might want to measure the actual SwiftUI view
           result(["width": 80.0, "height": 32.0])
-        } else if let button = self.button {
-          let size = button.intrinsicContentSize
-        result(["width": Double(size.width), "height": Double(size.height)])
+        } else if self.button != nil {
+          let size = self.ownSize()
+          result(["width": Double(size.width), "height": Double(size.height)])
         } else {
           result(["width": 80.0, "height": 32.0])
         }
@@ -406,8 +454,17 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         } else { result(FlutterError(code: "bad_args", message: "Missing pressed", details: nil)) }
       case "setButtonTitle":
         if let args = call.arguments as? [String: Any], let t = args["title"] as? String {
-          self.setButtonContent(title: t, image: nil, iconOnly: false, imagePlacement: nil, imagePadding: nil, horizontalPadding: nil)
-          result(nil)
+          if let keep = args["keepsTitleWhole"] as? NSNumber { self.keepsTitleWhole = keep.boolValue }
+          // With `atWidth` / `atHeight`, in the layout pass that gives the
+          // view that size: set before it, a wider title was drawn for a
+          // frame at the old width, truncated (#154).
+          self.whenSize(Self.cgFloat(args["atWidth"]), Self.cgFloat(args["atHeight"])) { [weak self] in
+            guard let self = self else { result(nil); return }
+            self.hasTitle = true
+            self.setButtonContent(title: t, image: nil, iconOnly: false, imagePlacement: nil, imagePadding: nil, horizontalPadding: nil)
+            self.fitTitleToWidth()
+            result(nil)
+          }
         } else { result(FlutterError(code: "bad_args", message: "Missing title", details: nil)) }
       case "setLabelStyle":
         // Issue #40 runtime label-style sync. Flutter sends the new
@@ -431,6 +488,18 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           }
           if let c = args["labelColor"] as? NSNumber {
             self.labelColor = Self.colorFromARGB(c.intValue)
+          }
+          if (args["clearLabelColorLight"] as? NSNumber)?.boolValue == true {
+            self.labelColorLight = nil
+          }
+          if let c = args["labelColorLight"] as? NSNumber {
+            self.labelColorLight = Self.colorFromARGB(c.intValue)
+          }
+          if (args["clearLabelColorDark"] as? NSNumber)?.boolValue == true {
+            self.labelColorDark = nil
+          }
+          if let c = args["labelColorDark"] as? NSNumber {
+            self.labelColorDark = Self.colorFromARGB(c.intValue)
           }
           if (args["clearFontWeight"] as? NSNumber)?.boolValue == true {
             self.labelFontWeight = nil
@@ -589,14 +658,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       case "setHorizontalPadding":
         if let args = call.arguments as? [String: Any], let padding = (args["padding"] as? NSNumber).map({ CGFloat(truncating: $0) }) {
           if !usesSwiftUI, let button = self.button {
-          if #available(iOS 15.0, *) {
+            self.horizontalPadding = padding
+            if #available(iOS 15.0, *) {
               var cfg = button.configuration ?? .plain()
-            var insets = cfg.contentInsets
-            insets.leading = padding
-            insets.trailing = padding
-            cfg.contentInsets = insets
+              self.applyInsets(&cfg)
               button.configuration = cfg
-          } else {
+            } else {
               button.contentEdgeInsets = UIEdgeInsets(top: 0, left: padding, bottom: 0, right: padding)
             }
           }
@@ -604,14 +671,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         } else {
           // Clear padding if args is nil
           if !usesSwiftUI, let button = self.button {
-          if #available(iOS 15.0, *) {
+            self.horizontalPadding = 0
+            if #available(iOS 15.0, *) {
               var cfg = button.configuration ?? .plain()
-            var insets = cfg.contentInsets
-            insets.leading = 0
-            insets.trailing = 0
-            cfg.contentInsets = insets
+              self.applyInsets(&cfg)
               button.configuration = cfg
-          } else {
+            } else {
               button.contentEdgeInsets = .zero
             }
           }
@@ -667,6 +732,8 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     let size = self.labelFontSize
     let weight = self.labelFontWeight
     let color = self.labelColor
+    let light = self.labelColorLight
+    let dark = self.labelColorDark
     return UIConfigurationTextAttributesTransformer { incoming in
       var outgoing = incoming
       let baseFont = incoming.font ?? UIFont.preferredFont(forTextStyle: .body)
@@ -683,7 +750,17 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         resolvedFont = baseFont.withSize(pointSize)
       }
       outgoing.font = resolvedFont
-      if let color = color {
+      if light != nil || dark != nil {
+        // A dynamic colour: Liquid Glass gives its content the light or dark
+        // appearance that suits what is behind it, as it does for the
+        // default label, so each side follows the glass (#153). A side
+        // without its own colour keeps `labelColor`, else the style's.
+        let fallback = color ?? incoming.foregroundColor ?? .label
+        outgoing.foregroundColor = UIColor { traits in
+          let side = traits.userInterfaceStyle == .dark ? dark : light
+          return side ?? fallback.resolvedColor(with: traits)
+        }
+      } else if let color = color {
         outgoing.foregroundColor = color
       }
       return outgoing
@@ -908,9 +985,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     
     if #available(iOS 15.0, *) {
       // Preserve current content while swapping configurations
-      let currentTitle = button.configuration?.title
-      let currentImage = button.configuration?.image
-      let currentSymbolCfg = button.configuration?.preferredSymbolConfigurationForImage
+      let previous = button.configuration
+      let currentTitle = previous?.title
+      let currentImage = previous?.image
+      let currentSymbolCfg = previous?.preferredSymbolConfigurationForImage
       var config: UIButton.Configuration
       switch buttonStyle {
       case "plain": config = .plain()
@@ -947,6 +1025,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         config = .plain()
       }
       config.cornerStyle = round ? .capsule : .dynamic
+      styleInsets = config.contentInsets
       // Apply theme tint to configuration in a platform-standard way
       if let tint = button.tintColor {
         switch buttonStyle {
@@ -963,10 +1042,20 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           break
         }
       }
-      // Restore content after style swap
+      // Restore content after style swap. The label style, line break,
+      // image placement and padding are kept too: a tint or style change
+      // used to drop them, so the label went back to 17 pt, could wrap,
+      // and lost its padding.
       config.title = currentTitle
       config.image = currentImage
       config.preferredSymbolConfigurationForImage = currentSymbolCfg
+      if let previous = previous {
+        config.titleLineBreakMode = previous.titleLineBreakMode
+        config.imagePlacement = previous.imagePlacement
+        config.imagePadding = previous.imagePadding
+        config.titleTextAttributesTransformer = makeTitleTextAttributesTransformer()
+      }
+      applyInsets(&config)
       button.configuration = config
     } else {
       button.layer.cornerRadius = round ? 999 : 8
@@ -1026,14 +1115,12 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         cfg.imagePadding = padding
       }
       
-      // Apply horizontalPadding
+      // Padding: horizontal for every button, vertical with a title (#154).
       if let padding = horizontalPadding {
-        var insets = cfg.contentInsets
-        insets.leading = padding
-        insets.trailing = padding
-        cfg.contentInsets = insets
+        self.horizontalPadding = padding
       }
-      
+      applyInsets(&cfg)
+
       button.configuration = cfg
     } else {
       button.setTitle(title, for: .normal)
@@ -1049,6 +1136,139 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         button.contentEdgeInsets = UIEdgeInsets(top: 0, left: padding, bottom: 0, right: padding)
       }
     }
+  }
+
+  /// Sets the content insets from `CNButtonConfig.padding` over the style's
+  /// own, less the squeeze that keeps a title whole while the width
+  /// animates. A side without padding keeps the style's inset.
+  @available(iOS 15.0, *)
+  private func applyInsets(_ cfg: inout UIButton.Configuration) {
+    guard var insets = styleInsets else { return }
+    let custom = horizontalPadding != nil || titleSqueeze > 0 ||
+      (hasTitle && (verticalPaddingTop != nil || verticalPaddingBottom != nil))
+    guard custom || cfg.contentInsets != insets else { return }
+    if let h = horizontalPadding {
+      insets.leading = h
+      insets.trailing = h
+    }
+    if hasTitle {
+      if let top = verticalPaddingTop { insets.top = top }
+      if let bottom = verticalPaddingBottom { insets.bottom = bottom }
+    }
+    if titleSqueeze > 0 {
+      insets.leading = max(0, insets.leading - titleSqueeze)
+      insets.trailing = max(0, insets.trailing - titleSqueeze)
+    }
+    cfg.contentInsets = insets
+  }
+
+  /// The size the button would take with `title`, measured on a copy of
+  /// its configuration.
+  private func measuredSize(title: String?) -> CGSize {
+    guard let button = button else { return CGSize(width: 80, height: 32) }
+    guard #available(iOS 15.0, *), var cfg = button.configuration else {
+      return button.intrinsicContentSize
+    }
+    cfg.title = title
+    let squeeze = titleSqueeze
+    let titled = hasTitle
+    titleSqueeze = 0
+    hasTitle = titled || title != nil
+    applyInsets(&cfg)
+    titleSqueeze = squeeze
+    hasTitle = titled
+    let probe = UIButton(configuration: cfg)
+    probe.tintColor = button.tintColor
+    if #available(iOS 17.0, *) {
+      probe.traitOverrides.preferredContentSizeCategory = button.traitCollection.preferredContentSizeCategory
+    }
+    return probe.intrinsicContentSize
+  }
+
+  /// The button's own size, as if its insets were not squeezed.
+  private func ownSize() -> CGSize {
+    guard let button = button else { return CGSize(width: 80, height: 32) }
+    var size = button.intrinsicContentSize
+    if #available(iOS 15.0, *), titleSqueeze > 0, let cfg = button.configuration {
+      var full = cfg
+      let squeeze = titleSqueeze
+      titleSqueeze = 0
+      applyInsets(&full)
+      titleSqueeze = squeeze
+      size.width += (full.contentInsets.leading - cfg.contentInsets.leading) +
+        (full.contentInsets.trailing - cfg.contentInsets.trailing)
+    }
+    return size
+  }
+
+  /// With `keepsTitleWhole`, narrows the leading and trailing insets while
+  /// the view is narrower than the button needs, so the title shows whole
+  /// as the width animates towards it (#154).
+  private func fitTitleToWidth() {
+    guard #available(iOS 15.0, *), let button = button, !usesSwiftUI,
+          var cfg = button.configuration else { return }
+    var squeeze: CGFloat = 0
+    if keepsTitleWhole, hasTitle {
+      // Measured on a copy: the button applies a new configuration lazily,
+      // so its own size can still be the old title's here.
+      let needed = measuredSize(title: cfg.title).width
+      let width = container.bounds.width
+      // Any shortfall truncates the title, even the last fraction of a
+      // point before the animation ends: half of it per side, rounded up to
+      // the pixel.
+      if width > 0, needed > width {
+        let scale = max(container.traitCollection.displayScale, 1)
+        squeeze = ceil((needed - width) / 2 * scale) / scale
+      }
+    }
+    guard abs(squeeze - titleSqueeze) > 0.01 else { return }
+    titleSqueeze = squeeze
+    applyInsets(&cfg)
+    button.configuration = cfg
+  }
+
+  /// Runs `action` once the view has the given width and height (nil: any):
+  /// now if it has, otherwise in the layout pass that resizes it, so the
+  /// change and the new size reach the screen in the same frame. Runs anyway
+  /// after 0.3 s, in case that size never comes.
+  private func whenSize(_ width: CGFloat?, _ height: CGFloat?, _ action: @escaping () -> Void) {
+    guard !hasSize(width, height) else {
+      action()
+      return
+    }
+    nextSizeActionId += 1
+    let id = nextSizeActionId
+    sizeActions.append((id: id, width: width, height: height, run: action))
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+      guard let self = self, let index = self.sizeActions.firstIndex(where: { $0.id == id }) else { return }
+      self.runSizeActions(through: index)
+    }
+  }
+
+  private func hasSize(_ width: CGFloat?, _ height: CGFloat?) -> Bool {
+    let size = container.bounds.size
+    // Tight: a frame even a fraction of a point narrower than the title
+    // needs truncates it.
+    if let w = width, abs(size.width - w) > 0.05 { return false }
+    if let h = height, abs(size.height - h) > 0.05 { return false }
+    return true
+  }
+
+  /// Runs the held actions up to the newest one the current size is due
+  /// for, in order (an older title is set before a newer one replaces it).
+  private func runDueSizeActions() {
+    guard let index = sizeActions.lastIndex(where: { hasSize($0.width, $0.height) }) else { return }
+    runSizeActions(through: index)
+  }
+
+  private func runSizeActions(through index: Int) {
+    let due = sizeActions[0...index]
+    sizeActions.removeFirst(index + 1)
+    for entry in due { entry.run() }
+  }
+
+  private static func cgFloat(_ value: Any?) -> CGFloat? {
+    (value as? NSNumber).map { CGFloat(truncating: $0) }
   }
 
   private static func createImageFromData(_ data: Data, format: String?, scale: CGFloat) -> UIImage? {

@@ -54,6 +54,8 @@ class CupertinoPopupMenuButtonNSView: NSView {
       $0.labelFontSize = (dict["labelFontSize"] as? NSNumber).map { CGFloat(truncating: $0) }
       $0.labelFontWeight = (dict["labelFontWeight"] as? NSNumber)?.intValue
       $0.labelColor = (dict["labelColor"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+      $0.labelColorLight = (dict["labelColorLight"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+      $0.labelColorDark = (dict["labelColorDark"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
     }
     rebuildMenu()
     // Not measured yet: shown by `reveal` once Flutter has given the view
@@ -167,7 +169,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
   /// is nil), otherwise when Flutter resizes it. Runs anyway after 0.3 s,
   /// in case that width never comes.
   private func whenWidth(_ width: CGFloat?, _ action: @escaping () -> Void) {
-    guard let width = width, abs(bounds.width - width) > 0.5 else {
+    guard let width = width, abs(bounds.width - width) > 0.05 else {
       action()
       return
     }
@@ -184,7 +186,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
   /// for, in order.
   private func runDueWidthActions() {
     let width = bounds.width
-    guard let index = widthActions.lastIndex(where: { abs($0.width - width) <= 0.5 }) else { return }
+    guard let index = widthActions.lastIndex(where: { abs($0.width - width) <= 0.05 }) else { return }
     runWidthActions(through: index)
   }
 

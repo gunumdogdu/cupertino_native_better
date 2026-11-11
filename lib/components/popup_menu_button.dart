@@ -227,6 +227,8 @@ class CNPopupMenuButton extends StatefulWidget {
     this.labelFontSize,
     this.labelFontWeight,
     this.labelColor,
+    this.labelColorLight,
+    this.labelColorDark,
     this.keepsSourceVisible = false,
     this.onOpened,
     this.onClosed,
@@ -263,6 +265,8 @@ class CNPopupMenuButton extends StatefulWidget {
        labelFontSize = null,
        labelFontWeight = null,
        labelColor = null,
+       labelColorLight = null,
+       labelColorDark = null,
        round = true,
        width = size,
        height = size,
@@ -329,8 +333,25 @@ class CNPopupMenuButton extends StatefulWidget {
   /// family's nearest face).
   final FontWeight? labelFontWeight;
 
-  /// The colour of [buttonLabel]. Null keeps the button style's.
+  /// The colour of [buttonLabel]. Null keeps the button style's. The same
+  /// colour is used on light and on dark glass; use [labelColorLight] and
+  /// [labelColorDark] for one colour each.
   final Color? labelColor;
+
+  /// The colour of [buttonLabel] while the button has a light appearance:
+  /// on glass that is light (over light content), or in light mode for the
+  /// other styles. Liquid Glass picks its appearance from what is behind it,
+  /// and the label switches with it, as the default label does; on macOS it
+  /// keeps the window's appearance, so the pair follows light and dark
+  /// mode. Without this, the light side uses [labelColor], else the style's
+  /// colour.
+  final Color? labelColorLight;
+
+  /// The colour of [buttonLabel] while the button has a dark appearance: on
+  /// glass that is dark (over dark content), or in dark mode for the other
+  /// styles. Without this, the dark side uses [labelColor], else the
+  /// style's colour.
+  final Color? labelColorDark;
 
   /// iOS 26+: whether the button is left out of the menu's morph.
   ///
@@ -752,6 +773,14 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       context,
     );
     final capturedLabelColor = resolveColorToArgb(widget.labelColor, context);
+    final capturedLabelColorLight = resolveColorToArgb(
+      widget.labelColorLight,
+      context,
+    );
+    final capturedLabelColorDark = resolveColorToArgb(
+      widget.labelColorDark,
+      context,
+    );
     final capturedButtonPaletteColors = widget.buttonIcon?.paletteColors
         ?.map((c) => resolveColorToArgb(c, context))
         .toList();
@@ -843,6 +872,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       if (widget.labelFontWeight != null)
         'labelFontWeight': widget.labelFontWeight!.value,
       'labelColor': ?capturedLabelColor,
+      'labelColorLight': ?capturedLabelColorLight,
+      'labelColorDark': ?capturedLabelColorDark,
       if (widget.keepsSourceVisible) 'keepsSourceVisible': true,
     };
 
@@ -960,6 +991,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         '${widget.imagePlacement.name}_${widget.imagePadding}_'
         '${widget.labelFontFamily}_${widget.labelFontSize}_'
         '${widget.labelFontWeight?.value}_${widget.labelColor?.toARGB32()}_'
+        '${widget.labelColorLight?.toARGB32()}_'
+        '${widget.labelColorDark?.toARGB32()}_'
         '${widget.keepsSourceVisible}_'
         '$_isDark';
   }
@@ -1012,10 +1045,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     } catch (_) {}
     if (!mounted || !identical(ch, _channel)) return;
     if (w != null) _rememberWidth(key, w);
-    final resize =
-        w != null &&
-        _sizedToLabel &&
-        (w - (_laidOutLabelWidth ?? w)).abs() > 0.5;
+    final resize = w != null && _sizedToLabel && w != (_laidOutLabelWidth ?? w);
     if (reveal) {
       ch
           .invokeMethod<void>('reveal', {if (resize) 'atWidth': w})
@@ -1053,7 +1083,9 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       return;
     }
     _rememberWidth(key, w);
-    final resize = (w - (_laidOutLabelWidth ?? w)).abs() > 0.5;
+    // Any change: a frame even a fraction of a point narrower than the
+    // label needs wraps it.
+    final resize = w != (_laidOutLabelWidth ?? w);
     final applied = ch.invokeMethod('setButtonTitle', {
       'title': title,
       if (resize) 'atWidth': w,
@@ -1254,7 +1286,9 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         fontFamily: widget.labelFontFamily,
         fontSize: widget.labelFontSize,
         fontWeight: widget.labelFontWeight,
-        color: widget.labelColor,
+        color:
+            (_isDark ? widget.labelColorDark : widget.labelColorLight) ??
+            widget.labelColor,
       ),
     );
     final symbol = widget.buttonIcon;

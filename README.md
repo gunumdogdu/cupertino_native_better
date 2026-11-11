@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.5.2
+  cupertino_native_better: ^2.6.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -1498,6 +1498,26 @@ CNButton(
 )
 ```
 
+### A label that changes often
+
+A shrink-wrapped button measures a new label before it shows it, so the label and the button's new width reach the screen in the same frame. With `animateSizeChanges`, the new label shows at once and the glass eases to its new width. `labelColorLight` and `labelColorDark` keep the label adapting to the glass, with your colours:
+
+```dart
+CNButton(
+  label: '$index/$count',
+  onPressed: () {},
+  config: const CNButtonConfig(
+    style: CNButtonStyle.glass,
+    shrinkWrap: true,
+    animateSizeChanges: true,
+    minHeight: 25,
+    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    labelColorLight: Color(0xFF262626), // on light glass
+    labelColorDark: Color(0xFFFFFFFF), // on dark glass
+  ),
+)
+```
+
 ### Button Styles Gallery
 
 ### Icon-Only Button
@@ -1990,7 +2010,7 @@ addTearDown(PlatformVersion.reset);
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.5.2
+   cupertino_native_better: ^2.6.0
    ```
 
 2. Update imports:

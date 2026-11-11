@@ -6,6 +6,8 @@
 /// {@category Components}
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -25,8 +27,15 @@ import 'icon.dart';
 
 /// Configuration for CNButton with default values.
 class CNButtonConfig {
-  /// Padding for button content.
-  /// If null, uses default EdgeInsets(top: 8.0, leading: 12.0, bottom: 8.0, trailing: 12.0).
+  /// Padding around the button's content.
+  ///
+  /// When null, the native button keeps the style's own insets. A side set
+  /// to 0 also keeps the style's inset on that side.
+  ///
+  /// On iOS and macOS, the top and bottom padding apply to a button with a
+  /// label, and its height grows to fit the label and that padding (at
+  /// least [minHeight], or 44). An icon-only button is sized by [width]
+  /// and [minHeight].
   final EdgeInsets? padding;
 
   /// Border radius for button corners.
@@ -119,14 +128,51 @@ class CNButtonConfig {
   /// When null, the label uses the configuration's natural foreground:
   /// [CNButton.tint] for non-filled styles, white for filled /
   /// borderedProminent / prominentGlass / prominentClearGlass.
-  /// Set this to override that decision. A button with a
-  /// `glassEffectUnionId` or `glassEffectId` ignores it.
+  /// Set this to override that decision. The same colour is used on light
+  /// and on dark glass; use [labelColorLight] and [labelColorDark] for one
+  /// colour each. A button with a `glassEffectUnionId` or `glassEffectId`
+  /// ignores it.
   final Color? labelColor;
+
+  /// The label colour while the button has a light appearance: on glass
+  /// that is light (over light content), or in light mode for the other
+  /// styles.
+  ///
+  /// Liquid Glass picks a light or dark appearance from what is behind it,
+  /// and the label switches with it, as the default label does. On macOS
+  /// the glass keeps the window's appearance, so the pair follows light and
+  /// dark mode. Without this, the light side uses [labelColor], else the
+  /// style's colour. A button with a `glassEffectUnionId` or
+  /// `glassEffectId` ignores it.
+  final Color? labelColorLight;
+
+  /// The label colour while the button has a dark appearance: on glass that
+  /// is dark (over dark content), or in dark mode for the other styles.
+  ///
+  /// Without this, the dark side uses [labelColor], else the style's colour.
+  /// See [labelColorLight].
+  final Color? labelColorDark;
 
   /// Optional weight for the button label.
   ///
   /// When null, uses the system default weight for the selected [style].
   final FontWeight? labelFontWeight;
+
+  /// Whether a change of the button's size eases to the new size instead of
+  /// jumping, for example when a shrink-wrapped button gets a wider label.
+  ///
+  /// The new label shows at once, whole, and the button grows or shrinks
+  /// around it over [sizeAnimationDuration] with [sizeAnimationCurve].
+  /// Defaults to false.
+  final bool animateSizeChanges;
+
+  /// How long a size change takes with [animateSizeChanges]. Defaults to
+  /// 200 ms.
+  final Duration sizeAnimationDuration;
+
+  /// The curve of a size change with [animateSizeChanges]. Defaults to
+  /// [Curves.easeOut].
+  final Curve sizeAnimationCurve;
 
   /// Creates a configuration for [CNButton].
   const CNButtonConfig({
@@ -147,7 +193,12 @@ class CNButtonConfig {
     this.labelFontFamily,
     this.labelFontSize,
     this.labelColor,
+    this.labelColorLight,
+    this.labelColorDark,
     this.labelFontWeight,
+    this.animateSizeChanges = false,
+    this.sizeAnimationDuration = const Duration(milliseconds: 200),
+    this.sizeAnimationCurve = Curves.easeOut,
   });
 }
 
@@ -304,9 +355,107 @@ class _CNButtonState extends State<CNButton>
   String? _lastLabelFontFamily;
   double? _lastLabelFontSize;
   int? _lastLabelColor;
+  int? _lastLabelColorLight;
+  int? _lastLabelColorDark;
   int? _lastLabelFontWeight;
   Offset? _downPosition;
   bool _pressed = false;
+
+  /// Whether the last layout sized the button to its label (shrink-wrapped
+  /// or in an unbounded row), so a new label changes its width.
+  bool _sizedToLabel = false;
+
+  /// The width and height the last layout gave the button.
+  double? _laidOutWidth;
+  double? _laidOutHeight;
+
+  /// Whether the last layout used a measured size, not the placeholder, so
+  /// a size change after it may animate.
+  bool _laidOutMeasured = false;
+
+  /// Sizes measured natively, by everything that sets them (see
+  /// [_sizeKey]), so a button built again with a label it had before takes
+  /// its size from the first frame (#154).
+  static final Map<String, Size> _measuredSizes = <String, Size>{};
+
+  /// The [_measuredSizes] key for [label] with the current options.
+  String _sizeKey(String? label) {
+    final c = widget.config;
+    return [
+      defaultTargetPlatform.name,
+      c.style.name,
+      c.padding,
+      c.minHeight,
+      c.imagePlacement.name,
+      c.imagePadding,
+      c.labelFontFamily,
+      c.labelFontSize,
+      c.labelFontWeight?.value,
+      widget.icon?.name,
+      widget.icon?.size,
+      widget.imageAsset?.assetPath,
+      widget.imageAsset?.size,
+      widget.customIcon?.codePoint,
+      c.customIconSize,
+      MediaQuery.maybeTextScalerOf(context)?.scale(17),
+      label,
+    ].join('|');
+  }
+
+  Size? _measuredSize(String? label) =>
+      label == null ? null : _measuredSizes[_sizeKey(label)];
+
+  void _rememberSize(String key, Size size) {
+    _measuredSizes.remove(key);
+    _measuredSizes[key] = size;
+    if (_measuredSizes.length > 256) {
+      _measuredSizes.remove(_measuredSizes.keys.first);
+    }
+  }
+
+  bool get _hasImage =>
+      widget.imageAsset != null ||
+      widget.customIcon != null ||
+      widget.icon != null;
+
+  bool get _imageAboveOrBelow =>
+      _hasImage &&
+      (widget.config.imagePlacement == CNImagePlacement.top ||
+          widget.config.imagePlacement == CNImagePlacement.bottom);
+
+  bool get _hasVerticalPadding {
+    final padding = widget.config.padding;
+    return widget.label != null &&
+        padding != null &&
+        (padding.top != 0 || padding.bottom != 0);
+  }
+
+  /// Whether a button with a label takes its height from its content: an
+  /// image above or below the label, or vertical padding (#154).
+  bool get _heightFollowsContent =>
+      widget.label != null && (_imageAboveOrBelow || _hasVerticalPadding);
+
+  /// The height a button with a label takes for a content [height].
+  double _labelButtonHeight(double? height) {
+    final base = widget.config.minHeight ?? 44.0;
+    if (_imageAboveOrBelow) return height ?? base;
+    if (_hasVerticalPadding) return math.max(base, height ?? 0);
+    return base;
+  }
+
+  /// The `atWidth` / `atHeight` arguments that hold a native change until
+  /// the layout for [size] reaches the view.
+  Map<String, double> _sizeArgs(Size size) {
+    final height = _labelButtonHeight(size.height);
+    return {
+      // Any change: a frame even a fraction of a point narrower than the
+      // label needs truncates it.
+      if (_sizedToLabel && size.width != (_laidOutWidth ?? size.width))
+        'atWidth': size.width,
+      if (_heightFollowsContent && height != (_laidOutHeight ?? height))
+        'atHeight': height,
+    };
+  }
 
   // Halo containment (Issues #29 and #124) is driven by
   // HaloContainmentMixin: on while the route animates, and while a modal is
@@ -548,6 +697,16 @@ class _CNButtonState extends State<CNButton>
         'labelFontSize': widget.config.labelFontSize,
       if (widget.config.labelColor != null)
         'labelColor': resolveColorToArgb(widget.config.labelColor!, context),
+      if (widget.config.labelColorLight != null)
+        'labelColorLight': resolveColorToArgb(
+          widget.config.labelColorLight!,
+          context,
+        ),
+      if (widget.config.labelColorDark != null)
+        'labelColorDark': resolveColorToArgb(
+          widget.config.labelColorDark!,
+          context,
+        ),
       if (widget.config.labelFontWeight != null)
         'labelFontWeight': widget.config.labelFontWeight!.value,
     };
@@ -603,25 +762,46 @@ class _CNButtonState extends State<CNButton>
 
           final defaultHeight =
               widget.config.minHeight ?? calculatedSize ?? 44.0;
+          // A button with a label takes the size measured for it, else the
+          // last one measured, else a placeholder until the first
+          // measurement; it is created hidden then, and shown in the frame
+          // that gives it its size (#154).
+          final measured = _measuredSize(widget.label);
+          final sizedToLabel = !isIconButton && preferIntrinsic;
           if (isIconButton) {
             width = widget.config.width ?? calculatedSize ?? defaultHeight;
-          } else if (preferIntrinsic) {
-            width = _intrinsicWidth ?? 80.0;
+          } else if (sizedToLabel) {
+            width = measured?.width ?? _intrinsicWidth ?? 80.0;
           }
-          // Use intrinsic height when image is top/bottom to prevent cropping
-          final needsDynamicHeight =
-              widget.imageAsset != null ||
-              widget.customIcon != null ||
-              widget.icon != null;
-          final isVerticalPlacement =
-              widget.config.imagePlacement == CNImagePlacement.top ||
-              widget.config.imagePlacement == CNImagePlacement.bottom;
-          final height =
-              (needsDynamicHeight &&
-                  isVerticalPlacement &&
-                  _intrinsicHeight != null)
-              ? _intrinsicHeight!
-              : defaultHeight;
+          final double height;
+          if (widget.label != null) {
+            height = _labelButtonHeight(measured?.height ?? _intrinsicHeight);
+          } else {
+            // Use intrinsic height when image is top/bottom to prevent cropping
+            height = (_imageAboveOrBelow && _intrinsicHeight != null)
+                ? _intrinsicHeight!
+                : defaultHeight;
+          }
+          final hasSize =
+              measured != null ||
+              _intrinsicWidth != null ||
+              _intrinsicHeight != null;
+          final hiddenUntilSized =
+              widget.label != null &&
+              measured == null &&
+              (sizedToLabel || _heightFollowsContent);
+          final animate =
+              widget.config.animateSizeChanges && _laidOutMeasured && hasSize;
+          _sizedToLabel = sizedToLabel;
+          _laidOutWidth = width;
+          _laidOutHeight = height;
+          _laidOutMeasured = hasSize;
+          final params = {
+            ...creationParams,
+            if (hiddenUntilSized) 'hiddenUntilSized': true,
+            if (widget.config.animateSizeChanges && sizedToLabel)
+              'keepsTitleWhole': true,
+          };
 
           // Modal-hide placeholder: dimensions MUST mirror the live
           // SizedBox(height: height, width: width, child: platformView) below.
@@ -639,7 +819,7 @@ class _CNButtonState extends State<CNButton>
           final platformView = defaultTargetPlatform == TargetPlatform.iOS
               ? UiKitView(
                   viewType: viewType,
-                  creationParams: creationParams,
+                  creationParams: params,
                   creationParamsCodec: const StandardMessageCodec(),
                   onPlatformViewCreated: _onCreated,
                   gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
@@ -649,7 +829,7 @@ class _CNButtonState extends State<CNButton>
                 )
               : AppKitView(
                   viewType: viewType,
-                  creationParams: creationParams,
+                  creationParams: params,
                   creationParamsCodec: const StandardMessageCodec(),
                   onPlatformViewCreated: _onCreated,
                   gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
@@ -684,7 +864,13 @@ class _CNButtonState extends State<CNButton>
               _downPosition = null;
             },
             child: ClipRect(
-              child: SizedBox(
+              // Always an AnimatedContainer, so turning the animation on or
+              // off keeps the native view.
+              child: AnimatedContainer(
+                duration: animate
+                    ? widget.config.sizeAnimationDuration
+                    : Duration.zero,
+                curve: widget.config.sizeAnimationCurve,
                 height: height,
                 width: width,
                 child: platformView,
@@ -733,14 +919,18 @@ class _CNButtonState extends State<CNButton>
     _lastLabelColor = widget.config.labelColor != null
         ? resolveColorToArgb(widget.config.labelColor!, context)
         : null;
+    _lastLabelColorLight = resolveColorToArgb(
+      widget.config.labelColorLight,
+      context,
+    );
+    _lastLabelColorDark = resolveColorToArgb(
+      widget.config.labelColorDark,
+      context,
+    );
     _lastLabelFontWeight = widget.config.labelFontWeight?.value;
-    // Always request intrinsic size to get both width and height
-    // Use a small delay to ensure native view has finished layout
-    Future.delayed(const Duration(milliseconds: 10), () {
-      if (mounted && _channel != null) {
-        _requestIntrinsicSize();
-      }
-    });
+    // Measure the button; one created hidden is shown in the frame that
+    // gives it the measured size.
+    _requestIntrinsicSize(reveal: widget.label != null);
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {
@@ -756,20 +946,86 @@ class _CNButtonState extends State<CNButton>
     return null;
   }
 
-  Future<void> _requestIntrinsicSize() async {
+  /// Measures the native button and lays out its size. With [reveal], also
+  /// shows a button created hidden, in the frame that gives it that size.
+  Future<void> _requestIntrinsicSize({bool reveal = false}) async {
     final ch = _channel;
     if (ch == null) return;
+    final label = widget.label;
+    final key = _sizeKey(label);
+    Size? size;
     try {
-      final size = await ch.invokeMethod<Map>('getIntrinsicSize');
-      final w = (size?['width'] as num?)?.toDouble();
-      final h = (size?['height'] as num?)?.toDouble();
-      if (mounted) {
-        setState(() {
-          if (w != null) _intrinsicWidth = w;
-          if (h != null) _intrinsicHeight = h;
-        });
-      }
+      size = _sizeFrom(await ch.invokeMethod<Map>('getIntrinsicSize'));
     } catch (_) {}
+    if (!mounted || !identical(ch, _channel)) return;
+    if (size != null && label != null && label == widget.label) {
+      _rememberSize(key, size);
+    }
+    if (reveal) {
+      ch
+          .invokeMethod<void>('reveal', size == null ? null : _sizeArgs(size))
+          .catchError((Object _) {});
+    }
+    if (size != null &&
+        (size.width != _intrinsicWidth || size.height != _intrinsicHeight)) {
+      final measured = size;
+      setState(() {
+        _intrinsicWidth = measured.width;
+        _intrinsicHeight = measured.height;
+      });
+    }
+  }
+
+  static Size? _sizeFrom(Map? map) {
+    final w = (map?['width'] as num?)?.toDouble();
+    final h = (map?['height'] as num?)?.toDouble();
+    return w == null || h == null ? null : Size(w, h);
+  }
+
+  /// Sets a new label. A button sized to its label is measured with it
+  /// first, and the native side sets it in the layout pass that applies the
+  /// new size, so the label is never drawn at the old width, truncated
+  /// (#154). With `animateSizeChanges` it is set at once and kept whole
+  /// while the size eases to the new one.
+  Future<void> _setTitle(MethodChannel ch, String title) async {
+    final keepWhole = widget.config.animateSizeChanges && _sizedToLabel;
+    if (!_sizedToLabel && !_heightFollowsContent) {
+      await ch.invokeMethod('setButtonTitle', {'title': title});
+      if (mounted) _requestIntrinsicSize();
+      return;
+    }
+    final key = _sizeKey(title);
+    var size = _measuredSizes[key];
+    if (size == null) {
+      try {
+        size = _sizeFrom(
+          await ch.invokeMethod<Map>('measureTitle', {'title': title}),
+        );
+      } on MissingPluginException {
+        size = null;
+      }
+      if (!mounted || !identical(ch, _channel)) return;
+    }
+    if (size == null) {
+      await ch.invokeMethod('setButtonTitle', {'title': title});
+      if (mounted) _requestIntrinsicSize();
+      return;
+    }
+    _rememberSize(key, size);
+    final applied = ch.invokeMethod('setButtonTitle', {
+      'title': title,
+      'keepsTitleWhole': keepWhole,
+      if (!keepWhole) ..._sizeArgs(size),
+    });
+    final measured = size;
+    if (measured.width != _intrinsicWidth ||
+        measured.height != _intrinsicHeight) {
+      setState(() {
+        _intrinsicWidth = measured.width;
+        _intrinsicHeight = measured.height;
+      });
+    }
+    await applied;
   }
 
   Future<void> _syncPropsToNativeIfNeeded() async {
@@ -787,6 +1043,14 @@ class _CNButtonState extends State<CNButton>
     final labelColorArgb = widget.config.labelColor != null
         ? resolveColorToArgb(widget.config.labelColor!, context)
         : null;
+    final labelColorLight = resolveColorToArgb(
+      widget.config.labelColorLight,
+      context,
+    );
+    final labelColorDark = resolveColorToArgb(
+      widget.config.labelColorDark,
+      context,
+    );
     final labelWeight = widget.config.labelFontWeight?.value;
 
     if (_lastTint != tint) {
@@ -802,15 +1066,17 @@ class _CNButtonState extends State<CNButton>
         'buttonStyle': widget.config.style.name,
       });
       _lastStyle = widget.config.style;
+      // Styles have different insets.
+      _requestIntrinsicSize();
     }
     // Enabled state
     await ch.invokeMethod('setEnabled', {
       'enabled': (widget.enabled && widget.onPressed != null),
     });
     if (_lastTitle != widget.label && widget.label != null) {
-      await ch.invokeMethod('setButtonTitle', {'title': widget.label});
       _lastTitle = widget.label;
-      _requestIntrinsicSize();
+      await _setTitle(ch, widget.label!);
+      if (!mounted) return;
     }
 
     // Sync imagePlacement
@@ -849,6 +1115,8 @@ class _CNButtonState extends State<CNButton>
     if (_lastLabelFontFamily != widget.config.labelFontFamily ||
         _lastLabelFontSize != widget.config.labelFontSize ||
         _lastLabelColor != labelColorArgb ||
+        _lastLabelColorLight != labelColorLight ||
+        _lastLabelColorDark != labelColorDark ||
         _lastLabelFontWeight != labelWeight) {
       await ch.invokeOptionalMethod('setLabelStyle', {
         if (widget.config.labelFontFamily != null)
@@ -856,16 +1124,22 @@ class _CNButtonState extends State<CNButton>
         if (widget.config.labelFontSize != null)
           'labelFontSize': widget.config.labelFontSize,
         if (labelColorArgb != null) 'labelColor': labelColorArgb,
+        if (labelColorLight != null) 'labelColorLight': labelColorLight,
+        if (labelColorDark != null) 'labelColorDark': labelColorDark,
         if (labelWeight != null) 'labelFontWeight': labelWeight,
         // Always include "clear" markers so native can reset removed values.
         'clearFontFamily': widget.config.labelFontFamily == null,
         'clearFontSize': widget.config.labelFontSize == null,
         'clearLabelColor': labelColorArgb == null,
+        'clearLabelColorLight': labelColorLight == null,
+        'clearLabelColorDark': labelColorDark == null,
         'clearFontWeight': labelWeight == null,
       });
       _lastLabelFontFamily = widget.config.labelFontFamily;
       _lastLabelFontSize = widget.config.labelFontSize;
       _lastLabelColor = labelColorArgb;
+      _lastLabelColorLight = labelColorLight;
+      _lastLabelColorDark = labelColorDark;
       _lastLabelFontWeight = labelWeight;
       _requestIntrinsicSize();
     }

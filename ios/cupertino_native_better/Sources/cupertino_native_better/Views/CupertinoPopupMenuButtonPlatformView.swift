@@ -60,6 +60,9 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var labelFontSize: CGFloat? = nil
   private var labelFontWeight: Int? = nil
   private var labelColor: UIColor? = nil
+  /// The label colour on light and on dark glass (#153).
+  private var labelColorLight: UIColor? = nil
+  private var labelColorDark: UIColor? = nil
   /// Changes held until the view has a given width: a new title with the
   /// width it needs, or the first appearance at the measured width (#147).
   private var widthActions: [(id: Int, width: CGFloat, run: () -> Void)] = []
@@ -107,6 +110,8 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       if let v = dict["labelFontSize"] as? NSNumber, v.doubleValue > 0 { self.labelFontSize = CGFloat(v.doubleValue) }
       if let v = dict["labelFontWeight"] as? NSNumber { self.labelFontWeight = v.intValue }
       if let v = dict["labelColor"] as? NSNumber { self.labelColor = Self.colorFromARGB(v.intValue) }
+      if let v = dict["labelColorLight"] as? NSNumber { self.labelColorLight = Self.colorFromARGB(v.intValue) }
+      if let v = dict["labelColorDark"] as? NSNumber { self.labelColorDark = Self.colorFromARGB(v.intValue) }
       if let v = dict["keepsSourceVisible"] as? NSNumber { self.button.keepsSourceVisible = v.boolValue }
       if let label = dict["semanticLabel"] as? String, !label.isEmpty {
         semanticLabel = label
@@ -416,7 +421,9 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   /// and the new width reach the screen in the same frame. Runs anyway
   /// after 0.3 s, in case that width never comes.
   private func whenWidth(_ width: CGFloat?, _ action: @escaping () -> Void) {
-    guard let width = width, abs(container.bounds.width - width) > 0.5 else {
+    // Tight: a frame even a fraction of a point narrower than the title
+    // needs wraps it.
+    guard let width = width, abs(container.bounds.width - width) > 0.05 else {
       action()
       return
     }
@@ -433,7 +440,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   /// for, in order (an older title is set before a newer one replaces it).
   private func runDueWidthActions() {
     let width = container.bounds.width
-    guard let index = widthActions.lastIndex(where: { abs($0.width - width) <= 0.5 }) else { return }
+    guard let index = widthActions.lastIndex(where: { abs($0.width - width) <= 0.05 }) else { return }
     runWidthActions(through: index)
   }
 
@@ -786,8 +793,10 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private func applyContentOptions(to cfg: inout UIButton.Configuration) {
     cfg.imagePlacement = imagePlacement
     if let padding = imagePadding { cfg.imagePadding = padding }
-    guard labelFontFamily != nil || labelFontSize != nil || labelFontWeight != nil || labelColor != nil else { return }
+    guard labelFontFamily != nil || labelFontSize != nil || labelFontWeight != nil || labelColor != nil ||
+      labelColorLight != nil || labelColorDark != nil else { return }
     let family = labelFontFamily, size = labelFontSize, color = labelColor
+    let light = labelColorLight, dark = labelColorDark
     let weight = CNFontResolver.weight(fromFlutterValue: labelFontWeight)
     cfg.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
       var outgoing = incoming
@@ -800,7 +809,15 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       } else {
         outgoing.font = base.withSize(pointSize)
       }
-      if let color { outgoing.foregroundColor = color }
+      if light != nil || dark != nil {
+        // Liquid Glass gives its content the appearance that suits what is
+        // behind it, so each side follows the glass (#153).
+        let fallback = color ?? incoming.foregroundColor ?? .label
+        outgoing.foregroundColor = UIColor { traits in
+          let side = traits.userInterfaceStyle == .dark ? dark : light
+          return side ?? fallback.resolvedColor(with: traits)
+        }
+      } else if let color { outgoing.foregroundColor = color }
       return outgoing
     }
   }

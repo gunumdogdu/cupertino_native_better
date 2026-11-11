@@ -16,6 +16,14 @@ class CupertinoButtonNSView: NSView {
   private var isInteractive: Bool = true
   private var usesSwiftUI: Bool = false
   private var semanticLabel: String?
+  /// Changes held until the view has a given size: a new title with the size
+  /// it needs, or the first appearance at the measured size (#154).
+  private var sizeActions: [(id: Int, width: CGFloat?, height: CGFloat?, minWidth: CGFloat?, run: () -> Void)] = []
+  private var nextSizeActionId = 0
+  /// While Flutter animates the width (`animateSizeChanges`), a new title
+  /// wider than the view waits until the view is wide enough, so it is not
+  /// truncated on the way (#154).
+  private var keepsTitleWhole = false
 
   // The icon as Flutter last described it, so a size or colour change can
   // rebuild it.
@@ -48,6 +56,7 @@ class CupertinoButtonNSView: NSView {
     isEnabled = enabled
     isInteractive = (dict["interaction"] as? NSNumber)?.boolValue ?? true
     if let label = dict["semanticLabel"] as? String, !label.isEmpty { semanticLabel = label }
+    keepsTitleWhole = (dict["keepsTitleWhole"] as? NSNumber)?.boolValue ?? false
 
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
@@ -101,7 +110,13 @@ class CupertinoButtonNSView: NSView {
         $0.expectedHeight = minHeight ?? 44
         $0.paddingLeft = paddingLeft ?? paddingHorizontal
         $0.paddingRight = paddingRight ?? paddingHorizontal
+        if title != nil {
+          $0.paddingTop = paddingTop ?? paddingVertical
+          $0.paddingBottom = paddingBottom ?? paddingVertical
+        }
         $0.labelColor = (dict["labelColor"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+        $0.labelColorLight = (dict["labelColorLight"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+        $0.labelColorDark = (dict["labelColorDark"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
         $0.labelFontSize = Self.cgFloat(dict["labelFontSize"]).flatMap { $0 > 0 ? $0 : nil }
         $0.labelFontFamily = (dict["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         $0.labelFontWeight = (dict["labelFontWeight"] as? NSNumber)?.intValue
@@ -109,6 +124,7 @@ class CupertinoButtonNSView: NSView {
         $0.isInteractive = isInteractive
         $0.accessibilityText = semanticLabel
       }
+      if (dict["hiddenUntilSized"] as? NSNumber)?.boolValue == true { host.alphaValue = 0 }
     }
 
     if let count = badgeCount, count > 0 {
@@ -126,6 +142,11 @@ class CupertinoButtonNSView: NSView {
   override func hitTest(_ point: NSPoint) -> NSView? {
     guard isInteractive else { return nil }
     return super.hitTest(point)
+  }
+
+  override func setFrameSize(_ newSize: NSSize) {
+    super.setFrameSize(newSize)
+    runDueSizeActions()
   }
 
   // MARK: - Method calls
@@ -157,12 +178,37 @@ class CupertinoButtonNSView: NSView {
         }
       }
       result(nil)
+    case "measureTitle":
+      // The size the button would take with this title, without showing it,
+      // so Flutter can lay out the new size first (#154).
+      let size = measuredSize(title: args?["title"] as? String)
+      result(["width": Double(size.width), "height": Double(size.height)])
+    case "reveal":
+      whenSize(Self.cgFloat(args?["atWidth"]), Self.cgFloat(args?["atHeight"])) { [weak self] in
+        self?.host?.alphaValue = 1
+        self?.hostingController?.view.alphaValue = 1
+        result(nil)
+      }
     case "setButtonTitle":
       guard let t = args?["title"] as? String else {
         result(FlutterError(code: "bad_args", message: "Missing title", details: nil)); return
       }
-      host?.title = t
-      result(nil)
+      if let keep = args?["keepsTitleWhole"] as? NSNumber { keepsTitleWhole = keep.boolValue }
+      let apply: () -> Void = { [weak self] in
+        self?.host?.title = t
+        result(nil)
+      }
+      let width = Self.cgFloat(args?["atWidth"])
+      let height = Self.cgFloat(args?["atHeight"])
+      if width == nil, height == nil, keepsTitleWhole, host != nil {
+        // Growing: wait until the animated width fits the title.
+        let needed = measuredSize(title: t).width
+        whenSize(nil, nil, minWidth: needed > bounds.width + 0.5 ? needed : nil, apply)
+      } else {
+        // With `atWidth` / `atHeight`, in the layout pass that gives the
+        // view that size (#154).
+        whenSize(width, height, apply)
+      }
     case "setImagePlacement":
       guard let placement = args?["placement"] as? String else {
         result(FlutterError(code: "bad_args", message: "Missing placement", details: nil)); return
@@ -184,6 +230,10 @@ class CupertinoButtonNSView: NSView {
         if (a["clearFontFamily"] as? NSNumber)?.boolValue == true { h.labelFontFamily = nil }
         if (a["clearFontSize"] as? NSNumber)?.boolValue == true { h.labelFontSize = nil }
         if (a["clearLabelColor"] as? NSNumber)?.boolValue == true { h.labelColor = nil }
+        if (a["clearLabelColorLight"] as? NSNumber)?.boolValue == true { h.labelColorLight = nil }
+        if (a["clearLabelColorDark"] as? NSNumber)?.boolValue == true { h.labelColorDark = nil }
+        if let c = a["labelColorLight"] as? NSNumber { h.labelColorLight = ImageUtils.colorFromARGB(c.intValue) }
+        if let c = a["labelColorDark"] as? NSNumber { h.labelColorDark = ImageUtils.colorFromARGB(c.intValue) }
         if (a["clearFontWeight"] as? NSNumber)?.boolValue == true { h.labelFontWeight = nil }
         if call.method == "setTextStyle", args == nil {
           h.labelFontFamily = nil; h.labelFontSize = nil; h.labelColor = nil; h.labelFontWeight = nil
@@ -267,6 +317,59 @@ class CupertinoButtonNSView: NSView {
     } else if let hosting = hostingController, let base = swiftUIBase {
       hosting.rootView = semanticLabel.map { AnyView(base.accessibilityLabel(Text($0))) } ?? base
     }
+  }
+
+  /// The size the button would take with `title`.
+  private func measuredSize(title: String?) -> CGSize {
+    guard let host = host else {
+      let size = hostingController?.view.fittingSize ?? .zero
+      return CGSize(width: size.width > 0 ? size.width : 80, height: size.height > 0 ? size.height : 32)
+    }
+    let previous = host.title
+    host.title = title
+    let size = host.preferredSize()
+    host.title = previous
+    return size
+  }
+
+  /// Runs `action` once the view has the given width and height (nil: any),
+  /// or is at least `minWidth` wide: now if it is, otherwise in the frame
+  /// change that resizes it, so the change and the new size reach the screen
+  /// together. Runs anyway after 0.3 s (1 s for `minWidth`, which waits for
+  /// an animation), in case that size never comes.
+  private func whenSize(_ width: CGFloat?, _ height: CGFloat?, minWidth: CGFloat? = nil, _ action: @escaping () -> Void) {
+    guard !hasSize(width, height, minWidth) else {
+      action()
+      return
+    }
+    nextSizeActionId += 1
+    let id = nextSizeActionId
+    sizeActions.append((id: id, width: width, height: height, minWidth: minWidth, run: action))
+    DispatchQueue.main.asyncAfter(deadline: .now() + (minWidth != nil ? 1.0 : 0.3)) { [weak self] in
+      guard let self = self, let index = self.sizeActions.firstIndex(where: { $0.id == id }) else { return }
+      self.runSizeActions(through: index)
+    }
+  }
+
+  private func hasSize(_ width: CGFloat?, _ height: CGFloat?, _ minWidth: CGFloat?) -> Bool {
+    let size = bounds.size
+    if let w = width, abs(size.width - w) > 0.5 { return false }
+    if let h = height, abs(size.height - h) > 0.5 { return false }
+    if let m = minWidth, size.width < m - 0.5 { return false }
+    return true
+  }
+
+  /// Runs the held actions up to the newest one the current size is due
+  /// for, in order (an older title is set before a newer one replaces it).
+  private func runDueSizeActions() {
+    guard let index = sizeActions.lastIndex(where: { hasSize($0.width, $0.height, $0.minWidth) }) else { return }
+    runSizeActions(through: index)
+  }
+
+  private func runSizeActions(through index: Int) {
+    let due = sizeActions[0...index]
+    sizeActions.removeFirst(index + 1)
+    for entry in due { entry.run() }
   }
 
   private static func cgFloat(_ value: Any?) -> CGFloat? {
