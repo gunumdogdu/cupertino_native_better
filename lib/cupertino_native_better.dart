@@ -101,6 +101,7 @@ export 'components/gauge.dart';
 export 'components/toast.dart';
 export 'components/floating_island.dart';
 export 'components/search_scaffold.dart';
+export 'components/scroll_edge_effect.dart';
 export 'components/toolbar.dart'
     hide debugResolveToolbarItemIds, debugResetCNToolbarWindow;
 export 'components/alert.dart';

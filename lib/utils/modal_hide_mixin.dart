@@ -201,24 +201,30 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
 ///
 ///  * while the host route animates, because a page is pushed over it or
 ///    popped off it (#29); and
-///  * while a modal route (a dialog, popup or sheet) over a widget that
-///    stays mounted animates: as it fades in or out, or is dragged (#124).
-///    A modal doesn't move the host route's secondary animation, so the
-///    first rule never fires for it; and
-///  * while the modal's sheet, popup or dialog is up within reach of the
-///    widget's glow, or its bounds aren't known, so the glow isn't drawn
-///    over it.
+///  * while a modal route (a dialog, popup or sheet) is over a widget that
+///    stays mounted, and its sheet, popup or dialog is within reach of the
+///    widget's glow, or its bounds aren't known yet, so the glow isn't
+///    drawn over it (#124). A modal doesn't move the host route's secondary
+///    animation, so the first rule never fires for it.
 ///
-/// Under a modal at rest whose sheet is elsewhere, the widget keeps its full
-/// glass, dimmed by the barrier like the rest of the page (#149). A widget
-/// that [ModalHideMixin] removed while the modal is up needs nothing.
+///  * while a modal route moves the page under it as it comes or goes, as
+///    sheet packages that scale the page down do.
+///
+/// The modal's bounds are measured after every frame while it moves, and
+/// lead its motion by a frame ([CNTabBarRouteObserver.modalRect]). A modal
+/// whose sheet, popup or dialog stays elsewhere leaves the widget its full
+/// glass, dimmed by the barrier like the rest of the page, at rest (#149)
+/// and while it fades in or out (#156). A widget that [ModalHideMixin]
+/// removed while the modal is up needs nothing.
 ///
 /// The modal rules read [CNTabBarRouteObserver.anyModalDepth],
-/// [CNTabBarRouteObserver.modalAnimating] and
+/// [CNTabBarRouteObserver.modalAnimating],
+/// [CNTabBarRouteObserver.modalBoundsPending] and
 /// [CNTabBarRouteObserver.modalRect], so like `autoHideOnModal` they need a
 /// `CNTabBarRouteObserver` in the navigator's `navigatorObservers`. They are
-/// listened to directly, not after a frame, so containment is on before the
-/// modal's first frame is drawn and stays on through its exit animation.
+/// listened to directly, not after a frame: a modal that appears without an
+/// entrance animation is contained against before its first frame, until
+/// its bounds are known.
 ///
 /// **Usage.** Mix in after [ModalHideMixin] and call
 /// [resetHaloContainment] from `onPlatformViewCreated`, once
@@ -231,6 +237,12 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
   /// How far past its bounds the glass can draw its glow and shadow.
   static const double _haloReach = 24;
 
+  /// Where the widget was while the modal over it was last still (or when
+  /// it was pushed), and whether the widget has moved since while the modal
+  /// animates: some sheets move the page under them (#156).
+  Rect? _stillRect;
+  bool _movedWithModal = false;
+
   /// Whether containment should be on now.
   bool get isHaloContained {
     final status = _routeAnimation?.status;
@@ -240,11 +252,45 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
     }
     final modalAbove = CNTabBarRouteObserver.anyModalDepth.value > _mountDepth;
     if (!modalAbove || isHiddenForModal) return false;
-    if (CNTabBarRouteObserver.modalAnimating.value) return true;
+    // A modal entering from nothing paints next to nothing in its first
+    // frame: keep the glass as it is until its bounds are measured, so a
+    // modal elsewhere doesn't clip it for that frame (#156).
+    if (CNTabBarRouteObserver.modalBoundsPending.value) {
+      return _sentContainment ?? false;
+    }
+    // A sheet that moves the page under it as it comes and goes (a sheet
+    // package scaling the page down) would show the glow's box: contained
+    // while it does (#29).
+    if (_movedWithModal) return true;
+    // Otherwise where the sheet, popup or dialog is decides, while it moves
+    // too: a barrier fading in or out dims the glass evenly (#156).
     final sheet = CNTabBarRouteObserver.modalRect;
     final mine = _globalRect();
     if (sheet == null || mine == null) return true;
     return mine.inflate(_haloReach).overlaps(sheet);
+  }
+
+  /// Follows whether the widget moves while a modal over it animates.
+  void _trackMotionWithModal() {
+    if (CNTabBarRouteObserver.anyModalDepth.value <= _mountDepth) {
+      _stillRect = null;
+      _movedWithModal = false;
+      return;
+    }
+    final mine = _globalRect();
+    final still = _stillRect;
+    // The first call for a modal comes from its push, before its first
+    // frame: the widget is where it was.
+    if (still == null || !CNTabBarRouteObserver.modalAnimating.value) {
+      _stillRect = mine;
+      _movedWithModal = false;
+      return;
+    }
+    if (mine != null &&
+        ((mine.topLeft - still.topLeft).distance > 0.5 ||
+            (mine.bottomRight - still.bottomRight).distance > 0.5)) {
+      _movedWithModal = true;
+    }
   }
 
   @override
@@ -252,6 +298,8 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
     super.initState();
     CNTabBarRouteObserver.anyModalDepth.addListener(syncHaloContainment);
     CNTabBarRouteObserver.modalAnimating.addListener(syncHaloContainment);
+    CNTabBarRouteObserver.modalBoundsPending.addListener(syncHaloContainment);
+    CNTabBarRouteObserver.modalFrame.addListener(syncHaloContainment);
     CNTabBarRouteObserver.topModalRect.addListener(syncHaloContainment);
     CNTabBarRouteObserver.routeModalRect.addListener(syncHaloContainment);
   }
@@ -279,6 +327,10 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
   void dispose() {
     CNTabBarRouteObserver.anyModalDepth.removeListener(syncHaloContainment);
     CNTabBarRouteObserver.modalAnimating.removeListener(syncHaloContainment);
+    CNTabBarRouteObserver.modalBoundsPending.removeListener(
+      syncHaloContainment,
+    );
+    CNTabBarRouteObserver.modalFrame.removeListener(syncHaloContainment);
     CNTabBarRouteObserver.topModalRect.removeListener(syncHaloContainment);
     CNTabBarRouteObserver.routeModalRect.removeListener(syncHaloContainment);
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
@@ -291,8 +343,10 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
   /// Sends the containment state to the native view if it changed since
   /// the last send.
   void syncHaloContainment() {
+    if (!mounted) return;
+    _trackMotionWithModal();
     final channel = platformViewChannel;
-    if (!mounted || channel == null) return;
+    if (channel == null) return;
     final contained = isHaloContained;
     if (contained == _sentContainment) return;
     _sentContainment = contained;

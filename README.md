@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.6.0
+  cupertino_native_better: ^2.7.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -200,7 +200,7 @@ controller.closed.whenComplete(CNTabBarRouteObserver.markAnyModalInactive);
 The observer above also keeps CN-widgets right under modals (Issues #53, #124, #149):
 
 - **A sheet over a CN-widget removes it.** While a bottom sheet, popup or dialog covers a CN-widget on the page below, the widget's platform view is removed (a same-size placeholder keeps its space) and created again when the modal has gone, so it can't bleed through the sheet. This is **position-aware**: only the widgets the sheet actually covers are removed, so an app-bar button stays up under a 40%-high sheet.
-- **Widgets that stay keep their glass.** A CN-widget the sheet doesn't cover stays up, dimmed by the barrier like the rest of the page, with its full Liquid Glass. Its glow is clipped to its bounds only while it could show through: while the modal fades in or out or is dragged, and while the sheet is within reach of the glow.
+- **Widgets that stay keep their glass.** A CN-widget the sheet doesn't cover stays up, dimmed by the barrier like the rest of the page, with its full Liquid Glass. Its glow is clipped to its bounds only while it could show through: while the sheet, popup or dialog is within reach of the glow, and while a sheet moves the page under it (as sheet packages that scale the page down do). A modal elsewhere leaves it its full glass while it fades in or out too.
 
 The observer measures where the sheet is from what the modal route paints, after every frame while it is up, so this works with `showModalBottomSheet`, `showCupertinoModalPopup`, `showDialog`, `CNBottomSheet` and sheet packages alike. For a sheet that isn't a route (`Scaffold.showBottomSheet`), wrap its content in `CNSheetGeometryProbe`, which publishes its rect, and call `CNTabBarRouteObserver.markAnyModalActive()` / `markAnyModalInactive()` around it:
 
@@ -757,6 +757,22 @@ await CNNativeSheet.show(
   onItemTap: (page, index) {},
 );
 ```
+
+### Scroll edge effect
+
+`CNScrollEdgeEffect` puts the iOS&nbsp;26 scroll edge effect over Flutter content: the soft blur native apps get where content scrolls under the status bar, a bar or the home indicator. iOS draws it (`UIScrollEdgeEffect`), over the Flutter content behind the view, so it matches native apps and follows accessibility settings. With a `ScrollController` it shows while content is under the edge and is gone at rest, as in a native scroll view.
+
+```dart
+Stack(
+  children: [
+    ListView(controller: controller, children: rows),
+    CNScrollEdgeEffect(edge: CNScrollEdge.top, controller: controller),
+    CNScrollEdgeEffect(edge: CNScrollEdge.bottom, height: 100, controller: controller),
+  ],
+)
+```
+
+`CNTabScaffold(bottomScrollEdgeEffect: true)` puts it behind the tab bar. It draws nothing before iOS&nbsp;26, on macOS and on other platforms.
 
 ### iPhone Duo
 
@@ -2010,7 +2026,7 @@ addTearDown(PlatformVersion.reset);
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.6.0
+   cupertino_native_better: ^2.7.0
    ```
 
 2. Update imports:

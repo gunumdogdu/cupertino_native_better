@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 
 import 'foldable.dart';
+import 'scroll_edge_effect.dart';
 import 'tab_bar.dart';
 import 'tab_rail.dart';
 
@@ -43,7 +44,11 @@ enum CNTabPlacement {
 /// unfolding never resets the page's state. It receives a `MediaQuery` whose
 /// padding includes the space the tabs take, so scroll views keep their last
 /// item clear of the bar.
-class CNTabScaffold extends StatelessWidget {
+///
+/// With [bottomScrollEdgeEffect], content scrolling under the bottom bar gets
+/// the iOS 26 scroll edge effect ([CNScrollEdgeEffect]), as under a system
+/// tab bar.
+class CNTabScaffold extends StatefulWidget {
   /// Creates an adaptive tab scaffold.
   const CNTabScaffold({
     super.key,
@@ -57,6 +62,7 @@ class CNTabScaffold extends StatelessWidget {
     this.sidebarMinWidth = 600,
     this.placement,
     this.tabBarBuilder,
+    this.bottomScrollEdgeEffect = false,
   });
 
   /// The tabs, shared by the bottom bar and the rail.
@@ -93,6 +99,13 @@ class CNTabScaffold extends StatelessWidget {
   /// [items], [currentIndex], [onTap] and [tint].
   final WidgetBuilder? tabBarBuilder;
 
+  /// iOS 26: put the system scroll edge effect ([CNScrollEdgeEffect]) behind
+  /// the bottom bar, over the content that scrolls under it, as under a
+  /// system tab bar. It follows the body's main vertical scroll view (the
+  /// first one under [body]): it shows while that view's content is under
+  /// the bar. Only with the bottom placement. Defaults to false.
+  final bool bottomScrollEdgeEffect;
+
   /// Height the bottom bar is assumed to take, above the bottom safe area.
   static const double bottomBarExtent = 64;
 
@@ -106,6 +119,9 @@ class CNTabScaffold extends StatelessWidget {
     }
     return CNTabPlacement.bottom;
   }
+
+  @override
+  State<CNTabScaffold> createState() => _CNTabScaffoldState();
 
   /// Bottom offset for the rail: just above the bottom safe area, unless an
   /// active camera region (the iPhone Duo outer display puts its camera in a
@@ -134,12 +150,36 @@ class CNTabScaffold extends StatelessWidget {
     }
     return bottom;
   }
+}
+
+class _CNTabScaffoldState extends State<CNTabScaffold> {
+  /// The metrics of the body's main vertical scroll view, for the bottom
+  /// scroll edge effect.
+  final ValueNotifier<ScrollMetrics?> _bodyScroll = ValueNotifier(null);
+
+  @override
+  void dispose() {
+    _bodyScroll.dispose();
+    super.dispose();
+  }
+
+  bool _onScrollMetrics(ScrollMetrics metrics, int depth) {
+    // Kept with the effect off too, so turning it on finds the metrics.
+    if (depth == 0 && metrics.axis == Axis.vertical) {
+      _bodyScroll.value = metrics.copyWith();
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final items = widget.items;
+    final currentIndex = widget.currentIndex;
+    final onTap = widget.onTap;
+    final tint = widget.tint;
     final mq = MediaQuery.of(context);
     final padding = mq.padding;
-    final resolved = resolvePlacement(context);
+    final resolved = widget.resolvePlacement(context);
     final barSide = CNFoldable.of(context).verticalBarSide;
     final railOnLeft = barSide == CNVerticalBarSide.left;
 
@@ -151,7 +191,7 @@ class CNTabScaffold extends StatelessWidget {
     switch (resolved) {
       case CNTabPlacement.bottom:
         bodyPadding = padding.copyWith(
-          bottom: padding.bottom + bottomBarExtent,
+          bottom: padding.bottom + CNTabScaffold.bottomBarExtent,
         );
         tabs = Positioned(
           left: 0,
@@ -160,7 +200,7 @@ class CNTabScaffold extends StatelessWidget {
           child: SafeArea(
             top: false,
             child:
-                tabBarBuilder?.call(context) ??
+                widget.tabBarBuilder?.call(context) ??
                 CNTabBar(
                   items: items,
                   currentIndex: currentIndex,
@@ -189,7 +229,7 @@ class CNTabScaffold extends StatelessWidget {
         tabs = Positioned(
           left: railOnLeft ? edge : null,
           right: railOnLeft ? null : edge,
-          bottom: _railBottom(context, railOnLeft, edge),
+          bottom: widget._railBottom(context, railOnLeft, edge),
           child: rail,
         );
       case CNTabPlacement.sidebar:
@@ -210,9 +250,11 @@ class CNTabScaffold extends StatelessWidget {
         );
     }
 
+    final edgeEffect =
+        widget.bottomScrollEdgeEffect && resolved == CNTabPlacement.bottom;
     return ColoredBox(
       color:
-          backgroundColor ??
+          widget.backgroundColor ??
           CupertinoColors.systemBackground.resolveFrom(context),
       child: Stack(
         children: <Widget>[
@@ -231,9 +273,25 @@ class CNTabScaffold extends StatelessWidget {
                   mq.size.height,
                 ),
               ),
-              child: body,
+              // Always present, so turning the effect on or off keeps the
+              // body's state.
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: (n) => _onScrollMetrics(n.metrics, n.depth),
+                child: NotificationListener<ScrollUpdateNotification>(
+                  onNotification: (n) => _onScrollMetrics(n.metrics, n.depth),
+                  child: widget.body,
+                ),
+              ),
             ),
           ),
+          if (edgeEffect)
+            Positioned.fill(
+              child: CNScrollEdgeEffect(
+                edge: CNScrollEdge.bottom,
+                height: padding.bottom + CNTabScaffold.bottomBarExtent,
+                scrollMetrics: _bodyScroll,
+              ),
+            ),
           tabs,
         ],
       ),

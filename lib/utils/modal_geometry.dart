@@ -72,12 +72,24 @@ class _ContentWalk {
       ro is RenderClipOval ||
       ro is RenderClipPath;
 
+  /// The render object of an `OverlayPortal`, private to the framework: it
+  /// paints its child only (the portal's overlay child is painted by the
+  /// overlay). Sheet packages wrap their sheet in one (#156).
+  static bool _isOverlayPortal(RenderBox ro) =>
+      ro.runtimeType.toString() == '_RenderLayoutSurrogateProxyBox';
+
   /// Render objects that paint nothing of their own, only their children.
   static bool _paintsOnlyChildren(RenderBox ro) =>
       // Shifted boxes (padding, alignment, custom single-child layouts such
       // as the Material bottom sheet's) paint their child at an offset.
       ro is RenderShiftedBox ||
       ro is RenderRepaintBoundary ||
+      ro is RenderSemanticsGestureHandler ||
+      ro is RenderTapRegion ||
+      ro is RenderTapRegionSurface ||
+      ro is RenderLeaderLayer ||
+      ro is RenderFollowerLayer ||
+      _isOverlayPortal(ro) ||
       ro is RenderSemanticsAnnotations ||
       ro is RenderMergeSemantics ||
       ro is RenderBlockSemantics ||

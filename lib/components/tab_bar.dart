@@ -2148,8 +2148,9 @@ class CNTabBarRouteObserver extends NavigatorObserver {
 
   /// What the top modal route paints (its sheet, popup or dialog, without
   /// the barrier), measured from its render tree after every frame while it
-  /// is up, for any API that opened it (#149). [Rect.zero] when it paints
-  /// nothing, null when no modal is up or its bounds can't be told.
+  /// is up, for any API that opened it (#149). While it moves, it also
+  /// covers where it will be a frame later (#156). [Rect.zero] when it
+  /// paints nothing, null when no modal is up or its bounds can't be told.
   /// [topModalRect], published by a sheet's own probe, takes precedence.
   static final ValueNotifier<Rect?> _routeModalRect = ValueNotifier<Rect?>(
     null,
@@ -2164,12 +2165,30 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   static Rect? get modalRect => _topModalRect.value ?? _routeModalRect.value;
 
   /// True while a modal route animates: it is entering, leaving, or being
-  /// dragged. Glass widgets under it contain their halo then (#124), and
-  /// keep their full glass once it is at rest (#149).
+  /// dragged.
   static final ValueNotifier<bool> _modalAnimating = ValueNotifier<bool>(false);
 
   /// Read-only listenable of [_modalAnimating].
   static ValueListenable<bool> get modalAnimating => _modalAnimating;
+
+  /// True from the push of a modal route with an entrance animation until
+  /// its bounds have been measured after its first frame ([routeModalRect]).
+  /// It paints next to nothing until then (#156).
+  static final ValueNotifier<bool> _modalBoundsPending = ValueNotifier<bool>(
+    false,
+  );
+
+  /// Read-only listenable of [_modalBoundsPending].
+  static ValueListenable<bool> get modalBoundsPending => _modalBoundsPending;
+  static Route<dynamic>? _pendingRoute;
+
+  /// Notifies after every frame while a modal route animates, once its
+  /// bounds are measured, so widgets under it can follow what the frame did
+  /// to them: some sheets move the page under them (#156).
+  static final ValueNotifier<int> _modalFrame = ValueNotifier<int>(0);
+
+  /// Read-only listenable of [_modalFrame].
+  static Listenable get modalFrame => _modalFrame;
 
   /// The modal routes counted in [anyModalDepth], oldest first, until their
   /// exit animation has finished.
@@ -2189,6 +2208,12 @@ class CNTabBarRouteObserver extends NavigatorObserver {
       return;
     }
     _trackedModals.add(route);
+    if (animation != null &&
+        animation.status == AnimationStatus.forward &&
+        animation.value == 0) {
+      _pendingRoute = route;
+      _modalBoundsPending.value = true;
+    }
     if (animation != null) {
       void onStatus(AnimationStatus status) {
         if (status == AnimationStatus.dismissed) {
@@ -2207,6 +2232,7 @@ class CNTabBarRouteObserver extends NavigatorObserver {
 
   static void _untrackModal(Route<dynamic> route) {
     if (!_trackedModals.remove(route)) return;
+    if (identical(route, _pendingRoute)) _clearPending();
     final listener = _statusListeners.remove(route);
     if (listener != null && route is TransitionRoute) {
       route.animation?.removeStatusListener(listener);
@@ -2235,15 +2261,54 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _measureArmed = false;
       if (_trackedModals.isEmpty) {
+        _measuredRoute = null;
+        _measuredRect = null;
         _routeModalRect.value = null;
+        _clearPending();
         return;
       }
       final top = _trackedModals.last;
-      _routeModalRect.value = top is ModalRoute
-          ? modalRouteContentRect(top)
+      final rect = top is ModalRoute ? modalRouteContentRect(top) : null;
+      // Led only while the route's animation moves it: its last frame is
+      // measured at rest.
+      final previous =
+          identical(top, _measuredRoute) && _animatingModals.contains(top)
+          ? _measuredRect
           : null;
+      _measuredRoute = top;
+      _measuredRect = rect;
+      _routeModalRect.value = _leadingMotion(rect, previous);
+      // After the bounds, so their listeners see both.
+      if (identical(top, _pendingRoute)) _clearPending();
+      if (_animatingModals.isNotEmpty) _modalFrame.value++;
       _armModalMeasure();
     });
+  }
+
+  static void _clearPending() {
+    _pendingRoute = null;
+    _modalBoundsPending.value = false;
+  }
+
+  /// The top modal route last measured, and what it painted then.
+  static Route<dynamic>? _measuredRoute;
+  static Rect? _measuredRect;
+
+  /// [rect], grown to where the modal will be a frame later if it keeps
+  /// moving as it did since [previous] (#156). The bounds are measured after
+  /// a frame, so a widget acting on them would otherwise be a frame behind
+  /// a sheet sliding towards it. Without [previous], [rect] itself.
+  static Rect? _leadingMotion(Rect? rect, Rect? previous) {
+    if (rect == null || previous == null || rect == previous) return rect;
+    if (rect.isEmpty || previous.isEmpty) return rect;
+    return rect.expandToInclude(
+      Rect.fromLTRB(
+        rect.left * 2 - previous.left,
+        rect.top * 2 - previous.top,
+        rect.right * 2 - previous.right,
+        rect.bottom * 2 - previous.bottom,
+      ),
+    );
   }
 
   /// Heuristic for "is this route a full-screen-ish sheet that should

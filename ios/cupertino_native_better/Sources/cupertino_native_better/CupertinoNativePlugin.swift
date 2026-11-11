@@ -105,6 +105,9 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     // Register the vertical tab rail platform view
     let tabRailFactory = CNTabRailViewFactory(messenger: registrar.messenger())
     registrar.register(tabRailFactory, withId: "CNTabRail")
+
+    // The system scroll edge effect over Flutter content (#150, iOS 26+)
+    registrar.register(CNScrollEdgeEffectFactory(messenger: registrar.messenger()), withId: "CNScrollEdgeEffect")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

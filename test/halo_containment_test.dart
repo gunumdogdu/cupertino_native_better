@@ -8,10 +8,10 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// #29: on while the host route animates. #124: also on while a modal route
 /// over a mounted widget animates, and while its dialog or sheet is up over
-/// the widget, from the push until the exit animation has finished. #149:
-/// with the sheet elsewhere, the widget keeps its full glass while the sheet
-/// is at rest, and a widget with the default `autoHideOnModal: true` stays
-/// mounted (a sheet over it removes it).
+/// the widget, from the push until the exit animation has finished. #149 and
+/// #156: with the sheet elsewhere, the widget keeps its full glass while the
+/// sheet is up and while it moves, and a widget with the default
+/// `autoHideOnModal: true` stays mounted (a sheet over it removes it).
 
 /// The method channel prefix of each glass widget's native view.
 const List<String> _prefixes = <String>[
@@ -220,7 +220,7 @@ void main() {
       for (final autoHide in <bool>[true, false]) {
         testWidgets(
           'autoHideOnModal: $autoHide, a sheet away from it: stays mounted, '
-          'contained only while the sheet moves (#149)',
+          'never contained (#149, #156)',
           (tester) async {
             mockNative(tester);
             await pumpHost(
@@ -233,12 +233,19 @@ void main() {
 
             openBottomSheet();
             await tester.pump();
-            expect(sent[name], <bool>[true], reason: 'as the sheet slides in');
+            expect(
+              sent[name],
+              isNull,
+              reason:
+                  'its first frame paints next to nothing, and it is '
+                  'measured elsewhere after it',
+            );
             await tester.pumpAndSettle();
-            expect(sent[name], <bool>[
-              true,
-              false,
-            ], reason: 'full glass while the sheet is up elsewhere');
+            expect(
+              sent[name],
+              isNull,
+              reason: 'full glass while the sheet slides in and is up',
+            );
             expect(
               find.byType(UiKitView),
               findsOneWidget,
@@ -246,11 +253,13 @@ void main() {
             );
 
             navigator.currentState!.pop();
-            await tester.pump();
-            expect(sent[name], <bool>[true, false, true], reason: 'leaving');
             await tester.pumpAndSettle();
-            expect(sent[name], <bool>[true, false, true, false]);
-            expect(sent.keys, <String>[name], reason: 'the same view');
+            expect(sent[name], isNull, reason: 'and while it leaves');
+            expect(
+              sent.keys,
+              isEmpty,
+              reason: 'a new view would have been sent its state',
+            );
             await finish(tester);
           },
           skip: !PlatformVersion.shouldUseNativeGlass,

@@ -1,3 +1,35 @@
+## 2.7.0
+
+> New: `CNScrollEdgeEffect`, the iOS 26 scroll edge effect over Flutter content (#150), and `CNTabScaffold.bottomScrollEdgeEffect`. Fixed: glass widgets with `autoHideOnModal: false` flat under a sheet from a sheet package, or while a dialog elsewhere fades in or out (#156).
+
+### New — `CNScrollEdgeEffect` (#150)
+
+The soft blur native apps get where content scrolls under the status bar, a bar or the home indicator, over Flutter content. Flutter content isn't in a `UIScrollView`, so the widget is a clear platform view with a scroll view of its own, its top or bottom edge effect on, and a `UIScrollEdgeElementContainerInteraction` that shapes the effect to the band. iOS draws the effect over the Flutter content behind the view: it is the system's own (`UIScrollEdgeEffect`, public API only), so it matches native apps and follows accessibility settings.
+
+- `edge` (top or bottom), `height` (the band; by default the safe area on that edge), `style` (`soft` or `hard`), `brightness`.
+- With a `controller` (or `scrollMetrics`), the effect shows while content is under the edge and is gone at rest, as in a native scroll view. iOS switches it on as soon as content is under the edge; it doesn't fade in with the offset.
+- It places itself at its edge and lets touches through to the content.
+- `CNTabScaffold(bottomScrollEdgeEffect: true)` puts it behind the tab bar, following the body's scroll view.
+- iOS 26 and later; elsewhere it draws nothing.
+
+Thanks to @Ashhad08 for the request and its precise requirements.
+
+### Fixed — glass flat under a sheet package's sheet, and while a dialog fades (#156)
+
+Glass widgets with `autoHideOnModal: false` (`CNButton`, `CNPopupMenuButton`, `CNGlassButtonGroup`, `LiquidGlassContainer`, `CNSearchBar`, `CNFloatingIsland`):
+
+- **Under a sheet from a sheet package** they stayed flat (no rim or shadow) for as long as the sheet was open, even with the sheet nowhere near them. The package wraps its sheet in a full-screen `OverlayPortal` and gesture detector, which `CNTabBarRouteObserver` didn't know paint only their child, so it measured the sheet as the whole screen. It now measures the sheet itself, and the widget keeps its full glass while the sheet is up, dimmed like the rest of the page.
+- **While a dialog, popup or sheet elsewhere fades in or out**, or slides, their shadow and rim dropped out and came back once it stopped. Where the modal is now decides while it moves too, so they keep their full glass. They are still contained while the modal comes within reach of their glow (its bounds lead its motion by a frame), and while a sheet moves the page under it, as sheet packages that scale the page down do.
+
+Thanks to @Ashhad08 for the report, the repro app and the recordings.
+
+### Checked
+- **#156, iPhone 17 Pro Max simulator, iOS 26.2, with the reporter's repro app:** under the package's sheet, full glass at rest (flat before), contained while the sheet scales the page; through a dialog's fade-in, rest and fade-out, the shadow stays on every frame (it dropped out before); the same with a half-height `showModalBottomSheet`.
+- **#156, iPhone Duo simulator, iOS 27.1, Flutter 3.47.9** (where #124's box showed): with no containment while a dialog fades, there is no box around the button, frame by frame at 10× slow motion; a dialog over the button still contains it.
+- **iPhone 17 Pro Max simulator, iOS 26.2:** text under the top band (status bar included, full width) and the bottom band blurred, measured against the same frame without the effect; nothing at rest at the top or at the end of the list; soft and hard; light and dark; behind `CNTabScaffold`'s tab bar.
+- **iPhone 17 simulator, iOS 27.0:** the same; there the system already softens content under the status bar, and the effect extends it to the band.
+- **Tests:** 12 new tests (7 for `CNScrollEdgeEffect`, 5 for #156); 621 tests pass.
+
 ## 2.6.0
 
 > `CNButton` labels that change often (#154) and label colours for light and dark glass (#153). New: `CNButtonConfig.animateSizeChanges`, `labelColorLight` and `labelColorDark` (also on `CNPopupMenuButton`). Fixed: vertical padding, and a tint or style change that dropped the label's font and padding.
