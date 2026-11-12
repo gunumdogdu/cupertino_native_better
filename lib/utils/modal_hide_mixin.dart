@@ -1,7 +1,12 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../components/tab_bar.dart' show CNTabBarRouteObserver;
+import 'modal_geometry.dart' show globalBoundsOf;
 
 /// Position-aware destroy-on-modal helper for PlatformView-based CN-widgets.
 ///
@@ -114,11 +119,8 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
   /// This widget's global bounds, or null before it is laid out.
   Rect? _globalRect() {
     final ro = context.findRenderObject();
-    if (ro is! RenderBox || !ro.attached || !ro.hasSize) return null;
-    return MatrixUtils.transformRect(
-      ro.getTransformTo(null),
-      Offset.zero & ro.size,
-    );
+    if (ro is! RenderBox) return null;
+    return globalBoundsOf(ro);
   }
 
   void _onModalStateChanged() {
@@ -192,24 +194,32 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
 }
 
 /// Drives the native halo containment (`setTransitioning`) of an iOS 26
-/// Liquid Glass platform view (Issues #29 and #124).
+/// Liquid Glass platform view (Issues #29, #124, #156 and #159).
 ///
 /// At rest the glass view is unclipped, so it can draw its full soft glow.
-/// While that glow could show past the view's bounds, the native side clips
-/// the view and clears its shadow instead. This mixin turns that
-/// containment on:
+/// Flutter draws what lies over the view inside its bounds above it, but
+/// past its bounds the glow would draw over a sheet or page coming over it.
+/// So while a sheet, popup, dialog or page is within reach of the glow,
+/// the native view hides the part of its glow under it (`cuts`) and keeps
+/// its full glass everywhere else:
 ///
-///  * while the host route animates, because a page is pushed over it or
-///    popped off it (#29); and
+///  * while the host route animates, because a page is pushed over it,
+///    popped off it, or dragged by the back gesture (#29, #159); and
 ///  * while a modal route (a dialog, popup or sheet) is over a widget that
 ///    stays mounted, and its sheet, popup or dialog is within reach of the
-///    widget's glow, or its bounds aren't known yet, so the glow isn't
-///    drawn over it (#124). A modal doesn't move the host route's secondary
-///    animation, so the first rule never fires for it.
+///    widget's glow (#124, #156). A modal doesn't move the host route's
+///    secondary animation, so the first rule never fires for it.
+///
+/// When the position of what covers it can't be told (no
+/// `CNTabBarRouteObserver`, or a modal whose bounds aren't known yet), the
+/// native view is clipped to its bounds and its shadow cleared instead
+/// (`active`), which leaves the glass flat. So is it on macOS, where the
+/// engine clips every platform view to its bounds anyway.
 ///
 /// The modal's bounds are measured after every frame while it moves, and
-/// lead its motion by a frame ([CNTabBarRouteObserver.modalRect]). A modal
-/// whose sheet, popup or dialog stays elsewhere leaves the widget its full
+/// lead its motion by a frame ([CNTabBarRouteObserver.modalRect]); so are a
+/// moving page's ([CNTabBarRouteObserver.movingRouteRect]). A modal whose
+/// sheet, popup or dialog stays elsewhere leaves the widget its full
 /// glass, dimmed by the barrier like the rest of the page: at rest (#149),
 /// while it fades in or out, and while it moves the page under it, as
 /// sheet packages that scale the page down do, also for as long as a finger
@@ -232,36 +242,165 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
 /// **Usage.** Mix in after [ModalHideMixin] and call
 /// [resetHaloContainment] from `onPlatformViewCreated`, once
 /// [ModalHideMixin.platformViewChannel] returns the new view's channel. The
-/// native view must handle `setTransitioning` (`{active: bool}`).
+/// native view must handle `setTransitioning` (`{active: bool, cuts:
+/// [[left, top, right, bottom], ...]}`, the cuts in its own coordinates and
+/// outside its bounds).
 mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
+  ModalRoute<dynamic>? _hostRoute;
   Animation<double>? _routeAnimation;
+  bool _pageAwaited = false;
   bool? _sentContainment;
+  List<double> _sentCuts = const <double>[];
 
   /// How far past its bounds the glass can draw its glow and shadow.
   static const double _haloReach = 24;
 
-  /// Whether containment should be on now.
-  bool get isHaloContained {
+  /// How far past its bounds a cut reaches: well past the glow.
+  static const double _cutReach = 160;
+
+  /// Whether the native view hides only the covered part of its glow. On
+  /// macOS the engine clips every platform view to its bounds.
+  static bool get _cutsSupported => defaultTargetPlatform == TargetPlatform.iOS;
+
+  /// Whether the native view was last told to clip to its bounds, its glass
+  /// flat.
+  bool get isHaloContained => _sentContainment ?? false;
+
+  /// The containment now: clipped, or the global rect of what covers part of
+  /// the glow, or neither. Null to keep what was sent.
+  ({bool contained, Rect? cover})? _haloState() {
+    const full = (contained: false, cover: null);
+    const contained = (contained: true, cover: null);
     final status = _routeAnimation?.status;
     if (status == AnimationStatus.forward ||
         status == AnimationStatus.reverse) {
-      return true;
+      // The page moving over or off this one hides the glow it covers,
+      // where it is now (#159). Only an observer of this navigator can tell
+      // where that is.
+      final navigator = _hostRoute?.navigator;
+      final observed =
+          navigator?.widget.observers.any((o) => o is CNTabBarRouteObserver) ??
+          false;
+      if (!_cutsSupported || !observed) return contained;
+      final moving = CNTabBarRouteObserver.movingRoute;
+      final page = CNTabBarRouteObserver.movingRouteRect.value;
+      if (page == null ||
+          moving == null ||
+          identical(moving, _hostRoute) ||
+          !identical(moving.navigator, navigator)) {
+        // The route starts moving before the navigator tells its observers
+        // about the push or pop, in the same call: wait for it, a frame at
+        // most.
+        if (_pageAwaited) return contained;
+        _pageAwaited = true;
+        _retryAfterFrame();
+        return _sentContainment == null ? full : null;
+      }
+      _pageAwaited = false;
+      if (page.isEmpty) return full;
+      final mine = _globalRect();
+      if (mine == null) return _retryAfterFrame();
+      return mine.inflate(_haloReach).overlaps(page)
+          ? (contained: false, cover: page)
+          : full;
     }
+    _pageAwaited = false;
     final modalAbove = CNTabBarRouteObserver.anyModalDepth.value > _mountDepth;
-    if (!modalAbove || isHiddenForModal) return false;
+    if (!modalAbove || isHiddenForModal) return full;
     // A modal entering from nothing paints next to nothing in its first
     // frame: keep the glass as it is until its bounds are measured, so a
     // modal elsewhere doesn't clip it for that frame (#156).
     if (CNTabBarRouteObserver.modalBoundsPending.value) {
-      return _sentContainment ?? false;
+      return _sentContainment == null ? full : null;
     }
     // Where the sheet, popup or dialog is decides, while it moves too: a
     // barrier fading in or out dims the glass evenly, and a page the modal
     // moves carries the glass with it (#156).
     final sheet = CNTabBarRouteObserver.modalRect;
+    if (sheet == null) return contained;
     final mine = _globalRect();
-    if (sheet == null || mine == null) return true;
-    return mine.inflate(_haloReach).overlaps(sheet);
+    if (mine == null) return _retryAfterFrame();
+    if (!mine.inflate(_haloReach).overlaps(sheet)) return full;
+    return _cutsSupported ? (contained: false, cover: sheet) : contained;
+  }
+
+  bool _retryArmed = false;
+
+  /// Keeps what was sent while this widget isn't laid out where it is now,
+  /// and decides again after the frame (#159). Nothing sent yet: contained.
+  ({bool contained, Rect? cover})? _retryAfterFrame() {
+    if (!_retryArmed) {
+      _retryArmed = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _retryArmed = false;
+        syncHaloContainment();
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
+    return _sentContainment == null ? (contained: true, cover: null) : null;
+  }
+
+  /// The parts of [cover] (global) that lie past the glass view's bounds and
+  /// within reach of its glow, as `[left, top, right, bottom]` rects in the
+  /// view's own coordinates: at most four, not overlapping. Inside its
+  /// bounds Flutter draws what covers the view above it.
+  List<List<double>> _cutsFor(Rect cover) {
+    final box = _glassBox();
+    if (box == null || globalBoundsOf(box) == null) {
+      return const <List<double>>[];
+    }
+    final toLocal = Matrix4.tryInvert(box.getTransformTo(null));
+    if (toLocal == null) return const <List<double>>[];
+    final bounds = Offset.zero & box.size;
+    final local = MatrixUtils.transformRect(toLocal, cover);
+    if (!bounds.inflate(_haloReach).overlaps(local)) {
+      return const <List<double>>[];
+    }
+    final c = local.intersect(bounds.inflate(_cutReach));
+    final pieces = <Rect>[];
+    if (!c.overlaps(bounds)) {
+      pieces.add(c);
+    } else {
+      final top = math.max(c.top, bounds.top);
+      final bottom = math.min(c.bottom, bounds.bottom);
+      pieces
+        ..add(Rect.fromLTRB(c.left, c.top, c.right, top))
+        ..add(Rect.fromLTRB(c.left, bottom, c.right, c.bottom))
+        ..add(Rect.fromLTRB(c.left, top, bounds.left, bottom))
+        ..add(Rect.fromLTRB(bounds.right, top, c.right, bottom));
+    }
+    double round(double v) => (v * 2).roundToDouble() / 2;
+    return <List<double>>[
+      for (final p in pieces)
+        if (p.width > 0 && p.height > 0)
+          <double>[
+            round(p.left),
+            round(p.top),
+            round(p.right),
+            round(p.bottom),
+          ],
+    ];
+  }
+
+  /// The render box of the glass platform view: the first `UiKitView` under
+  /// this widget, else the widget's own box.
+  RenderBox? _glassBox() {
+    final root = context.findRenderObject();
+    if (root is! RenderBox || !root.attached || !root.hasSize) return null;
+    RenderBox? found;
+    var budget = 64;
+    void visit(RenderObject ro) {
+      if (found != null || --budget < 0) return;
+      if (ro is RenderUiKitView) {
+        found = ro;
+        return;
+      }
+      ro.visitChildren(visit);
+    }
+
+    visit(root);
+    final box = found ?? root;
+    return box.hasSize ? box : null;
   }
 
   @override
@@ -271,12 +410,14 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
     CNTabBarRouteObserver.modalBoundsPending.addListener(syncHaloContainment);
     CNTabBarRouteObserver.topModalRect.addListener(syncHaloContainment);
     CNTabBarRouteObserver.routeModalRect.addListener(syncHaloContainment);
+    CNTabBarRouteObserver.movingRouteRect.addListener(syncHaloContainment);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final animation = ModalRoute.of(context)?.secondaryAnimation;
+    _hostRoute = ModalRoute.of(context);
+    final animation = _hostRoute?.secondaryAnimation;
     if (!identical(animation, _routeAnimation)) {
       _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
       _routeAnimation = animation;
@@ -300,8 +441,10 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
     );
     CNTabBarRouteObserver.topModalRect.removeListener(syncHaloContainment);
     CNTabBarRouteObserver.routeModalRect.removeListener(syncHaloContainment);
+    CNTabBarRouteObserver.movingRouteRect.removeListener(syncHaloContainment);
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
     _routeAnimation = null;
+    _hostRoute = null;
     super.dispose();
   }
 
@@ -313,15 +456,23 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
     if (!mounted) return;
     final channel = platformViewChannel;
     if (channel == null) return;
-    final contained = isHaloContained;
-    if (contained == _sentContainment) return;
-    _sentContainment = contained;
+    final state = _haloState();
+    if (state == null) return;
+    final cover = state.cover;
+    final cuts = cover == null ? const <List<double>>[] : _cutsFor(cover);
+    final flat = <double>[for (final c in cuts) ...c];
+    if (state.contained == _sentContainment && listEquals(flat, _sentCuts)) {
+      return;
+    }
+    _sentContainment = state.contained;
+    _sentCuts = flat;
     // Fire-and-forget from a listener. `catchError`, not try/catch, because
     // the error (e.g. MissingPluginException while the view is recreated)
     // arrives asynchronously.
     channel
         .invokeMethod<void>('setTransitioning', <String, Object?>{
-          'active': contained,
+          'active': state.contained,
+          if (cuts.isNotEmpty) 'cuts': cuts,
         })
         .catchError((Object _) {});
   }
@@ -329,6 +480,7 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
   /// Sends the current state to a newly created native view.
   void resetHaloContainment() {
     _sentContainment = null;
+    _sentCuts = const <double>[];
     syncHaloContainment();
   }
 }

@@ -1,6 +1,20 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+/// The global bounds of [box] as painted now, or null when it or any
+/// render object above it hasn't been laid out yet: a transition that
+/// starts inserts a wrapper the frame lays out (#159).
+Rect? globalBoundsOf(RenderBox box) {
+  if (!box.attached) return null;
+  for (RenderObject? ro = box; ro != null; ro = ro.parent) {
+    if (ro is RenderBox && !ro.hasSize) return null;
+  }
+  return MatrixUtils.transformRect(
+    box.getTransformTo(null),
+    Offset.zero & box.size,
+  );
+}
+
 /// The global bounds of what a modal route paints (its sheet, popup or
 /// dialog, not its barrier), for position-aware hiding and halo containment
 /// of the CN widgets under it (#149). [Rect.zero] when it paints nothing,

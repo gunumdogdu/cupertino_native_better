@@ -277,6 +277,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         // glass capsule renders its full soft-edge glow.
         let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
         self.applyTransitionContainment(active)
+        CNHaloMask.apply(self.container, arguments: call.arguments)
         result(nil)
       case "getIntrinsicSize":
         // At an unlimited width: `intrinsicContentSize` wraps a

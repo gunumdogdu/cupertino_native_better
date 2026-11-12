@@ -123,6 +123,10 @@
 //     --dart-define=OBSERVER=true
 //     (#156: a glass button under a sheet built like a sheet package's, and
 //     a dialog away from it; AUTO=true opens each, printing `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue159
+//     --dart-define=OBSERVER=true
+//     (#159: a glass button under a page pushed over it and popped off it;
+//     AUTO=true pushes and pops twice, printing `CNB_SHOT`)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -204,6 +208,7 @@ import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/issue149_glass_button_under_sheet_test.dart';
 import 'demos/issue156_glass_button_package_sheet_test.dart';
+import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -361,6 +366,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue156') {
       return const Issue156GlassButtonPackageSheetTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue159') {
+      return const Issue159GlassButtonPagePopTestPage(autoCycle: _auto);
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();

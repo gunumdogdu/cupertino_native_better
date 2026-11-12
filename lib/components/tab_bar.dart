@@ -2311,6 +2311,144 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     );
   }
 
+  /// Where the page route moving over or off another page is, measured
+  /// after every frame while it moves: pushed, popped, or dragged by the
+  /// back gesture (#159). The glass widgets on the page under it hide only
+  /// the part of their glow it covers, instead of clipping all of it until
+  /// the transition ends. While it moves, it also covers where it will be a
+  /// frame later. Null while no page route moves, or when its bounds can't
+  /// be told.
+  static final ValueNotifier<Rect?> _movingRouteRect = ValueNotifier<Rect?>(
+    null,
+  );
+
+  /// Read-only listenable of [_movingRouteRect].
+  static ValueListenable<Rect?> get movingRouteRect => _movingRouteRect;
+
+  /// The page route [movingRouteRect] was measured from, so a widget can
+  /// tell it moves in its own navigator.
+  static ModalRoute<dynamic>? get movingRoute =>
+      _movingRouteRect.value == null ? null : _movingMeasured;
+
+  /// The page routes whose animation is watched, with their listeners.
+  static final Map<Route<dynamic>, AnimationStatusListener> _routeWatchers =
+      <Route<dynamic>, AnimationStatusListener>{};
+
+  /// The watched routes moving now, in the order they started.
+  static final List<ModalRoute<dynamic>> _movingRoutes =
+      <ModalRoute<dynamic>>[];
+  static bool _movingMeasureArmed = false;
+  static ModalRoute<dynamic>? _movingMeasured;
+  static Rect? _movingMeasuredRect;
+
+  /// Watches [route]'s animation while it is in the navigator, so its moves
+  /// are measured. Popups, dialogs and sheets on a popup route don't move
+  /// the page under them, and the modal rules cover them.
+  static void _watchRoute(Route<dynamic> route) {
+    if (route is! ModalRoute || route is PopupRoute) return;
+    if (_routeWatchers.containsKey(route)) return;
+    final animation = route.animation;
+    if (animation == null) return;
+    void onStatus(AnimationStatus status) {
+      if (status == AnimationStatus.dismissed) {
+        _unwatchRoute(route);
+      } else {
+        _setRouteMoving(route, _isMoving(status));
+      }
+    }
+
+    animation.addStatusListener(onStatus);
+    _routeWatchers[route] = onStatus;
+    _setRouteMoving(route, _isMoving(animation.status));
+  }
+
+  static void _unwatchRoute(Route<dynamic> route) {
+    _wasOffstage.remove(route);
+    _layoutPending.remove(route);
+    final listener = _routeWatchers.remove(route);
+    if (listener != null && route is TransitionRoute) {
+      route.animation?.removeStatusListener(listener);
+    }
+    if (route is ModalRoute) _setRouteMoving(route, false);
+  }
+
+  /// The routes that stopped moving because they went offstage.
+  static final Set<Route<dynamic>> _wasOffstage = <Route<dynamic>>{};
+
+  /// The routes back from offstage that no frame has laid out since: they
+  /// are laid out where their transition ends, and have painted nothing.
+  static final Set<Route<dynamic>> _layoutPending = <Route<dynamic>>{};
+
+  static void _setRouteMoving(ModalRoute<dynamic> route, bool moving) {
+    if (!moving && route.offstage) _wasOffstage.add(route);
+    if (moving) {
+      if (_movingRoutes.contains(route)) return;
+      _movingRoutes.add(route);
+      // Where it is now: a page popped or dragged back is laid out where it
+      // stands, and a page pushed has painted nothing yet. Back from an
+      // offstage frame, it is laid out where it will end until the next
+      // frame: it has painted nothing yet either.
+      if (_wasOffstage.remove(route)) {
+        _layoutPending.add(route);
+        // Runs after the next frame, which lays it out where it is, also
+        // when this runs among the post-frame callbacks of the frame before.
+        SchedulerBinding.instance.addPostFrameCallback(
+          (_) => _layoutPending.remove(route),
+        );
+      }
+      _movingMeasured = route;
+      _movingMeasuredRect = _pageRect(route);
+      _movingRouteRect.value = _movingMeasuredRect;
+      _armMovingMeasure();
+    } else if (_movingRoutes.remove(route) && _movingRoutes.isEmpty) {
+      // Cleared after the frame: the hero controller makes a pushed route
+      // offstage for its first frame, which stops and restarts its
+      // animation within it.
+      _armMovingMeasure();
+    }
+  }
+
+  /// Measures the last route that started moving after the next frame, and
+  /// after each frame while it moves.
+  static void _armMovingMeasure() {
+    if (_movingMeasureArmed) return;
+    _movingMeasureArmed = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _movingMeasureArmed = false;
+      // A navigator disposed with its routes reports nothing more.
+      for (final route in List<ModalRoute<dynamic>>.of(_movingRoutes)) {
+        if (route.navigator == null) _unwatchRoute(route);
+      }
+      if (_movingRoutes.isEmpty) {
+        _movingMeasured = null;
+        _movingMeasuredRect = null;
+        _movingRouteRect.value = null;
+        return;
+      }
+      final route = _movingRoutes.last;
+      final rect = _pageRect(route);
+      final previous = identical(route, _movingMeasured)
+          ? _movingMeasuredRect
+          : null;
+      _movingMeasured = route;
+      _movingMeasuredRect = rect;
+      _movingRouteRect.value = _leadingMotion(rect, previous);
+      // Frames come only while it moves, so a finger holding the back
+      // gesture still costs nothing.
+      _armMovingMeasure();
+    });
+  }
+
+  /// The global bounds of [route]'s page as its transition places it now. A
+  /// page paints its whole box, so its box is enough. [Rect.zero] while it
+  /// is offstage or hasn't been laid out: it paints nothing.
+  static Rect _pageRect(ModalRoute<dynamic> route) {
+    if (route.offstage || _layoutPending.contains(route)) return Rect.zero;
+    final box = route.subtreeContext?.findRenderObject();
+    if (box is! RenderBox) return Rect.zero;
+    return globalBoundsOf(box) ?? Rect.zero;
+  }
+
   /// Heuristic for "is this route a full-screen-ish sheet that should
   /// trigger tab-bar auto-hide?". Intentionally narrow: only matches
   /// routes whose runtime type name contains `Sheet`. This catches the
@@ -2411,6 +2549,7 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _bumpUp(route);
+    _watchRoute(route);
     notifyCNRouteChange();
   }
 
@@ -2419,6 +2558,8 @@ class CNTabBarRouteObserver extends NavigatorObserver {
     // Defer ONLY the broad _anyModalDepth decrement; the narrow _modalDepth
     // path remains synchronous inside _bumpDown.
     _bumpDown(route, deferAnyModal: true);
+    // Watched since its push; also when it was pushed before this observer.
+    _watchRoute(route);
     notifyCNRouteChange();
   }
 
@@ -2426,14 +2567,21 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     // didRemove represents a non-animated removal; deferring would never fire.
     _bumpDown(route);
+    _unwatchRoute(route);
     notifyCNRouteChange();
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     // Replaced route's pixels are immediately gone; keep synchronous.
-    if (oldRoute != null) _bumpDown(oldRoute);
-    if (newRoute != null) _bumpUp(newRoute);
+    if (oldRoute != null) {
+      _bumpDown(oldRoute);
+      _unwatchRoute(oldRoute);
+    }
+    if (newRoute != null) {
+      _bumpUp(newRoute);
+      _watchRoute(newRoute);
+    }
     notifyCNRouteChange();
   }
 }

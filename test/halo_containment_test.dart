@@ -6,12 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Halo containment (`setTransitioning`) of the iOS 26 glass widgets.
 ///
-/// #29: on while the host route animates. #124: also on while a modal route
-/// over a mounted widget animates, and while its dialog or sheet is up over
-/// the widget, from the push until the exit animation has finished. #149 and
-/// #156: with the sheet elsewhere, the widget keeps its full glass while the
-/// sheet is up and while it moves, and a widget with the default
-/// `autoHideOnModal: true` stays mounted (a sheet over it removes it).
+/// Each value sent is recorded as `full` (no containment), `cut` (full
+/// glass, the glow under what covers it masked out) or `contained` (clipped
+/// to its bounds, flat).
+///
+/// #29 and #159: while the host route animates, the glow the moving page
+/// covers is cut; without a `CNTabBarRouteObserver` the widget is contained.
+/// #124 and #156: while a modal route's dialog or sheet is within reach of a
+/// mounted widget's glow, from the push until the exit animation has
+/// finished, the glow it covers is cut. #149 and #156: with the sheet
+/// elsewhere, the widget keeps its full glass while the sheet is up and
+/// while it moves, and a widget with the default `autoHideOnModal: true`
+/// stays mounted (a sheet over it removes it).
 
 /// The method channel prefix of each glass widget's native view.
 const List<String> _prefixes = <String>[
@@ -61,7 +67,10 @@ final Map<String, Widget Function(bool autoHide)> _widgets =
 
 void main() {
   /// `setTransitioning` values sent, by channel name, in order.
-  final sent = <String, List<bool>>{};
+  final sent = <String, List<String>>{};
+
+  /// The `cuts` of the last `setTransitioning` call, by channel name.
+  final lastCuts = <String, List<Rect>>{};
   final navigator = GlobalKey<NavigatorState>();
 
   void mockNative(WidgetTester tester) {
@@ -76,8 +85,24 @@ void main() {
         final name = '$prefix$id';
         messenger.setMockMethodCallHandler(MethodChannel(name), (call) async {
           if (call.method == 'setTransitioning') {
-            final active = (call.arguments as Map)['active'] as bool;
-            (sent[name] ??= <bool>[]).add(active);
+            final args = call.arguments as Map;
+            final cuts = <Rect>[
+              for (final c in (args['cuts'] as List?) ?? const <Object>[])
+                Rect.fromLTRB(
+                  (c as List)[0] as double,
+                  c[1] as double,
+                  c[2] as double,
+                  c[3] as double,
+                ),
+            ];
+            lastCuts[name] = cuts;
+            (sent[name] ??= <String>[]).add(
+              args['active'] as bool
+                  ? 'contained'
+                  : cuts.isEmpty
+                  ? 'full'
+                  : 'cut',
+            );
           }
           return null;
         });
@@ -120,11 +145,11 @@ void main() {
   }
 
   /// Every value sent to any view since the last [clear].
-  List<bool> all() => <bool>[for (final v in sent.values) ...v];
+  List<String> all() => <String>[for (final v in sent.values) ...v];
 
   /// The last value sent to each view that is still on screen. Views
   /// removed under a modal stay in [sent]; [names] narrows it down.
-  bool? last(String name) => sent[name]?.last;
+  String? last(String name) => sent[name]?.last;
 
   void clear() => sent.clear();
 
@@ -151,39 +176,49 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   }
 
-  setUp(sent.clear);
+  setUp(() {
+    sent.clear();
+    lastCuts.clear();
+  });
 
   for (final entry in _widgets.entries) {
     group(entry.key, () {
       testWidgets(
-        'autoHideOnModal: false keeps containment on from the dialog push '
-        'until its exit animation ends (#124)',
+        'autoHideOnModal: false: the dialog over it cuts the glow it covers '
+        'from its first frame until its exit animation ends (#124, #156)',
         (tester) async {
           mockNative(tester);
           await pumpHost(tester, entry.value(false));
           final names = sent.keys.toList();
           expect(names, hasLength(1), reason: 'one native view');
           final name = names.single;
-          expect(last(name), isFalse, reason: 'at rest: no containment');
+          expect(last(name), 'full', reason: 'at rest: no containment');
           clear();
 
           await openDialog(tester);
-          // The observer bumps the depth inside push, before any frame.
           await tester.pump();
-          expect(sent[name], <bool>[true], reason: 'on with the push');
+          expect(sent[name], isNotEmpty, reason: 'cut after its first frame');
+          expect(sent[name], everyElement('cut'));
 
           await tester.pumpAndSettle();
-          expect(sent[name], <bool>[true], reason: 'stays on while up');
+          expect(sent[name], everyElement('cut'), reason: 'cut while up');
 
           navigator.currentState!.pop();
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 50));
-          expect(sent[name], <bool>[
-            true,
-          ], reason: 'still on during the exit fade');
+          expect(
+            sent[name],
+            everyElement('cut'),
+            reason: 'still cut during the exit fade',
+          );
 
           await tester.pumpAndSettle();
-          expect(sent[name], <bool>[true, false], reason: 'off once gone');
+          expect(last(name), 'full', reason: 'full once gone');
+          expect(
+            sent[name]!.sublist(0, sent[name]!.length - 1),
+            everyElement('cut'),
+            reason: 'never clipped flat',
+          );
           await finish(tester);
         },
         skip: !PlatformVersion.shouldUseNativeGlass,
@@ -211,7 +246,7 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(find.byType(UiKitView), findsOneWidget);
-          expect(sent[sent.keys.last]!.last, isFalse);
+          expect(sent[sent.keys.last]!.last, 'full');
           await finish(tester);
         },
         skip: !PlatformVersion.shouldUseNativeGlass,
@@ -266,8 +301,8 @@ void main() {
         );
       }
 
-      testWidgets('a page pushed over it turns containment on only while it '
-          'animates (#29)', (tester) async {
+      testWidgets('a page pushed over it and popped off it cuts the glow it '
+          'covers, and never clips it flat (#29, #159)', (tester) async {
         mockNative(tester);
         await pumpHost(tester, entry.value(false));
         final name = sent.keys.single;
@@ -279,17 +314,49 @@ void main() {
           ),
         );
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(sent[name], <bool>[true]);
+        expect(sent[name], isNull, reason: 'the page has painted nothing yet');
         await tester.pumpAndSettle();
-        expect(sent[name], <bool>[true, false]);
+        expect(sent[name], contains('cut'), reason: 'cut as the page comes');
+        expect(sent[name], isNot(contains('contained')));
+        expect(last(name), 'full', reason: 'full once it stops');
+        clear();
 
         navigator.currentState!.pop();
+        expect(
+          sent[name],
+          <String>['cut'],
+          reason: 'the page covers it where it stands when the pop starts',
+        );
+        await tester.pumpAndSettle();
+        expect(sent[name], isNot(contains('contained')));
+        expect(last(name), 'full', reason: 'full once the page has gone');
+        expect(
+          sent[name]!.sublist(0, sent[name]!.length - 1),
+          everyElement('cut'),
+        );
+        await finish(tester);
+      }, skip: !PlatformVersion.shouldUseNativeGlass);
+
+      testWidgets('without a route observer, a page pushed over it contains '
+          'it while it animates (#29)', (tester) async {
+        mockNative(tester);
+        await pumpHost(tester, entry.value(false), observer: false);
+        final name = sent.keys.single;
+        clear();
+
+        navigator.currentState!.push(
+          CupertinoPageRoute<void>(
+            builder: (_) => const CupertinoPageScaffold(child: SizedBox()),
+          ),
+        );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
-        expect(sent[name], <bool>[true, false, true]);
+        expect(sent[name], <String>['contained']);
         await tester.pumpAndSettle();
-        expect(sent[name], <bool>[true, false, true, false]);
+        expect(sent[name], <String>['contained', 'full']);
+
+        navigator.currentState!.pop();
+        await tester.pumpAndSettle();
         await finish(tester);
       }, skip: !PlatformVersion.shouldUseNativeGlass);
     });
@@ -315,7 +382,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(all(), isNotEmpty, reason: 'the button inside reported in');
-      expect(all(), isNot(contains(true)));
+      expect(all(), everyElement('full'));
 
       navigator.currentState!.pop();
       await tester.pumpAndSettle();
@@ -325,7 +392,8 @@ void main() {
   );
 
   testWidgets(
-    'a dialog over a dialog contains the button in the first one',
+    'a dialog over a dialog cuts the glow it covers of the button in the '
+    'first one',
     (tester) async {
       mockNative(tester);
       await pumpHost(tester, const SizedBox());
@@ -343,15 +411,15 @@ void main() {
       );
       await tester.pumpAndSettle();
       final name = sent.keys.single;
-      expect(last(name), isFalse);
+      expect(last(name), 'full');
 
       await openDialog(tester);
       await tester.pumpAndSettle();
-      expect(last(name), isTrue);
+      expect(last(name), 'cut');
 
       navigator.currentState!.pop();
       await tester.pumpAndSettle();
-      expect(last(name), isFalse);
+      expect(last(name), 'full');
 
       navigator.currentState!.pop();
       await tester.pumpAndSettle();
@@ -359,4 +427,98 @@ void main() {
     },
     skip: !PlatformVersion.shouldUseNativeGlass,
   );
+
+  testWidgets(
+    'a sheet whose edge is just below the button cuts the glow under the '
+    'sheet only, in the native view\'s coordinates (#156)',
+    (tester) async {
+      mockNative(tester);
+      // The 60 pt host ends 8 pt above the 200 pt sheet's top edge (400).
+      await pumpHost(
+        tester,
+        CNButton.icon(
+          icon: const CNSymbol('xmark'),
+          autoHideOnModal: false,
+          onPressed: () {},
+        ),
+        alignment: const Alignment(0, 0.1925),
+      );
+      final name = sent.keys.single;
+      final view = tester.getRect(find.byType(UiKitView));
+      expect(400 - view.bottom, inExclusiveRange(0, 24), reason: 'in reach');
+      clear();
+
+      openBottomSheet();
+      await tester.pumpAndSettle();
+      expect(last(name), 'cut');
+      expect(sent[name], isNot(contains('contained')));
+      final bounds = Offset.zero & view.size;
+      final sheet = const Rect.fromLTRB(
+        0,
+        400,
+        800,
+        600,
+      ).shift(-view.topLeft).intersect(bounds.inflate(160));
+      expect(lastCuts[name], hasLength(1), reason: 'below its bounds only');
+      expect(_rounded(lastCuts[name]!.single), _rounded(sheet));
+
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(last(name), 'full');
+      await finish(tester);
+    },
+    skip: !PlatformVersion.shouldUseNativeGlass,
+  );
+
+  testWidgets(
+    'a page over the button cuts its glow all round its bounds, never '
+    'inside them (#159)',
+    (tester) async {
+      mockNative(tester);
+      await pumpHost(
+        tester,
+        CNButton.icon(
+          icon: const CNSymbol('xmark'),
+          autoHideOnModal: false,
+          onPressed: () {},
+        ),
+      );
+      final name = sent.keys.single;
+      final view = tester.getRect(find.byType(UiKitView));
+      navigator.currentState!.push(
+        CupertinoPageRoute<void>(
+          builder: (_) => const CupertinoPageScaffold(child: SizedBox()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      clear();
+
+      navigator.currentState!.pop();
+      final bounds = Offset.zero & view.size;
+      expect(sent[name], <String>['cut']);
+      final cuts = lastCuts[name]!;
+      expect(cuts, hasLength(4), reason: 'above, below, left and right');
+      for (final cut in cuts) {
+        expect(cut.overlaps(bounds), isFalse, reason: 'never inside it');
+      }
+      // Every point of the glow's reach outside the bounds is cut.
+      final reach = bounds.inflate(24);
+      for (var x = reach.left + 1; x < reach.right; x += 4) {
+        for (var y = reach.top + 1; y < reach.bottom; y += 4) {
+          final p = Offset(x, y);
+          if (bounds.contains(p)) continue;
+          expect(cuts.any((c) => c.contains(p)), isTrue, reason: '$p');
+        }
+      }
+      await tester.pumpAndSettle();
+      await finish(tester);
+    },
+    skip: !PlatformVersion.shouldUseNativeGlass,
+  );
+}
+
+/// [r] rounded to the half point the cuts are sent at.
+String _rounded(Rect r) {
+  String h(double v) => ((v * 2).roundToDouble() / 2).toStringAsFixed(1);
+  return '${h(r.left)},${h(r.top)},${h(r.right)},${h(r.bottom)}';
 }

@@ -1,3 +1,35 @@
+## 2.7.2
+
+> Fixed: glass widgets with `autoHideOnModal: false` flat while a sheet's edge is near or over them (#156), and flat while a page is popped off them, then blinking back when the pop ends (#159). They now hide only the part of their glow that the sheet or page covers.
+
+### Fixed — glass flat next to a sheet's edge, and while a page slides over or off it (#156, #159)
+
+A glass widget's glow draws past its bounds, over whatever Flutter painted there. So while a sheet, popup, dialog or page came within reach of it, the widget was clipped to its bounds and its shadow cleared, which left it flat (no rim or shadow):
+- **Sheets (#156):** with a sheet's edge near or over the widget, the widget stayed flat. It got its glass back only once the sheet was dragged clear of it.
+- **Pages (#159):** the widget stayed flat for the whole push or pop. When a pop ended, its glass and shadow came back in a single frame, so the widget blinked each time you came back to the page.
+
+Now the widget keeps its full glass and shadow, and the native view masks out only the part of its glow that the sheet or page covers. Inside its bounds, Flutter already draws the sheet or page above it.
+- **Sheets:** `CNTabBarRouteObserver` already measures where the sheet is after every frame.
+- **Pages:** it now does the same for a page pushed over the widget, popped off it, or dragged by the back gesture. The new `CNTabBarRouteObserver.movingRouteRect` gives that rect.
+- **Fallback:** when the position can't be told, the widget is clipped flat as before, for example without a `CNTabBarRouteObserver` in the navigator, or for a modal whose bounds aren't known yet. This also applies on macOS, where the engine clips every platform view to its bounds anyway.
+
+This applies to `CNButton`, `CNPopupMenuButton`, `CNGlassButtonGroup`, `LiquidGlassContainer`, `CNSearchBar`, `CNFloatingIsland` and `CNTabRail`.
+
+Thanks to @Ashhad08 for both reports and their videos.
+
+### Checked
+These checks use the iPhone 17 Pro Max simulator on iOS 26.2 and the iPhone 17 simulator on iOS 27.0, with a `CNButton` and a `CNPopupMenuButton` in a page header:
+- **`modal_bottom_sheet` sheet (`CupertinoScaffold`):** the sheet's edge started at the bottom of the buttons and was dragged down in 8 pt steps.
+  - On 2.7.1 the buttons were flat while the edge was at them or just below them.
+  - Now they keep their rim and shadow at every step, and the shadow stops at the sheet's edge.
+- **`CupertinoPageRoute` push and pop, frame by frame:**
+  - On 2.7.1 the buttons were flat for the whole pop, and their glass came back in one frame at the end.
+  - Now they keep their glass on every frame, and their glow stops at the page's edge.
+  - The back gesture, held partway, also keeps the glass.
+  - One frame at the start of a push shows the glow cut just before the page covers the buttons. This happens because the page's first frame reaches the screen after the native mask does.
+- **Example app:** the #156 screen has a tall sheet whose edge starts at the button, and the new #159 screen pushes and pops a page.
+- **Tests:** 9 new tests, 15 rewritten; 633 tests pass. 17 of these fail on 2.7.1.
+
 ## 2.7.1
 
 > Fixed: glass widgets with `autoHideOnModal: false` flat while a sheet package's sheet moves the page, including for as long as the sheet is held mid-drag (#156). `CNScrollEdgeEffect` now fades the content toward the page's colour as native apps do, and its `hard` style works (#150). New: `CNScrollEdgeEffect.backgroundColor`.

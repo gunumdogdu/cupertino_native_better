@@ -116,6 +116,7 @@ final class CNTabRailPlatformView: NSObject, FlutterPlatformView, UIGestureRecog
                 self.container.clipsToBounds = active
                 self.hostingController.view.clipsToBounds = active
                 self.container.layer.shadowOpacity = 0
+                CNHaloMask.apply(self.container, arguments: args)
                 result(nil)
             case "setInteractive":
                 // No touches while a modal is above the rail's route.

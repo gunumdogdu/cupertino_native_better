@@ -21,6 +21,9 @@ import 'package:flutter/cupertino.dart';
 ///     around the glow: `CNButton` sat in a `ClipRect` its own size, which
 ///     the engine turns into a mask at the view's bounds under a scaled
 ///     page. The clip is gone, so the glass needs no flattening.
+///  4. A sheet whose edge is near or over the button left it flat (2.7.2):
+///     containment clipped the whole glass to its bounds. Now only the part
+///     of its glow under the sheet is masked out.
 ///
 /// ### How this screen proves it
 ///
@@ -29,15 +32,20 @@ import 'package:flutter/cupertino.dart';
 /// detector around a sheet that stops well below the header). **Dialog**
 /// opens a `showCupertinoDialog` with a list on the left, away from the
 /// button. **Scaling sheet** opens a sheet that scales the page down as it
-/// comes; drag its grabber down and hold. AUTO opens each in turn, drags the
-/// scaling sheet half way and holds it, and prints `CNB_SHOT 156-<step>`.
+/// comes; drag its grabber down and hold. **Tall sheet** is the same sheet
+/// with its edge at the bottom of the button. AUTO opens each in turn, drags
+/// the scaling sheet half way and holds it, steps the tall sheet's edge
+/// clear of the button, and prints `CNB_SHOT 156-<step>`.
 ///
 ///  * **Bug:** under the sheet the button is a flat disc (no rim or shadow)
 ///    until the sheet is closed; while the dialog fades the shadow drops out;
-///    while the scaling sheet is held mid-drag the button is flat.
+///    while the scaling sheet is held mid-drag the button is flat; while the
+///    tall sheet's edge is at or just below it, it is flat.
 ///  * **Fixed:** the button keeps its full glass under the sheets, while the
 ///    dialog fades in and out, and while the page scales or the sheet is
 ///    held, dimmed like the rest of the page, with no box around its glow.
+///    Next to the tall sheet only the part of its glow under the sheet is
+///    hidden.
 class Issue156GlassButtonPackageSheetTestPage extends StatefulWidget {
   const Issue156GlassButtonPackageSheetTestPage({
     super.key,
@@ -110,6 +118,30 @@ class _Issue156GlassButtonPackageSheetTestPageState
     if (!mounted) return;
     Navigator.of(context).pop();
     await shot('scale-closed', 1600);
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    _openScalingSheet(heightFactor: _tallSheet);
+    await shot('edge-at', 1500);
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    // Its edge just below the button, then clear of it.
+    for (final (tag, value) in const [
+      ('edge-below', 0.975),
+      ('edge-clear', 0.9),
+    ]) {
+      final from = _scaling?.value ?? 1;
+      for (var i = 1; i <= 10; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+        _scaling?.dragTo(from + (value - from) * i / 10);
+      }
+      await shot(tag, 1200);
+      // Held while the screenshot is taken.
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+    }
+    _scaling?.release();
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    await shot('edge-closed', 1600);
     debugPrint('CNB_SHOT 156-done');
   }
 
@@ -117,8 +149,12 @@ class _Issue156GlassButtonPackageSheetTestPageState
     Navigator.of(context).push(_PackageStyleSheetRoute());
   }
 
-  void _openScalingSheet() {
-    final route = _ScalingSheetRoute(_progress);
+  /// The tall sheet's height, as a fraction of the screen: its edge reaches
+  /// the bottom of the header's buttons.
+  static const double _tallSheet = 0.9;
+
+  void _openScalingSheet({double heightFactor = 0.85}) {
+    final route = _ScalingSheetRoute(_progress, heightFactor: heightFactor);
     _scaling = route;
     Navigator.of(context).push(route);
   }
@@ -227,6 +263,14 @@ class _Issue156GlassButtonPackageSheetTestPageState
                   ),
                 ),
                 Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: CupertinoButton.filled(
+                    onPressed: () =>
+                        _openScalingSheet(heightFactor: _tallSheet),
+                    child: const Text('Tall sheet (its edge at the button)'),
+                  ),
+                ),
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     '#156 · close taps: $_closeTaps\n'
@@ -322,9 +366,12 @@ class _PackageStyleSheetRoute extends PopupRoute<void> {
 /// follows a drag on its grabber, as `CupertinoScaffold` sheets do: the drag
 /// sets the route's animation value directly.
 class _ScalingSheetRoute extends PopupRoute<void> {
-  _ScalingSheetRoute(this.progress);
+  _ScalingSheetRoute(this.progress, {this.heightFactor = 0.85});
 
   final ValueNotifier<double> progress;
+
+  /// The sheet's height, as a fraction of the screen's.
+  final double heightFactor;
 
   @override
   Color? get barrierColor => const Color(0x33000000);
@@ -352,6 +399,9 @@ class _ScalingSheetRoute extends PopupRoute<void> {
     progress.value = 0;
     super.dispose();
   }
+
+  /// How far up the sheet is: 1 open, 0 closed.
+  double get value => controller!.value;
 
   /// Moves the sheet as a finger dragging it does.
   void dragTo(double value) => controller!.value = value.clamp(0.0, 1.0);
@@ -381,7 +431,7 @@ class _ScalingSheetRoute extends PopupRoute<void> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    final height = MediaQuery.sizeOf(context).height * 0.85;
+    final height = MediaQuery.sizeOf(context).height * heightFactor;
     return Align(
       alignment: Alignment.bottomCenter,
       child: GestureDetector(

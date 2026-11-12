@@ -181,6 +181,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             case "setTransitioning":
                 let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
                 self.applyTransitionContainment(active)
+                CNHaloMask.apply(self.container, arguments: call.arguments)
                 result(nil)
             case "setInteractive":
                 if let args = call.arguments as? [String: Any],

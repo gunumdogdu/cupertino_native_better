@@ -102,6 +102,9 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       } else if call.method == "setTransitioning" {
         let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
         self?.applyTransitionContainment(active)
+        if let container = self?.container {
+          CNHaloMask.apply(container, arguments: call.arguments)
+        }
         result(nil)
       } else if call.method == "setInteractive" {
         if let args = call.arguments as? [String: Any],

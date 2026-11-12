@@ -386,6 +386,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         // bounds on the outgoing/incoming page snapshot.
         let active = ((call.arguments as? [String: Any])?["active"] as? NSNumber)?.boolValue ?? false
         self.applyTransitionContainment(active)
+        CNHaloMask.apply(self.container, arguments: call.arguments)
         result(nil)
       case "measureTitle":
         // The size the button would take with this title, without showing
