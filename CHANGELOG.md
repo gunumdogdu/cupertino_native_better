@@ -1,3 +1,32 @@
+## 2.7.1
+
+> Fixed: glass widgets with `autoHideOnModal: false` flat while a sheet package's sheet moves the page, including for as long as the sheet is held mid-drag (#156). `CNScrollEdgeEffect` now fades the content toward the page's colour as native apps do, and its `hard` style works (#150). New: `CNScrollEdgeEffect.backgroundColor`.
+
+### Fixed — glass flat while a sheet moves the page, and while it is held mid-drag (#156)
+
+With a sheet that scales the page under it (as `CupertinoScaffold` sheets do), a glass widget with `autoHideOnModal: false` went flat (no rim or shadow) while the sheet came and went, and for as long as a finger held the sheet part-way down. 2.7.0 flattened it on purpose: unflattened, a square box showed around its glow while the page moved.
+
+That box came from the widget itself. `CNButton`, `CNPopupMenuButton` and `CNGlassButtonGroup` wrapped their native view in a `ClipRect` exactly its own size. It clips nothing in Flutter, but under a scaled page the engine can't always tell that it covers the view (a rounding difference, on about half of the frames), and then masks the native view to its bounds, which cuts the glow into a box. The clip is gone, and so is the flattening: the widget keeps its full glass while the sheet scales the page, while it is dragged and held, and while it comes and goes, dimmed like the rest of the page. It is still contained while the sheet, popup or dialog comes within reach of its glow.
+
+Thanks to @Ashhad08 for the report and the drag-and-hold repro.
+
+### Fixed — `CNScrollEdgeEffect` only blurred, and `hard` looked like `soft` (#150)
+
+Native apps fade the content under the edge toward the scroll view's background colour, besides blurring it, and the `hard` style is an opaque band of that colour. The widget's scroll view is clear (the content is Flutter's, behind it), so the system had no colour: the effect was only a light blur, and `hard` looked the same as `soft`. The widget now gives UIKit the colour of the page behind it.
+
+- New `backgroundColor`: the colour of the content under the edge. It defaults to the `CupertinoTheme`'s scaffold background colour; a transparent colour leaves only the blur.
+- `soft` blurs the content under the band and fades it toward that colour, as under a navigation bar with a title, and is gone just past the band. Over dark content the system darkens the band instead, as it does in a native table.
+- `hard` is an opaque band of that colour, ending in a sharp line.
+- The view is 48 pt taller than the band (24 before), so the end of the effect isn't cut off.
+
+Thanks to @Ashhad08 for the comparison with the App Store.
+
+### Checked
+- **#156, iPhone 17 Pro Max simulator, iOS 26.2, the reporter's repro app (`modal_bottom_sheet` 3.0.0, `CupertinoScaffold`), frame by frame:** dragging the sheet down 350 pt and holding it, the header `CNButton` and a `CNPopupMenuButton` next to it keep their full glass while the page moves, while held and after release (flat before); no box on any frame (before the fix, about half of the frames of a moving page showed one when not flattened); the sheet opening and closing, a dialog elsewhere fading in and out and a half-height `showModalBottomSheet` the same.
+- **#156, iPhone 17 simulator, iOS 27.0:** the same drag and hold, no box on any frame.
+- **#150, against a UIKit table under a navigation bar with a title and glass buttons, same rows and scroll offset:** iOS 26.2 `soft` and `hard`, and iOS 27.0 `hard`, match the native screen (the rows under the bar blurred and faded, the row below it sharp; the hard band and its line in the same place). On iOS 27.0, native `soft` reaches about 30 pt further below a bar with glass buttons than the widget does; under the band they match. A dark row under the band darkens it, natively too. A colour changed at run time reaches the effect.
+- **Tests:** 2 new tests for #156 and 1 for #150, 2 rewritten; 624 tests pass; the new #156 tests fail on 2.7.0.
+
 ## 2.7.0
 
 > New: `CNScrollEdgeEffect`, the iOS 26 scroll edge effect over Flutter content (#150), and `CNTabScaffold.bottomScrollEdgeEffect`. Fixed: glass widgets with `autoHideOnModal: false` flat under a sheet from a sheet package, or while a dialog elsewhere fades in or out (#156).

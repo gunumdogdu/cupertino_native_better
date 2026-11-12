@@ -312,27 +312,26 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
           final totalHeight = buttonHeight + 3.0;
           return LayoutBuilder(
             builder: (context, constraints) {
+              // No ClipRect around the view: one its size would get the
+              // native view masked to its bounds under a scaled page,
+              // cutting the glass's glow into a box (#156).
               if (constraints.hasBoundedWidth) {
-                return ClipRect(
-                  child: SizedBox(
-                    width:
-                        constraints.maxWidth +
-                        6.0, // Add 6px for badge overflow on right
-                    height: totalHeight,
-                    child: platformView,
-                  ),
+                return SizedBox(
+                  width:
+                      constraints.maxWidth +
+                      6.0, // Add 6px for badge overflow on right
+                  height: totalHeight,
+                  child: platformView,
                 );
               } else {
                 final estimatedWidth =
                     widget._effectiveButtonCount * 44.0 +
                     ((widget._effectiveButtonCount - 1) * widget.spacing) +
                     6.0; // Add 6px for badge overflow on right
-                return ClipRect(
-                  child: SizedBox(
-                    width: estimatedWidth,
-                    height: totalHeight,
-                    child: platformView,
-                  ),
+                return SizedBox(
+                  width: estimatedWidth,
+                  height: totalHeight,
+                  child: platformView,
                 );
               }
             },
@@ -343,11 +342,9 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
               (widget._effectiveButtonCount * buttonHeight) +
               ((widget._effectiveButtonCount - 1) * widget.spacing) +
               3.0; // Add 3px for badge overflow at top
-          return ClipRect(
-            child: LimitedBox(
-              maxHeight: estimatedHeight.clamp(44.0, 400.0),
-              child: SizedBox(width: double.infinity, child: platformView),
-            ),
+          return LimitedBox(
+            maxHeight: estimatedHeight.clamp(44.0, 400.0),
+            child: SizedBox(width: double.infinity, child: platformView),
           );
         }
       },

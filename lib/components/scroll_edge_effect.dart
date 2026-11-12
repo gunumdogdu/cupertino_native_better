@@ -3,6 +3,8 @@
 /// {@category Components}
 library;
 
+import 'package:flutter/cupertino.dart'
+    show CupertinoColors, CupertinoDynamicColor, CupertinoTheme;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -22,11 +24,13 @@ enum CNScrollEdge {
 
 /// The look of a [CNScrollEdgeEffect], as `UIScrollEdgeEffect.Style`.
 enum CNScrollEdgeStyle {
-  /// A soft, progressive blur that fades into the content.
+  /// A soft, progressive blur that fades the content toward the
+  /// [CNScrollEdgeEffect.backgroundColor] and out past the band.
   soft,
 
-  /// A band that ends in a sharp line instead of fading out, for a bar
-  /// whose content needs a clear separation from what scrolls under it.
+  /// An opaque band of the [CNScrollEdgeEffect.backgroundColor] that ends in
+  /// a sharp line instead of fading out, for a bar whose content needs a
+  /// clear separation from what scrolls under it.
   hard,
 }
 
@@ -36,8 +40,11 @@ enum CNScrollEdgeStyle {
 ///
 /// The effect is drawn by iOS itself (`UIScrollEdgeEffect`), so it matches
 /// native apps and follows accessibility settings such as Reduce
-/// Transparency. Put it over the scrolling content, for example in a
-/// [Stack]; it places itself at its [edge] and lets touches through:
+/// Transparency. Under the band it blurs the content and fades it toward the
+/// page's [backgroundColor], as under a navigation bar with a title, and it
+/// is gone just past the band. Put it over the scrolling content, for
+/// example in a [Stack]; it places itself at its [edge] and lets touches
+/// through:
 ///
 /// ```dart
 /// Stack(
@@ -68,6 +75,7 @@ class CNScrollEdgeEffect extends StatefulWidget {
     this.controller,
     this.scrollMetrics,
     this.brightness,
+    this.backgroundColor,
   }) : assert(height == null || height >= 0),
        assert(
          controller == null || scrollMetrics == null,
@@ -77,8 +85,8 @@ class CNScrollEdgeEffect extends StatefulWidget {
   /// The edge the effect covers. Defaults to [CNScrollEdge.top].
   final CNScrollEdge edge;
 
-  /// The height of the band the effect covers, from the edge. The effect
-  /// fades out over about 10 pt past it.
+  /// The height of the band the effect covers, from the edge. The soft
+  /// effect fades out at its end, as under a navigation bar.
   ///
   /// Defaults to the safe area on that edge (the status bar, or the home
   /// indicator), or 20 where there is none, which is what iOS covers in a
@@ -104,9 +112,16 @@ class CNScrollEdgeEffect extends StatefulWidget {
   /// app's brightness.
   final Brightness? brightness;
 
+  /// The background colour of the content under the edge, as a native
+  /// scroll view's background colour: the effect fades the content toward
+  /// it, and the [CNScrollEdgeStyle.hard] band is this colour. Defaults to
+  /// the [CupertinoTheme]'s scaffold background colour. A transparent colour
+  /// leaves only the blur.
+  final Color? backgroundColor;
+
   /// The extra height the view takes past [height], so the soft end of the
   /// effect isn't cut off.
-  static const double _tail = 24;
+  static const double _tail = 48;
 
   /// Whether the effect is drawn on this platform (iOS 26 and later).
   static bool get isSupported =>
@@ -123,6 +138,7 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
   String? _lastStyle;
   double? _lastBand;
   bool? _lastDark;
+  int? _lastColor;
 
   @override
   void initState() {
@@ -156,6 +172,27 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     Brightness.light => false,
     null => ThemeHelper.isDark(context),
   };
+
+  /// [CNScrollEdgeEffect.backgroundColor], or the page's, as ARGB.
+  int _color(BuildContext context) {
+    final color = widget.backgroundColor;
+    if (color != null) {
+      final brightness = widget.brightness;
+      final resolved = color is CupertinoDynamicColor && brightness != null
+          ? (brightness == Brightness.dark ? color.darkColor : color.color)
+          : CupertinoDynamicColor.resolve(color, context);
+      return resolved.toARGB32();
+    }
+    // The theme's colours are resolved for the app's brightness; for a
+    // brightness of its own, the effect takes the system background.
+    if (widget.brightness != null) {
+      return (_isDark
+              ? CupertinoColors.systemBackground.darkColor
+              : CupertinoColors.systemBackground.color)
+          .toARGB32();
+    }
+    return CupertinoTheme.of(context).scaffoldBackgroundColor.toARGB32();
+  }
 
   double _band(BuildContext context) {
     final height = widget.height;
@@ -208,6 +245,7 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     'style': widget.style.name,
     'band': _band(context),
     'isDark': _isDark,
+    'color': _color(context),
     'underneath': _underneath,
   };
 
@@ -217,16 +255,22 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     final band = _band(context);
     final dark = _isDark;
     final style = widget.style.name;
-    if (band == _lastBand && dark == _lastDark && style == _lastStyle) {
+    final color = _color(context);
+    if (band == _lastBand &&
+        dark == _lastDark &&
+        style == _lastStyle &&
+        color == _lastColor) {
       return;
     }
     _lastBand = band;
     _lastDark = dark;
     _lastStyle = style;
+    _lastColor = color;
     channel.invokeMethod<void>('update', {
       'band': band,
       'isDark': dark,
       'style': style,
+      'color': color,
     });
   }
 
@@ -236,6 +280,7 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     _lastBand = _band(context);
     _lastDark = _isDark;
     _lastStyle = widget.style.name;
+    _lastColor = _color(context);
     // The view was created with the value from the build, before the scroll
     // view's layout: always send the current one once.
     _lastUnderneath = double.nan;

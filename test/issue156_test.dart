@@ -61,6 +61,13 @@ class _PageScalingSheetRoute extends _PackageStyleSheetRoute {
     animation!.addListener(() => _pageScale.value = 1 - 0.1 * animation!.value);
     return super.didPush();
   }
+
+  /// Moves the sheet as a finger dragging it does: the package sets its
+  /// controller's value directly.
+  void dragTo(double value) => controller!.value = value;
+
+  /// Lets go: the sheet springs back up.
+  void release() => controller!.forward();
 }
 
 void main() {
@@ -216,36 +223,36 @@ void main() {
     skip: !PlatformVersion.shouldUseNativeGlass,
   );
 
-  testWidgets(
-    'a sheet that scales the page under it: contained while the page moves, '
-    'full glass once it is up',
-    (tester) async {
-      mockNative(tester);
-      await tester.pumpWidget(
-        app(
-          ValueListenableBuilder<double>(
-            valueListenable: _pageScale,
-            builder: (_, scale, child) => Transform.scale(
-              scale: scale,
-              alignment: Alignment.bottomCenter,
-              child: child,
-            ),
-            child: CupertinoPageScaffold(
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: CNButton.icon(
-                    icon: const CNSymbol('xmark'),
-                    autoHideOnModal: false,
-                    onPressed: () {},
-                  ),
-                ),
-              ),
+  Widget scalingPage() => app(
+    ValueListenableBuilder<double>(
+      valueListenable: _pageScale,
+      builder: (_, scale, child) => Transform.scale(
+        scale: scale,
+        alignment: Alignment.bottomCenter,
+        child: child,
+      ),
+      child: CupertinoPageScaffold(
+        child: Align(
+          alignment: Alignment.topRight,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: CNButton.icon(
+              icon: const CNSymbol('xmark'),
+              autoHideOnModal: false,
+              onPressed: () {},
             ),
           ),
         ),
-      );
+      ),
+    ),
+  );
+
+  testWidgets(
+    'a sheet that scales the page under it leaves the glass full as it comes '
+    'and goes',
+    (tester) async {
+      mockNative(tester);
+      await tester.pumpWidget(scalingPage());
       await tester.pumpAndSettle();
       final name = sent.keys.single;
       sent.clear();
@@ -254,19 +261,111 @@ void main() {
       for (var i = 0; i < 4; i++) {
         await tester.pump(const Duration(milliseconds: 30));
       }
-      expect(sent[name], <bool>[true], reason: 'the page moves');
+      expect(_pageScale.value, lessThan(1), reason: 'the page moves');
+      expect(sent[name], isNull, reason: 'never clipped: full glass');
       await tester.pumpAndSettle();
-      expect(sent[name], <bool>[true, false], reason: 'up, page still');
+      expect(sent[name], isNull);
 
       navigator.currentState!.pop();
       for (var i = 0; i < 4; i++) {
         await tester.pump(const Duration(milliseconds: 30));
       }
-      expect(sent[name], <bool>[true, false, true], reason: 'moves back');
       await tester.pumpAndSettle();
-      expect(sent[name], <bool>[true, false, true, false]);
+      expect(sent[name], isNull);
       await tester.pumpWidget(const SizedBox());
       _pageScale.value = 1;
+      debugDefaultTargetPlatformOverride = null;
+    },
+    skip: !PlatformVersion.shouldUseNativeGlass,
+  );
+
+  testWidgets(
+    'a sheet held mid-drag leaves the glass full while it moves the page and '
+    'for as long as the finger holds it',
+    (tester) async {
+      mockNative(tester);
+      await tester.pumpWidget(scalingPage());
+      await tester.pumpAndSettle();
+      final name = sent.keys.single;
+      final route = _PageScalingSheetRoute();
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      sent.clear();
+
+      // The finger drags the sheet down part-way and holds it there.
+      for (var v = 0.98; v > 0.6; v -= 0.02) {
+        route.dragTo(v);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pump(const Duration(seconds: 2));
+      expect(route.animation!.status, AnimationStatus.forward);
+      expect(_pageScale.value, lessThan(1));
+      expect(sent[name], isNull, reason: 'full glass mid-drag');
+
+      // Lets go: it springs back up.
+      route.release();
+      await tester.pumpAndSettle();
+      expect(sent[name], isNull);
+
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      _pageScale.value = 1;
+      debugDefaultTargetPlatformOverride = null;
+    },
+    skip: !PlatformVersion.shouldUseNativeGlass,
+  );
+
+  testWidgets(
+    'no clip the size of the glass view around it: under a scaled page the '
+    'engine would mask the view to its bounds and box the glow',
+    (tester) async {
+      mockNative(tester);
+      await tester.pumpWidget(
+        app(
+          CupertinoPageScaffold(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CNButton.icon(
+                    icon: const CNSymbol('xmark'),
+                    onPressed: () {},
+                  ),
+                  CNPopupMenuButton.icon(
+                    buttonIcon: const CNSymbol('ellipsis'),
+                    items: const [CNPopupMenuItem(label: 'One')],
+                    onSelected: (_) {},
+                  ),
+                  SizedBox(
+                    width: 200,
+                    child: CNGlassButtonGroup(
+                      buttons: [
+                        CNButtonData.icon(
+                          icon: const CNSymbol('plus'),
+                          onPressed: () {},
+                        ),
+                        CNButtonData.icon(
+                          icon: const CNSymbol('minus'),
+                          onPressed: () {},
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final views = find.byType(UiKitView);
+      expect(views, findsNWidgets(3));
+      expect(
+        find.ancestor(of: views, matching: find.byType(ClipRect)),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox());
       debugDefaultTargetPlatformOverride = null;
     },
     skip: !PlatformVersion.shouldUseNativeGlass,

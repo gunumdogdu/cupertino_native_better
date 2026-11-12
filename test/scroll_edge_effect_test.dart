@@ -109,7 +109,7 @@ void main() {
       expect(params['underneath'], 0.0, reason: 'nothing under the edge');
       final rect = tester.getRect(find.byType(UiKitView));
       expect(rect.top, 0);
-      expect(rect.height, 84.0);
+      expect(rect.height, 108.0);
       expect(
         rect.width,
         800 > 0 ? tester.getSize(find.byType(Stack).first).width : 0,
@@ -215,6 +215,70 @@ void main() {
       style.value = CNScrollEdgeStyle.hard;
       await tester.pump();
       expect(updates().single['style'], 'hard');
+      await tearDownView(tester);
+    },
+    skip: skip || !PlatformVersion.shouldUseNativeGlass,
+  );
+
+  testWidgets(
+    'the colour of the page under the edge goes with it: the theme scaffold '
+    'background by default, so the effect fades toward it and hard is a band '
+    'of it (#150)',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester);
+      Widget app(Brightness brightness, {Color? color, Brightness? own}) =>
+          CupertinoApp(
+            theme: CupertinoThemeData(brightness: brightness),
+            home: CNScrollEdgeEffect(
+              height: 100,
+              backgroundColor: color,
+              brightness: own,
+            ),
+          );
+
+      await tester.pumpWidget(app(Brightness.light));
+      await tester.pump();
+      expect(creationParams()['color'], 0xFFFFFFFF, reason: 'light page');
+      await tearDownView(tester);
+
+      calls.clear();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await tester.pumpWidget(app(Brightness.dark));
+      await tester.pump();
+      expect(creationParams()['color'], 0xFF000000, reason: 'dark page');
+      expect(creationParams()['isDark'], isTrue);
+      await tearDownView(tester);
+
+      // A brightness of its own takes that brightness's system background.
+      calls.clear();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await tester.pumpWidget(app(Brightness.light, own: Brightness.dark));
+      await tester.pump();
+      expect(creationParams()['color'], 0xFF000000);
+      await tearDownView(tester);
+
+      // A colour of its own, resolved for the effect's brightness.
+      calls.clear();
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await tester.pumpWidget(
+        app(
+          Brightness.light,
+          color: CupertinoColors.systemGroupedBackground,
+          own: Brightness.dark,
+        ),
+      );
+      await tester.pump();
+      expect(
+        creationParams()['color'],
+        CupertinoColors.systemGroupedBackground.darkColor.toARGB32(),
+      );
+      calls.clear();
+      await tester.pumpWidget(
+        app(Brightness.light, color: const Color(0xFFFF2020)),
+      );
+      await tester.pump();
+      expect(updates().single['color'], 0xFFFF2020, reason: 'a change');
       await tearDownView(tester);
     },
     skip: skip || !PlatformVersion.shouldUseNativeGlass,

@@ -863,18 +863,19 @@ class _CNButtonState extends State<CNButton>
               _setPressed(false);
               _downPosition = null;
             },
-            child: ClipRect(
-              // Always an AnimatedContainer, so turning the animation on or
-              // off keeps the native view.
-              child: AnimatedContainer(
-                duration: animate
-                    ? widget.config.sizeAnimationDuration
-                    : Duration.zero,
-                curve: widget.config.sizeAnimationCurve,
-                height: height,
-                width: width,
-                child: platformView,
-              ),
+            // Always an AnimatedContainer, so turning the animation on or off
+            // keeps the native view. No ClipRect around it: one the size of
+            // the view clips nothing in Flutter, but under a scaled page the
+            // engine masks the native view to its bounds, which cuts the
+            // glass's glow into a box (#156).
+            child: AnimatedContainer(
+              duration: animate
+                  ? widget.config.sizeAnimationDuration
+                  : Duration.zero,
+              curve: widget.config.sizeAnimationCurve,
+              height: height,
+              width: width,
+              child: platformView,
             ),
           );
 

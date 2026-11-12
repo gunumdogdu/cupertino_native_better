@@ -950,12 +950,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
               _setPressed(false);
               _downPosition = null;
             },
-            child: ClipRect(
-              child: SizedBox(
-                height: widget.height,
-                width: width,
-                child: platformView(_sizedToLabel),
-              ),
+            // No ClipRect: one the size of the view would get the native
+            // view masked to its bounds under a scaled page, cutting the
+            // glass's glow into a box (#156).
+            child: SizedBox(
+              height: widget.height,
+              width: width,
+              child: platformView(_sizedToLabel),
             ),
           );
         },

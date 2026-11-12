@@ -6,11 +6,17 @@ import UIKit
 ///
 /// Flutter content isn't in a `UIScrollView`, so this view carries a clear
 /// one of its own with its top or bottom edge effect on. A
-/// `UIScrollEdgeElementContainerInteraction` on a text element (a label with
-/// a space) shapes the effect to the band Flutter asks for: the effect
-/// follows text-like elements, and reaches about 10 pt past them, so the view
-/// is a little taller than the band. The system draws the effect over
-/// whatever is behind the view, which is the Flutter content.
+/// `UIScrollEdgeElementContainerInteraction` on a container the size of the
+/// band, holding a text element (a label with a space), shapes the effect to
+/// the band Flutter asks for, as a navigation bar's title does: blurred and
+/// faded under the band, gone just past it. The view is taller than the
+/// band, so the end of the soft effect isn't cut off. The system draws the
+/// effect over whatever is behind the view, which is the Flutter content.
+///
+/// The system fades the content toward the scroll view's background colour,
+/// and the hard style's band is that colour. This scroll view is clear, so it
+/// reports the colour of the Flutter page behind it instead (#150): without
+/// it the effect is only a light blur, and `hard` looks the same as `soft`.
 ///
 /// The effect shows while content is under the edge, as in a scroll view.
 /// Flutter mirrors how far its content is under the edge (`underneath`); the
@@ -103,6 +109,9 @@ final class CNScrollEdgeEffectHost: UIView {
     if args.keys.contains("underneath") {
       underneath = (args["underneath"] as? NSNumber).map { CGFloat($0.doubleValue) }
     }
+    if args.keys.contains("color") {
+      scrollView.contentColor = (args["color"] as? NSNumber).map { Self.color(argb: $0.uint32Value) }
+    }
     if let style = args["style"] as? String, #available(iOS 26.0, *) {
       let effect = bottom ? scrollView.bottomEdgeEffect : scrollView.topEdgeEffect
       effect.style = style == "hard" ? .hard : .soft
@@ -113,13 +122,31 @@ final class CNScrollEdgeEffectHost: UIView {
     setNeedsLayout()
   }
 
+  static func color(argb: UInt32) -> UIColor {
+    UIColor(
+      red: CGFloat((argb >> 16) & 0xFF) / 255,
+      green: CGFloat((argb >> 8) & 0xFF) / 255,
+      blue: CGFloat(argb & 0xFF) / 255,
+      alpha: CGFloat((argb >> 24) & 0xFF) / 255)
+  }
+
+  /// How far short of the band's end the text element stops. The effect
+  /// reaches past text, by more on iOS 26 than on iOS 27; this ends it where
+  /// a navigation bar's ends, measured against UIKit's own (#150).
+  private static var textInset: CGFloat {
+    if #available(iOS 27.0, *) { return 0 }
+    return 14
+  }
+
   override func layoutSubviews() {
     super.layoutSubviews()
     let w = bounds.width, h = bounds.height
     let band = min(self.band > 0 ? self.band : h, h)
     scrollView.frame = bounds
-    element.frame = bounds
-    label.frame = bottom ? CGRect(x: 0, y: h - band, width: w, height: band) : CGRect(x: 0, y: 0, width: w, height: band)
+    // The container is the band: iOS 27 ends the hard style just past it.
+    element.frame = bottom ? CGRect(x: 0, y: h - band, width: w, height: band) : CGRect(x: 0, y: 0, width: w, height: band)
+    let text = max(band - Self.textInset, band / 2)
+    label.frame = bottom ? CGRect(x: 0, y: band - text, width: w, height: text) : CGRect(x: 0, y: 0, width: w, height: text)
     // Clear content, long enough to scroll under the band; at rest it ends
     // at the band, so nothing is under the edge.
     let length = max(h * 4, 2000)
@@ -138,6 +165,26 @@ final class CNScrollEdgeEffectHost: UIView {
 
 /// A scroll view without a safe area, so the effect covers the band from the
 /// view's edge, under the status bar or the home indicator too.
+///
+/// It stays clear, but tells UIKit the colour of the content behind it as
+/// its background colour, which the edge effect takes its colour from.
 final class CNEdgeEffectScrollView: UIScrollView {
   override var safeAreaInsets: UIEdgeInsets { .zero }
+
+  /// The colour of the Flutter content behind the view; nil: none.
+  var contentColor: UIColor? {
+    didSet {
+      guard contentColor != oldValue else { return }
+      // Setting a background colour is what makes UIKit look at it again.
+      // The layer stays clear either way.
+      super.backgroundColor = super.backgroundColor == .clear ? Self.clearAlt : .clear
+    }
+  }
+
+  private static let clearAlt = UIColor(white: 1, alpha: 0)
+
+  override var backgroundColor: UIColor? {
+    get { contentColor ?? super.backgroundColor }
+    set { super.backgroundColor = .clear }
+  }
 }
