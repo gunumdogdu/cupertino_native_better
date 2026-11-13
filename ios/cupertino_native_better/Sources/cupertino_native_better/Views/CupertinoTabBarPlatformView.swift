@@ -87,7 +87,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeTabBar_\(viewId)", binaryMessenger: messenger)
-    self.container = UIView(frame: frame)
+    self.container = TabBarHitContainer(frame: frame)
 
     var labels: [String] = []
     var symbols: [String] = []
@@ -158,6 +158,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
     }
 
     super.init()
+    (container as? TabBarHitContainer)?.owner = self
 
     // Read the label font before the bars are built, so the first appearance
     // carries it (Issue #82, found by @johndavid92).
@@ -1082,6 +1083,9 @@ channel.setMethodCallHandler { [weak self] call, result in
 
   func view() -> UIView { container }
 
+  /// The bars in the container, for its hit forwarding.
+  fileprivate var bars: [UITabBar] { [tabBar, tabBarLeft, tabBarRight].compactMap { $0 } }
+
   /// How much a custom label is taller than the native 10pt one. The bar
   /// keeps its height and grows the label up into the icon, so half of
   /// this moves the icon up and half moves the label down.
@@ -1324,4 +1328,26 @@ channel.setMethodCallHandler { [weak self] call, result in
     return scaled.withRenderingMode(image.renderingMode)
   }
 
+}
+
+/// The bar sits 14pt below the container's top so the iOS 26 Liquid Glass
+/// selection pill has room, and the pill (with the item's icon) draws in that
+/// strip. A touch there hit the bare container, so a tap on the top part of
+/// an icon did nothing. Send those touches to the bar item underneath, so
+/// UIKit handles them like any other tap: the glass press and selection
+/// morph play and the delegate hears the selection.
+final class TabBarHitContainer: UIView {
+  weak var owner: CupertinoTabBarPlatformView?
+
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    let hit = super.hitTest(point, with: event)
+    guard hit === self, let owner = owner else { return hit }
+    for bar in owner.bars where point.x >= bar.frame.minX && point.x <= bar.frame.maxX {
+      guard point.y < bar.frame.minY else { continue }
+      // Same x, just inside the bar's top edge: the item under the finger.
+      let inside = CGPoint(x: point.x - bar.frame.minX, y: 1)
+      return bar.hitTest(inside, with: event) ?? bar
+    }
+    return hit
+  }
 }
