@@ -2201,6 +2201,43 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   static bool _isMoving(AnimationStatus status) =>
       status == AnimationStatus.forward || status == AnimationStatus.reverse;
 
+  /// Whether [route]'s secondary animation follows a modal route counted in
+  /// [anyModalDepth], so a sheet moves it, not a page pushed over it (#161).
+  ///
+  /// A page transitions with the route over it when it can: a page in a
+  /// `PageRouteBuilder` with any page route, a sheet package's sheet route
+  /// too, and any page with a route that has a delegated transition, as
+  /// `showCupertinoSheet`'s has. What covers the page then is the sheet
+  /// ([modalRect]), not its route's whole box ([movingRouteRect]).
+  static bool secondaryAnimationFollowsModal(ModalRoute<dynamic> route) {
+    final driver = _driverOf(route.secondaryAnimation);
+    if (driver == null) return false;
+    for (final modal in _trackedModals) {
+      if (modal is TransitionRoute &&
+          identical(_driverOf(modal.animation), driver)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// The animation that drives [animation]: a modal route's animations are
+  /// proxies (of proxies, for its secondary animation), and a train hopping
+  /// animation follows its current train.
+  static Animation<double>? _driverOf(Animation<double>? animation) {
+    var driver = animation;
+    for (var i = 0; i < 8; i++) {
+      if (driver is ProxyAnimation) {
+        driver = driver.parent;
+      } else if (driver is TrainHoppingAnimation) {
+        driver = driver.currentTrain;
+      } else {
+        break;
+      }
+    }
+    return driver;
+  }
+
   static void _trackModal(Route<dynamic> route) {
     if (_trackedModals.contains(route)) return;
     final animation = route is TransitionRoute ? route.animation : null;
@@ -2268,7 +2305,7 @@ class CNTabBarRouteObserver extends NavigatorObserver {
         return;
       }
       final top = _trackedModals.last;
-      final rect = top is ModalRoute ? modalRouteContentRect(top) : null;
+      final rect = top is ModalRoute ? _modalContentRect(top) : null;
       // Led only while the route's animation moves it: its last frame is
       // measured at rest.
       final previous =
@@ -2288,6 +2325,16 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   static void _clearPending() {
     _pendingRoute = null;
     _modalBoundsPending.value = false;
+  }
+
+  /// What [route] paints ([modalRouteContentRect]). A sheet route that is a
+  /// page route is offstage for the first frame of its push (the hero
+  /// controller does that), laid out where its transition ends, and stays
+  /// laid out there until a frame lays it out again: it paints nothing
+  /// then, so [Rect.zero], not the open sheet (#161).
+  static Rect? _modalContentRect(ModalRoute<dynamic> route) {
+    if (route.offstage || _layoutPending.contains(route)) return Rect.zero;
+    return modalRouteContentRect(route);
   }
 
   /// The top modal route last measured, and what it painted then.

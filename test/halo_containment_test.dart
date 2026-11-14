@@ -81,7 +81,7 @@ void main() {
       (call) async => null,
     );
     for (final prefix in _prefixes) {
-      for (var id = 0; id < 60; id++) {
+      for (var id = 0; id < 200; id++) {
         final name = '$prefix$id';
         messenger.setMockMethodCallHandler(MethodChannel(name), (call) async {
           if (call.method == 'setTransitioning') {
@@ -111,7 +111,7 @@ void main() {
     addTearDown(() {
       messenger.setMockMethodCallHandler(SystemChannels.platform_views, null);
       for (final prefix in _prefixes) {
-        for (var id = 0; id < 60; id++) {
+        for (var id = 0; id < 200; id++) {
           messenger.setMockMethodCallHandler(MethodChannel('$prefix$id'), null);
         }
       }
@@ -123,19 +123,29 @@ void main() {
     Widget child, {
     bool observer = true,
     Alignment alignment = Alignment.center,
+    bool pageRouteBuilder = false,
   }) async {
+    final page = CupertinoPageScaffold(
+      child: Align(
+        alignment: alignment,
+        child: SizedBox(width: 200, height: 60, child: child),
+      ),
+    );
     await tester.pumpWidget(
       CupertinoApp(
         navigatorKey: navigator,
         navigatorObservers: <NavigatorObserver>[
           if (observer) CNTabBarRouteObserver(),
         ],
-        home: CupertinoPageScaffold(
-          child: Align(
-            alignment: alignment,
-            child: SizedBox(width: 200, height: 60, child: child),
-          ),
-        ),
+        home: pageRouteBuilder ? null : page,
+        // A page in a `PageRouteBuilder` transitions to any page route over
+        // it, a sheet package's sheet route too (#161).
+        onGenerateRoute: pageRouteBuilder
+            ? (_) => PageRouteBuilder<void>(
+                pageBuilder: (_, _, _) => page,
+                transitionDuration: Duration.zero,
+              )
+            : null,
       ),
     );
     // LiquidGlassContainer waits 500 ms before its first platform view in
@@ -337,6 +347,46 @@ void main() {
         await finish(tester);
       }, skip: !PlatformVersion.shouldUseNativeGlass);
 
+      testWidgets('on a page in a PageRouteBuilder, a sheet route away from '
+          'it leaves its full glass while it opens, is held mid-drag and '
+          'closes (#161)', (tester) async {
+        mockNative(tester);
+        await pumpHost(
+          tester,
+          entry.value(false),
+          alignment: Alignment.topCenter,
+          pageRouteBuilder: true,
+        );
+        final name = sent.keys.single;
+        clear();
+
+        final sheet = _SheetPageRoute();
+        navigator.currentState!.push(sheet);
+        await tester.pumpAndSettle();
+        expect(
+          sent[name],
+          isNull,
+          reason: 'full glass while the sheet slides in and is up',
+        );
+
+        // A finger holding the sheet part-way down, as sheet packages drive
+        // their route's animation.
+        sheet.drag(0.6);
+        await tester.pump();
+        await tester.pump();
+        sheet.drag(0.5);
+        await tester.pump();
+        await tester.pump();
+        expect(sent[name], isNull, reason: 'and while it is held mid-drag');
+        sheet.drag(1);
+        await tester.pumpAndSettle();
+
+        navigator.currentState!.pop();
+        await tester.pumpAndSettle();
+        expect(sent[name], isNull, reason: 'and while it leaves');
+        await finish(tester);
+      }, skip: !PlatformVersion.shouldUseNativeGlass);
+
       testWidgets('without a route observer, a page pushed over it contains '
           'it while it animates (#29)', (tester) async {
         mockNative(tester);
@@ -471,6 +521,141 @@ void main() {
   );
 
   testWidgets(
+    'on a page in a PageRouteBuilder, a sheet route whose edge is just below '
+    'the button cuts the glow under the sheet only, not all round it (#161)',
+    (tester) async {
+      mockNative(tester);
+      // The 60 pt host ends 8 pt above the 200 pt sheet's top edge (400).
+      await pumpHost(
+        tester,
+        CNButton.icon(
+          icon: const CNSymbol('heart'),
+          autoHideOnModal: false,
+          onPressed: () {},
+        ),
+        alignment: const Alignment(0, 0.1925),
+        pageRouteBuilder: true,
+      );
+      final name = sent.keys.single;
+      final view = tester.getRect(find.byType(UiKitView));
+      clear();
+
+      final route = _SheetPageRoute();
+      navigator.currentState!.push(route);
+      await tester.pumpAndSettle();
+      expect(last(name), 'cut');
+      expect(sent[name], isNot(contains('contained')));
+      final bounds = Offset.zero & view.size;
+      final sheet = const Rect.fromLTRB(
+        0,
+        400,
+        800,
+        600,
+      ).shift(-view.topLeft).intersect(bounds.inflate(160));
+      expect(lastCuts[name], hasLength(1), reason: 'below its bounds only');
+      expect(_rounded(lastCuts[name]!.single), _rounded(sheet));
+
+      // Held part-way down, the sheet's edge is well below the button.
+      route.drag(0.5);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(last(name), 'full', reason: 'its edge is out of reach');
+      expect(sent[name], isNot(contains('contained')));
+      expect(lastCuts[name], isEmpty);
+      route.drag(1);
+      await tester.pumpAndSettle();
+      expect(last(name), 'cut');
+      expect(lastCuts[name], hasLength(1), reason: 'below its bounds only');
+
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(last(name), 'full');
+      expect(sent[name], isNot(contains('contained')));
+      await finish(tester);
+    },
+    skip: !PlatformVersion.shouldUseNativeGlass,
+  );
+
+  for (final pageRouteBuilder in <bool>[false, true]) {
+    testWidgets(
+      'a sheet route that is a page route cuts nothing in the first frame of '
+      'its push, when it is offstage and laid out open '
+      '(pageRouteBuilder: $pageRouteBuilder, #161)',
+      (tester) async {
+        mockNative(tester);
+        // At the bottom, under where the 200 pt sheet ends up.
+        await pumpHost(
+          tester,
+          CNButton.icon(
+            icon: const CNSymbol('heart'),
+            autoHideOnModal: false,
+            onPressed: () {},
+          ),
+          alignment: Alignment.bottomCenter,
+          pageRouteBuilder: pageRouteBuilder,
+        );
+        final name = sent.keys.single;
+        clear();
+
+        navigator.currentState!.push(_SheetPageRoute());
+        await tester.pump();
+        expect(sent[name], isNull, reason: 'the sheet has painted nothing yet');
+        await tester.pump();
+        expect(
+          sent[name],
+          isNull,
+          reason: 'its first painted frame is below the screen',
+        );
+        await tester.pumpAndSettle();
+        expect(last(name), 'cut', reason: 'under the sheet once it is up');
+        expect(sent[name], isNot(contains('contained')));
+
+        navigator.currentState!.pop();
+        await tester.pumpAndSettle();
+        expect(last(name), 'full');
+        await finish(tester);
+      },
+      skip: !PlatformVersion.shouldUseNativeGlass,
+    );
+  }
+
+  testWidgets(
+    'on a page in a PageRouteBuilder, a page pushed over the button still '
+    'cuts the glow it covers as it slides (#159, #161)',
+    (tester) async {
+      mockNative(tester);
+      await pumpHost(
+        tester,
+        CNButton.icon(
+          icon: const CNSymbol('xmark'),
+          autoHideOnModal: false,
+          onPressed: () {},
+        ),
+        pageRouteBuilder: true,
+      );
+      final name = sent.keys.single;
+      clear();
+
+      navigator.currentState!.push(
+        CupertinoPageRoute<void>(
+          builder: (_) => const CupertinoPageScaffold(child: SizedBox()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(sent[name], contains('cut'), reason: 'cut as the page comes');
+      expect(sent[name], isNot(contains('contained')));
+      expect(last(name), 'full', reason: 'full once it stops');
+
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(last(name), 'full');
+      await finish(tester);
+    },
+    skip: !PlatformVersion.shouldUseNativeGlass,
+  );
+
+  testWidgets(
     'a page over the button cuts its glow all round its bounds, never '
     'inside them (#159)',
     (tester) async {
@@ -515,6 +700,50 @@ void main() {
     },
     skip: !PlatformVersion.shouldUseNativeGlass,
   );
+}
+
+/// A sheet route that is a `PageRoute`, as sheet packages' are
+/// (`modal_bottom_sheet`): its page is the whole screen, and it slides its
+/// sheet up from the bottom itself. The type name has `Sheet` in it, so the
+/// observer counts it as a modal (#161).
+class _SheetPageRoute extends PageRoute<void> {
+  _SheetPageRoute();
+
+  /// Sets the route's animation as a finger dragging the sheet does.
+  void drag(double value) => controller!.value = value;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  bool get opaque => false;
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 300);
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(animation),
+        child: Container(height: 200, color: const Color(0xFFFFFFFF)),
+      ),
+    );
+  }
 }
 
 /// [r] rounded to the half point the cuts are sent at.

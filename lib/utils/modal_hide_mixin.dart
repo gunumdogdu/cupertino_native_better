@@ -207,8 +207,11 @@ mixin ModalHideMixin<T extends StatefulWidget> on State<T> {
 ///    popped off it, or dragged by the back gesture (#29, #159); and
 ///  * while a modal route (a dialog, popup or sheet) is over a widget that
 ///    stays mounted, and its sheet, popup or dialog is within reach of the
-///    widget's glow (#124, #156). A modal doesn't move the host route's
-///    secondary animation, so the first rule never fires for it.
+///    widget's glow (#124, #156). This rule also holds when the host route
+///    transitions with the modal, so the modal moves its secondary
+///    animation: a sheet package's sheet route over a page in a
+///    `PageRouteBuilder`, or `showCupertinoSheet` (#161). What covers the
+///    widget is the sheet, not the sheet route's whole box.
 ///
 /// When the position of what covers it can't be told (no
 /// `CNTabBarRouteObserver`, or a modal whose bounds aren't known yet), the
@@ -272,8 +275,14 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
     const full = (contained: false, cover: null);
     const contained = (contained: true, cover: null);
     final status = _routeAnimation?.status;
-    if (status == AnimationStatus.forward ||
-        status == AnimationStatus.reverse) {
+    final host = _hostRoute;
+    if ((status == AnimationStatus.forward ||
+            status == AnimationStatus.reverse) &&
+        // A sheet route the host transitions with moves its secondary
+        // animation too, but the modal rules below measure its sheet; its
+        // route's box is the whole screen (#161).
+        !(host != null &&
+            CNTabBarRouteObserver.secondaryAnimationFollowsModal(host))) {
       // The page moving over or off this one hides the glow it covers,
       // where it is now (#159). Only an observer of this navigator can tell
       // where that is.
@@ -318,6 +327,8 @@ mixin HaloContainmentMixin<T extends StatefulWidget> on ModalHideMixin<T> {
     // moves carries the glass with it (#156).
     final sheet = CNTabBarRouteObserver.modalRect;
     if (sheet == null) return contained;
+    // It paints nothing yet, as in the first frame of a sheet route's push.
+    if (sheet.isEmpty) return full;
     final mine = _globalRect();
     if (mine == null) return _retryAfterFrame();
     if (!mine.inflate(_haloReach).overlaps(sheet)) return full;

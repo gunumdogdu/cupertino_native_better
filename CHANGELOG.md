@@ -1,3 +1,32 @@
+## 2.7.3
+
+> Fixed: on a page hosted in a `PageRouteBuilder`, glass widgets with `autoHideOnModal: false` showed a square box around their glass while a sheet package's sheet was open or held mid-drag (#161, new in 2.7.2). Also fixed: the first frame of a sheet route's push cut the glow of the glass widgets the open sheet would cover, before the sheet had appeared, on any page.
+
+### Fixed — a box around the glass under a sheet, on a page in a `PageRouteBuilder` (#161)
+
+A page in a `PageRouteBuilder` transitions with any page route pushed over it, and a sheet package's sheet route (`modal_bottom_sheet`'s) is a page route. So the sheet moved the page's secondary animation, as a page pushed over it does. 2.7.2 then took the sheet route's whole box, which is the whole screen, for a page covering the widget, and hid all of its glow outside its bounds. That left a square box around the glass for as long as the sheet moved or was held.
+
+Now a sheet route that the page transitions with counts as a modal: what covers the widget is its sheet, measured as for any other sheet (#156). The new `CNTabBarRouteObserver.secondaryAnimationFollowsModal` tells whether it does. `showCupertinoSheet` moves the secondary animation of every page under it, so it takes the same path.
+
+### Fixed — the glow cut before a sheet route appears
+
+A sheet route that is a page route (`modal_bottom_sheet`'s, or `showCupertinoSheet`'s) is offstage for the first frame of its push, and laid out open. The observer measured that layout as the open sheet, so a glass widget under where the sheet ends up had its glow cut all round before the sheet appeared. On the simulator, where that first frame is slow, this showed as a box for several frames. Now an offstage route paints nothing, and so does a route back from offstage until a frame lays it out again.
+
+Thanks to @Ashhad08 for the report, the test matrix and the diagnosis.
+
+### Checked
+These checks use the iPhone 17 Pro Max simulator on iOS 26.2 and the iPhone 17 simulator on iOS 27.0, with the reporter's sample (`modal_bottom_sheet` 3.0.0, a heart `CNButton.icon` on light cards):
+- **`PageRouteBuilder` page, `CupertinoScaffold.showCupertinoModalBottomSheet`, dragged down in 60 pt steps and held at each:**
+  - On 2.7.2 a grey box showed around the heart at every held step.
+  - Now the heart keeps its glass and soft shadow at every step, also on every frame of a recording of the open and the drag.
+- **Plain `showCupertinoModalBottomSheet` on a `PageRouteBuilder` page, and both sheets on a `MaterialPageRoute` page:** glass and shadow at every step. With the sheet's edge just below a heart, the shadow stops at the edge.
+- **`showCupertinoSheet`, frame by frame:**
+  - On 2.7.2 a box showed around the heart for a few frames before the sheet reached it.
+  - Now the heart keeps its glass until the sheet covers it, and on every frame of the close.
+- **Earlier cases (#149, #156, #159):** their tests are unchanged and pass.
+- **Example app:** the new #161 screen opens a page in a `PageRouteBuilder`, with a sheet route held mid-drag and `showCupertinoSheet`.
+- **Tests:** 11 new; 644 tests pass. 10 of the new ones fail on 2.7.2.
+
 ## 2.7.2
 
 > Fixed: glass widgets with `autoHideOnModal: false` flat while a sheet's edge is near or over them (#156), and flat while a page is popped off them, then blinking back when the pop ends (#159). They now hide only the part of their glow that the sheet or page covers.
