@@ -109,6 +109,90 @@ final class CNDotTabBar: CNLabelFontTabBar {
     placeMenuButtons()
     placeActionButtons()
     applyItemNames()
+    onLayout?()
+  }
+
+  /// Called after each layout, so the platform view can tell Flutter where
+  /// the bar now takes touches (#162).
+  var onLayout: (() -> Void)?
+
+  /// Where the bar takes touches, in its own coordinates (#162).
+  ///
+  /// [capsules] are the areas in which its `hitTest` finds a view. UIKit's
+  /// iOS 26 bar takes touches only on its glass capsule and lets those above
+  /// and beside it through to what is behind; an earlier bar takes them all
+  /// over. They are found by asking
+  /// `hitTest` point by point, so nothing depends on UIKit's private views:
+  /// down a column for the capsule's rows, along its middle row for the span
+  /// of each capsule, then down the middle of each span for its own rows.
+  ///
+  /// A bar shorter than its own height draws its icons up past the top of
+  /// its capsule, into the room above the bar. Those parts of the icons are
+  /// in [icons], each with the capsule's top, so a touch there can go to the
+  /// item under it as a touch on the capsule would.
+  ///
+  /// Both are empty when the bar takes no touches yet, such as before its
+  /// first layout.
+  func touchRegions() -> (capsules: [CGRect], icons: [(area: CGRect, capsuleTop: CGFloat)]) {
+    let capsules = capsuleRegions()
+    var icons: [(area: CGRect, capsuleTop: CGFloat)] = []
+    // The room above the bar is 14 pt, so an icon reaches at most that far up.
+    for icon in iconFrames(reach: 16) {
+      guard let capsule = capsules.first(where: { $0.minX <= icon.midX && icon.midX <= $0.maxX }),
+            icon.minY < capsule.minY - 0.5 else { continue }
+      let area = CGRect(x: icon.minX, y: icon.minY,
+                        width: icon.width, height: capsule.minY - icon.minY)
+      icons.append((area, capsule.minY))
+    }
+    return (capsules, icons)
+  }
+
+  /// The capsules of [touchRegions].
+  private func capsuleRegions() -> [CGRect] {
+    let b = bounds
+    guard !isHidden, alpha > 0.01, isUserInteractionEnabled,
+          b.width >= 1, b.height >= 1 else { return [] }
+    func takes(_ x: CGFloat, _ y: CGFloat) -> Bool {
+      return hitTest(CGPoint(x: x, y: y), with: nil) != nil
+    }
+    // The first and last row a column takes touches in, probed at each
+    // point's centre.
+    func rows(at x: CGFloat) -> (CGFloat, CGFloat)? {
+      var first: CGFloat?
+      var last: CGFloat = 0
+      var y = b.minY + 0.5
+      while y < b.maxY {
+        if takes(x, y) {
+          if first == nil { first = y }
+          last = y
+        }
+        y += 1
+      }
+      guard let first else { return nil }
+      return (first, last)
+    }
+    let columns: [CGFloat] = [0.5, 0.25, 0.75, 0.1, 0.9].map { (b.minX + b.width * $0).rounded(.down) + 0.5 }
+    guard let row = columns.lazy.compactMap({ rows(at: $0) }).first else { return [] }
+    let y = ((row.0 + row.1) / 2).rounded(.down) + 0.5
+    // The spans of that row that take touches; a one-point gap doesn't split one.
+    var spans: [(CGFloat, CGFloat)] = []
+    var x = b.minX + 0.5
+    while x < b.maxX {
+      if takes(x, y) {
+        if let last = spans.last, x - last.1 <= 2 {
+          spans[spans.count - 1].1 = x
+        } else {
+          spans.append((x, x))
+        }
+      }
+      x += 1
+    }
+    return spans.map { span in
+      let mid = ((span.0 + span.1) / 2).rounded(.down) + 0.5
+      let r = rows(at: mid) ?? row
+      return CGRect(x: span.0 - 0.5, y: r.0 - 0.5,
+                    width: span.1 - span.0 + 1, height: r.1 - r.0 + 1)
+    }
   }
 
   /// `CNTabBarItem.semanticLabel` by item index: what VoiceOver reads for
@@ -347,19 +431,16 @@ final class CNDotTabBar: CNLabelFontTabBar {
     }
   }
 
-  /// The icons of each item, one column per item from left to right, or nil
-  /// when they can't be told apart.
-  private func iconColumns() -> [[CGRect]]? {
-    guard let items = items else { return nil }
-
-    // Every visible icon-sized image in the bar, in the bar's coordinates.
+  /// Every visible icon-sized image in the bar, in the bar's coordinates,
+  /// that reaches at most [reach] points past the bar's edges.
+  private func iconFrames(reach: CGFloat) -> [CGRect] {
     var icons: [CGRect] = []
     func walk(_ view: UIView) {
       for sub in view.subviews where !sub.isHidden && sub.alpha > 0.01 && !dots.contains(sub) {
         if let image = sub as? UIImageView, image.image != nil {
           let r = image.convert(image.bounds, to: self)
           if r.width >= 12, r.width <= 60, r.height >= 12, r.height <= 60,
-             bounds.insetBy(dx: -8, dy: -8).contains(r) {
+             bounds.insetBy(dx: -reach, dy: -reach).contains(r) {
             icons.append(r)
           }
         }
@@ -367,6 +448,14 @@ final class CNDotTabBar: CNLabelFontTabBar {
       }
     }
     walk(self)
+    return icons
+  }
+
+  /// The icons of each item, one column per item from left to right, or nil
+  /// when they can't be told apart.
+  private func iconColumns() -> [[CGRect]]? {
+    guard let items = items else { return nil }
+    let icons = iconFrames(reach: 8)
 
     // One column per item: icons whose centres are within a few points share
     // a column (the selection lens holds a second copy of each icon).

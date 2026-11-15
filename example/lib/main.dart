@@ -76,6 +76,7 @@ import 'demos/issue149_glass_button_under_sheet_test.dart';
 import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue161_glass_button_page_route_builder_sheet_test.dart';
+import 'demos/issue162_tab_bar_touch_regions_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -1431,6 +1432,21 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue161GlassButtonPageRouteBuilderSheetTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#162: Taps above and beside the tab bar'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('hand.tap', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue162TabBarTouchRegionsTestPage(),
                       ),
                     );
                   },

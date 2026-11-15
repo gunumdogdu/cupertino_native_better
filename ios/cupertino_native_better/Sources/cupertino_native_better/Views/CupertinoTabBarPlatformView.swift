@@ -42,7 +42,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
   }
 
   private let channel: FlutterMethodChannel
-  private let container: UIView
+  private let container: CNTabBarContainer
   private var tabBar: UITabBar?
   private var tabBarLeft: UITabBar?
   private var tabBarRight: UITabBar?
@@ -87,7 +87,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
 
   init(frame: CGRect, viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativeTabBar_\(viewId)", binaryMessenger: messenger)
-    self.container = UIView(frame: frame)
+    self.container = CNTabBarContainer(frame: frame)
 
     var labels: [String] = []
     var symbols: [String] = []
@@ -279,6 +279,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       // which iOS 26+ Liquid Glass can still render despite UITabBarAppearance.shadowImage.
       left.shadowImage = UIImage(); right.shadowImage = UIImage()
       left.delegate = self; right.delegate = self
+      watchTouches(of: left); watchTouches(of: right)
       if let bg = bg { left.barTintColor = bg; right.barTintColor = bg }
       if #available(iOS 10.0, *), let tint = tint { left.tintColor = tint; right.tintColor = tint }
       if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap; if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap; right.scrollEdgeAppearance = ap } } }
@@ -403,6 +404,7 @@ class CupertinoTabBarPlatformView: NSObject, FlutterPlatformView, UITabBarDelega
       let bar = CNDotTabBar(frame: .zero)
       tabBar = bar
       bar.delegate = self
+      watchTouches(of: bar)
       bar.translatesAutoresizingMaskIntoConstraints = false
       // iOS 26+: leave the bar unclipped so the Liquid Glass selection pill
       // can render into the container's 6pt headroom. Container clip blocks
@@ -748,6 +750,7 @@ channel.setMethodCallHandler { [weak self] call, result in
             left.layer.shadowOpacity = 0; right.layer.shadowOpacity = 0
             left.shadowImage = UIImage(); right.shadowImage = UIImage()
             left.delegate = self; right.delegate = self
+            self.watchTouches(of: left); self.watchTouches(of: right)
             if let ap = appearance { if #available(iOS 13.0, *) { left.standardAppearance = ap; right.standardAppearance = ap; if #available(iOS 15.0, *) { left.scrollEdgeAppearance = ap; right.scrollEdgeAppearance = ap } } }
             left.items = buildItems(0..<leftEnd)
             right.items = buildItems(leftEnd..<count)
@@ -855,6 +858,7 @@ channel.setMethodCallHandler { [weak self] call, result in
             let bar = CNDotTabBar(frame: .zero)
             self.tabBar = bar
             bar.delegate = self
+            self.watchTouches(of: bar)
             bar.translatesAutoresizingMaskIntoConstraints = false
             // iOS 26+: leave unclipped for pill overflow into 6pt headroom.
             // iOS < 26: clip to contain the legacy hairline shadow.
@@ -1081,6 +1085,65 @@ channel.setMethodCallHandler { [weak self] call, result in
   }
 
   func view() -> UIView { container }
+
+  // MARK: - Touch regions (#162)
+
+  /// What Flutter was last told about where the bars take touches, in the
+  /// container's coordinates; nil for everywhere.
+  private var sentTouchRegions: [CGRect]?
+  private var touchRegionsScheduled = false
+
+  /// Has [bar] tell Flutter where it takes touches after each layout.
+  private func watchTouches(of bar: CNDotTabBar) {
+    bar.onLayout = { [weak self] in self?.scheduleTouchRegions() }
+  }
+
+  /// Tells Flutter where the bars take touches once this layout pass is
+  /// over, at most once per pass.
+  private func scheduleTouchRegions() {
+    guard !touchRegionsScheduled else { return }
+    touchRegionsScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.touchRegionsScheduled = false
+      self.sendTouchRegions()
+    }
+  }
+
+  /// The container is taller than the bars: they sit 14 pt below its top to
+  /// leave room for the Liquid Glass pill, and the iOS 26 capsule doesn't
+  /// fill a bar's width. A touch there hit the bare container, so it did
+  /// nothing; in a native app it reaches what is behind the bar. Flutter
+  /// gets the areas the bars take touches in and sends only those touches
+  /// to this view, so the others reach the Flutter content behind it.
+  /// When none are found, such as before the first layout, Flutter is told
+  /// nil and sends this view every touch on it, as before.
+  ///
+  /// The parts of icons drawn above a short bar's capsule are sent to this
+  /// view too, and the container hands their touches to the item below.
+  private func sendTouchRegions() {
+    var regions: [CGRect] = []
+    var iconAreas: [CNTabBarContainer.IconArea] = []
+    for case let bar as CNDotTabBar in [tabBar, tabBarLeft, tabBarRight] where bar.superview === container {
+      let found = bar.touchRegions()
+      regions += found.capsules.map { bar.convert($0, to: container) }
+      for icon in found.icons {
+        // The selection lens holds a second copy of each icon, at the same place.
+        let area = bar.convert(icon.area, to: container).intersection(container.bounds)
+        guard !area.isEmpty, !regions.contains(area) else { continue }
+        regions.append(area)
+        iconAreas.append(CNTabBarContainer.IconArea(area: area, bar: bar, capsuleTop: icon.capsuleTop))
+      }
+    }
+    container.iconAreas = regions.isEmpty ? [] : iconAreas
+    let found: [CGRect]? = regions.isEmpty ? nil : regions
+    guard found != sentTouchRegions else { return }
+    sentTouchRegions = found
+    let args: [[Double]]? = found?.map {
+      [Double($0.minX), Double($0.minY), Double($0.width), Double($0.height)]
+    }
+    channel.invokeMethod("touchRegions", arguments: args)
+  }
 
   /// How much a custom label is taller than the native 10pt one. The bar
   /// keeps its height and grows the label up into the icon, so half of
@@ -1324,4 +1387,35 @@ channel.setMethodCallHandler { [weak self] call, result in
     return scaled.withRenderingMode(image.renderingMode)
   }
 
+}
+
+/// The view `CNTabBar` hands Flutter: the bars, 14 pt below its top to leave
+/// room for the Liquid Glass pill.
+///
+/// A bar shorter than its own height draws its icons up past the top of its
+/// capsule, into that room. A touch on that part of an icon hit this bare
+/// view and did nothing, so it goes to the bar instead, at the same x just
+/// inside the capsule's top, and UIKit handles it as a touch on the item:
+/// the glass press and the selection play, and the delegate hears of it.
+/// After PR #162 by @djedi, kept to where an icon draws, so a touch on the
+/// empty room still goes to the content behind the bar.
+final class CNTabBarContainer: UIView {
+  struct IconArea {
+    /// The part of an icon above its capsule, in the container's coordinates.
+    let area: CGRect
+    weak var bar: UITabBar?
+    /// The capsule's top, in the bar's coordinates.
+    let capsuleTop: CGFloat
+  }
+
+  var iconAreas: [IconArea] = []
+
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    let hit = super.hitTest(point, with: event)
+    guard hit === self,
+          let icon = iconAreas.first(where: { $0.area.contains(point) }),
+          let bar = icon.bar, bar.superview === self else { return hit }
+    let inBar = convert(point, to: bar)
+    return bar.hitTest(CGPoint(x: inBar.x, y: icon.capsuleTop + 1), with: event) ?? hit
+  }
 }

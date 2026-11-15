@@ -1,3 +1,31 @@
+## 2.7.4
+
+> Fixed: on iOS 26 and later, a tap just above `CNTabBar`'s glass capsule, or beside it, did nothing (#162). It now reaches the Flutter content behind the bar, as in a native app. Also fixed: on a bar shorter than its own height, a tap on the top of an icon, where it draws above the capsule, now selects its tab.
+
+### Fixed — taps above and beside the tab bar's capsule (#162)
+
+The native bar sits 14 pt below the top of its platform view, which leaves room for the Liquid Glass selection pill, and the iOS 26 capsule doesn't fill the bar's width. A touch in that room, or beside the capsule, hit the bare view behind the bar and was dropped. UIKit's own bar takes no touches there, so in a native app they reach the content behind it.
+
+Now the native bar tells Flutter where it takes touches, found with UIKit's own hit testing after each layout, and Flutter sends only those touches to the platform view. Any other touch on the view goes to the Flutter content behind the bar, such as a list row, a button or the start of a scroll. Until the bar has reported, the view takes every touch on it, as before.
+
+### Fixed — taps on the top of a short bar's icons (#162)
+
+A bar given a `height` shorter than its own draws its icons up past the top of its capsule, into the room above the bar. A tap on that part of an icon hit the bare view and did nothing. Now the bar hands it to the item below, which selects it with the glass press, as a tap on the capsule does. A tap on the room between and above the icons goes to the content behind.
+
+Thanks to @djedi for the report and PR #162, whose way of handing those touches to the bar this uses.
+
+### Checked
+These checks use the iPhone 17 Pro Max simulator on iOS 26.2, the iPhone 17 Pro simulator on iOS 26.0 and the iPhone 17 simulator on iOS 27.0, with five bars: labeled and icon-only, each at its own height and at `height: 60`, and a split bar.
+- **Where each bar takes touches:** the area it reports is its capsule on the screen, 274 by 62 pt, 14 pt below the top of the view; the split bar reports its two capsules.
+- **Taps sent through Flutter's hit testing:**
+  - In the room above the capsule, beside it, and 1 pt above it, the taps reach the content behind the bar.
+  - On the capsule, they stay with the bar.
+- **Short bars:** the parts of icons above the capsule stay with the bar. In the running app, the native view hands a touch there to the capsule, and a touch on the room between the icons to no view.
+- **Not checked here:** the simulator can't be sent real taps, so the bar's selection after such a handed-over touch rests on the PR author's check on an iPhone with iOS 26.
+- **Build:** the Swift compiles with Xcode 26.0's compiler against the iOS 26.0 SDK.
+- **Example app:** the new #162 screen floats a bar over a list. Taps above and beside the capsule reach the rows, with the full bar and with a short icon-only bar.
+- **Tests:** 4 new; 648 tests pass.
+
 ## 2.7.3
 
 > Fixed: on a page hosted in a `PageRouteBuilder`, glass widgets with `autoHideOnModal: false` showed a square box around their glass while a sheet package's sheet was open or held mid-drag (#161, new in 2.7.2). Also fixed: the first frame of a sheet route's push cut the glow of the glass widgets the open sheet would cover, before the sheet had appeared, on any page.

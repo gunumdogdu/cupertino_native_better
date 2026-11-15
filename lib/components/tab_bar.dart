@@ -20,6 +20,7 @@ import '../utils/theme_helper.dart';
 import '../utils/optional_method_call.dart';
 import '../utils/layout_direction.dart';
 import '../utils/modal_geometry.dart';
+import '../utils/touch_regions.dart';
 import 'icon.dart';
 import 'popup_menu_button.dart';
 import 'tab_badge.dart';
@@ -423,6 +424,12 @@ class _CNTabBarState extends State<CNTabBar> {
   bool? _lastIsDark;
   double? _intrinsicHeight;
   double? _intrinsicWidth;
+
+  /// Where the native bar takes touches, in the platform view's coordinates,
+  /// as it last reported them; null for everywhere (#162). A touch elsewhere
+  /// on the view, such as in the room above the bar or beside the iOS 26
+  /// capsule, goes to the Flutter content behind the bar, as in a native app.
+  List<Rect>? _touchRegions;
   List<String>? _lastLabels;
   List<String>? _lastSymbols;
   List<String>? _lastActiveSymbols;
@@ -1046,7 +1053,7 @@ class _CNTabBarState extends State<CNTabBar> {
 
   Widget _buildNativeTabBarPlatformView(Map<String, dynamic> creationParams) {
     const viewType = 'CupertinoNativeTabBar';
-    final platformView = defaultTargetPlatform == TargetPlatform.iOS
+    final nativeView = defaultTargetPlatform == TargetPlatform.iOS
         ? UiKitView(
             viewType: viewType,
             creationParams: creationParams,
@@ -1080,6 +1087,11 @@ class _CNTabBarState extends State<CNTabBar> {
             },
           );
 
+    final platformView = PlatformViewTouchRegions(
+      regions: _touchRegions,
+      child: nativeView,
+    );
+
     final h = widget.height ?? _intrinsicHeight ?? 50.0;
     final w = !widget.split && widget.shrinkCentered ? _intrinsicWidth : null;
     final own = _intrinsicHeight;
@@ -1104,6 +1116,8 @@ class _CNTabBarState extends State<CNTabBar> {
   void _onCreated(int id) {
     final ch = MethodChannel('CupertinoNativeTabBar_$id');
     _channel = ch;
+    // A new native bar reports its own regions after its first layout.
+    if (_touchRegions != null) setState(() => _touchRegions = null);
     ch.setMethodCallHandler(_onMethodCall);
     _lastIndex = widget.currentIndex;
     // The native bar was built from _creationParams, prepared once at the
@@ -1224,7 +1238,24 @@ class _CNTabBarState extends State<CNTabBar> {
       menus == null ? null : jsonEncode(menus);
 
   Future<dynamic> _onMethodCall(MethodCall call) async {
-    if (call.method == 'menuSelected') {
+    if (call.method == 'touchRegions') {
+      final regions = (call.arguments as List?)
+          ?.map((r) => (r as List).cast<num>())
+          .where((r) => r.length == 4)
+          .map(
+            (r) => Rect.fromLTWH(
+              r[0].toDouble(),
+              r[1].toDouble(),
+              r[2].toDouble(),
+              r[3].toDouble(),
+            ),
+          )
+          .toList();
+      final next = regions == null || regions.isEmpty ? null : regions;
+      if (mounted && !listEquals(next, _touchRegions)) {
+        setState(() => _touchRegions = next);
+      }
+    } else if (call.method == 'menuSelected') {
       final args = call.arguments as Map?;
       final idx = (args?['index'] as num?)?.toInt();
       final path = (args?['path'] as List?)?.cast<num>().map((e) => e.toInt());

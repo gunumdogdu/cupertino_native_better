@@ -132,6 +132,10 @@
 //     (#161: glass buttons on a page in a PageRouteBuilder under a sheet
 //     route held mid-drag, and showCupertinoSheet; AUTO=true opens each,
 //     printing `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue162
+//     (#162: taps above and beside CNTabBar's capsule reach the list behind
+//     it; AUTO=true taps both, full and short bar, printing `CNB_TAP` and
+//     `CNB_SHOT`)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -215,6 +219,7 @@ import 'demos/issue149_glass_button_under_sheet_test.dart';
 import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue161_glass_button_page_route_builder_sheet_test.dart';
+import 'demos/issue162_tab_bar_touch_regions_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -380,6 +385,9 @@ class _ProbeApp extends StatelessWidget {
       return const Issue161GlassButtonPageRouteBuilderSheetTestPage(
         autoCycle: _auto,
       );
+    }
+    if (_probe == 'issue162') {
+      return const Issue162TabBarTouchRegionsTestPage(autoCycle: _auto);
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();
