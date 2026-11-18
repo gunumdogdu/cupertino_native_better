@@ -85,6 +85,7 @@ import 'demos/issue169_button_content_padding_test.dart';
 import 'demos/issue170_search_bar_glass_shadow_test.dart';
 import 'demos/issue171_search_bar_placeholder_color_test.dart';
 import 'demos/issue173_search_bar_rtl_test.dart';
+import 'demos/issue176_reduce_transparency_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -1585,6 +1586,24 @@ class HomePage extends StatelessWidget {
                     Navigator.of(context).push(
                       CupertinoPageRoute(
                         builder: (_) => const Issue173SearchBarRtlTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#176: Reduce Transparency'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'circle.lefthalf.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue176ReduceTransparencyTestPage(),
                       ),
                     );
                   },

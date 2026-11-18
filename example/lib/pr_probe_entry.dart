@@ -160,6 +160,10 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue173
 //     (#173: CNSearchBar right to left beside left to right, a runtime
 //     switch and a pubspec font; AUTO=true prints `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue176
+//     (#176: CNAccessibility.reduceTransparency and
+//     CNScrollEdgeEffect.reduceTransparencyHeight; RT_MODE=34|none|0 picks
+//     the height; AUTO=true prints `CNB_RT on|off` on every change)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -252,6 +256,7 @@ import 'demos/issue169_button_content_padding_test.dart';
 import 'demos/issue170_search_bar_glass_shadow_test.dart';
 import 'demos/issue171_search_bar_placeholder_color_test.dart';
 import 'demos/issue173_search_bar_rtl_test.dart';
+import 'demos/issue176_reduce_transparency_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -444,6 +449,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue173') {
       return const Issue173SearchBarRtlTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue176') {
+      return const Issue176ReduceTransparencyTestPage(
+        autoCycle: _auto,
+        initialMode: String.fromEnvironment('RT_MODE', defaultValue: '34'),
+      );
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();
