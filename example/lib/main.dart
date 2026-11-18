@@ -1539,59 +1539,52 @@ class HomePage extends StatelessWidget {
                         builder: (_) =>
                             const Issue169ButtonContentPaddingTestPage(),
                       ),
-                      CupertinoListTile(
-                        title: Text('#170: Search bar shadow and initial text'),
-                        leading: CNIcon(
-                          symbol: CNSymbol(
-                            'magnifyingglass',
-                            color: accentColor,
-                          ),
-                        ),
-                        trailing: CupertinoListTileChevron(),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            CupertinoPageRoute(
-                              builder: (_) =>
-                                  const Issue170SearchBarGlassShadowTestPage(),
-                            ),
-                          );
-                        },
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#170: Search bar shadow and initial text'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('magnifyingglass', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue170SearchBarGlassShadowTestPage(),
                       ),
-                      CupertinoListTile(
-                        title: Text('#171: Search bar placeholder colour'),
-                        leading: CNIcon(
-                          symbol: CNSymbol(
-                            'character.cursor.ibeam',
-                            color: accentColor,
-                          ),
-                        ),
-                        trailing: CupertinoListTileChevron(),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            CupertinoPageRoute(
-                              builder: (_) =>
-                                  const Issue171SearchBarPlaceholderColorTestPage(),
-                            ),
-                            CupertinoListTile(
-                              title: Text('#173: Search bar right to left'),
-                              leading: CNIcon(
-                                symbol: CNSymbol(
-                                  'text.alignright',
-                                  color: accentColor,
-                                ),
-                              ),
-                              trailing: CupertinoListTileChevron(),
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  CupertinoPageRoute(
-                                    builder: (_) =>
-                                        const Issue173SearchBarRtlTestPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#171: Search bar placeholder colour'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'character.cursor.ibeam',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue171SearchBarPlaceholderColorTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#173: Search bar right to left'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('text.alignright', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue173SearchBarRtlTestPage(),
                       ),
                     );
                   },
