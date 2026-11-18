@@ -22,6 +22,11 @@ import UIKit
 /// Flutter mirrors how far its content is under the edge (`underneath`); the
 /// clear content of this scroll view is placed that far under the band, so
 /// the system decides when to show it.
+///
+/// With Reduce Transparency on, the system draws the effect as an opaque
+/// band. `rtBand` (`reduceTransparencyHeight`, #176) is the band's height in
+/// that mode; the view follows the setting itself, so a change while the
+/// app runs applies at once.
 final class CNScrollEdgeEffectFactory: NSObject, FlutterPlatformViewFactory {
   private let messenger: FlutterBinaryMessenger
 
@@ -71,6 +76,8 @@ final class CNScrollEdgeEffectHost: UIView {
   private let bottom: Bool
   /// The height of the band the effect covers, from the view's edge.
   private var band: CGFloat = 0
+  /// The band's height while Reduce Transparency is on; nil: `band`.
+  private var rtBand: CGFloat?
   /// How far Flutter's content is under the edge; nil: always under.
   private var underneath: CGFloat?
 
@@ -100,12 +107,29 @@ final class CNScrollEdgeEffectHost: UIView {
       interaction.edge = bottom ? .bottom : .top
       element.addInteraction(interaction)
     }
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(reduceTransparencyChanged),
+      name: UIAccessibility.reduceTransparencyStatusDidChangeNotification, object: nil)
+  }
+
+  @objc private func reduceTransparencyChanged() {
+    setNeedsLayout()
+  }
+
+  /// The band for the current Reduce Transparency setting, and whether it
+  /// is the Reduce Transparency one.
+  private var activeBand: (height: CGFloat, reduced: Bool) {
+    if let rtBand, UIAccessibility.isReduceTransparencyEnabled { return (rtBand, true) }
+    return (band, false)
   }
 
   required init?(coder: NSCoder) { nil }
 
   func apply(_ args: [String: Any]) {
     if let b = args["band"] as? NSNumber { band = CGFloat(b.doubleValue) }
+    if args.keys.contains("rtBand") {
+      rtBand = (args["rtBand"] as? NSNumber).map { CGFloat($0.doubleValue) }
+    }
     if args.keys.contains("underneath") {
       underneath = (args["underneath"] as? NSNumber).map { CGFloat($0.doubleValue) }
     }
@@ -130,10 +154,13 @@ final class CNScrollEdgeEffectHost: UIView {
       alpha: CGFloat((argb >> 24) & 0xFF) / 255)
   }
 
-  /// How far short of the band's end the text element stops. The effect
-  /// reaches past text, by more on iOS 26 than on iOS 27; this ends it where
-  /// a navigation bar's ends, measured against UIKit's own (#150).
+  /// How far short of the band's end the text element stops. The soft
+  /// effect reaches past text, by more on iOS 26 than on iOS 27; this ends
+  /// it where a navigation bar's ends, measured against UIKit's own (#150).
+  /// With Reduce Transparency on, the opaque band ends at the text, so the
+  /// text fills the band (#176).
   private static var textInset: CGFloat {
+    if UIAccessibility.isReduceTransparencyEnabled { return 0 }
     if #available(iOS 27.0, *) { return 0 }
     return 14
   }
@@ -141,7 +168,13 @@ final class CNScrollEdgeEffectHost: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
     let w = bounds.width, h = bounds.height
-    let band = min(self.band > 0 ? self.band : h, h)
+    let active = activeBand
+    // A Reduce Transparency band of 0 draws no effect at all.
+    if #available(iOS 26.0, *) {
+      let effect = bottom ? scrollView.bottomEdgeEffect : scrollView.topEdgeEffect
+      effect.isHidden = active.reduced && active.height <= 0
+    }
+    let band = min(active.height > 0 ? active.height : h, h)
     scrollView.frame = bounds
     // The container is the band: iOS 27 ends the hard style just past it.
     element.frame = bottom ? CGRect(x: 0, y: h - band, width: w, height: band) : CGRect(x: 0, y: 0, width: w, height: band)

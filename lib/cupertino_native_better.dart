@@ -83,6 +83,7 @@ export 'components/tab_rail.dart';
 export 'components/tab_scaffold.dart';
 export 'components/sidebar.dart';
 export 'components/foldable.dart';
+export 'components/accessibility.dart';
 export 'components/native_tab_bar.dart';
 export 'components/native_sheet.dart';
 export 'components/action_sheet.dart';

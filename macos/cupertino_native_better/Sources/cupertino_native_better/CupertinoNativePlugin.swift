@@ -21,6 +21,8 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     // inspector around the Flutter content.
     CNNativeTabBarManager.shared.setup(messenger: registrar.messenger)
     CNNativeSheetManager.shared.setup(messenger: registrar.messenger)
+    // App-wide accessibility settings Flutter doesn't expose (#176)
+    CNAccessibilityManager.shared.setup(messenger: registrar.messenger)
 
     let sliderFactory = CupertinoSliderViewFactory(messenger: registrar.messenger)
     registrar.register(sliderFactory, withId: "CupertinoNativeSlider")

@@ -3,6 +3,8 @@
 /// {@category Components}
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart'
     show CupertinoColors, CupertinoDynamicColor, CupertinoTheme;
 import 'package:flutter/foundation.dart';
@@ -11,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../utils/theme_helper.dart';
+import 'accessibility.dart';
 import '../utils/version_detector.dart';
 
 /// The edge of the screen or scroll view a [CNScrollEdgeEffect] covers.
@@ -71,12 +74,16 @@ class CNScrollEdgeEffect extends StatefulWidget {
     super.key,
     this.edge = CNScrollEdge.top,
     this.height,
+    this.reduceTransparencyHeight,
     this.style = CNScrollEdgeStyle.soft,
     this.controller,
     this.scrollMetrics,
     this.brightness,
     this.backgroundColor,
   }) : assert(height == null || height >= 0),
+       assert(
+         reduceTransparencyHeight == null || reduceTransparencyHeight >= 0,
+       ),
        assert(
          controller == null || scrollMetrics == null,
          'Pass a controller or scrollMetrics, not both',
@@ -93,6 +100,20 @@ class CNScrollEdgeEffect extends StatefulWidget {
   /// scroll view without bars. Under a bar, pass the bar's height plus the
   /// safe area.
   final double? height;
+
+  /// The height of the band while Reduce Transparency is on, in place of
+  /// [height].
+  ///
+  /// With Reduce Transparency on, iOS draws the effect as an opaque band
+  /// instead of a blur. A band that suits a soft blur behind a whole floating
+  /// bar can then hide content that would show through the blur; a shorter
+  /// band here, such as the home indicator area, keeps it visible. 0 draws no
+  /// effect in that mode.
+  ///
+  /// The effect follows the setting by itself, also when it changes while
+  /// the app runs. Null (the default) keeps [height] in both modes. The
+  /// setting itself is [CNAccessibility.reduceTransparency].
+  final double? reduceTransparencyHeight;
 
   /// The look of the effect. Defaults to [CNScrollEdgeStyle.soft].
   final CNScrollEdgeStyle style;
@@ -137,6 +158,7 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
   double? _lastUnderneath;
   String? _lastStyle;
   double? _lastBand;
+  double? _lastRtBand;
   bool? _lastDark;
   int? _lastColor;
 
@@ -244,6 +266,7 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     'edge': widget.edge.name,
     'style': widget.style.name,
     'band': _band(context),
+    'rtBand': widget.reduceTransparencyHeight,
     'isDark': _isDark,
     'color': _color(context),
     'underneath': _underneath,
@@ -253,21 +276,25 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     final channel = _channel;
     if (channel == null) return;
     final band = _band(context);
+    final rtBand = widget.reduceTransparencyHeight;
     final dark = _isDark;
     final style = widget.style.name;
     final color = _color(context);
     if (band == _lastBand &&
+        rtBand == _lastRtBand &&
         dark == _lastDark &&
         style == _lastStyle &&
         color == _lastColor) {
       return;
     }
     _lastBand = band;
+    _lastRtBand = rtBand;
     _lastDark = dark;
     _lastStyle = style;
     _lastColor = color;
     channel.invokeMethod<void>('update', {
       'band': band,
+      'rtBand': rtBand,
       'isDark': dark,
       'style': style,
       'color': color,
@@ -278,6 +305,7 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     final channel = MethodChannel('CNScrollEdgeEffect_$id');
     _channel = channel;
     _lastBand = _band(context);
+    _lastRtBand = widget.reduceTransparencyHeight;
     _lastDark = _isDark;
     _lastStyle = widget.style.name;
     _lastColor = _color(context);
@@ -293,7 +321,10 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
   Widget build(BuildContext context) {
     if (!CNScrollEdgeEffect.isSupported) return const SizedBox.shrink();
     _syncIfNeeded(context);
-    final band = _band(context);
+    // The view is as tall as the taller band, so it keeps its size when the
+    // setting changes; the native view picks the band.
+    final rtBand = widget.reduceTransparencyHeight;
+    final band = math.max(_band(context), rtBand ?? 0);
     final view = UiKitView(
       viewType: 'CNScrollEdgeEffect',
       creationParams: _params(context),

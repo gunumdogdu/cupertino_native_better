@@ -1,3 +1,23 @@
+## 2.9.0
+
+> `CNAccessibility.reduceTransparency` tells Flutter whether Reduce Transparency is on, and `CNScrollEdgeEffect.reduceTransparencyHeight` sets a shorter band for that mode (#176).
+
+### Added — Reduce Transparency for Flutter (#176)
+- `CNAccessibility.reduceTransparency`, a static `ValueListenable<bool>` for the whole app: true while Reduce Transparency is on (Settings › Accessibility › Display & Text Size on iOS, System Settings › Accessibility › Display on macOS). It follows changes while the app runs, with no platform view. Flutter's `MediaQuery` has no such flag, so an app that draws its own blur can now swap it for a solid colour. The value is read on first use; `await CNAccessibility.ensureInitialized()` before `runApp` has it on the first frame. It is always false on other platforms.
+- `CNScrollEdgeEffect.reduceTransparencyHeight`: the band's height while Reduce Transparency is on, in place of `height`. iOS draws the effect as an opaque band in that mode, so a band sized for a soft blur behind a whole floating bar hides the content under the bar; a shorter one, such as the home indicator area, keeps it visible. 0 draws no effect in that mode. The native view follows the setting by itself, so a change while the app runs applies at once, and the view keeps the size of the taller band, so it doesn't resize.
+
+### Fixed — the scroll edge effect's opaque band was 14 pt short on iOS 26
+With Reduce Transparency on, iOS 26 drew `CNScrollEdgeEffect`'s band 14 pt shorter than its `height`, because the effect was shaped for the soft blur, which reaches past the band. The band now covers exactly `height` (or `reduceTransparencyHeight`) from the edge, on iOS 26 and 27. The soft effect is unchanged.
+
+Thanks to @Ashhad08 for the request and its suggested shape.
+
+### Checked
+These checks use the iPhone 17 Pro simulator on iOS 26.0 and the iPhone 17 simulator on iOS 27.0, with Reduce Transparency switched on and off while the app runs.
+- `CNAccessibility.reduceTransparency` has the setting at start and changes with it every time, on iOS 26.0 and 27.0.
+- With a bottom effect as tall as a floating bar (106 pt) and `reduceTransparencyHeight: 34`, the opaque band measures 34 pt with the setting on, and the soft effect is back with it off, switching every time while the app runs. Without `reduceTransparencyHeight` the band covers the whole 106 pt; with 0 there is no band. Before the fix, the 34 pt band measured 20 pt on iOS 26.0.
+- macOS: the Swift typechecks; the app wasn't run with the setting switched, since that switches it for the whole Mac.
+- The iOS sources typecheck against the iOS 26.0 SDK, `flutter analyze` passes with Flutter 3.44 and 3.38, and 723 tests pass (9 new).
+
 ## 2.8.0
 
 > A `CNPopupMenuButton` mounted again (a header swapped for a loading placeholder and back) now shows in its first frame instead of a few frames late (#166). Its menu follows Flutter's `Directionality` (#167), can mark the checked item with your own symbol (#168), and the button can drop its content insets (#169). `CNSearchBar` has its Liquid Glass shadow on iOS 26 (#170), an `initialText` (#170), its `placeholderColor` now reaches the placeholder (#171), and it follows `Directionality` and takes a label font (#173). `LiquidGlassConfig.appearance` keeps glass light or dark (#165).

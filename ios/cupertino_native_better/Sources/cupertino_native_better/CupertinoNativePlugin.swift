@@ -98,6 +98,9 @@ public class CupertinoNativePlugin: NSObject, FlutterPlugin {
     // Setup the foldable observer (hinge, vertical bar, reserved regions)
     CNFoldableManager.shared.setup(messenger: registrar.messenger())
 
+    // App-wide accessibility settings Flutter doesn't expose (#176)
+    CNAccessibilityManager.shared.setup(messenger: registrar.messenger())
+
     // CNToolbar: a UIToolbar where the widget is laid out (iOS 26+)
     let toolbarFactory = CNToolbarViewFactory(messenger: registrar.messenger())
     registrar.register(toolbarFactory, withId: "CNToolbar")

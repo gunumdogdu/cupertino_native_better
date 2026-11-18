@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.8.0
+  cupertino_native_better: ^2.9.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -772,6 +772,17 @@ Stack(
 )
 ```
 
+With Reduce Transparency on, iOS draws the effect as an opaque band. `reduceTransparencyHeight` sets a shorter band for that mode, so a band behind a whole floating bar doesn't become a solid slab over the content; the effect follows the setting by itself:
+
+```dart
+CNScrollEdgeEffect(
+  edge: CNScrollEdge.bottom,
+  height: barHeight,            // a soft blur behind the whole bar
+  reduceTransparencyHeight: 34, // with Reduce Transparency on: the home indicator area
+  controller: controller,
+)
+```
+
 `CNTabScaffold(bottomScrollEdgeEffect: true)` puts it behind the tab bar. It draws nothing before iOS&nbsp;26, on macOS and on other platforms.
 
 ### iPhone Duo
@@ -821,6 +832,7 @@ Open the example app's **Showcase** section to try every screen above on your ow
 | `CNTabRail` | Vertical tab bar (glass rail or sidebar) for the side of the screen | - |
 | `CNTabScaffold` | Tab layout that moves the tabs to the side on iPhone Duo, like the system | - |
 | `CNFoldable` | iPhone Duo hinge (status + angle), vertical-bar side, fold and camera regions | - |
+| `CNAccessibility` | Reduce Transparency for Flutter, app-wide and live | - |
 | `CNSlider` | Native slider with min/max range and step support | `CNSliderController` |
 | `CNSwitch` | Native toggle switch with animated state changes | `CNSwitchController` |
 | `CNDatePicker` | Native date and time picker: compact, inline or wheels | - |
@@ -1420,6 +1432,18 @@ CNSlider(value: volume, semanticLabel: 'Volume', onChanged: setVolume)
 **macOS.** The controls are AppKit controls, so VoiceOver on the Mac reads them as the system's own, and `semanticLabel` names them there too: `CNButton`, `CNPopupMenuButton`, `CNSlider`, `CNSwitch`, `CNSegmentedControl`, `CNStepper`, `CNDatePicker`, `CNColorWell` and `CNProgressIndicator`. A `CNTabBar` badge is read as the tab's help. VoiceOver cannot open a `CNContextMenu` on macOS, because Flutter gives a widget no Show Menu action there; offer the same actions in a visible control too, such as a `CNPopupMenuButton`.
 
 **Dynamic Type.** Button titles follow the system text size. Tab bars, the tab rail and segmented controls keep a fixed size, as they do throughout iOS, and offer the **Large Content Viewer** instead: with a large text size, long-press an item to see it enlarged. `CNTabBar` and `CNTabBarNative` are system tab bars, and `CNTabRail` adopts the viewer as well: as on the system tab bar, slide to another item and lift your finger to select it.
+
+**Reduce Transparency.** Flutter's `MediaQuery` has no flag for it. `CNAccessibility.reduceTransparency` is a `ValueListenable<bool>` for the whole app, read from iOS or macOS and updated while the app runs, so a blur the app draws itself can become a solid colour. Native glass and `CNScrollEdgeEffect` follow the setting by themselves.
+
+```dart
+ValueListenableBuilder<bool>(
+  valueListenable: CNAccessibility.reduceTransparency,
+  builder: (context, reduce, child) => reduce
+      ? ColoredBox(color: solid, child: child)
+      : BackdropFilter(filter: blur, child: child),
+  child: bar,
+)
+```
 
 > **Known Flutter limitation ([flutter/flutter#194389](https://github.com/flutter/flutter/issues/194389)):** VoiceOver *touch exploration* — moving a finger over the screen to find an element — does not reach a native control that shares its area with a scrolling Flutter list, because Flutter's accessibility hit test returns the list first. That covers controls placed inside a `ListView`, and a `CNTabBar` or `CNTabScaffold` bar floating over scrolling content. `CNTabBarNative` is not affected: its tab bar is a real `UITabBarController` outside Flutter's view. Where touch exploration of the tab bar matters, prefer `CNTabBarNative`.
 
@@ -2026,7 +2050,7 @@ addTearDown(PlatformVersion.reset);
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.8.0
+   cupertino_native_better: ^2.9.0
    ```
 
 2. Update imports:
