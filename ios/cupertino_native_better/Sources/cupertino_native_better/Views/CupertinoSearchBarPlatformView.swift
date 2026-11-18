@@ -31,6 +31,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var backgroundColor: UIColor? = nil
         var textColor: UIColor? = nil
         var placeholderColor: UIColor? = nil
+        var clearButtonColor: UIColor? = nil
+        var shadow = true
         var showCancelButton = true
         var cancelText = "Cancel"
         var autofocus = false
@@ -54,6 +56,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["backgroundColor"] as? NSNumber { backgroundColor = ImageUtils.colorFromARGB(v.intValue) }
             if let v = dict["textColor"] as? NSNumber { textColor = ImageUtils.colorFromARGB(v.intValue) }
             if let v = dict["placeholderColor"] as? NSNumber { placeholderColor = ImageUtils.colorFromARGB(v.intValue) }
+            if let v = dict["clearButtonColor"] as? NSNumber { clearButtonColor = ImageUtils.colorFromARGB(v.intValue) }
+            if let v = dict["shadow"] as? Bool { shadow = v }
             if let v = dict["showCancelButton"] as? Bool { showCancelButton = v }
             if let v = dict["cancelText"] as? String { cancelText = v }
             if let v = dict["autofocus"] as? Bool { autofocus = v }
@@ -96,6 +100,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             backgroundColor: backgroundColor.map { Color(uiColor: $0) },
             textColor: textColor.map { Color(uiColor: $0) },
             placeholderColor: placeholderColor.map { Color(uiColor: $0) },
+            clearButtonColor: clearButtonColor.map { Color(uiColor: $0) },
+            shadow: shadow,
             showCancelButton: showCancelButton,
             cancelText: cancelText,
             autofocus: autofocus,
@@ -208,7 +214,12 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
     }
 
     /// Toggle Issue #29 halo containment (container + hosting view).
+    ///
+    /// Clipped to its bounds, the glass would keep the part of its shadow
+    /// that lies inside them, around the capsule's ends: a box. So the glass
+    /// is also clipped to its capsule, which removes its shadow (#170).
     private func applyTransitionContainment(_ active: Bool) {
+        model.glassContained = active
         if active {
             container.isOpaque = false
             container.clipsToBounds = true
@@ -232,6 +243,9 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
 final class CNSearchBarModel: ObservableObject {
     @Published var isExpanded: Bool
     @Published var searchText: String = ""
+    /// Whether the view is clipped to its bounds (halo containment), so the
+    /// glass is clipped to its capsule, without its shadow (#170).
+    @Published var glassContained = false
     /// Bumped on each `focus`/`unfocus` call; [wantsFocus] says which.
     @Published var focusToken: Int = 0
     private(set) var wantsFocus = false
@@ -314,6 +328,11 @@ struct CNSearchBarSwiftUI: View {
     let backgroundColor: Color?
     let textColor: Color?
     let placeholderColor: Color?
+    /// The clear button's colour: `clearButtonColor`, else
+    /// `placeholderColor`, else the secondary label colour (#171).
+    let clearButtonColor: Color?
+    /// Whether the Liquid Glass capsule casts its shadow on iOS 26+ (#170).
+    let shadow: Bool
     let showCancelButton: Bool
     let cancelText: String
     let autofocus: Bool
@@ -344,6 +363,8 @@ struct CNSearchBarSwiftUI: View {
         backgroundColor: Color?,
         textColor: Color?,
         placeholderColor: Color?,
+        clearButtonColor: Color?,
+        shadow: Bool,
         showCancelButton: Bool,
         cancelText: String,
         autofocus: Bool,
@@ -366,6 +387,8 @@ struct CNSearchBarSwiftUI: View {
         self.backgroundColor = backgroundColor
         self.textColor = textColor
         self.placeholderColor = placeholderColor
+        self.clearButtonColor = clearButtonColor
+        self.shadow = shadow
         self.showCancelButton = showCancelButton
         self.cancelText = cancelText
         self.autofocus = autofocus
@@ -390,18 +413,22 @@ struct CNSearchBarSwiftUI: View {
                     .matchedGeometryEffect(id: "searchIcon", in: animation)
 
                 if isExpanded {
-                    // Text field
-                    TextField(placeholder, text: $model.searchText)
-                        .foregroundColor(textColor ?? .primary)
-                        .focused($isFocused)
-                        .submitLabel(.search)
-                        .textInputAutocapitalization(keyboard.capitalization)
-                        .autocorrectionDisabled(!keyboard.autocorrect)
-                        .keyboardType(keyboard.type)
-                        .onSubmit {
-                            onSubmitted(model.searchText)
-                        }
-                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+                    // Text field. The placeholder is the prompt, so
+                    // `placeholderColor` reaches it; the label is what
+                    // VoiceOver reads (#171).
+                    TextField(text: $model.searchText, prompt: prompt) {
+                        Text(placeholder)
+                    }
+                    .foregroundColor(textColor ?? .primary)
+                    .focused($isFocused)
+                    .submitLabel(.search)
+                    .textInputAutocapitalization(keyboard.capitalization)
+                    .autocorrectionDisabled(!keyboard.autocorrect)
+                    .keyboardType(keyboard.type)
+                    .onSubmit {
+                        onSubmitted(model.searchText)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
 
                     // Clear button
                     if !model.searchText.isEmpty {
@@ -410,7 +437,7 @@ struct CNSearchBarSwiftUI: View {
                         }) {
                             Image(systemName: clearIconName)
                                 .font(.system(size: clearIconSize))
-                                .foregroundColor(placeholderColor ?? .secondary)
+                                .foregroundColor(clearButtonColor ?? placeholderColor ?? .secondary)
                         }
                         // Without a label VoiceOver reads the symbol's name,
                         // "Close" (#134).
@@ -422,8 +449,10 @@ struct CNSearchBarSwiftUI: View {
             .padding(.horizontal, 12)
             .frame(height: expandedHeight)
             .frame(maxWidth: isExpanded ? .infinity : collapsedWidth)
-            .background(glassBackground)
-            .clipShape(Capsule())
+            .modifier(CNSearchBarGlass(
+                backgroundColor: backgroundColor,
+                shadow: shadow && !model.glassContained
+            ))
             .contentShape(Capsule())
             .onTapGesture {
                 if !isExpanded && expandable {
@@ -473,20 +502,53 @@ struct CNSearchBarSwiftUI: View {
         }
     }
 
-    @ViewBuilder
-    private var glassBackground: some View {
-        if #available(iOS 26.0, *) {
-            // Use native glass effect on iOS 26+
-            Color.clear
-                .glassEffect(.regular, in: .capsule)
-        } else {
-            // Fallback to blur effect
-            if let bg = backgroundColor {
-                bg
-            } else {
-                Color(.systemGray6)
-            }
+    /// The placeholder, in `placeholderColor` when one is set, else in the
+    /// system's placeholder colour.
+    private var prompt: Text {
+        if let color = placeholderColor {
+            return Text(placeholder).foregroundColor(color)
         }
+        return Text(placeholder)
+    }
+}
+
+/// The search capsule's background.
+///
+/// On iOS 26+ the Liquid Glass is applied to the bar itself and is not
+/// clipped, so it casts its soft shadow past the capsule, as the system's
+/// glass controls do (#170); the platform view is not clipped either, so the
+/// shadow draws past its bounds. Without `shadow` the glass is clipped to
+/// the capsule, which removes the shadow. Before iOS 26 the capsule is a
+/// plain fill.
+struct CNSearchBarGlass: ViewModifier {
+    let backgroundColor: Color?
+    let shadow: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            // One clip whose shape changes, rather than a clip added and
+            // removed: the field keeps its identity, so its focus and
+            // text, when the shadow goes during halo containment.
+            content
+                .glassEffect(.regular, in: .capsule)
+                .clipShape(CNSearchBarGlassClip(clipped: !shadow))
+        } else {
+            content
+                .background(backgroundColor ?? Color(.systemGray6))
+                .clipShape(Capsule())
+        }
+    }
+}
+
+/// The capsule when [clipped], else a rect far past it that clips nothing
+/// the glass draws.
+struct CNSearchBarGlassClip: Shape {
+    var clipped: Bool
+
+    func path(in rect: CGRect) -> Path {
+        clipped
+            ? Capsule().path(in: rect)
+            : Path(rect.insetBy(dx: -400, dy: -400))
     }
 }
 

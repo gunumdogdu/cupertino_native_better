@@ -1,6 +1,9 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
@@ -8,9 +11,11 @@ import '../style/button_style.dart';
 import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/layout_direction.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/popup_menu_encoder.dart';
 import '../utils/popup_menu_fallback_sheet.dart';
+import '../utils/reusable_platform_view.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import '../utils/optional_method_call.dart';
@@ -36,6 +41,7 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
     this.checked = false,
     this.isDestructive = false,
     this.keepsMenuPresented = false,
+    this.checkedIcon,
   });
 
   /// Display label for the item.
@@ -68,6 +74,11 @@ class CNPopupMenuItem extends CNPopupMenuEntry {
 
   /// Whether the item shows a checkmark (selected/active state).
   final bool checked;
+
+  /// The symbol this item shows while [checked], in place of the system
+  /// checkmark (#168). Overrides [CNPopupMenuButton.checkedIcon] for this
+  /// item; see there.
+  final CNSymbol? checkedIcon;
 
   /// Marks the item as destructive (e.g. "Delete", "Logout", "Remove").
   ///
@@ -232,6 +243,9 @@ class CNPopupMenuButton extends StatefulWidget {
     this.keepsSourceVisible = false,
     this.onOpened,
     this.onClosed,
+    this.textDirection,
+    this.contentPadding,
+    this.checkedIcon,
   }) : width = null,
        round = false,
        assert(
@@ -258,6 +272,8 @@ class CNPopupMenuButton extends StatefulWidget {
     this.keepsSourceVisible = false,
     this.onOpened,
     this.onClosed,
+    this.textDirection,
+    this.checkedIcon,
   }) : buttonLabel = null,
        imagePlacement = CNImagePlacement.leading,
        imagePadding = null,
@@ -267,6 +283,7 @@ class CNPopupMenuButton extends StatefulWidget {
        labelColor = null,
        labelColorLight = null,
        labelColorDark = null,
+       contentPadding = null,
        round = true,
        width = size,
        height = size,
@@ -442,6 +459,40 @@ class CNPopupMenuButton extends StatefulWidget {
   /// on every icon-only button.
   final String? semanticLabel;
 
+  /// The direction the button and its menu are laid out in: right to left
+  /// mirrors the menu, with titles aligned right and icons, checkmarks and
+  /// submenu arrows on the other side (#167).
+  ///
+  /// Null takes the ambient [Directionality], so an app that switches its
+  /// language in Dart mirrors the menu without the system language
+  /// changing. A change reaches a button already on screen.
+  final TextDirection? textDirection;
+
+  /// The space between the button's edges and its label (and icon), on
+  /// every [buttonStyle], zeros included (#169).
+  ///
+  /// Null keeps the style's own insets: about 12 pt on each side on iOS 26.
+  /// With [EdgeInsetsDirectional.zero] the button ends where its label
+  /// does, so a button at the end of a row lines up with the row's padding,
+  /// and the menu, which the system aligns to the button, keeps its
+  /// distance from the screen edge. A [shrinkWrap] button is measured with
+  /// it. `start` and `end` follow [textDirection]. On macOS the bezel draws
+  /// its own margins, so only extra space on the sides applies there.
+  final EdgeInsetsDirectional? contentPadding;
+
+  /// The symbol a [CNPopupMenuItem.checked] item shows in place of the
+  /// system checkmark, at its size and in its colour or rendering mode, for
+  /// example `CNSymbol('checkmark.circle.fill', size: 18, color: purple)`
+  /// (#168). Items in submenus too; [CNPopupMenuItem.checkedIcon] overrides
+  /// it for one item. Null keeps the system checkmark.
+  ///
+  /// iOS has no setting for the checkmark itself, so the symbol is the
+  /// checked item's image: it takes the place of the item's own icon while
+  /// the item is checked. The menu keeps room for an image on every row of
+  /// the section, so the titles stay lined up. VoiceOver still reads the
+  /// item as selected. On macOS it is the item's on-state image.
+  final CNSymbol? checkedIcon;
+
   /// Whether this is the round, icon-only variant ([CNPopupMenuButton.icon]).
   bool get isIconButton => round;
 
@@ -475,6 +526,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   int? _lastIconColor;
   double? _intrinsicWidth;
   CNButtonStyle? _lastStyle;
+  bool? _lastRtl;
 
   /// Whether the last layout sized the button to its label (shrink-wrapped
   /// or in an unbounded row), so a new label changes its width.
@@ -566,6 +618,19 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncBrightnessIfNeeded();
+    _syncLayoutDirectionIfNeeded();
+  }
+
+  /// Sends a new layout direction to the native button (#167).
+  void _syncLayoutDirectionIfNeeded() {
+    final ch = _channel;
+    if (ch == null) return;
+    final rtl = nativeRtl(context, widget.textDirection);
+    if (rtl == null || rtl == _lastRtl) return;
+    _lastRtl = rtl;
+    ch
+        .invokeOptionalMethod('setLayoutDirection', {'rtl': rtl})
+        .catchError((Object _) {});
   }
 
   @override
@@ -660,110 +725,160 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final hiddenWrapper = _maybeHiddenWithLiveDimensions();
     if (hiddenWrapper != null) return hiddenWrapper;
 
-    // Priority: imageAsset > customIcon > icon
-
-    // Check if we need to render custom icons or image assets
-    final hasCustomButtonIcon = widget.buttonCustomIcon != null;
-    final hasButtonImageAsset = widget.buttonImageAsset != null;
-    final hasCustomMenuIcons = walkPopupMenuEntries(
-      widget.items,
-    ).any((e) => popupMenuEntryVisual(e)?.customIcon != null);
-    final hasMenuImageAssets = walkPopupMenuEntries(
-      widget.items,
-    ).any((e) => popupMenuEntryVisual(e)?.imageAsset != null);
-
-    if (hasCustomButtonIcon ||
-        hasCustomMenuIcons ||
-        hasButtonImageAsset ||
-        hasMenuImageAssets) {
-      // Create a key that changes when button or menu icons change
-      final buttonIconKey =
-          '${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}_${widget.buttonCustomIconColor?.toARGB32() ?? 0}';
-      final menuIconsKey = walkPopupMenuEntries(widget.items)
-          .map((e) {
-            final v = popupMenuEntryVisual(e);
-            if (v != null) {
-              return '${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}_${v.iconColor?.toARGB32() ?? 0}';
-            }
-            return '';
-          })
-          .join('|');
-      return FutureBuilder<Map<String, dynamic>>(
-        key: ValueKey('popupMenu_icons_$buttonIconKey|$menuIconsKey'),
-        future: _renderCustomIcons(context),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return _loadingPlaceholder();
-          }
-          return FutureBuilder<Widget>(
-            future: _buildNativePopupMenu(
-              context,
-              customIconData: snapshot.data,
-            ),
-            builder: (context, widgetSnapshot) {
-              if (!widgetSnapshot.hasData) {
-                return _loadingPlaceholder();
-              }
-              return widgetSnapshot.data!;
-            },
-          );
-        },
-      );
+    // Custom icons are rendered and image assets resolved before the native
+    // button is created. Both are cached, so a button built again (a header
+    // swapped for a loading placeholder and back) has them in its first
+    // frame and shows at once, as one without them always does (#166). The
+    // FutureBuilder is there either way, so the tree keeps its shape and
+    // the native view isn't created again once the future completes.
+    final prepKey = _prepKey();
+    if (_prepFutureKey != prepKey || _prepFuture == null) {
+      _prepFutureKey = prepKey;
+      _prepNow = _preparedNow();
+      _prepFuture = _prepNow != null ? Future.value(_prepNow) : _prepare();
     }
-
-    return FutureBuilder<Widget>(
-      future: _buildNativePopupMenu(context, customIconData: null),
+    return FutureBuilder<_PopupPrep>(
+      key: ValueKey('popupMenu_prep_$prepKey'),
+      initialData: _prepNow,
+      future: _prepFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return _loadingPlaceholder();
-        }
-        return snapshot.data!;
+        final prep = snapshot.data;
+        if (prep == null) return _loadingPlaceholder();
+        _menuIconBytes = prep.menuIconBytes;
+        return _buildNativePopupMenu(context, prep);
       },
     );
   }
 
-  Future<Map<String, dynamic>> _renderCustomIcons(BuildContext context) async {
-    Uint8List? buttonIconBytes;
-    // By icon rather than by position, so that dividers and submenus cannot
-    // shift an icon onto another entry, and the icons of the previous build
-    // still match while this one renders.
-    final menuIconBytes = <PopupMenuIconKey, Uint8List?>{};
+  /// Rendered custom icons, by icon, size and colour (#166).
+  static final Map<PopupMenuIconKey, Uint8List?> _renderedIcons =
+      <PopupMenuIconKey, Uint8List?>{};
 
-    // Handle button icon - imageAsset takes precedence over customIcon
-    if (widget.buttonImageAsset != null) {
-      // ImageAsset doesn't need async rendering, it's already data
-      buttonIconBytes = null; // Will be handled in _buildNativePopupMenu
-    } else if (widget.buttonCustomIcon != null) {
-      buttonIconBytes = await iconDataToImageBytes(
-        widget.buttonCustomIcon!,
-        size: widget.buttonIcon?.size ?? 20.0,
-        color: widget.buttonCustomIconColor ?? CupertinoColors.white,
-      );
-    }
+  /// Image asset paths resolved for a pixel ratio, by `path@ratio` (#166).
+  static final Map<String, String> _resolvedAssetPaths = <String, String>{};
 
-    // Handle menu item icons - imageAsset takes precedence over customIcon
-    // (an image asset doesn't need async rendering, it's already data)
-    for (final e in walkPopupMenuEntries(widget.items)) {
-      final key = popupMenuIconKey(e);
-      if (key == null || menuIconBytes.containsKey(key)) continue;
-      menuIconBytes[key] = await iconDataToImageBytes(
-        key.icon,
-        size: key.size,
-        color: key.color,
-      );
-    }
-    _menuIconBytes = menuIconBytes;
-
-    return {'buttonIconBytes': buttonIconBytes, 'menuIconBytes': menuIconBytes};
+  static void _remember<K, V>(Map<K, V> cache, K key, V value) {
+    cache.remove(key);
+    cache[key] = value;
+    if (cache.length > 64) cache.remove(cache.keys.first);
   }
 
-  Future<Widget> _buildNativePopupMenu(
-    BuildContext context, {
-    Map<String, dynamic>? customIconData,
-  }) async {
+  String? _prepFutureKey;
+  _PopupPrep? _prepNow;
+  Future<_PopupPrep>? _prepFuture;
+
+  /// Everything [_PopupPrep] is made from.
+  String _prepKey() {
+    final buttonIconKey =
+        '${widget.buttonImageAsset?.assetPath}_${widget.buttonImageAsset?.imageData?.length ?? 0}_${widget.buttonCustomIcon?.hashCode ?? 0}_${widget.buttonCustomIconColor?.toARGB32() ?? 0}_${widget.buttonIcon?.size}';
+    final menuIconsKey = walkPopupMenuEntries(widget.items)
+        .map((e) {
+          final v = popupMenuEntryVisual(e);
+          if (v != null) {
+            return '${v.imageAsset?.assetPath}_${v.imageAsset?.imageData?.length ?? 0}_${v.customIcon?.hashCode ?? 0}_${v.iconColor?.toARGB32() ?? 0}';
+          }
+          return '';
+        })
+        .join('|');
+    return '$buttonIconKey|$menuIconsKey|$_pixelRatio';
+  }
+
+  double get _pixelRatio =>
+      ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+
+  /// The button's custom icon, as a menu icon key.
+  PopupMenuIconKey? get _buttonIconKey {
+    final icon = widget.buttonCustomIcon;
+    if (widget.buttonImageAsset != null || icon == null) return null;
+    return (
+      icon: icon,
+      size: widget.buttonIcon?.size ?? 20.0,
+      color: widget.buttonCustomIconColor ?? CupertinoColors.white,
+    );
+  }
+
+  /// What the native button needs, if every piece of it is cached already;
+  /// otherwise null, and [_prepare] makes it.
+  _PopupPrep? _preparedNow() {
+    final ratio = _pixelRatio;
+    Uint8List? buttonIconBytes;
+    final buttonKey = _buttonIconKey;
+    if (buttonKey != null) {
+      if (!_renderedIcons.containsKey(buttonKey)) return null;
+      buttonIconBytes = _renderedIcons[buttonKey];
+    }
+    String? buttonAssetPath;
+    final asset = widget.buttonImageAsset;
+    if (asset != null && asset.assetPath.isNotEmpty) {
+      buttonAssetPath = _resolvedAssetPaths['${asset.assetPath}@$ratio'];
+      if (buttonAssetPath == null) return null;
+    }
+    // By icon rather than by position, so that dividers and submenus cannot
+    // shift an icon onto another entry.
+    final menuIconBytes = <PopupMenuIconKey, Uint8List?>{};
+    final menuAssetPaths = Map<CNPopupMenuEntry, String>.identity();
+    for (final e in walkPopupMenuEntries(widget.items)) {
+      final key = popupMenuIconKey(e);
+      if (key != null && !menuIconBytes.containsKey(key)) {
+        if (!_renderedIcons.containsKey(key)) return null;
+        menuIconBytes[key] = _renderedIcons[key];
+      }
+      final menuAsset = popupMenuEntryVisual(e)?.imageAsset;
+      if (menuAsset != null) {
+        final path = _resolvedAssetPaths['${menuAsset.assetPath}@$ratio'];
+        if (path == null) return null;
+        menuAssetPaths[e] = path;
+      }
+    }
+    return _PopupPrep(
+      buttonIconBytes: buttonIconBytes,
+      buttonAssetPath: buttonAssetPath,
+      menuIconBytes: menuIconBytes,
+      menuAssetPaths: menuAssetPaths,
+    );
+  }
+
+  /// Renders the custom icons and resolves the image asset paths that
+  /// aren't cached yet.
+  Future<_PopupPrep> _prepare() async {
+    final ratio = _pixelRatio;
+    final icons = <PopupMenuIconKey>{
+      ?_buttonIconKey,
+      for (final e in walkPopupMenuEntries(widget.items))
+        ?popupMenuIconKey(e),
+    };
+    final assets = <String>{
+      if (widget.buttonImageAsset?.assetPath.isNotEmpty ?? false)
+        widget.buttonImageAsset!.assetPath,
+      for (final e in walkPopupMenuEntries(widget.items))
+        ?popupMenuEntryVisual(e)?.imageAsset?.assetPath,
+    };
+    for (final key in icons) {
+      if (_renderedIcons.containsKey(key)) continue;
+      _remember(
+        _renderedIcons,
+        key,
+        await iconDataToImageBytes(key.icon, size: key.size, color: key.color),
+      );
+    }
+    await Future.wait(
+      assets.where((p) => !_resolvedAssetPaths.containsKey('$p@$ratio')).map((
+        p,
+      ) async {
+        final resolved = await resolveAssetPathForPixelRatio(
+          p,
+          devicePixelRatio: ratio,
+        );
+        _remember(_resolvedAssetPaths, '$p@$ratio', resolved);
+      }),
+    );
+    if (!mounted) return const _PopupPrep();
+    return _preparedNow() ?? const _PopupPrep();
+  }
+
+  Widget _buildNativePopupMenu(BuildContext context, _PopupPrep prep) {
     const viewType = 'CupertinoNativePopupMenuButton';
 
-    // Capture all context-derived values before any async operations
     final capturedIsDark = _isDark;
     final capturedStyle = encodeStyle(context, tint: _effectiveTint);
     final capturedButtonIconColor = resolveColorToArgb(
@@ -784,40 +899,16 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final capturedButtonPaletteColors = widget.buttonIcon?.paletteColors
         ?.map((c) => resolveColorToArgb(c, context))
         .toList();
-    // Resolve button image asset path if present
-    String? resolvedButtonAssetPath;
-    if (widget.buttonImageAsset != null &&
-        widget.buttonImageAsset!.assetPath.isNotEmpty) {
-      resolvedButtonAssetPath = await resolveAssetPathForPixelRatio(
-        widget.buttonImageAsset!.assetPath,
-      );
-    }
-    if (!mounted) return const SizedBox();
-
-    // Resolve menu image assets concurrently, submenus included
-    final menuAssetPaths = Map<CNPopupMenuEntry, String>.identity();
-    await Future.wait(
-      walkPopupMenuEntries(widget.items).map((e) async {
-        final asset = popupMenuEntryVisual(e)?.imageAsset;
-        if (asset != null) {
-          menuAssetPaths[e] = await resolveAssetPathForPixelRatio(
-            asset.assetPath,
-          );
-        }
-      }),
-    );
-    if (!mounted) return const SizedBox();
-
-    final buttonIconBytes = customIconData?['buttonIconBytes'] as Uint8List?;
-    final menuIconBytes =
-        customIconData?['menuIconBytes'] as Map<PopupMenuIconKey, Uint8List?>?;
+    final resolvedButtonAssetPath = prep.buttonAssetPath;
+    final buttonIconBytes = prep.buttonIconBytes;
 
     // Flatten entries into parallel arrays for the platform view.
     final menu = encodePopupMenuEntries(
       widget.items,
       resolveColor: (c) => resolveColorToArgb(c, context),
-      customIconBytes: menuIconBytes ?? const {},
-      assetPaths: menuAssetPaths,
+      customIconBytes: prep.menuIconBytes,
+      assetPaths: prep.menuAssetPaths,
+      checkedIcon: widget.checkedIcon,
     );
 
     final creationParams = <String, dynamic>{
@@ -875,6 +966,9 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       'labelColorLight': ?capturedLabelColorLight,
       'labelColorDark': ?capturedLabelColorDark,
       if (widget.keepsSourceVisible) 'keepsSourceVisible': true,
+      'rtl': ?nativeRtl(context, widget.textDirection),
+      if (widget.contentPadding case final p?)
+        'contentInsets': [p.top, p.start, p.bottom, p.end],
     };
 
     final viewKey = ValueKey(_viewKeyString());
@@ -886,31 +980,28 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     // view is created.
     final measured = _measuredWidth(widget.buttonLabel) != null;
     Widget platformView(bool sizedToLabel) {
+      final hidden = sizedToLabel && !measured;
       final params = <String, dynamic>{
         ...creationParams,
-        if (sizedToLabel && !measured) 'hiddenUntilSized': true,
+        if (hidden) 'hiddenUntilSized': true,
       };
-      return defaultTargetPlatform == TargetPlatform.iOS
-          ? UiKitView(
-              key: viewKey,
-              viewType: viewType,
-              creationParams: params,
-              creationParamsCodec: const StandardMessageCodec(),
-              onPlatformViewCreated: _onCreated,
-              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-              },
-            )
-          : AppKitView(
-              key: viewKey,
-              viewType: viewType,
-              creationParams: params,
-              creationParamsCodec: const StandardMessageCodec(),
-              onPlatformViewCreated: _onCreated,
-              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-              },
-            );
+      // The native button is kept for a moment once this one is disposed,
+      // and a button built again with the same configuration shows it in
+      // its first frame (#166). Not for a label that hasn't been measured:
+      // its width isn't known for that frame.
+      return ReusableDarwinPlatformView(
+        key: viewKey,
+        viewType: viewType,
+        creationParams: params,
+        onPlatformViewCreated: _onCreated,
+        onPlatformViewReused: _onReused,
+        reuseKey: viewKey.value,
+        reuse: !hidden,
+        memo: _keep,
+        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+          Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+        },
+      );
     }
 
     return wrapWithModalInteractionGuard(
@@ -995,6 +1086,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         '${widget.labelColorLight?.toARGB32()}_'
         '${widget.labelColorDark?.toARGB32()}_'
         '${widget.keepsSourceVisible}_'
+        '${widget.contentPadding}_'
         '$_isDark';
   }
 
@@ -1011,9 +1103,118 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     _lastIconSize = widget.buttonIcon?.size;
     _lastIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
     _lastStyle = widget.buttonStyle;
+    _lastRtl = nativeRtl(context, widget.textDirection);
     if (widget.isIconButton) return;
     final key = _sizeKey(widget.buttonLabel);
-    _requestIntrinsicSize(ch, key, reveal: true);
+    _requestIntrinsicSize(ch, key, reveal: true).then((_) => _premeasure(ch));
+  }
+
+  /// What a native button kept for reuse shows: the values this state last
+  /// sent it (#166). The state stops using it.
+  Object? _keep() {
+    final shown = _PopupShown(
+      tint: _lastTint,
+      isDark: _lastIsDark,
+      title: _lastTitle,
+      semanticLabel: _lastSemanticLabel,
+      iconName: _lastIconName,
+      iconSize: _lastIconSize,
+      iconColor: _lastIconColor,
+      style: _lastStyle,
+      rtl: _lastRtl,
+    );
+    _channel?.setMethodCallHandler(null);
+    _channel = null;
+    return shown;
+  }
+
+  /// Takes over a kept native button with this widget's configuration
+  /// (#166). Called while the button is laid out, before the frame that
+  /// shows it, so what changed is sent now (no `setState`, no awaits before
+  /// the sends) and reaches the button before it is on screen.
+  void _onReused(int id, Object? memo) {
+    final ch = MethodChannel('CupertinoNativePopupMenuButton_$id');
+    _channel = ch;
+    ch.setMethodCallHandler(_onMethodCall);
+    final shown = memo is _PopupShown ? memo : const _PopupShown();
+    _lastTint = shown.tint;
+    _lastIsDark = shown.isDark;
+    _lastSemanticLabel = shown.semanticLabel;
+    _lastIconName = shown.iconName;
+    _lastIconSize = shown.iconSize;
+    _lastIconColor = shown.iconColor;
+    _lastStyle = shown.style;
+    _lastTitle = shown.title;
+    _lastRtl = shown.rtl;
+    _syncLayoutDirectionIfNeeded();
+    // A button kept before it was revealed is still hidden.
+    ch.invokeMethod<void>('reveal').catchError((Object _) {});
+    final title = widget.buttonLabel;
+    if (title != null && title != _lastTitle) {
+      _lastTitle = title;
+      ch
+          .invokeMethod<void>('setButtonTitle', {
+            'title': title,
+            // Set in the layout pass that gives the view its new width.
+            'atWidth': ?_laidOutLabelWidth,
+          })
+          .catchError((Object _) {});
+    }
+    ch
+        .invokeMethod<void>(
+          'setItems',
+          encodePopupMenuEntries(
+            widget.items,
+            resolveColor: (c) => resolveColorToArgb(c, context),
+            customIconBytes: _menuIconBytes,
+            includeCustomIcons: false,
+            checkedIcon: widget.checkedIcon,
+          ),
+        )
+        .catchError((Object _) {});
+    if (_lastSemanticLabel != widget.semanticLabel) {
+      _lastSemanticLabel = widget.semanticLabel;
+      ch
+          .invokeOptionalMethod('setSemanticLabel', {
+            'label': widget.semanticLabel,
+          })
+          .catchError((Object _) {});
+    }
+    resetHaloContainment();
+    // The rest (tint, icon) after this frame. Not measured again: a label
+    // button is only reused with a label whose width is known.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(ch, _channel)) return;
+      _syncBrightnessIfNeeded();
+      _syncPropsToNativeIfNeeded();
+    });
+  }
+
+  /// Measures the menu's item labels as button titles, so that a button
+  /// built again with the item picked as its label (a sort button) knows its
+  /// width in its first frame and can reuse the kept native button (#166).
+  Future<void> _premeasure(MethodChannel ch) async {
+    if (!_sizedToLabel) return;
+    final labels = <String>{
+      for (final e in widget.items)
+        if (e is CNPopupMenuItem) e.label,
+    }.take(24);
+    for (final label in labels) {
+      if (!mounted || !identical(ch, _channel)) return;
+      final key = _sizeKey(label);
+      if (_measuredWidths.containsKey(key)) continue;
+      try {
+        final size = await ch.invokeMethod<Map>('measureTitle', {
+          'title': label,
+        });
+        final w = (size?['width'] as num?)?.toDouble();
+        if (w != null && mounted && identical(ch, _channel)) {
+          _rememberWidth(key, w);
+        }
+      } catch (_) {
+        return;
+      }
+    }
   }
 
   Future<dynamic> _onMethodCall(MethodCall call) async {
@@ -1098,6 +1299,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   Future<void> _syncPropsToNativeIfNeeded() async {
     final ch = _channel;
     if (ch == null) return;
+    _syncLayoutDirectionIfNeeded();
     // Prepare popup items upfront to avoid using BuildContext after awaits.
     // Image asset paths are sent unresolved, as `setItems` always did.
     final updItems = encodePopupMenuEntries(
@@ -1105,6 +1307,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       resolveColor: (c) => resolveColorToArgb(c, context),
       customIconBytes: _menuIconBytes,
       includeCustomIcons: false,
+      checkedIcon: widget.checkedIcon,
     );
     // Capture context-dependent values before any awaits
     final tint = resolveColorToArgb(_effectiveTint, context);
@@ -1309,4 +1512,46 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         ? Column(mainAxisSize: MainAxisSize.min, children: children)
         : Row(mainAxisSize: MainAxisSize.min, children: children);
   }
+}
+
+/// What a native popup menu button needs that takes time to prepare:
+/// rendered custom icons, and image asset paths resolved for the screen.
+class _PopupPrep {
+  const _PopupPrep({
+    this.buttonIconBytes,
+    this.buttonAssetPath,
+    this.menuIconBytes = const <PopupMenuIconKey, Uint8List?>{},
+    this.menuAssetPaths = const <CNPopupMenuEntry, String>{},
+  });
+
+  final Uint8List? buttonIconBytes;
+  final String? buttonAssetPath;
+  final Map<PopupMenuIconKey, Uint8List?> menuIconBytes;
+  final Map<CNPopupMenuEntry, String> menuAssetPaths;
+}
+
+/// What a native popup menu button kept for reuse shows: the values its
+/// last widget sent it (#166).
+class _PopupShown {
+  const _PopupShown({
+    this.tint,
+    this.isDark,
+    this.title,
+    this.semanticLabel,
+    this.iconName,
+    this.iconSize,
+    this.iconColor,
+    this.style,
+    this.rtl,
+  });
+
+  final int? tint;
+  final bool? isDark;
+  final String? title;
+  final String? semanticLabel;
+  final String? iconName;
+  final double? iconSize;
+  final int? iconColor;
+  final CNButtonStyle? style;
+  final bool? rtl;
 }

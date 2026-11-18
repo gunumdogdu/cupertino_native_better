@@ -1,3 +1,65 @@
+## 2.8.0
+
+> A `CNPopupMenuButton` mounted again (a header swapped for a loading placeholder and back) now shows in its first frame instead of a few frames late (#166). Its menu follows Flutter's `Directionality` (#167), can mark the checked item with your own symbol (#168), and the button can drop its content insets (#169). `CNSearchBar` has its Liquid Glass shadow on iOS 26 (#170), an `initialText` (#170), and its `placeholderColor` now reaches the placeholder (#171). `LiquidGlassConfig.appearance` keeps glass light or dark (#165).
+
+### Behaviour changes
+- `CNPopupMenuButton` and `CNPopupMenuButton.icon` follow the ambient `Directionality`, as the tab bar, segmented control, alert and action sheet have since 2.5.0. A menu opened in a direction different from the app's language is mirrored. Set `textDirection` to choose.
+- On iOS 26 and later, `CNSearchBar`'s glass casts the soft shadow of the system's glass controls. `showShadow: false` brings back the flat capsule.
+
+### Fixed — a popup menu button mounted again was blank for a few frames (#166)
+
+A header that is swapped for a loading placeholder and back mounts a new `CNPopupMenuButton` each time. Its place stayed empty for 2 to 3 frames while the Flutter content around it was already drawn, so with a reload after every sort change the button blinked. There were two causes:
+- The button spent its first frame on an empty placeholder while it prepared its icons, even with none to prepare. It is now built in its first frame. Rendered custom icons and resolved image assets are cached, so a button built again has them at once.
+- A new native view takes an asynchronous call to create, which costs about a frame more. Now a disposed button's native view is kept for 5 seconds, out of sight, and a button built again with the same configuration takes it over in its first frame. The label and the items can differ: they are set before the frame that shows the button. This is what keeping the header mounted under `Visibility(maintainState: true)` does, without the app doing it.
+
+The menu's item labels are measured as button titles once the button is created, so a header back with the item just picked as its label starts at that label's width. Also fixed: the button's width measured right after a label change could be the old label's, which then made the new label wrap.
+
+### Added — popup menus right to left (#167)
+- `CNPopupMenuButton.textDirection` (also on `.icon`). Null takes the ambient `Directionality`, and a change reaches a button already on screen.
+- iOS shows the menu in a view of its own on top of the window, which follows the app's language. When the menu opens in a direction different from the app's, its views get Flutter's direction: titles aligned right, and icons, checkmarks and submenu arrows on the other side. Rows it adds later, such as a submenu's, get it too.
+- On macOS the `NSMenu` and its submenus take the direction, and the menu opens from the button's leading edge.
+
+### Added — a custom symbol for checked items (#168)
+- `CNPopupMenuButton.checkedIcon` sets the symbol for every checked item, submenus included, with the `CNSymbol`'s size and colour or rendering mode. `CNPopupMenuItem.checkedIcon` overrides it for one item. Null keeps the system checkmark.
+- UIKit can't restyle its checkmark, so on iOS the symbol is the checked item's image and takes the place of that item's own icon while it is checked. Rows without an image get a clear one of the same size, so the titles stay lined up (iOS 27 doesn't keep that room by itself). VoiceOver still reads the checked row as selected. On macOS the symbol is the item's on-state image, in the check column.
+- `CNPopoverRow.checkedIcon` does the same for popover rows.
+
+### Added — content padding (#169)
+- `CNPopupMenuButton.contentPadding` (`EdgeInsetsDirectional?`) sets the button's content insets on every style, zeros included. Null keeps the style's, about 12 pt on each side on iOS 26. A `shrinkWrap` button is measured with it, so with `EdgeInsetsDirectional.zero` it ends where its label does.
+- `CNButtonConfig.contentPadding` does the same for `CNButton`, and a change applies in place. It is separate from `padding`, where a side set to 0 keeps the style's inset.
+- On macOS the bezel draws its own margins, so only extra space on the sides applies.
+
+### Fixed — no Liquid Glass shadow on the search bar (#170)
+The search bar's glass was clipped to its capsule in SwiftUI, and its platform view was clipped to a capsule in Flutter, which cut away the shadow drawn outside the capsule. On a white page the bar almost disappeared. The glass is now applied to the bar itself and the platform view is no longer clipped, so the shadow draws past the bar's box; the bar's layout size is unchanged. While a page moves over the bar without `CNTabBarRouteObserver`, the bar drops its shadow, so no clipped box shows.
+
+### Added — search bar initial text and clear button colour (#170, #171)
+- `CNSearchBar.initialText` opens the bar with that text, on iOS, macOS and the bar drawn in Flutter. `onChanged` is not called for it.
+- `CNSearchBarController.setText` and `clear` made before the native view exists, right after building or while the view is removed under a modal, are now applied once it is created, instead of being dropped. Once the view exists, `setText` reports to `onChanged` as before. The controller now also drives the bar drawn in Flutter (iOS before 26).
+- `CNSearchBar.clearButtonColor` colours the clear button on its own. It defaults to `placeholderColor`, so today's look is unchanged.
+
+### Fixed — `placeholderColor` ignored on the iOS 26 search bar (#171)
+The placeholder was the text field's plain title, which can't be coloured, and `placeholderColor` only reached the clear button. It is now the field's prompt, in `placeholderColor`, and still what VoiceOver reads. Also fixed on macOS: a custom fill-style clear icon with `placeholderColor` was drawn as a solid disc without its cross.
+
+### Added — light or dark glass (#165)
+`LiquidGlassConfig.appearance`, with `CNGlassAppearance.adaptive` (the default, follows the app's brightness), `.light` and `.dark`, keeps the glass's look whatever the app's theme is. `.liquidGlass(appearance:)` takes it too, and on macOS it sets the view's appearance.
+
+On iOS 26 (seen on 26.0 and 26.2) the system also switches glass under about 65 pt on its shorter side by itself, dark over near-black content and light over near-white content. No public API turns that off, so `.light` and `.dark` can't stop it there. Glass of 66 pt or more on its shorter side doesn't switch. On iOS 27 and macOS 27 the glass doesn't switch with the content, so `.light` and `.dark` hold over any content.
+
+Thanks to @Ashhad08 for all seven reports, each with a repro and its cause.
+
+### Checked
+These checks use the iPhone 17 Pro simulator on iOS 26.0, the iPhone 17 Pro Max simulator on iOS 26.2 and the iPhone 17 and iPhone 18 Pro simulators on iOS 27.0.
+- **#166, by screen recording of the reporter's two rows, six reloads each:** before, row A's button came back 30 to 42 ms after the text next to it. Now it is back in the same frame on iOS 26.0 and 27.0, with the same label as the row kept mounted in every frame.
+- **#167:** the right-to-left menu is mirrored like a system Arabic menu with the system language in English, on iOS 26.0 and 27.0; a row added while the menu is open gets the direction; the left-to-right menu is unchanged.
+- **#168:** the checked symbol shows in place of the checkmark with the titles lined up, on iOS 26.0 and 27.0; the checked row's accessibility traits match a system-checked row's; popover rows show the symbol.
+- **#169:** with a line at the row's 16 pt padding, the default label ends 13 pt before it, the zero-padding label on it.
+- **#170:** the search bar matches a plain SwiftUI glass capsule without a clip within 1/255 per pixel on iOS 26.2 and 27.0, shadow included (up to 136/255 before).
+- **#171:** the placeholder takes `placeholderColor` on iOS 26.2 and 27.0, and in the bar drawn in Flutter.
+- **#165:** glass bars of 56 and 72 pt with each appearance over white, grey, black and a dark gradient, in a light and a dark app, on iOS 26.0, 26.2 and 27.0 and on macOS.
+- **Build:** the iOS Swift compiles with Xcode 26.0's compiler against the iOS 26.0 SDK; the macOS Swift compiles against the macOS SDK; `flutter analyze lib` is clean with Flutter 3.38 and 3.44.
+- **Example app:** new screens for #165 to #171.
+- **Tests:** 46 new; 694 tests pass.
+
 ## 2.7.4
 
 > Fixed: on iOS 26 and later, a tap just above `CNTabBar`'s glass capsule, or beside it, did nothing (#162). It now reaches the Flutter content behind the bar, as in a native app. Also fixed: on a bar shorter than its own height, a tap on the top of an icon, where it draws above the capsule, now selects its tab.

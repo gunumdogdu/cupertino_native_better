@@ -364,6 +364,11 @@ struct CNPopoverConfig {
         /// The `CNListItem` part, parsed as `CNNativeSheet` parses its rows.
         let item: CNSheetConfig.Item
         let checked: Bool
+        /// The symbol shown in place of the checkmark, its size and colour
+        /// (#168).
+        var checkedSymbol: String? = nil
+        var checkedSymbolSize: CGFloat? = nil
+        var checkedSymbolColor: Color? = nil
         let enabled: Bool
         /// Shows information only: not a button, never closes the popover
         /// (#129).
@@ -414,6 +419,9 @@ struct CNPopoverConfig {
                 Row(id: raw["id"] as? String ?? "",
                     item: item,
                     checked: raw["checked"] as? Bool ?? false,
+                    checkedSymbol: raw["checkedSymbol"] as? String,
+                    checkedSymbolSize: (raw["checkedSymbolSize"] as? NSNumber).map { CGFloat(truncating: $0) },
+                    checkedSymbolColor: (raw["checkedSymbolColor"] as? NSNumber).map { Color(uiColor: ImageUtils.colorFromARGB($0.intValue)) },
                     enabled: raw["enabled"] as? Bool ?? true,
                     readOnly: raw["readOnly"] as? Bool ?? false)
             }
@@ -769,9 +777,9 @@ struct CNPopoverBody: View {
                     .foregroundStyle(secondary)
             }
             if row.checked {
-                Image(systemName: "checkmark")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(tint ?? .accentColor)
+                Image(systemName: row.checkedSymbol ?? "checkmark")
+                    .font(row.checkedSymbolSize.map { .system(size: $0, weight: .semibold) } ?? .body.weight(.semibold))
+                    .foregroundStyle(row.checkedSymbolColor ?? tint ?? .accentColor)
                     .accessibilityHidden(true)
             }
             if row.item.chevron {

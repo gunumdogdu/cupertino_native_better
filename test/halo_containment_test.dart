@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'native_view_finder.dart';
+
 /// Halo containment (`setTransitioning`) of the iOS 26 glass widgets.
 ///
 /// Each value sent is recorded as `full` (no containment), `cut` (full
@@ -245,7 +247,7 @@ void main() {
           await openDialog(tester);
           await tester.pumpAndSettle();
           expect(
-            find.byType(UiKitView),
+            findNativeView(),
             findsNothing,
             reason: 'removed under the dialog',
           );
@@ -255,7 +257,7 @@ void main() {
           await tester.pump(const Duration(milliseconds: 600));
           await tester.pumpAndSettle();
 
-          expect(find.byType(UiKitView), findsOneWidget);
+          expect(findNativeView(), findsOneWidget);
           expect(sent[sent.keys.last]!.last, 'full');
           await finish(tester);
         },
@@ -291,11 +293,7 @@ void main() {
               isNull,
               reason: 'full glass while the sheet slides in and is up',
             );
-            expect(
-              find.byType(UiKitView),
-              findsOneWidget,
-              reason: 'not removed',
-            );
+            expect(findNativeView(), findsOneWidget, reason: 'not removed');
 
             navigator.currentState!.pop();
             await tester.pumpAndSettle();
@@ -494,7 +492,7 @@ void main() {
         alignment: const Alignment(0, 0.1925),
       );
       final name = sent.keys.single;
-      final view = tester.getRect(find.byType(UiKitView));
+      final view = tester.getRect(findNativeView());
       expect(400 - view.bottom, inExclusiveRange(0, 24), reason: 'in reach');
       clear();
 
@@ -537,7 +535,7 @@ void main() {
         pageRouteBuilder: true,
       );
       final name = sent.keys.single;
-      final view = tester.getRect(find.byType(UiKitView));
+      final view = tester.getRect(findNativeView());
       clear();
 
       final route = _SheetPageRoute();
@@ -669,7 +667,7 @@ void main() {
         ),
       );
       final name = sent.keys.single;
-      final view = tester.getRect(find.byType(UiKitView));
+      final view = tester.getRect(findNativeView());
       navigator.currentState!.push(
         CupertinoPageRoute<void>(
           builder: (_) => const CupertinoPageScaffold(child: SizedBox()),

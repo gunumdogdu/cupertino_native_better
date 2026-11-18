@@ -33,6 +33,9 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   /// `CNButtonConfig.padding`, by side; nil keeps the style's own inset.
   /// The vertical ones apply to a button with a title (#154).
   private var horizontalPadding: CGFloat? = nil
+  /// `CNButtonConfig.contentPadding`: the insets on every side, zeros
+  /// included, in place of the padding (#169).
+  private var exactInsets: NSDirectionalEdgeInsets? = nil
   private var verticalPaddingTop: CGFloat? = nil
   private var verticalPaddingBottom: CGFloat? = nil
   private var hasTitle = false
@@ -111,6 +114,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       if let pal = dict["buttonIconPaletteColors"] as? [NSNumber] { iconPalette = pal }
       if let ip = dict["imagePlacement"] as? String { imagePlacement = ip }
       if let ip = dict["imagePadding"] as? NSNumber { imagePadding = CGFloat(truncating: ip) }
+      exactInsets = Self.readInsets(dict["contentInsets"])
       if let pt = dict["paddingTop"] as? NSNumber { paddingTop = CGFloat(truncating: pt) }
       if let pb = dict["paddingBottom"] as? NSNumber { paddingBottom = CGFloat(truncating: pb) }
       if let pl = dict["paddingLeft"] as? NSNumber { paddingLeft = CGFloat(truncating: pl) }
@@ -656,6 +660,15 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
           }
           result(nil)
         }
+      case "setContentInsets":
+        self.exactInsets = Self.readInsets((call.arguments as? [String: Any])?["insets"])
+        if !usesSwiftUI, let button = self.button, #available(iOS 15.0, *) {
+          var cfg = button.configuration ?? .plain()
+          if let style = self.styleInsets { cfg.contentInsets = style }
+          self.applyInsets(&cfg)
+          button.configuration = cfg
+        }
+        result(nil)
       case "setHorizontalPadding":
         if let args = call.arguments as? [String: Any], let padding = (args["padding"] as? NSNumber).map({ CGFloat(truncating: $0) }) {
           if !usesSwiftUI, let button = self.button {
@@ -1145,22 +1158,34 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   @available(iOS 15.0, *)
   private func applyInsets(_ cfg: inout UIButton.Configuration) {
     guard var insets = styleInsets else { return }
-    let custom = horizontalPadding != nil || titleSqueeze > 0 ||
+    let custom = exactInsets != nil || horizontalPadding != nil || titleSqueeze > 0 ||
       (hasTitle && (verticalPaddingTop != nil || verticalPaddingBottom != nil))
     guard custom || cfg.contentInsets != insets else { return }
-    if let h = horizontalPadding {
-      insets.leading = h
-      insets.trailing = h
-    }
-    if hasTitle {
-      if let top = verticalPaddingTop { insets.top = top }
-      if let bottom = verticalPaddingBottom { insets.bottom = bottom }
+    if let exact = exactInsets {
+      insets = exact
+    } else {
+      if let h = horizontalPadding {
+        insets.leading = h
+        insets.trailing = h
+      }
+      if hasTitle {
+        if let top = verticalPaddingTop { insets.top = top }
+        if let bottom = verticalPaddingBottom { insets.bottom = bottom }
+      }
     }
     if titleSqueeze > 0 {
       insets.leading = max(0, insets.leading - titleSqueeze)
       insets.trailing = max(0, insets.trailing - titleSqueeze)
     }
     cfg.contentInsets = insets
+  }
+
+  /// `[top, leading, bottom, trailing]` from Flutter (#169).
+  private static func readInsets(_ value: Any?) -> NSDirectionalEdgeInsets? {
+    guard let v = value as? [NSNumber], v.count == 4 else { return nil }
+    return NSDirectionalEdgeInsets(
+      top: CGFloat(truncating: v[0]), leading: CGFloat(truncating: v[1]),
+      bottom: CGFloat(truncating: v[2]), trailing: CGFloat(truncating: v[3]))
   }
 
   /// The size the button would take with `title`, measured on a copy of

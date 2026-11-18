@@ -17,6 +17,12 @@ class CupertinoPopupMenuButtonNSView: NSView {
   /// width it needs, or the first appearance at the measured width (#147).
   private var widthActions: [(id: Int, width: CGFloat, run: () -> Void)] = []
   private var nextWidthActionId = 0
+  /// The newest title Flutter sent, set at once or held until the view has
+  /// its width (#166).
+  private var requestedTitle: String?
+  /// Flutter's text direction for the button and its menu (#167); nil
+  /// keeps the system's.
+  private var rtl: Bool?
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(name: "CupertinoNativePopupMenuButton_\(viewId)", binaryMessenger: messenger)
@@ -58,6 +64,15 @@ class CupertinoPopupMenuButtonNSView: NSView {
       $0.labelColorDark = (dict["labelColorDark"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
     }
     rebuildMenu()
+    rtl = CNLayoutDirection.read(dict)
+    CNLayoutDirection.apply(rtl, to: self)
+    // `contentPadding` (#169): extra space on the sides; the bezel keeps its
+    // own margins, so it is never narrower than its natural width.
+    if let insets = dict["contentInsets"] as? [NSNumber], insets.count == 4 {
+      let start = CGFloat(truncating: insets[1]), end = CGFloat(truncating: insets[3])
+      host.paddingLeft = rtl == true ? end : start
+      host.paddingRight = rtl == true ? start : end
+    }
     // Not measured yet: shown by `reveal` once Flutter has given the view
     // the measured width (#147).
     if (dict["hiddenUntilSized"] as? NSNumber)?.boolValue == true { host.alphaValue = 0 }
@@ -84,7 +99,12 @@ class CupertinoPopupMenuButtonNSView: NSView {
     let args = call.arguments as? [String: Any]
     switch call.method {
     case "getIntrinsicSize":
+      // A title still waiting for its width is measured, not the one
+      // shown, so the old title's width isn't taken for it (#166).
+      let current = host.title
+      if let pending = requestedTitle, pending != current { host.title = pending }
       let s = host.preferredSize()
+      host.title = current
       result(["width": Double(s.width), "height": Double(s.height)])
     case "measureTitle":
       // The size the button would take with this title, without showing
@@ -143,6 +163,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
       // With `atWidth`, once the view has that width, so the title isn't
       // drawn for a frame at the old width (#147).
       let width = (args?["atWidth"] as? NSNumber).map { CGFloat(truncating: $0) }
+      requestedTitle = t
       whenWidth(width) { [weak self] in
         self?.host.title = t
         result(nil)
@@ -150,6 +171,12 @@ class CupertinoPopupMenuButtonNSView: NSView {
     case "setSemanticLabel":
       let label = args?["label"] as? String
       host.accessibilityText = (label?.isEmpty ?? true) ? nil : label
+      result(nil)
+    case "setLayoutDirection":
+      if let value = CNLayoutDirection.read(args) {
+        rtl = value
+        CNLayoutDirection.apply(value, to: self)
+      }
       result(nil)
     case "setInteractive":
       isInteractive = (args?["interactive"] as? NSNumber)?.boolValue ?? true
@@ -199,13 +226,22 @@ class CupertinoPopupMenuButtonNSView: NSView {
   @objc private func onButtonPressed(_ sender: NSButton) {
     // In the view's light or dark appearance, which follows the app's theme.
     popupMenu.appearance = effectiveAppearance
-    // Below the button, aligned to its leading edge, as a pull-down menu.
-    let location = NSPoint(x: 0, y: sender.isFlipped ? sender.bounds.height + 4 : -4)
+    // In Flutter's direction (#167), submenus included.
+    if let rtl { Self.setDirection(rtl ? .rightToLeft : .leftToRight, of: popupMenu) }
+    // Below the button, aligned to its leading edge, as a pull-down menu: a
+    // right-to-left menu is placed by its top-right corner.
+    let leadingX: CGFloat = rtl == true ? sender.bounds.width : 0
+    let location = NSPoint(x: leadingX, y: sender.isFlipped ? sender.bounds.height + 4 : -4)
     // The menu is modal: popUp returns once it has closed (`onOpened`,
     // `onClosed`, #141).
     channel.invokeMethod("menuOpened", arguments: nil)
     popupMenu.popUp(positioning: nil, at: location, in: sender)
     channel.invokeMethod("menuClosed", arguments: nil)
+  }
+
+  private static func setDirection(_ direction: NSUserInterfaceLayoutDirection, of menu: NSMenu) {
+    menu.userInterfaceLayoutDirection = direction
+    for item in menu.items { if let sub = item.submenu { setDirection(direction, of: sub) } }
   }
 
   private func rebuildMenu() {

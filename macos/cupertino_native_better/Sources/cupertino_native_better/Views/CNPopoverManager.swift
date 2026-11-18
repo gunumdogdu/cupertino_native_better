@@ -321,6 +321,11 @@ struct CNPopoverConfig {
     let id: String
     let item: Item
     let checked: Bool
+    /// The symbol shown in place of the checkmark, its size and colour
+    /// (#168).
+    var checkedSymbol: String? = nil
+    var checkedSymbolSize: CGFloat? = nil
+    var checkedSymbolColor: Color? = nil
     let enabled: Bool
     /// Shows information only: not a button, never closes the popover
     /// (#129).
@@ -376,6 +381,9 @@ struct CNPopoverConfig {
             image: CNPopoverConfig.loadImage(r["leadingImage"] as? [String: Any]),
             chevron: r["showChevron"] as? Bool ?? false),
           checked: r["checked"] as? Bool ?? false,
+          checkedSymbol: r["checkedSymbol"] as? String,
+          checkedSymbolSize: (r["checkedSymbolSize"] as? NSNumber).map { CGFloat(truncating: $0) },
+          checkedSymbolColor: (r["checkedSymbolColor"] as? NSNumber).map { Color(nsColor: ImageUtils.colorFromARGB($0.intValue)) },
           enabled: r["enabled"] as? Bool ?? true,
           readOnly: r["readOnly"] as? Bool ?? false)
       }
@@ -588,6 +596,10 @@ struct CNPopoverBody: View {
   }
 
   private var anyChecked: Bool { content.rows.contains { $0.checked } }
+  /// Wide enough for the largest checked symbol (#168).
+  private var checkColumnWidth: CGFloat {
+    max(12, content.rows.map { ($0.checkedSymbolSize ?? 11) + 2 }.max() ?? 12)
+  }
   private var anyLeading: Bool { content.rows.contains { $0.item.image != nil || $0.item.symbol != nil } }
 
   /// The gauges: each label and value over its bar, read by VoiceOver as
@@ -645,11 +657,11 @@ struct CNPopoverBody: View {
       // A choice list marks the current choice at the leading edge, as a
       // menu does.
       if anyChecked {
-        Image(systemName: "checkmark")
-          .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(tint ?? .primary)
+        Image(systemName: row.checkedSymbol ?? "checkmark")
+          .font(.system(size: row.checkedSymbolSize ?? 11, weight: .semibold))
+          .foregroundStyle(row.checkedSymbolColor ?? tint ?? .primary)
           .opacity(row.checked ? 1 : 0)
-          .frame(width: 12)
+          .frame(width: checkColumnWidth)
           .accessibilityHidden(true)
       }
       if anyLeading {

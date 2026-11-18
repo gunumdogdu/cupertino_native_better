@@ -42,6 +42,44 @@ enum CNGlassEffectShape {
   circle,
 }
 
+/// Whether Liquid Glass takes the light or the dark look.
+///
+/// By default ([adaptive]) the glass follows the app's brightness. [light]
+/// and [dark] fix the look whatever the app's brightness is.
+///
+/// On iOS 26 (seen on 26.0 and 26.2) the system also switches small glass
+/// by itself according to the content behind it. Small here means less
+/// than about 65 pt on its shorter side. Light glass turns dark while near-black content
+/// is behind it, and dark glass turns light over near-white content. The
+/// glass switches back when that content has gone. No public API turns this
+/// off, so [light] and [dark] can't stop it there. Glass of 66 pt or more on
+/// its shorter side doesn't switch. On iOS 27 and macOS 27 the glass doesn't
+/// switch by itself, so [light] and [dark] hold over any content. Below
+/// macOS 26 the setting applies to the translucent material that the
+/// container uses there.
+///
+/// Only the glass changes. A [LiquidGlassContainer]'s child is drawn by
+/// Flutter and keeps its own colours, so give it colours that read on the
+/// look you choose.
+enum CNGlassAppearance {
+  /// Light glass in a light app and dark glass in a dark app. The default.
+  adaptive,
+
+  /// Light glass, also in a dark app.
+  ///
+  /// On iOS 26, glass less than about 65 pt on its shorter side still
+  /// turns dark while near-black content is behind it. See
+  /// [CNGlassAppearance].
+  light,
+
+  /// Dark glass, also in a light app.
+  ///
+  /// On iOS 26, glass less than about 65 pt on its shorter side still
+  /// turns light while near-white content is behind it. See
+  /// [CNGlassAppearance].
+  dark,
+}
+
 /// Configuration for Liquid Glass effects.
 class LiquidGlassConfig {
   /// The glass effect variant to apply.
@@ -59,6 +97,15 @@ class LiquidGlassConfig {
   /// Whether the glass effect should be interactive (responds to touch/pointer).
   final bool interactive;
 
+  /// Whether the glass takes the light or the dark look.
+  ///
+  /// Defaults to [CNGlassAppearance.adaptive], which follows the app's
+  /// brightness. [CNGlassAppearance.light] keeps light glass in a dark app,
+  /// and [CNGlassAppearance.dark] keeps dark glass in a light app. On iOS
+  /// 26 the system still switches small glass over near-black or near-white
+  /// content. See [CNGlassAppearance] for the details.
+  final CNGlassAppearance appearance;
+
   /// Creates a configuration for Liquid Glass effects.
   const LiquidGlassConfig({
     this.effect = CNGlassEffect.regular,
@@ -66,6 +113,7 @@ class LiquidGlassConfig {
     this.cornerRadius,
     this.tint,
     this.interactive = false,
+    this.appearance = CNGlassAppearance.adaptive,
   });
 
   @override
@@ -77,15 +125,12 @@ class LiquidGlassConfig {
           shape == other.shape &&
           cornerRadius == other.cornerRadius &&
           tint == other.tint &&
-          interactive == other.interactive;
+          interactive == other.interactive &&
+          appearance == other.appearance;
 
   @override
   int get hashCode =>
-      effect.hashCode ^
-      shape.hashCode ^
-      (cornerRadius?.hashCode ?? 0) ^
-      (tint?.hashCode ?? 0) ^
-      interactive.hashCode;
+      Object.hash(effect, shape, cornerRadius, tint, interactive, appearance);
 }
 
 /// Extension on Widget to apply Liquid Glass effects.
@@ -121,12 +166,15 @@ extension LiquidGlassExtension on Widget {
   /// The [cornerRadius] is only used when [shape] is [CNGlassEffectShape.rect].
   /// The [tint] applies a color tint to the glass effect.
   /// The [interactive] makes the glass effect respond to touch/pointer interactions.
+  /// The [appearance] chooses light or dark glass, or, by default, follows
+  /// the app's brightness (see [CNGlassAppearance]).
   Widget liquidGlass({
     CNGlassEffect effect = CNGlassEffect.regular,
     CNGlassEffectShape shape = CNGlassEffectShape.capsule,
     double? cornerRadius,
     Color? tint,
     bool interactive = false,
+    CNGlassAppearance appearance = CNGlassAppearance.adaptive,
   }) {
     // Only apply glass effect on iOS 26+ or macOS 26+
     if (!PlatformVersion.supportsLiquidGlass) {
@@ -140,6 +188,7 @@ extension LiquidGlassExtension on Widget {
         cornerRadius: cornerRadius,
         tint: tint,
         interactive: interactive,
+        appearance: appearance,
       ),
       child: this,
     );

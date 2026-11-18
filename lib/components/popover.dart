@@ -58,6 +58,7 @@ class CNPopoverRow {
     this.checked = false,
     this.enabled = true,
     this.readOnly = false,
+    this.checkedIcon,
   });
 
   /// Returned by [CNPopover.show] when the row is tapped.
@@ -68,6 +69,12 @@ class CNPopoverRow {
 
   /// Whether the row carries a checkmark.
   final bool checked;
+
+  /// The symbol drawn on the row while [checked], in place of the
+  /// checkmark (#168): its name, its colour (null keeps the popover's tint)
+  /// and its size (CNSymbol's default 24 keeps the checkmark's size, the
+  /// size of the row's text).
+  final CNSymbol? checkedIcon;
 
   /// Whether the row can be tapped. A disabled row is dimmed.
   final bool enabled;
@@ -739,6 +746,14 @@ Map<String, Object?> debugEncodePopoverContent(
         ...encodeListItem(row.item),
         'id': row.id,
         'checked': row.checked,
+        if (row.checkedIcon case final icon?) ...{
+          'checkedSymbol': icon.name,
+          if (icon.size != 24) 'checkedSymbolSize': icon.size,
+          if (icon.color != null)
+            'checkedSymbolColor': context != null && context.mounted
+                ? resolveColorToArgb(icon.color, context)
+                : icon.color!.toARGB32(),
+        },
         'enabled': row.enabled,
         if (row.readOnly) 'readOnly': true,
       },

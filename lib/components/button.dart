@@ -38,6 +38,18 @@ class CNButtonConfig {
   /// and [minHeight].
   final EdgeInsets? padding;
 
+  /// The space between the button's edges and its content, on every side,
+  /// zeros included (#169). It takes the place of [padding].
+  ///
+  /// Unlike [padding], where a side set to 0 keeps the style's inset, a 0
+  /// here is 0: [EdgeInsetsDirectional.zero] makes the button end where its
+  /// label does. `start` and `end` follow the button's direction. A top or
+  /// bottom other than 0 grows a button with a label as [padding] does. On
+  /// macOS the bezel draws its own margins, so only extra space on the
+  /// sides applies there. Not applied to a button in a glass effect union
+  /// ([glassEffectUnionId], [glassEffectId]).
+  final EdgeInsetsDirectional? contentPadding;
+
   /// Border radius for button corners.
   /// If null, uses capsule shape (always round).
   final double? borderRadius;
@@ -177,6 +189,7 @@ class CNButtonConfig {
   /// Creates a configuration for [CNButton].
   const CNButtonConfig({
     this.padding,
+    this.contentPadding,
     this.borderRadius,
     this.minHeight,
     this.imagePadding,
@@ -346,6 +359,7 @@ class _CNButtonState extends State<CNButton>
   CNImagePlacement? _lastImagePlacement;
   double? _lastImagePadding;
   EdgeInsets? _lastPadding;
+  EdgeInsetsDirectional? _lastContentPadding;
   String? _lastImageAssetPath;
   Uint8List? _lastImageAssetData;
   IconData? _lastCustomIcon;
@@ -385,6 +399,7 @@ class _CNButtonState extends State<CNButton>
       defaultTargetPlatform.name,
       c.style.name,
       c.padding,
+      c.contentPadding,
       c.minHeight,
       c.imagePlacement.name,
       c.imagePadding,
@@ -424,6 +439,10 @@ class _CNButtonState extends State<CNButton>
           widget.config.imagePlacement == CNImagePlacement.bottom);
 
   bool get _hasVerticalPadding {
+    final exact = widget.config.contentPadding;
+    if (exact != null) {
+      return widget.label != null && (exact.top != 0 || exact.bottom != 0);
+    }
     final padding = widget.config.padding;
     return widget.label != null &&
         padding != null &&
@@ -681,6 +700,8 @@ class _CNButtonState extends State<CNButton>
             effectivePadding.top != 0.0)
           'paddingVertical': effectivePadding.top,
       },
+      if (widget.config.contentPadding case final p?)
+        'contentInsets': [p.top, p.start, p.bottom, p.end],
       if (widget.config.borderRadius != null)
         'borderRadius': widget.config.borderRadius,
       if (widget.config.minHeight != null) 'minHeight': widget.config.minHeight,
@@ -909,6 +930,7 @@ class _CNButtonState extends State<CNButton>
     _lastImagePlacement = widget.config.imagePlacement;
     _lastImagePadding = widget.config.imagePadding;
     _lastPadding = widget.config.padding;
+    _lastContentPadding = widget.config.contentPadding;
     _lastImageAssetPath = widget.imageAsset?.assetPath;
     _lastImageAssetData = widget.imageAsset?.imageData;
     _lastCustomIcon = widget.customIcon;
@@ -1101,6 +1123,16 @@ class _CNButtonState extends State<CNButton>
       }
       _lastImagePadding = widget.config.imagePadding;
       // Request intrinsic size when padding changes (affects layout)
+      _requestIntrinsicSize();
+    }
+
+    // Exact insets (#169), set in place.
+    if (_lastContentPadding != widget.config.contentPadding) {
+      final p = widget.config.contentPadding;
+      _lastContentPadding = p;
+      await ch.invokeOptionalMethod('setContentInsets', {
+        'insets': p == null ? null : [p.top, p.start, p.bottom, p.end],
+      });
       _requestIntrinsicSize();
     }
 

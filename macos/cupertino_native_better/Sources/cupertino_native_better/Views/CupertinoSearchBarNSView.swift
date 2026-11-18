@@ -25,6 +25,9 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
   private var tint: NSColor?
   private var placeholder: String
   private var placeholderColor: NSColor?
+  /// The clear button's colour (#171); without it a custom clear icon takes
+  /// [placeholderColor] and the system one keeps its own look.
+  private var clearButtonColor: NSColor?
   private var searchIconName: String
   private var clearIconName: String
   /// The text Flutter last heard about, so each change is reported once.
@@ -42,6 +45,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     var backgroundColor: NSColor? = nil
     var textColor: NSColor? = nil
     var placeholderColor: NSColor? = nil
+    var clearButtonColor: NSColor? = nil
     var autofocus = false
     var searchIconName = "magnifyingglass"
     var clearIconName = "xmark.circle.fill"
@@ -59,6 +63,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
       if let v = dict["backgroundColor"] as? NSNumber { backgroundColor = Self.colorFromARGB(v.intValue) }
       if let v = dict["textColor"] as? NSNumber { textColor = Self.colorFromARGB(v.intValue) }
       if let v = dict["placeholderColor"] as? NSNumber { placeholderColor = Self.colorFromARGB(v.intValue) }
+      if let v = dict["clearButtonColor"] as? NSNumber { clearButtonColor = Self.colorFromARGB(v.intValue) }
       if let v = dict["autofocus"] as? NSNumber { autofocus = v.boolValue }
       if let v = dict["searchIconName"] as? String, !v.isEmpty { searchIconName = v }
       if let v = dict["clearIconName"] as? String, !v.isEmpty { clearIconName = v }
@@ -77,6 +82,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     self.tint = tint
     self.placeholder = placeholder
     self.placeholderColor = placeholderColor
+    self.clearButtonColor = clearButtonColor
     self.searchIconName = searchIconName
     self.clearIconName = clearIconName
 
@@ -391,6 +397,9 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     if dict.keys.contains("placeholderColor") {
       placeholderColor = (dict["placeholderColor"] as? NSNumber).map { Self.colorFromARGB($0.intValue) }
     }
+    if dict.keys.contains("clearButtonColor") {
+      clearButtonColor = (dict["clearButtonColor"] as? NSNumber).map { Self.colorFromARGB($0.intValue) }
+    }
     if dict.keys.contains("textColor") {
       searchField.textColor = (dict["textColor"] as? NSNumber).map { Self.colorFromARGB($0.intValue) } ?? .controlTextColor
     }
@@ -431,7 +440,9 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
 
   /// The field's magnifying glass and clear button keep the system images
   /// unless Flutter asks for other symbols or a tint. The tint goes on the
-  /// system image, which keeps the recents chevron when there is a menu.
+  /// system image, which keeps the recents chevron when there is a menu. The
+  /// clear button takes `clearButtonColor`, else (a custom symbol only)
+  /// `placeholderColor`.
   private func applyIcons() {
     guard let cell = searchField.cell as? NSSearchFieldCell else { return }
     cell.resetSearchButtonCell()
@@ -447,7 +458,16 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     }
     cell.resetCancelButtonCell()
     if clearIconName != "xmark.circle.fill" {
-      cell.cancelButtonCell?.image = Self.symbol(clearIconName, color: placeholderColor)
+      var image = Self.symbol(clearIconName, color: nil)
+      if let color = clearButtonColor ?? placeholderColor, let symbol = image {
+        image = Self.tinted(symbol, color)
+      }
+      cell.cancelButtonCell?.image = image
+    } else if let color = clearButtonColor,
+              let image = cell.cancelButtonCell?.image ?? Self.symbol(clearIconName, color: nil) {
+      let tinted = Self.tinted(image, color)
+      cell.cancelButtonCell?.image = tinted
+      cell.cancelButtonCell?.alternateImage = tinted
     }
     searchField.needsDisplay = true
   }
@@ -477,6 +497,18 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     if height >= 24 { return .regular }
     if height >= 20 { return .small }
     return .mini
+  }
+
+  /// [image] drawn in one [color], as iOS draws a coloured symbol: the
+  /// parts the symbol leaves open, such as the cross of
+  /// `xmark.circle.fill`, stay open. (One palette colour would fill them.)
+  private static func tinted(_ image: NSImage, _ color: NSColor) -> NSImage {
+    NSImage(size: image.size, flipped: false) { rect in
+      image.draw(in: rect)
+      color.set()
+      rect.fill(using: .sourceAtop)
+      return true
+    }
   }
 
   private static func symbol(_ name: String, color: NSColor?) -> NSImage? {

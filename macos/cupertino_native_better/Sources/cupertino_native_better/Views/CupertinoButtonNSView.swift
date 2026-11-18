@@ -110,6 +110,11 @@ class CupertinoButtonNSView: NSView {
         $0.expectedHeight = minHeight ?? 44
         $0.paddingLeft = paddingLeft ?? paddingHorizontal
         $0.paddingRight = paddingRight ?? paddingHorizontal
+        // `contentPadding` (#169): exact sides, on top of the bezel's margins.
+        if let insets = dict["contentInsets"] as? [NSNumber], insets.count == 4 {
+          $0.paddingLeft = CGFloat(truncating: insets[1])
+          $0.paddingRight = CGFloat(truncating: insets[3])
+        }
         if title != nil {
           $0.paddingTop = paddingTop ?? paddingVertical
           $0.paddingBottom = paddingBottom ?? paddingVertical
@@ -217,6 +222,11 @@ class CupertinoButtonNSView: NSView {
       result(nil)
     case "setImagePadding":
       host?.imagePadding = Self.cgFloat(args?["padding"])
+      result(nil)
+    case "setContentInsets":
+      let insets = args?["insets"] as? [NSNumber]
+      host?.paddingLeft = insets.flatMap { $0.count == 4 ? CGFloat(truncating: $0[1]) : nil }
+      host?.paddingRight = insets.flatMap { $0.count == 4 ? CGFloat(truncating: $0[3]) : nil }
       result(nil)
     case "setHorizontalPadding":
       host?.paddingLeft = Self.cgFloat(args?["padding"])

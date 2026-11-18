@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'native_view_finder.dart';
+
 /// #156: a glass widget with `autoHideOnModal: false` under a sheet from a
 /// sheet package stayed flat (contained) the whole time the sheet was up,
 /// because the sheet's route was measured as covering the whole screen: the
@@ -156,7 +158,7 @@ void main() {
       navigator.currentState!.push(_PackageStyleSheetRoute());
       await tester.pumpAndSettle();
       expect(sent[name], isNull, reason: 'never clipped: full glass');
-      expect(find.byType(UiKitView), findsOneWidget);
+      expect(findNativeView(), findsOneWidget);
 
       navigator.currentState!.pop();
       await tester.pumpAndSettle();
@@ -359,7 +361,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final views = find.byType(UiKitView);
+      final views = findNativeView();
       expect(views, findsNWidgets(3));
       expect(
         find.ancestor(of: views, matching: find.byType(ClipRect)),

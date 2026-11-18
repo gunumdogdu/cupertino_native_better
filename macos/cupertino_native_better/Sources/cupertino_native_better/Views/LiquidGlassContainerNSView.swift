@@ -71,8 +71,19 @@ class LiquidGlassContainerNSView: NSView {
     cornerRadius = (dict["cornerRadius"] as? NSNumber).map { CGFloat(truncating: $0) }
     tint = (dict["tint"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
     inset = (dict["inset"] as? NSNumber).map { CGFloat(truncating: $0) } ?? 0
-    if let isDark = (dict["isDark"] as? NSNumber)?.boolValue {
-      appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+    // The glass takes its light or dark look from the view's appearance:
+    // fixed for `light` and `dark` (Issue #165), else the app's brightness.
+    // AppKit's glass doesn't switch with the content behind it (checked on
+    // macOS 27.2), so the fixed look holds over any content.
+    switch dict["appearance"] as? String {
+    case "light":
+      appearance = NSAppearance(named: .aqua)
+    case "dark":
+      appearance = NSAppearance(named: .darkAqua)
+    default:
+      if let isDark = (dict["isDark"] as? NSNumber)?.boolValue {
+        appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+      }
     }
   }
 

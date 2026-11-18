@@ -16,6 +16,9 @@ import '../utils/version_detector.dart';
 /// `NSVisualEffectView`, the translucent material that preceded Liquid
 /// Glass. On older iOS and other platforms, the child is returned unchanged.
 ///
+/// The glass follows the app's brightness. [LiquidGlassConfig.appearance]
+/// can keep it light or dark instead.
+///
 /// The glass takes the size of [child]: in a parent that stretches its
 /// children, such as a [ListView], wrap it in an [Align] to keep it to the
 /// child's own width.
@@ -171,6 +174,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
       if (widget.config.tint != null)
         'tint': resolveColorToArgb(widget.config.tint!, context),
       'interactive': widget.config.interactive,
+      'appearance': widget.config.appearance.name,
       'isDark': ThemeHelper.isDark(context),
     };
 
@@ -239,6 +243,7 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
         if (widget.config.tint != null)
           'tint': resolveColorToArgb(widget.config.tint!, context),
         'interactive': widget.config.interactive,
+        'appearance': widget.config.appearance.name,
         'isDark': _isDark,
       });
     } catch (e) {

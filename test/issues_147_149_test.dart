@@ -7,6 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:cupertino_native_better/utils/reusable_platform_view.dart';
+
+import 'native_view_finder.dart';
+
 /// #147 follow-up (a `CNPopupMenuButton` label drawn for a frame at the
 /// wrong width) and #149 (glass widgets under a sheet that doesn't publish
 /// its frame). The native-path tests run on a macOS 26+ host with the
@@ -106,8 +110,7 @@ void main() {
       );
     }
 
-    double width(WidgetTester tester) =>
-        tester.getSize(find.byType(UiKitView)).width;
+    double width(WidgetTester tester) => tester.getSize(findNativeView()).width;
 
     testWidgets(
       'a fresh button is created hidden and shown in the frame that gives it '
@@ -153,11 +156,23 @@ void main() {
         expect(named('create'), isEmpty);
         expect(named('getIntrinsicSize'), isEmpty);
 
+        // Mounted again: the kept native button comes back at once (#166).
         shown.value = false;
         await settle(tester);
         calls.clear();
         shown.value = true;
         await tester.pump();
+        expect(named('create'), isEmpty, reason: 'the kept view is reused');
+        expect(named('reveal'), hasLength(1));
+        expect(width(tester), 190.0, reason: 'the remembered width');
+
+        // With nothing kept, a new view starts at the remembered width, in
+        // its first frame.
+        ReusablePlatformViews.keepAlive = Duration.zero;
+        shown.value = false;
+        await settle(tester);
+        calls.clear();
+        shown.value = true;
         await tester.pump();
         final create = named('create').single;
         expect(creationParams(create)['hiddenUntilSized'], isNull);
@@ -230,14 +245,14 @@ void main() {
           ),
         );
         await settle(tester);
-        expect(find.byType(UiKitView), findsNWidgets(2));
+        expect(findNativeView(), findsNWidgets(2));
 
         openSheet(navigator);
         await tester.pumpAndSettle();
         expect(
           find.descendant(
             of: find.byKey(const Key('top')),
-            matching: find.byType(UiKitView),
+            matching: findNativeView(),
           ),
           findsOneWidget,
           reason: 'the sheet is nowhere near it',
@@ -245,7 +260,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byKey(const Key('bottom')),
-            matching: find.byType(UiKitView),
+            matching: findNativeView(),
           ),
           findsNothing,
           reason: 'the sheet covers it',
@@ -254,7 +269,7 @@ void main() {
         navigator.currentState!.pop();
         await tester.pumpAndSettle();
         await settle(tester);
-        expect(find.byType(UiKitView), findsNWidgets(2));
+        expect(findNativeView(), findsNWidgets(2));
         await tearDownView(tester);
       },
       skip: skip || !PlatformVersion.shouldUseNativeGlass,

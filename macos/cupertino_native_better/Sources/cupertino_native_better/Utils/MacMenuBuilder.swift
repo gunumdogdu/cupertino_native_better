@@ -102,6 +102,12 @@ enum MacMenuBuilder {
       item.isEnabled = enabled
       item.state = level.isChecked(i) ? .on : .off
       decorate(item, level: level, at: i)
+      if level.isChecked(i), level.hasCheckedImage(i), let image = item.image {
+        // A checked symbol (#168) goes in the check column, as the item's
+        // on-state image.
+        item.onStateImage = image
+        item.image = nil
+      }
       if level.isDestructive(i) {
         // AppKit has no destructive menu item style; the label and a
         // symbol icon are drawn in the system red, as the destructive
@@ -317,6 +323,7 @@ struct MacMenuLevel {
   func isDivider(_ i: Int) -> Bool { bool("isDivider", i, false) }
   func isEnabled(_ i: Int) -> Bool { bool("enabled", i, true) }
   func isChecked(_ i: Int) -> Bool { bool("checked", i, false) }
+  func hasCheckedImage(_ i: Int) -> Bool { bool("checkedImage", i, false) }
   func isDestructive(_ i: Int) -> Bool { bool("isDestructive", i, false) }
   func isSubmenu(_ i: Int) -> Bool { bool("isSubmenu", i, false) }
   func subtitle(_ i: Int) -> String? { string("subtitles", i) }

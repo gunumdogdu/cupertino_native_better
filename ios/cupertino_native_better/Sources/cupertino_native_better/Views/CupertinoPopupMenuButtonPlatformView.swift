@@ -37,6 +37,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var keepsMenuPresented: [Bool] = []
   private var submenuStyles: [String?] = []
   private var elementSizes: [String?] = []
+  private var checkedImages: [Bool] = []
   private var iconScale: CGFloat = UIScreen.main.scale
   private var preserveTopToBottomOrder: Bool = false
   // Track current button icon configuration to keep image across state updates
@@ -51,10 +52,16 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private var btnIconPalette: [UIColor] = []
   /// The title, kept so an icon change doesn't drop it (#141).
   private var currentTitle: String? = nil
+  /// The newest title Flutter sent, set at once or held until the view has
+  /// its width (#166).
+  private var requestedTitle: String? = nil
   /// `CNPopupMenuButton.imagePlacement` / `imagePadding` for a button with
   /// both a title and an image (#141).
   private var imagePlacement: NSDirectionalRectEdge = .leading
   private var imagePadding: CGFloat? = nil
+  /// `CNPopupMenuButton.contentPadding`: the button's content insets on every
+  /// style, zeros included; nil keeps the style's (#169).
+  private var contentInsets: NSDirectionalEdgeInsets? = nil
   /// `labelFontFamily` / `labelFontSize` / `labelFontWeight` / `labelColor`.
   private var labelFontFamily: String? = nil
   private var labelFontSize: CGFloat? = nil
@@ -106,6 +113,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       default: self.imagePlacement = .leading
       }
       if let v = dict["imagePadding"] as? NSNumber { self.imagePadding = CGFloat(v.doubleValue) }
+      if let v = dict["contentInsets"] as? [NSNumber], v.count == 4 {
+        self.contentInsets = NSDirectionalEdgeInsets(
+          top: CGFloat(truncating: v[0]), leading: CGFloat(truncating: v[1]),
+          bottom: CGFloat(truncating: v[2]), trailing: CGFloat(truncating: v[3]))
+      }
       if let f = dict["labelFontFamily"] as? String, !f.isEmpty { self.labelFontFamily = f }
       if let v = dict["labelFontSize"] as? NSNumber, v.doubleValue > 0 { self.labelFontSize = CGFloat(v.doubleValue) }
       if let v = dict["labelFontWeight"] as? NSNumber { self.labelFontWeight = v.intValue }
@@ -160,6 +172,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       self.keepsMenuPresented = layout.keepsMenuPresented
       self.submenuStyles = layout.submenuStyles
       self.elementSizes = layout.elementSizes
+      self.checkedImages = layout.checkedImages
       if let preserve = dict["preserveTopToBottomOrder"] as? NSNumber {
         self.preserveTopToBottomOrder = preserve.boolValue
       }
@@ -172,6 +185,9 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     button.onMenuDidHide = { [weak self] in self?.channel.invokeMethod("menuClosed", arguments: nil) }
 
     container.backgroundColor = .clear
+    // Flutter's text direction (#167): the button, and the menu it opens.
+    CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: container)
+    button.menuRtl = CNLayoutDirection.read(args as? [String: Any])
     container.onLayout = { [weak self] in self?.runDueWidthActions() }
     // Not measured yet: shown by `reveal` once Flutter has given the view
     // the measured width, so the first frame isn't at a placeholder width
@@ -215,6 +231,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     if !buttonIconPalette.isEmpty { self.btnIconPalette = buttonIconPalette.map { Self.colorFromARGB($0.intValue) } }
     // Apply content initially
     currentTitle = title
+    requestedTitle = title
     setButtonContent(title: title, image: makeButtonIconImage(), iconOnly: (title == nil))
     if #available(iOS 15.0, *), var cfg = button.configuration {
       // Prefer explicit icon mode/color if provided
@@ -270,6 +287,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         let label = (call.arguments as? [String: Any])?["label"] as? String
         self.button.accessibilityLabel = (label?.isEmpty ?? true) ? nil : label
         result(nil)
+      case "setLayoutDirection":
+        let rtl = CNLayoutDirection.read(call.arguments as? [String: Any])
+        CNLayoutDirection.apply(rtl, to: self.container)
+        if rtl != nil { self.button.menuRtl = rtl }
+        result(nil)
       case "setTransitioning":
         // Issue #29 follow-up: apply halo-containment clipping only while
         // the enclosing route is animating OR while a modal/sheet/popup
@@ -280,6 +302,14 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
         CNHaloMask.apply(self.container, arguments: call.arguments)
         result(nil)
       case "getIntrinsicSize":
+        // A title still waiting for its width is measured, not the one
+        // shown: measured right after a title change, the old title's width
+        // was taken for the new one (#166).
+        if let pending = self.requestedTitle, pending != self.currentTitle {
+          let size = self.measuredSize(title: pending)
+          result(["width": Double(ceil(size.width)), "height": Double(ceil(size.height))])
+          return
+        }
         // At an unlimited width: `intrinsicContentSize` wraps a
         // configuration button's title to the width it has now, so a longer
         // title set in place came back narrower each time and wrapped (#147).
@@ -375,6 +405,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
           // width: set before it, the title was drawn for a frame at the
           // old width and wrapped (#147).
           let width = (args["atWidth"] as? NSNumber).map { CGFloat(truncating: $0) }
+          self.requestedTitle = t
           self.whenWidth(width) { [weak self] in
             guard let self = self else { result(nil); return }
             self.currentTitle = t
@@ -489,6 +520,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     level.dividers = dividers
     level.enabled = enabled
     level.checked = checked
+    level.checkedImages = checkedImages
     level.isDestructive = isDestructive
     level.sizes = itemSizes
     level.colors = itemColors
@@ -508,6 +540,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     keepsMenuPresented = level.keepsMenuPresented
     submenuStyles = level.submenuStyles
     elementSizes = level.elementSizes
+    checkedImages = level.checkedImages
   }
 
   private static func parseSubmenus(_ value: Any?) -> [[String: Any]?] {
@@ -794,6 +827,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private func applyContentOptions(to cfg: inout UIButton.Configuration) {
     cfg.imagePlacement = imagePlacement
     if let padding = imagePadding { cfg.imagePadding = padding }
+    if let insets = contentInsets { cfg.contentInsets = insets }
     guard labelFontFamily != nil || labelFontSize != nil || labelFontWeight != nil || labelColor != nil ||
       labelColorLight != nil || labelColorDark != nil else { return }
     let family = labelFontFamily, size = labelFontSize, color = labelColor
@@ -879,7 +913,75 @@ final class CNPopupMenuUIButton: UIButton {
   var onMenuWillShow: (() -> Void)?
   var onMenuDidHide: (() -> Void)?
   var keepsSourceVisible = false
+
+  deinit { directionLink?.invalidate() }
   private var standIn: UIView?
+  /// The direction the menu is laid out in, from Flutter (#167); nil keeps
+  /// the system's.
+  var menuRtl: Bool?
+  /// The window's views from before the menu opened, so the views the
+  /// system adds for the menu can be told apart.
+  private var viewsBeforeMenu: Set<ObjectIdentifier> = []
+  /// The views the system added for the open menu, and the display link
+  /// that gives views it adds later (a submenu's rows) the direction too.
+  private var menuViews: [UIView] = []
+  private var directionLink: CADisplayLink?
+
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    configurationForMenuAtLocation location: CGPoint
+  ) -> UIContextMenuConfiguration? {
+    viewsBeforeMenu = Set((window?.subviews ?? []).map(ObjectIdentifier.init))
+    return super.contextMenuInteraction(interaction, configurationForMenuAtLocation: location)
+  }
+
+  /// Lays the menu out in Flutter's direction (#167). UIKit shows the menu
+  /// in a view of its own on top of the window, which takes the app's
+  /// language, not the button's direction. Its views get the direction:
+  /// the layout direction trait, which views it adds later inherit, and the
+  /// semantic content attribute, which aligns the titles.
+  private func applyMenuDirection() {
+    guard let rtl = menuRtl, let window else { return }
+    // Already the app's direction: nothing to change.
+    let appRtl = UIApplication.shared.userInterfaceLayoutDirection == .rightToLeft
+    guard rtl != appRtl else { return }
+    for view in window.subviews
+    where !viewsBeforeMenu.contains(ObjectIdentifier(view)) && !isDescendant(of: view)
+      && !menuViews.contains(where: { $0 === view }) {
+      if #available(iOS 17.0, *) {
+        view.traitOverrides.layoutDirection = rtl ? .rightToLeft : .leftToRight
+      }
+      menuViews.append(view)
+    }
+    for view in menuViews { Self.force(rtl, on: view) }
+    if directionLink == nil, !menuViews.isEmpty {
+      // Titles take their alignment from the attribute, not the trait, so
+      // rows added after this (a submenu opening) need it as well.
+      let link = CADisplayLink(target: CNMenuDirectionTicker(button: self), selector: #selector(CNMenuDirectionTicker.tick))
+      link.add(to: .main, forMode: .common)
+      directionLink = link
+    }
+  }
+
+  fileprivate func reapplyMenuDirection() {
+    guard let rtl = menuRtl else { return }
+    for view in menuViews { Self.force(rtl, on: view) }
+  }
+
+  private func endMenuDirection() {
+    directionLink?.invalidate()
+    directionLink = nil
+    menuViews = []
+  }
+
+  private static func force(_ rtl: Bool, on view: UIView) {
+    let attribute: UISemanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
+    if view.semanticContentAttribute != attribute {
+      view.semanticContentAttribute = attribute
+      view.setNeedsLayout()
+    }
+    for sub in view.subviews { force(rtl, on: sub) }
+  }
 
   private func standInPreview() -> UITargetedPreview? {
     guard keepsSourceVisible, let superview, window != nil else { return nil }
@@ -919,6 +1021,8 @@ final class CNPopupMenuUIButton: UIButton {
     animator: UIContextMenuInteractionAnimating?
   ) {
     super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
+    applyMenuDirection()
+    animator?.addCompletion { [weak self] in self?.applyMenuDirection() }
     onMenuWillShow?()
   }
 
@@ -931,10 +1035,19 @@ final class CNPopupMenuUIButton: UIButton {
     let done = { [weak self] in
       self?.standIn?.removeFromSuperview()
       self?.standIn = nil
+      self?.endMenuDirection()
       self?.onMenuDidHide?()
     }
     if let animator { animator.addCompletion(done) } else { done() }
   }
+}
+
+/// Calls the button from the display link without the link keeping the
+/// button alive (#167).
+final class CNMenuDirectionTicker: NSObject {
+  weak var button: CNPopupMenuUIButton?
+  init(button: CNPopupMenuUIButton) { self.button = button }
+  @objc func tick() { button?.reapplyMenuDirection() }
 }
 
 /// The popup menu button's container: reports each layout pass, so a change

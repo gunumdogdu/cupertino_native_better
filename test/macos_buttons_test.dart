@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'native_view_finder.dart';
+
 /// The platform views created, by view type, with their creation params.
 final _created = <String, List<Map<Object?, Object?>>>{};
 
@@ -187,7 +189,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(AppKitView), findsOneWidget);
+    expect(findNativeView(), findsOneWidget);
     final params = _created['CupertinoNativePopupMenuButton']!.single;
     expect(params['semanticLabel'], 'More');
     expect(params['round'], true);

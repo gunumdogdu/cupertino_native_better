@@ -19,11 +19,24 @@ enum PopupMenuBuilder {
     let flushGroup: () -> Void = {
       if !current.isEmpty { groups.append(current); current = [] }
     }
+    // With a checked symbol (#168), rows without an image get a clear one
+    // of its size: iOS 27 starts the title of a row without an image where
+    // the image would be, so the titles weren't lined up.
+    let spacer: UIImage? = {
+      guard let i = level.checkedImages.indices.first(where: {
+        level.checkedImages[$0] && $0 < level.checked.count && level.checked[$0]
+      }), let checkedImage = Self.image(level: level, at: i, iconScale: iconScale) else { return nil }
+      let format = UIGraphicsImageRendererFormat.preferred()
+      format.opaque = false
+      return UIGraphicsImageRenderer(size: checkedImage.size, format: format)
+        .image { _ in }
+        .withRenderingMode(.alwaysOriginal)
+    }()
     for i in 0..<count {
         let isDiv = i < level.dividers.count ? level.dividers[i] : false
         if isDiv { flushGroup(); continue }
         let title = i < level.labels.count ? level.labels[i] : ""
-        let image = Self.image(level: level, at: i, iconScale: iconScale)
+        let image = Self.image(level: level, at: i, iconScale: iconScale) ?? spacer
         let isEnabled = i < level.enabled.count ? level.enabled[i] : true
         let isChecked = i < level.checked.count ? level.checked[i] : false
         let destructive = i < level.isDestructive.count ? level.isDestructive[i] : false
@@ -77,7 +90,12 @@ enum PopupMenuBuilder {
         let action = UIAction(title: title, subtitle: subtitle, image: image, attributes: attrs) { _ in
           onSelect(itemPath)
         }
-        action.state = isChecked ? .on : .off
+        // A checked symbol (#168) is the item's image instead of the system
+        // checkmark: UIKit can't restyle the checkmark. VoiceOver still
+        // reads it as selected.
+        let checkedImage = i < level.checkedImages.count ? level.checkedImages[i] : false
+        action.state = isChecked && !checkedImage ? .on : .off
+        if isChecked && checkedImage { action.accessibilityTraits.insert(.selected) }
         current.append(action)
       }
     flushGroup()
@@ -273,6 +291,9 @@ struct PopupMenuLevel {
   var dividers: [Bool] = []
   var enabled: [Bool] = []
   var checked: [Bool] = []
+  /// Checked items whose image is a checked symbol from Flutter, shown in
+  /// place of the system checkmark (#168).
+  var checkedImages: [Bool] = []
   var isDestructive: [Bool] = []
   var sizes: [Any] = []
   var colors: [Any] = []
@@ -304,6 +325,7 @@ struct PopupMenuLevel {
     dividers = ((dict["isDivider"] as? [NSNumber]) ?? []).map { $0.boolValue }
     enabled = ((dict["enabled"] as? [NSNumber]) ?? []).map { $0.boolValue }
     checked = ((dict["checked"] as? [NSNumber]) ?? []).map { $0.boolValue }
+    checkedImages = ((dict["checkedImage"] as? [NSNumber]) ?? []).map { $0.boolValue }
     isDestructive = ((dict["isDestructive"] as? [NSNumber]) ?? []).map { $0.boolValue }
     sizes = (dict["sfSymbolSizes"] as? [Any]) ?? []
     colors = (dict["sfSymbolColors"] as? [Any]) ?? []

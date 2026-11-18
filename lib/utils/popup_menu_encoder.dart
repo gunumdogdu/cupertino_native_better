@@ -102,6 +102,7 @@ Map<String, Object?> encodePopupMenuEntries(
   Map<PopupMenuIconKey, Uint8List?> customIconBytes = const {},
   Map<CNPopupMenuEntry, String> assetPaths = const {},
   bool includeCustomIcons = true,
+  CNSymbol? checkedIcon,
 }) {
   final labels = <String>[];
   final symbols = <String>[];
@@ -113,6 +114,8 @@ Map<String, Object?> encodePopupMenuEntries(
   final isDivider = <bool>[];
   final enabled = <bool>[];
   final checked = <bool>[];
+  final checkedImages = <bool>[];
+  var usesCheckedImages = false;
   final isDestructive = <bool>[];
   final sizes = <double?>[];
   final colors = <int?>[];
@@ -146,6 +149,7 @@ Map<String, Object?> encodePopupMenuEntries(
       isDivider.add(true);
       enabled.add(false);
       checked.add(false);
+      checkedImages.add(false);
       isDestructive.add(false);
       sizes.add(null);
       colors.add(null);
@@ -161,11 +165,18 @@ Map<String, Object?> encodePopupMenuEntries(
       continue;
     }
 
-    final icon = visual.icon;
-    final asset = visual.imageAsset;
+    // A checked item with a checked icon shows that symbol as its image, in
+    // place of the system checkmark and of its own icon (#168).
+    final isChecked = e is CNPopupMenuItem && e.checked;
+    final checkSymbol = isChecked ? (e.checkedIcon ?? checkedIcon) : null;
+    if (checkSymbol != null) usesCheckedImages = true;
+    final icon = checkSymbol ?? visual.icon;
+    final asset = checkSymbol != null ? null : visual.imageAsset;
     labels.add(visual.label);
     symbols.add(icon?.name ?? '');
-    customIcons.add(customIconBytes[popupMenuIconKey(e)]);
+    customIcons.add(
+      checkSymbol != null ? null : customIconBytes[popupMenuIconKey(e)],
+    );
     customIconColors.add(resolveColor(visual.iconColor));
     if (asset != null) {
       final path = assetPaths[e] ?? asset.assetPath;
@@ -181,7 +192,8 @@ Map<String, Object?> encodePopupMenuEntries(
     }
     isDivider.add(false);
     enabled.add(visual.enabled);
-    checked.add(e is CNPopupMenuItem && e.checked);
+    checked.add(isChecked);
+    checkedImages.add(checkSymbol != null);
     isDestructive.add(e is CNPopupMenuItem && e.isDestructive);
     sizes.add(asset?.size ?? icon?.size);
     colors.add(resolveColor(asset?.color ?? icon?.color));
@@ -215,6 +227,7 @@ Map<String, Object?> encodePopupMenuEntries(
           resolveColor: resolveColor,
           customIconBytes: customIconBytes,
           assetPaths: assetPaths,
+          checkedIcon: checkedIcon,
         ),
       );
     } else {
@@ -236,6 +249,7 @@ Map<String, Object?> encodePopupMenuEntries(
     'isDivider': isDivider,
     'enabled': enabled,
     'checked': checked,
+    if (usesCheckedImages) 'checkedImage': checkedImages,
     'isDestructive': isDestructive,
     'sfSymbolSizes': sizes,
     'sfSymbolColors': colors,

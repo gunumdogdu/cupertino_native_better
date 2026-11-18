@@ -28,6 +28,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     var tint: UIColor? = nil
     var interactive: Bool = false
     var isDark: Bool = false
+    var appearance: String? = nil
     
     if let dict = args as? [String: Any] {
       if let effectStr = dict["effect"] as? String {
@@ -53,7 +54,12 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
       if let isDarkBool = dict["isDark"] as? Bool {
         isDark = isDarkBool
       }
+      appearance = dict["appearance"] as? String
     }
+    let style = LiquidGlassContainerPlatformView.interfaceStyle(
+      appearance: appearance,
+      isDark: isDark
+    )
     
     // Create SwiftUI view
     let glassView = LiquidGlassContainerSwiftUI(
@@ -66,7 +72,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
 
     self.hostingController = UIHostingController(rootView: glassView)
     self.hostingController.view.backgroundColor = .clear
-    self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
+    self.hostingController.overrideUserInterfaceStyle = style
     // Don't propagate the screen's safe area into the SwiftUI glass. When the
     // container's frame reaches into the bottom safe area (e.g. a floating
     // bottom panel), UIHostingController otherwise insets the SwiftUI content
@@ -79,9 +85,10 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     self.configuredShape = shape
     self.configuredCornerRadius = cornerRadius
     
-    // Sync Flutter's brightness mode with Swift at initialization
+    // Sync Flutter's brightness mode (or the fixed appearance) with Swift at
+    // initialization
     if #available(iOS 13.0, *) {
-      self.hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
+      self.hostingController.overrideUserInterfaceStyle = style
     }
     
     // Add hosting controller as child
@@ -158,6 +165,24 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     }
   }
   
+  /// The trait the glass is drawn with: the app's brightness for
+  /// `adaptive`, else the fixed light or dark look (Issue #165).
+  ///
+  /// The glass takes its light or dark material from this trait. On iOS
+  /// 26 (seen on 26.0 and 26.2) the system also switches glass under about
+  /// 65 pt on its shorter side by itself over near-black or near-white
+  /// content, whatever the trait. No public API turns that off: overriding the trait on the
+  /// hosting controller, its view, an effect view or its content view, and
+  /// SwiftUI's `colorScheme`, all leave it switching. On iOS 27 the glass
+  /// keeps the trait's look over any content.
+  static func interfaceStyle(appearance: String?, isDark: Bool) -> UIUserInterfaceStyle {
+    switch appearance {
+    case "light": return .light
+    case "dark": return .dark
+    default: return isDark ? .dark : .light
+    }
+  }
+
   private func updateConfig(args: Any?) {
     guard let dict = args as? [String: Any] else { return }
     
@@ -191,6 +216,7 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     if let isDarkBool = dict["isDark"] as? Bool {
       isDark = isDarkBool
     }
+    let appearance = dict["appearance"] as? String
     
     // Update the SwiftUI view
     let newGlassView = LiquidGlassContainerSwiftUI(
@@ -202,7 +228,10 @@ class LiquidGlassContainerPlatformView: NSObject, FlutterPlatformView {
     )
 
     hostingController.rootView = newGlassView
-    hostingController.overrideUserInterfaceStyle = isDark ? .dark : .light
+    hostingController.overrideUserInterfaceStyle = Self.interfaceStyle(
+      appearance: appearance,
+      isDark: isDark
+    )
     // Keep stored config in sync for `applyTransitionContainment`.
     self.configuredShape = shape
     self.configuredCornerRadius = cornerRadius
