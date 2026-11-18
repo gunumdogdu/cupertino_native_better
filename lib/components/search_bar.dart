@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../style/sf_symbol.dart';
+import '../utils/layout_direction.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
 import '../utils/theme_helper.dart';
@@ -176,6 +177,11 @@ class CNSearchBarController {
 /// editing), and `focus` opens a collapsed bar before it brings up the
 /// keyboard. [initialText] opens the bar with text in it.
 ///
+/// The bar takes the ambient [Directionality] ([textDirection]), so an app
+/// that switches to Arabic in Dart gets a mirrored bar, and
+/// [labelFontFamily], [labelFontSize] and [labelFontWeight] set the font of
+/// the text, the placeholder and Cancel.
+///
 /// On macOS (every supported version) it is a native `NSSearchField`, which
 /// keeps the keyboard while the user types and hands it back to Flutter when
 /// the search ends. macOS search fields have no Cancel button, so there:
@@ -234,6 +240,10 @@ class CNSearchBar extends StatefulWidget {
     this.autocorrect = true,
     this.keyboardType = TextInputType.text,
     this.clearButtonSemanticLabel,
+    this.textDirection,
+    this.labelFontFamily,
+    this.labelFontSize,
+    this.labelFontWeight,
   });
 
   /// Placeholder text shown when the search field is empty.
@@ -273,15 +283,15 @@ class CNSearchBar extends StatefulWidget {
   final Color? textColor;
 
   /// Color for the placeholder text. It also colours the clear button,
-  /// unless [clearButtonColor] is set.
+  /// unless [clearButtonColor] or the [clearIcon]'s [CNSymbol.color] is set.
   final Color? placeholderColor;
 
   /// Color of the button that clears the text.
   ///
-  /// Defaults to [placeholderColor], and without it to the system's colour
-  /// for the button. On macOS [placeholderColor] colours only a custom
-  /// [clearIcon]: the system clear button keeps its own look unless this is
-  /// set.
+  /// Defaults to the [clearIcon]'s [CNSymbol.color], then [placeholderColor],
+  /// and without either to the system's colour for the button. On macOS
+  /// [placeholderColor] colours only a custom [clearIcon]: the system clear
+  /// button keeps its own look unless this or the icon's colour is set.
   final Color? clearButtonColor;
 
   /// The text the bar opens with, for example the query a user comes back
@@ -321,8 +331,42 @@ class CNSearchBar extends StatefulWidget {
   final CNSymbol? searchIcon;
 
   /// Custom clear icon (defaults to xmark.circle.fill SF Symbol), sized like
-  /// [searchIcon].
+  /// [searchIcon]. Its [CNSymbol.color] colours the button when
+  /// [clearButtonColor] is not set.
   final CNSymbol? clearIcon;
+
+  /// The direction the bar is laid out in. Null takes the ambient
+  /// [Directionality] (#173), so an app that switches to Arabic in Dart
+  /// gets a mirrored bar although the system language stays English, as
+  /// for the other native widgets.
+  ///
+  /// Right to left puts the magnifying glass on the right, aligns the
+  /// placeholder and the text to the right (Latin text too, in its own
+  /// order), and puts the clear button and Cancel on the left. A change
+  /// reaches a bar already on screen.
+  ///
+  /// On macOS AppKit lays a search field out by the app's language, so the
+  /// field's magnifying glass and clear button keep their places; the text
+  /// and the placeholder align to the right, and a collapsed [expandable]
+  /// bar's button sits on the right.
+  final TextDirection? textDirection;
+
+  /// The font family of the search text, the placeholder and Cancel: a
+  /// family declared under `fonts:` in `pubspec.yaml`, which the package
+  /// registers with the system the first time it is used, or one the
+  /// platform knows. Null keeps the system font. A change reaches a bar
+  /// already on screen.
+  final String? labelFontFamily;
+
+  /// The size of the search text, the placeholder and Cancel, in points
+  /// (17 by default on iOS). On iOS it is the size at the default text size,
+  /// and grows and shrinks with Dynamic Type like the system's.
+  final double? labelFontSize;
+
+  /// The weight of the search text, the placeholder and Cancel, also
+  /// applied with [labelFontFamily] (the family's nearest face). Null keeps
+  /// the regular weight.
+  final FontWeight? labelFontWeight;
 
   /// Whether the keyboard capitalizes what the user types. Defaults to none,
   /// as for the system search fields, so a query such as a username isn't
@@ -396,6 +440,11 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   bool? _lastIsDark;
 
+  /// The direction and label font last sent to the native view, to send
+  /// changes only (#173).
+  bool? _lastRtl;
+  Map<String, Object>? _lastLabelFont;
+
   /// The options last sent to the macOS search field, to send changes only.
   Map<String, Object?>? _lastMacConfig;
 
@@ -438,6 +487,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     super.didChangeDependencies();
     _syncBrightnessIfNeeded();
     _syncMacConfigIfNeeded();
+    _syncLayoutDirectionIfNeeded();
   }
 
   @override
@@ -450,7 +500,63 @@ class _CNSearchBarState extends State<CNSearchBar>
       if (ch != null) _controller._attach(ch);
     }
     _syncMacConfigIfNeeded();
+    _syncLayoutDirectionIfNeeded();
+    _syncLabelFontIfNeeded();
+    if (widget.placeholder != oldWidget.placeholder ||
+        widget.cancelText != oldWidget.cancelText) {
+      _syncLabels();
+    }
   }
+
+  /// Sends a new placeholder and Cancel title to the iOS bar, e.g. after an
+  /// in-app language switch (#173); macOS takes the placeholder in
+  /// `setConfig`.
+  void _syncLabels() {
+    final ch = _channel;
+    if (ch == null || !_usesNativeIOSBar) return;
+    ch
+        .invokeOptionalMethod('setLabels', <String, Object>{
+          'placeholder': widget.placeholder,
+          'cancelText': widget.cancelText,
+        })
+        .catchError((Object _) {});
+  }
+
+  /// Sends a new layout direction to the native bar, e.g. after an in-app
+  /// language switch changed the ambient [Directionality] (#173).
+  void _syncLayoutDirectionIfNeeded() {
+    final ch = _channel;
+    if (ch == null) return;
+    final rtl = nativeRtl(context, widget.textDirection);
+    if (rtl == null || rtl == _lastRtl) return;
+    _lastRtl = rtl;
+    ch
+        .invokeOptionalMethod('setLayoutDirection', {'rtl': rtl})
+        .catchError((Object _) {});
+  }
+
+  /// [CNSearchBar.labelFontFamily], [CNSearchBar.labelFontSize] and
+  /// [CNSearchBar.labelFontWeight] for the native views; empty for none.
+  Map<String, Object> get _labelFont => <String, Object>{
+    'labelFontFamily': ?widget.labelFontFamily,
+    'labelFontSize': ?widget.labelFontSize,
+    'labelFontWeight': ?widget.labelFontWeight?.value,
+  };
+
+  /// Sends a new label font to the iOS bar (macOS takes it in `setConfig`).
+  void _syncLabelFontIfNeeded() {
+    final ch = _channel;
+    if (ch == null || !_usesNativeIOSBar) return;
+    final font = _labelFont;
+    if (mapEquals(font, _lastLabelFont)) return;
+    _lastLabelFont = font;
+    ch.invokeOptionalMethod('setLabelFont', font).catchError((Object _) {});
+  }
+
+  /// The clear button's colour: [CNSearchBar.clearButtonColor], else the
+  /// [CNSearchBar.clearIcon]'s colour; null leaves the view's default.
+  Color? get _clearButtonColor =>
+      widget.clearButtonColor ?? widget.clearIcon?.color;
 
   bool get _usesMacSearchField =>
       defaultTargetPlatform == TargetPlatform.macOS &&
@@ -478,11 +584,14 @@ class _CNSearchBarState extends State<CNSearchBar>
     'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
     'textColor': resolveColorToArgb(widget.textColor, context),
     'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
-    'clearButtonColor': resolveColorToArgb(widget.clearButtonColor, context),
+    'clearButtonColor': resolveColorToArgb(_clearButtonColor, context),
     'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
     'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
     'collapsedWidth': widget.collapsedWidth,
     'autofocus': widget.autofocus,
+    'labelFontFamily': widget.labelFontFamily,
+    'labelFontSize': widget.labelFontSize,
+    'labelFontWeight': widget.labelFontWeight?.value,
   };
 
   void _syncMacConfigIfNeeded() {
@@ -538,6 +647,8 @@ class _CNSearchBarState extends State<CNSearchBar>
     _channel = ch;
     ch.setMethodCallHandler(_onMethodCall);
     _lastIsDark = ThemeHelper.isDark(context);
+    _lastRtl = nativeRtl(context, widget.textDirection);
+    _lastLabelFont = _labelFont;
     if (_usesMacSearchField) _lastMacConfig = _macConfig(context);
     // Sends a setText made before the view existed.
     _controller._attach(ch);
@@ -660,7 +771,13 @@ class _CNSearchBarState extends State<CNSearchBar>
       return _buildNativeSearchBar(context);
     }
 
-    return _buildFlutterSearchBar(context);
+    // The bar drawn in Flutter follows the ambient Directionality, or the
+    // bar's own direction (#173).
+    final fallback = _buildFlutterSearchBar(context);
+    final direction = widget.textDirection;
+    return direction == null
+        ? fallback
+        : Directionality(textDirection: direction, child: fallback);
   }
 
   /// The creation parameters of the native views.
@@ -676,7 +793,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
     'textColor': resolveColorToArgb(widget.textColor, context),
     'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
-    'clearButtonColor': resolveColorToArgb(widget.clearButtonColor, context),
+    'clearButtonColor': resolveColorToArgb(_clearButtonColor, context),
     'shadow': widget.showShadow,
     'showCancelButton': widget.showCancelButton,
     'cancelText': widget.cancelText,
@@ -694,6 +811,8 @@ class _CNSearchBarState extends State<CNSearchBar>
     // [CNSearchBar.initialText], which it doesn't report (#170).
     'expanded': _isExpanded,
     if (_searchText.isNotEmpty) 'text': _searchText,
+    'rtl': ?nativeRtl(context, widget.textDirection),
+    ..._labelFont,
     'isDark': ThemeHelper.isDark(context),
   };
 
@@ -852,7 +971,13 @@ class _CNSearchBarState extends State<CNSearchBar>
         widget.placeholderColor ??
         CupertinoColors.placeholderText.resolveFrom(context);
     final effectiveClearButtonColor =
-        widget.clearButtonColor ?? effectivePlaceholderColor;
+        _clearButtonColor ?? effectivePlaceholderColor;
+    TextStyle labelStyle(Color color) => TextStyle(
+      color: color,
+      fontFamily: widget.labelFontFamily,
+      fontSize: widget.labelFontSize,
+      fontWeight: widget.labelFontWeight,
+    );
 
     // Caps the row at the parent's width; an unbounded parent (a horizontal
     // scroll view) gets the screen width.
@@ -909,7 +1034,9 @@ class _CNSearchBarState extends State<CNSearchBar>
                                   // 8 px gap.
                                   Expanded(
                                     child: Padding(
-                                      padding: const EdgeInsets.only(left: 8),
+                                      padding: const EdgeInsetsDirectional.only(
+                                        start: 8,
+                                      ),
                                       child: Opacity(
                                         opacity:
                                             (_expandAnimation.value - 0.3) /
@@ -918,12 +1045,10 @@ class _CNSearchBarState extends State<CNSearchBar>
                                           controller: _textController,
                                           focusNode: _focusNode,
                                           placeholder: widget.placeholder,
-                                          placeholderStyle: TextStyle(
-                                            color: effectivePlaceholderColor,
+                                          placeholderStyle: labelStyle(
+                                            effectivePlaceholderColor,
                                           ),
-                                          style: TextStyle(
-                                            color: effectiveTextColor,
-                                          ),
+                                          style: labelStyle(effectiveTextColor),
                                           decoration: null,
                                           padding: EdgeInsets.zero,
                                           onSubmitted: _onSubmitted,
@@ -977,7 +1102,7 @@ class _CNSearchBarState extends State<CNSearchBar>
                   onPressed: _onCancelTap,
                   child: Text(
                     widget.cancelText,
-                    style: TextStyle(color: effectiveTint),
+                    style: labelStyle(effectiveTint),
                   ),
                 ),
               ),

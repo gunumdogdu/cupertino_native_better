@@ -1,9 +1,10 @@
 ## 2.8.0
 
-> A `CNPopupMenuButton` mounted again (a header swapped for a loading placeholder and back) now shows in its first frame instead of a few frames late (#166). Its menu follows Flutter's `Directionality` (#167), can mark the checked item with your own symbol (#168), and the button can drop its content insets (#169). `CNSearchBar` has its Liquid Glass shadow on iOS 26 (#170), an `initialText` (#170), and its `placeholderColor` now reaches the placeholder (#171). `LiquidGlassConfig.appearance` keeps glass light or dark (#165).
+> A `CNPopupMenuButton` mounted again (a header swapped for a loading placeholder and back) now shows in its first frame instead of a few frames late (#166). Its menu follows Flutter's `Directionality` (#167), can mark the checked item with your own symbol (#168), and the button can drop its content insets (#169). `CNSearchBar` has its Liquid Glass shadow on iOS 26 (#170), an `initialText` (#170), its `placeholderColor` now reaches the placeholder (#171), and it follows `Directionality` and takes a label font (#173). `LiquidGlassConfig.appearance` keeps glass light or dark (#165).
 
 ### Behaviour changes
 - `CNPopupMenuButton` and `CNPopupMenuButton.icon` follow the ambient `Directionality`, as the tab bar, segmented control, alert and action sheet have since 2.5.0. A menu opened in a direction different from the app's language is mirrored. Set `textDirection` to choose.
+- `CNSearchBar` follows the ambient `Directionality` too. Set `textDirection` to choose.
 - On iOS 26 and later, `CNSearchBar`'s glass casts the soft shadow of the system's glass controls. `showShadow: false` brings back the flat capsule.
 
 ### Fixed — a popup menu button mounted again was blank for a few frames (#166)
@@ -35,17 +36,23 @@ The search bar's glass was clipped to its capsule in SwiftUI, and its platform v
 ### Added — search bar initial text and clear button colour (#170, #171)
 - `CNSearchBar.initialText` opens the bar with that text, on iOS, macOS and the bar drawn in Flutter. `onChanged` is not called for it.
 - `CNSearchBarController.setText` and `clear` made before the native view exists, right after building or while the view is removed under a modal, are now applied once it is created, instead of being dropped. Once the view exists, `setText` reports to `onChanged` as before. The controller now also drives the bar drawn in Flutter (iOS before 26).
-- `CNSearchBar.clearButtonColor` colours the clear button on its own. It defaults to `placeholderColor`, so today's look is unchanged.
+- `CNSearchBar.clearButtonColor` colours the clear button on its own. Without it, the clear button takes `clearIcon`'s colour, else `placeholderColor`, so today's look is unchanged.
 
 ### Fixed — `placeholderColor` ignored on the iOS 26 search bar (#171)
 The placeholder was the text field's plain title, which can't be coloured, and `placeholderColor` only reached the clear button. It is now the field's prompt, in `placeholderColor`, and still what VoiceOver reads. Also fixed on macOS: a custom fill-style clear icon with `placeholderColor` was drawn as a solid disc without its cross.
+
+### Added — search bar right to left and label font (#173)
+- `CNSearchBar.textDirection`. Null takes the ambient `Directionality`, and a change reaches a bar already on screen. So do new `placeholder` and `cancelText` values, so an in-app language switch updates the bar in place.
+- On iOS 26 the bar mirrors: magnifying glass on the right, clear button and Cancel on the left. The placeholder stays the field's own prompt, which keeps the left edge under a right-to-left environment whatever the alignment, so the field is laid out left to right and aligned trailing. That puts the placeholder, the caret of an empty field and the text on the right; Arabic, Latin and mixed text each keep their bidi order.
+- The bar drawn in Flutter mirrors too. On macOS, AppKit lays a search field out by the app's language, so `NSSearchField` keeps its magnifying glass on the left and its clear button on the right; the text and the placeholder align right.
+- `labelFontFamily`, `labelFontSize` and `labelFontWeight`, as on `CNPopupMenuButton` and `CNSegmentedControl`, set the text, the placeholder and Cancel. A pubspec font works, the size follows Dynamic Type on iOS, and a change applies in place. macOS uses `NSSearchField.font`.
 
 ### Added — light or dark glass (#165)
 `LiquidGlassConfig.appearance`, with `CNGlassAppearance.adaptive` (the default, follows the app's brightness), `.light` and `.dark`, keeps the glass's look whatever the app's theme is. `.liquidGlass(appearance:)` takes it too, and on macOS it sets the view's appearance.
 
 On iOS 26 (seen on 26.0 and 26.2) the system also switches glass under about 65 pt on its shorter side by itself, dark over near-black content and light over near-white content. No public API turns that off, so `.light` and `.dark` can't stop it there. Glass of 66 pt or more on its shorter side doesn't switch. On iOS 27 and macOS 27 the glass doesn't switch with the content, so `.light` and `.dark` hold over any content.
 
-Thanks to @Ashhad08 for all seven reports, each with a repro and its cause.
+Thanks to @Ashhad08 for all eight reports, each with a repro and its cause, and for PRs #172 and #174. The search bar's direction handling and font options follow PR #172.
 
 ### Checked
 These checks use the iPhone 17 Pro simulator on iOS 26.0, the iPhone 17 Pro Max simulator on iOS 26.2 and the iPhone 17 and iPhone 18 Pro simulators on iOS 27.0.
@@ -55,10 +62,11 @@ These checks use the iPhone 17 Pro simulator on iOS 26.0, the iPhone 17 Pro Max 
 - **#169:** with a line at the row's 16 pt padding, the default label ends 13 pt before it, the zero-padding label on it.
 - **#170:** the search bar matches a plain SwiftUI glass capsule without a clip within 1/255 per pixel on iOS 26.2 and 27.0, shadow included (up to 136/255 before).
 - **#171:** the placeholder takes `placeholderColor` on iOS 26.2 and 27.0, and in the bar drawn in Flutter.
+- **#173:** Arabic right to left beside English, collapsed and expanded, with and without text, the focused empty field, and a switch on screen, on iOS 26.2 and 27.0, and in the bar drawn in Flutter.
 - **#165:** glass bars of 56 and 72 pt with each appearance over white, grey, black and a dark gradient, in a light and a dark app, on iOS 26.0, 26.2 and 27.0 and on macOS.
 - **Build:** the iOS Swift compiles with Xcode 26.0's compiler against the iOS 26.0 SDK; the macOS Swift compiles against the macOS SDK; `flutter analyze lib` is clean with Flutter 3.38 and 3.44.
-- **Example app:** new screens for #165 to #171.
-- **Tests:** 46 new; 694 tests pass.
+- **Example app:** new screens for #165 to #171 and #173.
+- **Tests:** 66 new; 714 tests pass.
 
 ## 2.7.4
 
