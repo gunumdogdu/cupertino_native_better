@@ -136,6 +136,27 @@
 //     (#162: taps above and beside CNTabBar's capsule reach the list behind
 //     it; AUTO=true taps both, full and short bar, printing `CNB_TAP` and
 //     `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue165
+//     (#165: LiquidGlassContainer bars with appearance adaptive, light and
+//     dark over white, grey, black and a dark gradient; AUTO=true scrolls
+//     each under the bars in a light and a dark app, printing `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue166
+//     (#166: a CNPopupMenuButton mounted again after a loading placeholder;
+//     AUTO=true reloads six times, printing `CNB_RELOAD`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue167
+//     (#167: CNPopupMenuButton menus left to right and right to left)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue168
+//     (#168: checkedIcon on CNPopupMenuButton menus and CNPopover rows)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue169
+//     (#169: contentPadding on CNPopupMenuButton and CNButton; AUTO=true
+//     prints `CNB_SHOT 169`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue170
+//     (#170: CNSearchBar's glass shadow beside plain SwiftUI references,
+//     initialText and a setText made before the view exists; AUTO=true
+//     mounts and opens the bars, printing `CNB_STATE` and `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue171
+//     (#171: placeholderColor and clearButtonColor; FALLBACK=true for the
+//     bar drawn in Flutter; AUTO=true prints `CNB_SHOT`)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -220,6 +241,13 @@ import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue161_glass_button_page_route_builder_sheet_test.dart';
 import 'demos/issue162_tab_bar_touch_regions_test.dart';
+import 'demos/issue165_glass_light_appearance_test.dart';
+import 'demos/issue166_popup_menu_remount_test.dart';
+import 'demos/issue167_popup_menu_rtl_test.dart';
+import 'demos/issue168_popup_menu_checked_icon_test.dart';
+import 'demos/issue169_button_content_padding_test.dart';
+import 'demos/issue170_search_bar_glass_shadow_test.dart';
+import 'demos/issue171_search_bar_placeholder_color_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -388,6 +416,27 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue162') {
       return const Issue162TabBarTouchRegionsTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue165') {
+      return const Issue165GlassLightAppearanceTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue166') {
+      return const Issue166PopupMenuRemountTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue167') {
+      return const Issue167PopupMenuRtlTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue168') {
+      return const Issue168PopupMenuCheckedIconTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue169') {
+      return const Issue169ButtonContentPaddingTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue170') {
+      return const Issue170SearchBarGlassShadowTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue171') {
+      return const Issue171SearchBarPlaceholderColorTestPage(autoCycle: _auto);
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();

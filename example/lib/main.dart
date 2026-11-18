@@ -77,6 +77,13 @@ import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue161_glass_button_page_route_builder_sheet_test.dart';
 import 'demos/issue162_tab_bar_touch_regions_test.dart';
+import 'demos/issue165_glass_light_appearance_test.dart';
+import 'demos/issue166_popup_menu_remount_test.dart';
+import 'demos/issue167_popup_menu_rtl_test.dart';
+import 'demos/issue168_popup_menu_checked_icon_test.dart';
+import 'demos/issue169_button_content_padding_test.dart';
+import 'demos/issue170_search_bar_glass_shadow_test.dart';
+import 'demos/issue171_search_bar_placeholder_color_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -1447,6 +1454,125 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue162TabBarTouchRegionsTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#165: Light or dark glass over any content'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'circle.lefthalf.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue165GlassLightAppearanceTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#166: Popup menu button mounted again'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('arrow.clockwise', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue166PopupMenuRemountTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#167: Popup menu right to left'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('text.alignright', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue167PopupMenuRtlTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#168: Custom checked icon'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'checkmark.circle.fill',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue168PopupMenuCheckedIconTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#169: Button content padding'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'arrow.left.and.right',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue169ButtonContentPaddingTestPage(),
+                      ),
+                      CupertinoListTile(
+                        title: Text('#170: Search bar shadow and initial text'),
+                        leading: CNIcon(
+                          symbol: CNSymbol(
+                            'magnifyingglass',
+                            color: accentColor,
+                          ),
+                        ),
+                        trailing: CupertinoListTileChevron(),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            CupertinoPageRoute(
+                              builder: (_) =>
+                                  const Issue170SearchBarGlassShadowTestPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      CupertinoListTile(
+                        title: Text('#171: Search bar placeholder colour'),
+                        leading: CNIcon(
+                          symbol: CNSymbol(
+                            'character.cursor.ibeam',
+                            color: accentColor,
+                          ),
+                        ),
+                        trailing: CupertinoListTileChevron(),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            CupertinoPageRoute(
+                              builder: (_) =>
+                                  const Issue171SearchBarPlaceholderColorTestPage(),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
