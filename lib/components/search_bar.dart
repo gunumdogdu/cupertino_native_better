@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../style/sf_symbol.dart';
+import '../utils/layout_direction.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
 import '../utils/theme_helper.dart';
@@ -153,6 +154,10 @@ class CNSearchBar extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.clearButtonSemanticLabel,
     this.glassShadow = true,
+    this.textDirection,
+    this.labelFontFamily,
+    this.labelFontSize,
+    this.labelFontWeight,
   });
 
   /// Placeholder text shown when the search field is empty.
@@ -234,6 +239,27 @@ class CNSearchBar extends StatefulWidget {
   /// to false for the flat capsule of earlier versions.
   final bool glassShadow;
 
+  /// The direction the bar is laid out in: for [TextDirection.rtl] the
+  /// magnifying glass and the text start on the right, and the clear and
+  /// Cancel buttons are on the left. Null takes the ambient [Directionality]
+  /// (#173), so an app that switches to Arabic in Dart gets a mirrored bar
+  /// although the system language stays English.
+  final TextDirection? textDirection;
+
+  /// The font family of the search text, the placeholder and Cancel (#173):
+  /// a family declared under `fonts:` in pubspec.yaml or one the platform
+  /// knows. Null keeps the system font.
+  final String? labelFontFamily;
+
+  /// The size of the search text, the placeholder and Cancel, at the
+  /// default text size (#173). On iOS it grows and shrinks with Dynamic
+  /// Type, like the system's. Null keeps the system size.
+  final double? labelFontSize;
+
+  /// The weight of the search text, the placeholder and Cancel (#173). Null
+  /// keeps the regular weight.
+  final FontWeight? labelFontWeight;
+
   /// Whether the keyboard capitalizes what the user types. Defaults to none,
   /// as for the system search fields, so a query such as a username isn't
   /// capitalized.
@@ -301,6 +327,7 @@ class _CNSearchBarState extends State<CNSearchBar>
   // HaloContainmentMixin.
 
   bool? _lastIsDark;
+  bool? _lastRtl;
 
   /// The options last sent to the macOS search field, to send changes only.
   Map<String, Object?>? _lastMacConfig;
@@ -343,12 +370,27 @@ class _CNSearchBarState extends State<CNSearchBar>
     super.didChangeDependencies();
     _syncBrightnessIfNeeded();
     _syncMacConfigIfNeeded();
+    _syncLayoutDirectionIfNeeded();
   }
 
   @override
   void didUpdateWidget(covariant CNSearchBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncMacConfigIfNeeded();
+    _syncLayoutDirectionIfNeeded();
+  }
+
+  /// Sends a new direction to the native bar, e.g. after a language switch
+  /// changed the ambient [Directionality] (#173).
+  void _syncLayoutDirectionIfNeeded() {
+    final ch = _channel;
+    if (ch == null) return;
+    final rtl = nativeRtl(context, widget.textDirection);
+    if (rtl == null || rtl == _lastRtl) return;
+    _lastRtl = rtl;
+    ch
+        .invokeOptionalMethod('setLayoutDirection', {'rtl': rtl})
+        .catchError((_) {});
   }
 
   bool get _usesMacSearchField =>
@@ -367,6 +409,9 @@ class _CNSearchBarState extends State<CNSearchBar>
     'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
     'collapsedWidth': widget.collapsedWidth,
     'autofocus': widget.autofocus,
+    'labelFontFamily': widget.labelFontFamily,
+    'labelFontSize': widget.labelFontSize,
+    'labelFontWeight': widget.labelFontWeight?.value,
   };
 
   void _syncMacConfigIfNeeded() {
@@ -423,6 +468,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     _controller._attach(ch);
     ch.setMethodCallHandler(_onMethodCall);
     _lastIsDark = ThemeHelper.isDark(context);
+    _lastRtl = nativeRtl(context, widget.textDirection);
     if (_usesMacSearchField) _lastMacConfig = _macConfig(context);
     resetHaloContainment();
   }
@@ -522,7 +568,11 @@ class _CNSearchBarState extends State<CNSearchBar>
       return _buildNativeSearchBar(context);
     }
 
-    return _buildFlutterSearchBar(context);
+    final fallback = _buildFlutterSearchBar(context);
+    final direction = widget.textDirection;
+    return direction == null
+        ? fallback
+        : Directionality(textDirection: direction, child: fallback);
   }
 
   /// The creation parameters of the native views.
@@ -556,7 +606,25 @@ class _CNSearchBarState extends State<CNSearchBar>
     // has now, not the initial ones (#134).
     'expanded': _isExpanded,
     if (_searchText.isNotEmpty) 'text': _searchText,
+    'rtl': ?nativeRtl(context, widget.textDirection),
+    ..._labelFontParams,
     'isDark': ThemeHelper.isDark(context),
+  };
+
+  /// The fallback bar's text style in [color], with the label font options.
+  TextStyle _labelStyle(Color color) => TextStyle(
+    color: color,
+    fontFamily: widget.labelFontFamily,
+    fontSize: widget.labelFontSize,
+    fontWeight: widget.labelFontWeight,
+  );
+
+  /// [CNSearchBar.labelFontFamily], [CNSearchBar.labelFontSize] and
+  /// [CNSearchBar.labelFontWeight] for the native views.
+  Map<String, Object> get _labelFontParams => <String, Object>{
+    'labelFontFamily': ?widget.labelFontFamily,
+    'labelFontSize': ?widget.labelFontSize,
+    'labelFontWeight': ?widget.labelFontWeight?.value,
   };
 
   String _clearButtonLabel(BuildContext context) =>
@@ -652,8 +720,8 @@ class _CNSearchBarState extends State<CNSearchBar>
     if (hidden != null) return hidden;
 
     final platformView = UiKitView(
-      // The keyboard options, icon sizes and colour, glass shadow and
-      // clear-button name are set when the view is created; a change creates it again, with its text.
+      // The keyboard options, icon sizes and colour, glass shadow, label
+      // font and clear-button name are set when the view is created; a change creates it again, with its text.
       key: ValueKey<Object>(
         Object.hash(
           widget.textCapitalization,
@@ -663,6 +731,9 @@ class _CNSearchBarState extends State<CNSearchBar>
           widget.clearIcon?.size,
           widget.clearIcon?.color,
           widget.glassShadow,
+          widget.labelFontFamily,
+          widget.labelFontSize,
+          widget.labelFontWeight,
           _clearButtonLabel(context),
         ),
       ),
@@ -765,7 +836,9 @@ class _CNSearchBarState extends State<CNSearchBar>
                                   // 8 px gap.
                                   Expanded(
                                     child: Padding(
-                                      padding: const EdgeInsets.only(left: 8),
+                                      padding: const EdgeInsetsDirectional.only(
+                                        start: 8,
+                                      ),
                                       child: Opacity(
                                         opacity:
                                             (_expandAnimation.value - 0.3) /
@@ -774,11 +847,11 @@ class _CNSearchBarState extends State<CNSearchBar>
                                           controller: _textController,
                                           focusNode: _focusNode,
                                           placeholder: widget.placeholder,
-                                          placeholderStyle: TextStyle(
-                                            color: effectivePlaceholderColor,
+                                          placeholderStyle: _labelStyle(
+                                            effectivePlaceholderColor,
                                           ),
-                                          style: TextStyle(
-                                            color: effectiveTextColor,
+                                          style: _labelStyle(
+                                            effectiveTextColor,
                                           ),
                                           decoration: null,
                                           padding: EdgeInsets.zero,
@@ -835,7 +908,7 @@ class _CNSearchBarState extends State<CNSearchBar>
                   onPressed: _onCancelTap,
                   child: Text(
                     widget.cancelText,
-                    style: TextStyle(color: effectiveTint),
+                    style: _labelStyle(effectiveTint),
                   ),
                 ),
               ),

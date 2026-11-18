@@ -1,10 +1,11 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:flutter/cupertino.dart';
 
-/// Issues #170 and #171: `CNSearchBar` on iOS 26.
+/// Issues #170, #171 and #173: `CNSearchBar` on iOS 26.
 ///
 /// * https://github.com/gunumdogdu/cupertino_native_better/issues/170
 /// * https://github.com/gunumdogdu/cupertino_native_better/issues/171
+/// * https://github.com/gunumdogdu/cupertino_native_better/issues/173
 ///
 /// Reported by @Ashhad08.
 ///
@@ -30,6 +31,17 @@ import 'package:flutter/cupertino.dart';
 ///  * **Bug:** bar A's placeholder is grey.
 ///  * **Fixed:** bar A's placeholder is red. Bar B's clear button is green
 ///    (`clearIcon.color`), and bar A's clear button red once you type.
+///
+/// ### #173: right to left and label font
+///
+/// The bar took the system's direction, not Flutter's, and had no font
+/// options.
+///
+///  * **Bug:** bar E (inside `Directionality.rtl`) has the magnifying glass
+///    on the left and Cancel on the right; bar F is in the system font.
+///  * **Fixed:** bar E is mirrored: magnifying glass and placeholder on the
+///    right, Cancel on the left. Bar F's text, placeholder and Cancel are
+///    Avenir Next, 20 pt, bold.
 class Issue170171SearchBarTestPage extends StatefulWidget {
   const Issue170171SearchBarTestPage({super.key});
 
@@ -50,7 +62,7 @@ class _Issue170171SearchBarTestPageState
     return CupertinoPageScaffold(
       backgroundColor: CupertinoColors.white,
       navigationBar: const CupertinoNavigationBar(
-        middle: Text('#170 / #171 CNSearchBar'),
+        middle: Text('#170 / #171 / #173 CNSearchBar'),
       ),
       child: SafeArea(
         child: ListView(
@@ -98,6 +110,27 @@ class _Issue170171SearchBarTestPageState
             const Align(
               alignment: AlignmentDirectional.centerStart,
               child: CNSearchBar(placeholder: 'Search'),
+            ),
+            const SizedBox(height: 28),
+            const Text('E: Directionality.rtl, Arabic', style: label),
+            const SizedBox(height: 8),
+            const Directionality(
+              textDirection: TextDirection.rtl,
+              child: CNSearchBar(
+                expandable: false,
+                placeholder: 'ابحث عن سيارة',
+                cancelText: 'إلغاء',
+              ),
+            ),
+            const SizedBox(height: 28),
+            const Text('F: labelFont Avenir Next, 20, bold', style: label),
+            const SizedBox(height: 8),
+            const CNSearchBar(
+              expandable: false,
+              placeholder: 'Search cars',
+              labelFontFamily: 'Avenir Next',
+              labelFontSize: 20,
+              labelFontWeight: FontWeight.w700,
             ),
             const SizedBox(height: 28),
             const Text('onChanged log (newest first):', style: label),

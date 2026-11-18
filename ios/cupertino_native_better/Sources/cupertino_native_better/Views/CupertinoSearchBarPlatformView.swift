@@ -45,6 +45,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var searchIconSize: CGFloat? = nil
         var clearIconSize: CGFloat? = nil
         var clearButtonLabel = "Clear"
+        var rtl: Bool? = nil
+        var labelFont: CNSearchBarFont? = nil
 
         if let dict = args as? [String: Any] {
             if let v = dict["placeholder"] as? String { placeholder = v }
@@ -70,6 +72,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["searchIconSize"] as? NSNumber, v.doubleValue > 0 { searchIconSize = CGFloat(v.doubleValue) }
             if let v = dict["clearIconSize"] as? NSNumber, v.doubleValue > 0 { clearIconSize = CGFloat(v.doubleValue) }
             if let v = dict["clearButtonLabel"] as? String, !v.isEmpty { clearButtonLabel = v }
+            rtl = CNLayoutDirection.read(dict)
+            labelFont = CNSearchBarFont(dict)
         }
 
         let model = CNSearchBarModel(
@@ -85,6 +89,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             }
         )
         self.model = model
+        model.layoutDirection = CNSearchBarModel.direction(rtl)
         // ...and with its text, which Flutter already has (#134).
         if !text.isEmpty { model.setText(text, notify: false) }
 
@@ -110,6 +115,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             searchIconSize: searchIconSize,
             clearIconSize: clearIconSize,
             clearButtonLabel: clearButtonLabel,
+            labelFont: labelFont,
             keyboard: keyboard,
             onSubmitted: { text in
                 channelRef.invokeMethod("submitted", arguments: ["text": text])
@@ -127,6 +133,9 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         if #available(iOS 13.0, *) {
             container.overrideUserInterfaceStyle = isDark ? .dark : .light
         }
+        // Flutter's direction (#173): an app that picks Arabic in Dart gets
+        // a mirrored bar although the system language stays English.
+        CNLayoutDirection.apply(rtl, to: container)
 
         hostingController.view.backgroundColor = .clear
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -173,6 +182,11 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
                 result(nil)
             case "unfocus":
                 self.model.requestFocus(false)
+                result(nil)
+            case "setLayoutDirection":
+                let rtl = CNLayoutDirection.read(call.arguments as? [String: Any])
+                CNLayoutDirection.apply(rtl, to: self.container)
+                if let direction = CNSearchBarModel.direction(rtl) { self.model.layoutDirection = direction }
                 result(nil)
             case "setBrightness":
                 if let args = call.arguments as? [String: Any],
@@ -240,6 +254,8 @@ final class CNSearchBarModel: ObservableObject {
     @Published var searchText: String = ""
     /// Bumped on each `focus`/`unfocus` call; [wantsFocus] says which.
     @Published var focusToken: Int = 0
+    /// Flutter's text direction (#173); nil leaves the system's.
+    @Published var layoutDirection: LayoutDirection? = nil
     private(set) var wantsFocus = false
 
     let expandable: Bool
@@ -275,6 +291,12 @@ final class CNSearchBarModel: ObservableObject {
         if !notify { reportedText = text }
         searchText = text
         if notify { report(text) }
+    }
+
+    /// The SwiftUI direction for the `rtl` parameter.
+    static func direction(_ rtl: Bool?) -> LayoutDirection? {
+        guard let rtl else { return nil }
+        return rtl ? .rightToLeft : .leftToRight
     }
 
     func requestFocus(_ focused: Bool) {
@@ -332,16 +354,26 @@ struct CNSearchBarSwiftUI: View {
     let searchIconName: String
     let clearIconName: String
     let clearButtonLabel: String
+    /// `labelFontFamily` / `labelFontSize` / `labelFontWeight` (#173).
+    let customFont: CNSearchBarFont?
     let keyboard: CNSearchKeyboard
     /// The icons' sizes at the default text size; they follow Dynamic Type
     /// like the field's text (#134).
     @ScaledMetric(relativeTo: .body) private var searchIconSize: CGFloat = 16
     @ScaledMetric(relativeTo: .body) private var clearIconSize: CGFloat = 16
+    /// The text's size at the default text size; it follows Dynamic Type.
+    @ScaledMetric(relativeTo: .body) private var labelFontSize: CGFloat = 17
 
     let onSubmitted: (String) -> Void
     let onCancelTapped: () -> Void
 
     private var isExpanded: Bool { model.isExpanded }
+
+    /// The text, placeholder and Cancel font: nil keeps the system's body
+    /// font.
+    private var labelFont: Font? {
+        customFont?.font(size: labelFontSize)
+    }
     @FocusState private var isFocused: Bool
     @Namespace private var animation
 
@@ -366,6 +398,7 @@ struct CNSearchBarSwiftUI: View {
         searchIconSize: CGFloat?,
         clearIconSize: CGFloat?,
         clearButtonLabel: String,
+        labelFont: CNSearchBarFont?,
         keyboard: CNSearchKeyboard,
         onSubmitted: @escaping (String) -> Void,
         onCancelTapped: @escaping () -> Void
@@ -390,6 +423,8 @@ struct CNSearchBarSwiftUI: View {
         self._searchIconSize = ScaledMetric(wrappedValue: searchIconSize ?? 16, relativeTo: .body)
         self._clearIconSize = ScaledMetric(wrappedValue: clearIconSize ?? 16, relativeTo: .body)
         self.clearButtonLabel = clearButtonLabel
+        self.customFont = labelFont
+        self._labelFontSize = ScaledMetric(wrappedValue: labelFont?.size ?? 17, relativeTo: .body)
         self.keyboard = keyboard
         self.onSubmitted = onSubmitted
         self.onCancelTapped = onCancelTapped
@@ -406,18 +441,22 @@ struct CNSearchBarSwiftUI: View {
                     .matchedGeometryEffect(id: "searchIcon", in: animation)
 
                 if isExpanded {
-                    // Text field
-                    // The placeholder is the prompt, so it takes
-                    // placeholderColor (#171); a plain title string is always
-                    // drawn in the system's placeholder grey. The label stays
-                    // for VoiceOver.
-                    TextField(
-                        text: $model.searchText,
-                        prompt: Text(placeholder)
-                            .foregroundColor(placeholderColor ?? Color(uiColor: .placeholderText))
-                    ) {
-                        Text(placeholder)
-                    }
+                    // Text field. The placeholder is drawn by SwiftUI behind
+                    // it: the field's own placeholder is always the system
+                    // grey (#171) and follows the system's direction, not
+                    // Flutter's (#173). VoiceOver reads it as the label.
+                    ZStack(alignment: .leading) {
+                        if model.searchText.isEmpty {
+                            Text(placeholder)
+                                .font(labelFont)
+                                .foregroundColor(placeholderColor ?? Color(uiColor: .placeholderText))
+                                .lineLimit(1)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                        TextField("", text: $model.searchText)
+                        .accessibilityLabel(Text(placeholder))
+                        .font(labelFont)
                         .foregroundColor(textColor ?? .primary)
                         .focused($isFocused)
                         .submitLabel(.search)
@@ -427,7 +466,8 @@ struct CNSearchBarSwiftUI: View {
                         .onSubmit {
                             onSubmitted(model.searchText)
                         }
-                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
 
                     // Clear button
                     if !model.searchText.isEmpty {
@@ -478,11 +518,13 @@ struct CNSearchBarSwiftUI: View {
                     onCancelTapped()
                 }) {
                     Text(cancelText)
+                        .font(labelFont)
                         .foregroundColor(tint)
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
+        .modifier(CNSearchBarDirection(direction: model.layoutDirection))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
         .animation(.easeInOut(duration: 0.2), value: model.searchText.isEmpty)
         // Typing and every other change of the text reach Flutter once.
@@ -498,6 +540,47 @@ struct CNSearchBarSwiftUI: View {
             } else {
                 isFocused = false
             }
+        }
+    }
+}
+
+// MARK: - Font
+
+/// `CNSearchBar.labelFontFamily`, `labelFontSize` and `labelFontWeight`
+/// (#173). A family declared in pubspec.yaml is found by `CNFontResolver`.
+struct CNSearchBarFont {
+    let family: String?
+    let size: CGFloat?
+    let weight: UIFont.Weight?
+
+    init?(_ dict: [String: Any]) {
+        family = (dict["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        size = (dict["labelFontSize"] as? NSNumber).flatMap { $0.doubleValue > 0 ? CGFloat($0.doubleValue) : nil }
+        weight = CNFontResolver.weight(fromFlutterValue: (dict["labelFontWeight"] as? NSNumber)?.intValue)
+        if family == nil && size == nil && weight == nil { return nil }
+    }
+
+    /// The font at [size], already scaled for Dynamic Type.
+    func font(size: CGFloat) -> Font {
+        if let family, let font = CNFontResolver.font(family: family, size: size, weight: weight) {
+            return Font(font)
+        }
+        return Font(UIFont.systemFont(ofSize: size, weight: weight ?? .regular))
+    }
+}
+
+// MARK: - Direction
+
+/// Lays the bar out in Flutter's direction when it sent one (#173): the
+/// magnifying glass, text, clear button and Cancel mirror for right to left.
+private struct CNSearchBarDirection: ViewModifier {
+    let direction: LayoutDirection?
+
+    func body(content: Content) -> some View {
+        if let direction {
+            content.environment(\.layoutDirection, direction)
+        } else {
+            content
         }
     }
 }

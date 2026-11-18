@@ -128,8 +128,9 @@
 //     (#159: a glass button under a page pushed over it and popped off it;
 //     AUTO=true pushes and pops twice, printing `CNB_SHOT`)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue170
-//     (#170 and #171: CNSearchBar glass shadow, initialText, placeholder and
-//     clear-icon colours, on a white page; issue171 is the same screen)
+//     (#170, #171 and #173: CNSearchBar glass shadow, initialText,
+//     placeholder and clear-icon colours, RTL and label font, on a white
+//     page; issue171 and issue173 are the same screen)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue161
 //     --dart-define=OBSERVER=true
 //     (#161: glass buttons on a page in a PageRouteBuilder under a sheet
@@ -393,7 +394,7 @@ class _ProbeApp extends StatelessWidget {
     if (_probe == 'issue162') {
       return const Issue162TabBarTouchRegionsTestPage(autoCycle: _auto);
     }
-    if (_probe == 'issue170' || _probe == 'issue171') {
+    if (_probe == 'issue170' || _probe == 'issue171' || _probe == 'issue173') {
       return const Issue170171SearchBarTestPage();
     }
     if (_probe == 'issue151') {

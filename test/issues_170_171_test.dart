@@ -6,8 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The Dart side of #170 (glass shadow, initial text) and #171 (placeholder
-/// and clear-button colours) for CNSearchBar. The native-path tests run on a
+/// The Dart side of #170 (glass shadow, initial text), #171 (placeholder
+/// and clear-button colours) and #173 (right to left, label font) for
+/// CNSearchBar. The native-path tests run on a
 /// macOS 26+ host with the target platform set to iOS.
 void main() {
   final skip = !(Platform.isMacOS || Platform.isIOS);
@@ -135,9 +136,7 @@ void main() {
   });
 
   group('#171 CNSearchBar colours (native)', () {
-    testWidgets('sends the placeholder and clear-icon colours', (
-      tester,
-    ) async {
+    testWidgets('sends the placeholder and clear-icon colours', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       listen(tester);
       await tester.pumpWidget(
@@ -171,6 +170,89 @@ void main() {
       );
       await settle(tester);
       expect(creationParams().containsKey('clearIconColor'), isFalse);
+      await tearDownView(tester);
+    }, skip: skip);
+  });
+
+  group('#173 CNSearchBar native (iOS 26)', () {
+    testWidgets('sends rtl from Directionality, and a switch later', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester);
+      final dir = ValueNotifier(TextDirection.rtl);
+      await tester.pumpWidget(
+        ValueListenableBuilder<TextDirection>(
+          valueListenable: dir,
+          builder: (_, d, _) => app(
+            Directionality(
+              textDirection: d,
+              child: const CNSearchBar(expandable: false),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(creationParams()['rtl'], isTrue);
+      dir.value = TextDirection.ltr;
+      await settle(tester);
+      final switches = calls
+          .where((c) => c.method == 'setLayoutDirection')
+          .toList();
+      expect(switches, hasLength(1));
+      expect((switches.single.arguments as Map)['rtl'], isFalse);
+      await tearDownView(tester);
+    }, skip: skip);
+
+    testWidgets('textDirection overrides Directionality', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester);
+      await tester.pumpWidget(
+        app(
+          const Directionality(
+            textDirection: TextDirection.rtl,
+            child: CNSearchBar(
+              expandable: false,
+              textDirection: TextDirection.ltr,
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(creationParams()['rtl'], isFalse);
+      await tearDownView(tester);
+    }, skip: skip);
+
+    testWidgets('sends the label font', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester);
+      await tester.pumpWidget(
+        app(
+          const CNSearchBar(
+            expandable: false,
+            labelFontFamily: 'Nunito',
+            labelFontSize: 16,
+            labelFontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+      await settle(tester);
+      final params = creationParams();
+      expect(params['labelFontFamily'], 'Nunito');
+      expect(params['labelFontSize'], 16);
+      expect(params['labelFontWeight'], 600);
+      await tearDownView(tester);
+    }, skip: skip);
+
+    testWidgets('no label font keys when unset', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester);
+      await tester.pumpWidget(app(const CNSearchBar(expandable: false)));
+      await settle(tester);
+      final params = creationParams();
+      expect(params.containsKey('labelFontFamily'), isFalse);
+      expect(params.containsKey('labelFontSize'), isFalse);
+      expect(params.containsKey('labelFontWeight'), isFalse);
       await tearDownView(tester);
     }, skip: skip);
   });
@@ -225,6 +307,52 @@ void main() {
         find.byType(CupertinoTextField),
       );
       expect(field.placeholderStyle!.color, const Color(0xFFFF0000));
+      await tearDownView(tester);
+    });
+
+    testWidgets('#173 right to left: search icon on the right, clear on the '
+        'left', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await tester.pumpWidget(
+        app(
+          const CNSearchBar(
+            expandable: false,
+            showCancelButton: false,
+            initialText: 'a',
+            textDirection: TextDirection.rtl,
+          ),
+        ),
+      );
+      await tester.pump();
+      final search = tester.getCenter(find.byIcon(CupertinoIcons.search)).dx;
+      final clear = tester
+          .getCenter(find.byIcon(CupertinoIcons.xmark_circle_fill))
+          .dx;
+      expect(search, greaterThan(clear));
+      await tearDownView(tester);
+    });
+
+    testWidgets('#173 the label font reaches the field', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await tester.pumpWidget(
+        app(
+          const CNSearchBar(
+            expandable: false,
+            labelFontFamily: 'Nunito',
+            labelFontSize: 16,
+            labelFontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+      await tester.pump();
+      final field = tester.widget<CupertinoTextField>(
+        find.byType(CupertinoTextField),
+      );
+      for (final style in [field.style!, field.placeholderStyle!]) {
+        expect(style.fontFamily, 'Nunito');
+        expect(style.fontSize, 16);
+        expect(style.fontWeight, FontWeight.w600);
+      }
       await tearDownView(tester);
     });
   });

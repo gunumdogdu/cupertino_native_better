@@ -1372,7 +1372,9 @@ class HomePage extends StatelessWidget {
                   },
                 ),
                 CupertinoListTile(
-                  title: Text('#170 / #171: Search bar shadow, text, colours'),
+                  title: Text(
+                    '#170 / #171 / #173: Search bar shadow, text, RTL',
+                  ),
                   leading: CNIcon(
                     symbol: CNSymbol('magnifyingglass', color: accentColor),
                   ),

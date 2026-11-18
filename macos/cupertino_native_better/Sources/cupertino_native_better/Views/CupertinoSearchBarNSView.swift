@@ -28,6 +28,10 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
   /// `CNSearchBar.clearIcon.color`; the clear button otherwise takes
   /// [placeholderColor] (#171).
   private var clearIconColor: NSColor?
+  /// `labelFontFamily` / `labelFontSize` / `labelFontWeight` (#173).
+  private var labelFontFamily: String?
+  private var labelFontSize: CGFloat?
+  private var labelFontWeight: Int?
   private var searchIconName: String
   private var clearIconName: String
   /// The text Flutter last heard about, so each change is reported once.
@@ -110,6 +114,8 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
       searchField.searchMenuTemplate = Self.recentsMenuTemplate()
     }
     searchField.onFocus = { [weak self] in self?.fieldDidFocus() }
+    readLabelFont((args as? [String: Any]) ?? [:])
+    searchField.font = fieldFont()
     applyPlaceholder()
     applyIcons()
     addSubview(searchField)
@@ -122,6 +128,9 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     collapsedButton.toolTip = placeholder
     applyCollapsedButtonStyle()
     addSubview(collapsedButton)
+    // Flutter's direction (#173): the field and its icons mirror for right
+    // to left.
+    CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: self)
 
     applyExpandedState(animated: false)
     if !text.isEmpty { setText(text, notify: false) }
@@ -165,6 +174,9 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
       case "setConfig":
         self.applyConfig(args ?? [:])
         result(nil)
+      case "setLayoutDirection":
+        CNLayoutDirection.apply(CNLayoutDirection.read(args), to: self)
+        result(nil)
       case "setInteractive":
         let interactive = (args?["interactive"] as? NSNumber)?.boolValue ?? true
         self.searchField.isEnabled = interactive
@@ -191,7 +203,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     let controlSize = Self.controlSize(fitting: size.height)
     if searchField.controlSize != controlSize {
       searchField.controlSize = controlSize
-      searchField.font = NSFont.systemFont(ofSize: NSFont.systemFontSize(for: controlSize))
+      searchField.font = fieldFont()
       // A new control size brings new default button images.
       applyPlaceholder()
       applyIcons()
@@ -419,9 +431,32 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
       needsLayout = true
     }
     if let v = dict["autofocus"] as? NSNumber { autofocus = v.boolValue }
+    if readLabelFont(dict) { searchField.font = fieldFont() }
     applyPlaceholder()
     applyIcons()
     applyCollapsedButtonStyle()
+  }
+
+  /// Reads the label font options in [dict]; true when it had any.
+  @discardableResult
+  private func readLabelFont(_ dict: [String: Any]) -> Bool {
+    guard dict.keys.contains("labelFontFamily") || dict.keys.contains("labelFontSize")
+      || dict.keys.contains("labelFontWeight") else { return false }
+    labelFontFamily = (dict["labelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+    labelFontSize = (dict["labelFontSize"] as? NSNumber).flatMap { $0.doubleValue > 0 ? CGFloat($0.doubleValue) : nil }
+    labelFontWeight = (dict["labelFontWeight"] as? NSNumber)?.intValue
+    return true
+  }
+
+  /// The field's font: the label font options, else the system font at the
+  /// control size's size.
+  private func fieldFont() -> NSFont {
+    let size = labelFontSize ?? NSFont.systemFontSize(for: searchField.controlSize)
+    let weight = CNFontResolver.weight(fromFlutterValue: labelFontWeight)
+    if let family = labelFontFamily, let font = CNFontResolver.font(family: family, size: size, weight: weight) {
+      return font
+    }
+    return NSFont.systemFont(ofSize: size, weight: weight ?? .regular)
   }
 
   private func applyPlaceholder() {
