@@ -844,8 +844,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final ratio = _pixelRatio;
     final icons = <PopupMenuIconKey>{
       ?_buttonIconKey,
-      for (final e in walkPopupMenuEntries(widget.items))
-        ?popupMenuIconKey(e),
+      for (final e in walkPopupMenuEntries(widget.items)) ?popupMenuIconKey(e),
     };
     final assets = <String>{
       if (widget.buttonImageAsset?.assetPath.isNotEmpty ?? false)

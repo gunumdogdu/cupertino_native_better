@@ -222,8 +222,11 @@ class _ReusableDarwinPlatformViewState
     }
     _controller = kept.controller;
     _focus = kept.focus..target = _requestFocus;
-    _focusNode = FocusNode(debugLabel: 'ReusableDarwinPlatformView(id: '
-        '${kept.controller.id})');
+    _focusNode = FocusNode(
+      debugLabel:
+          'ReusableDarwinPlatformView(id: '
+          '${kept.controller.id})',
+    );
     kept.controller.setLayoutDirection(_layoutDirection!);
     widget.onPlatformViewReused?.call(kept.controller.id, kept.memo);
   }
@@ -304,9 +307,10 @@ class _ReusableDarwinPlatformViewState
   void _onFocusChange(bool isFocused, DarwinPlatformViewController c) {
     if (!isFocused) return;
     SystemChannels.textInput
-        .invokeMethod<void>('TextInput.setPlatformViewClient', <String, dynamic>{
-          'platformViewId': c.id,
-        })
+        .invokeMethod<void>(
+          'TextInput.setPlatformViewClient',
+          <String, dynamic>{'platformViewId': c.id},
+        )
         .catchError((Object _) {});
   }
 
