@@ -127,6 +127,7 @@ class CNSearchBar extends StatefulWidget {
   const CNSearchBar({
     super.key,
     this.placeholder = 'Search',
+    this.initialText,
     this.onChanged,
     this.onSubmitted,
     this.onCancelTap,
@@ -151,10 +152,20 @@ class CNSearchBar extends StatefulWidget {
     this.autocorrect = true,
     this.keyboardType = TextInputType.text,
     this.clearButtonSemanticLabel,
+    this.glassShadow = true,
   });
 
   /// Placeholder text shown when the search field is empty.
   final String placeholder;
+
+  /// The text the field starts with, e.g. the query the user searched for
+  /// last when they come back to a search screen (#170).
+  ///
+  /// Only read when the bar is first built; use the [controller]'s
+  /// `setText` to change the text later. It is not reported through
+  /// [onChanged]. An [expandable] bar that starts collapsed shows it once it
+  /// opens.
+  final String? initialText;
 
   /// Called when the search text changes.
   final ValueChanged<String>? onChanged;
@@ -189,7 +200,8 @@ class CNSearchBar extends StatefulWidget {
   /// Color for the search text.
   final Color? textColor;
 
-  /// Color for the placeholder text.
+  /// Color for the placeholder text, and for the clear button unless
+  /// [clearIcon] has a [CNSymbol.color].
   final Color? placeholderColor;
 
   /// Whether to show the cancel button when expanded.
@@ -212,8 +224,15 @@ class CNSearchBar extends StatefulWidget {
   final CNSymbol? searchIcon;
 
   /// Custom clear icon (defaults to xmark.circle.fill SF Symbol), sized like
-  /// [searchIcon].
+  /// [searchIcon]. Its [CNSymbol.color] colours the clear button; without
+  /// one the button takes [placeholderColor] (#171).
   final CNSymbol? clearIcon;
+
+  /// iOS 26+: whether the Liquid Glass capsule keeps the soft shadow it
+  /// draws around itself, as the system's glass controls do (#170). The
+  /// shadow is what makes the bar stand out on a light background. Set it
+  /// to false for the flat capsule of earlier versions.
+  final bool glassShadow;
 
   /// Whether the keyboard capitalizes what the user types. Defaults to none,
   /// as for the system search fields, so a query such as a username isn't
@@ -293,6 +312,9 @@ class _CNSearchBarState extends State<CNSearchBar>
   void initState() {
     super.initState();
     _isExpanded = widget.initiallyExpanded || !widget.expandable;
+    // Seeded before the listener is added, so it is not reported as a
+    // change; the native views receive it as their `text` (#170).
+    _searchText = widget.initialText ?? '';
 
     _animationController = AnimationController(
       vsync: this,
@@ -305,7 +327,7 @@ class _CNSearchBarState extends State<CNSearchBar>
       reverseCurve: Curves.easeInCubic,
     );
 
-    _textController = TextEditingController();
+    _textController = TextEditingController(text: _searchText);
     _textController.addListener(_onTextChanged);
 
     _focusNode = FocusNode();
@@ -340,6 +362,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
     'textColor': resolveColorToArgb(widget.textColor, context),
     'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
+    'clearIconColor': resolveColorToArgb(widget.clearIcon?.color, context),
     'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
     'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
     'collapsedWidth': widget.collapsedWidth,
@@ -515,6 +538,9 @@ class _CNSearchBarState extends State<CNSearchBar>
     'backgroundColor': resolveColorToArgb(widget.backgroundColor, context),
     'textColor': resolveColorToArgb(widget.textColor, context),
     'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
+    if (widget.clearIcon?.color != null)
+      'clearIconColor': resolveColorToArgb(widget.clearIcon!.color, context),
+    'glassShadow': widget.glassShadow,
     'showCancelButton': widget.showCancelButton,
     'cancelText': widget.cancelText,
     'autofocus': widget.autofocus,
@@ -626,8 +652,8 @@ class _CNSearchBarState extends State<CNSearchBar>
     if (hidden != null) return hidden;
 
     final platformView = UiKitView(
-      // The keyboard options, icon sizes and clear-button name are set when
-      // the view is created; a change creates it again, with its text.
+      // The keyboard options, icon sizes and colour, glass shadow and
+      // clear-button name are set when the view is created; a change creates it again, with its text.
       key: ValueKey<Object>(
         Object.hash(
           widget.textCapitalization,
@@ -635,6 +661,8 @@ class _CNSearchBarState extends State<CNSearchBar>
           widget.keyboardType,
           widget.searchIcon?.size,
           widget.clearIcon?.size,
+          widget.clearIcon?.color,
+          widget.glassShadow,
           _clearButtonLabel(context),
         ),
       ),
@@ -661,10 +689,14 @@ class _CNSearchBarState extends State<CNSearchBar>
             child: child,
           );
         },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(widget.expandedHeight / 2),
-          child: platformView,
-        ),
+        // The glass's shadow is drawn outside the capsule, so the view is
+        // only clipped to it when the shadow is off (#170).
+        child: widget.glassShadow
+            ? platformView
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(widget.expandedHeight / 2),
+                child: platformView,
+              ),
       ),
     );
   }
@@ -771,7 +803,9 @@ class _CNSearchBarState extends State<CNSearchBar>
                                         child: Icon(
                                           CupertinoIcons.xmark_circle_fill,
                                           size: 18,
-                                          color: effectivePlaceholderColor,
+                                          color:
+                                              widget.clearIcon?.color ??
+                                              effectivePlaceholderColor,
                                         ),
                                       ),
                                     ),

@@ -73,6 +73,7 @@ import 'demos/issue144_alert_font_rtl_test.dart';
 import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/issue149_glass_button_under_sheet_test.dart';
+import 'demos/issue170_171_search_bar_shadow_text_colors_test.dart';
 import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue161_glass_button_page_route_builder_sheet_test.dart';
@@ -1366,6 +1367,20 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue147PopupLabelChangeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#170 / #171: Search bar shadow, text, colours'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('magnifyingglass', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue170171SearchBarTestPage(),
                       ),
                     );
                   },

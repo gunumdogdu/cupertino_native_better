@@ -31,6 +31,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var backgroundColor: UIColor? = nil
         var textColor: UIColor? = nil
         var placeholderColor: UIColor? = nil
+        var clearIconColor: UIColor? = nil
+        var glassShadow = true
         var showCancelButton = true
         var cancelText = "Cancel"
         var autofocus = false
@@ -54,6 +56,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["backgroundColor"] as? NSNumber { backgroundColor = ImageUtils.colorFromARGB(v.intValue) }
             if let v = dict["textColor"] as? NSNumber { textColor = ImageUtils.colorFromARGB(v.intValue) }
             if let v = dict["placeholderColor"] as? NSNumber { placeholderColor = ImageUtils.colorFromARGB(v.intValue) }
+            if let v = dict["clearIconColor"] as? NSNumber { clearIconColor = ImageUtils.colorFromARGB(v.intValue) }
+            if let v = dict["glassShadow"] as? Bool { glassShadow = v }
             if let v = dict["showCancelButton"] as? Bool { showCancelButton = v }
             if let v = dict["cancelText"] as? String { cancelText = v }
             if let v = dict["autofocus"] as? Bool { autofocus = v }
@@ -96,6 +100,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             backgroundColor: backgroundColor.map { Color(uiColor: $0) },
             textColor: textColor.map { Color(uiColor: $0) },
             placeholderColor: placeholderColor.map { Color(uiColor: $0) },
+            clearIconColor: clearIconColor.map { Color(uiColor: $0) },
+            glassShadow: glassShadow,
             showCancelButton: showCancelButton,
             cancelText: cancelText,
             autofocus: autofocus,
@@ -314,6 +320,12 @@ struct CNSearchBarSwiftUI: View {
     let backgroundColor: Color?
     let textColor: Color?
     let placeholderColor: Color?
+    /// The clear button's colour (`CNSearchBar.clearIcon.color`); defaults
+    /// to [placeholderColor], then the system's secondary colour (#171).
+    let clearIconColor: Color?
+    /// Whether the iOS 26 glass keeps the shadow it draws outside the
+    /// capsule (#170).
+    let glassShadow: Bool
     let showCancelButton: Bool
     let cancelText: String
     let autofocus: Bool
@@ -344,6 +356,8 @@ struct CNSearchBarSwiftUI: View {
         backgroundColor: Color?,
         textColor: Color?,
         placeholderColor: Color?,
+        clearIconColor: Color?,
+        glassShadow: Bool,
         showCancelButton: Bool,
         cancelText: String,
         autofocus: Bool,
@@ -366,6 +380,8 @@ struct CNSearchBarSwiftUI: View {
         self.backgroundColor = backgroundColor
         self.textColor = textColor
         self.placeholderColor = placeholderColor
+        self.clearIconColor = clearIconColor
+        self.glassShadow = glassShadow
         self.showCancelButton = showCancelButton
         self.cancelText = cancelText
         self.autofocus = autofocus
@@ -391,7 +407,17 @@ struct CNSearchBarSwiftUI: View {
 
                 if isExpanded {
                     // Text field
-                    TextField(placeholder, text: $model.searchText)
+                    // The placeholder is the prompt, so it takes
+                    // placeholderColor (#171); a plain title string is always
+                    // drawn in the system's placeholder grey. The label stays
+                    // for VoiceOver.
+                    TextField(
+                        text: $model.searchText,
+                        prompt: Text(placeholder)
+                            .foregroundColor(placeholderColor ?? Color(uiColor: .placeholderText))
+                    ) {
+                        Text(placeholder)
+                    }
                         .foregroundColor(textColor ?? .primary)
                         .focused($isFocused)
                         .submitLabel(.search)
@@ -410,7 +436,7 @@ struct CNSearchBarSwiftUI: View {
                         }) {
                             Image(systemName: clearIconName)
                                 .font(.system(size: clearIconSize))
-                                .foregroundColor(placeholderColor ?? .secondary)
+                                .foregroundColor(clearIconColor ?? placeholderColor ?? .secondary)
                         }
                         // Without a label VoiceOver reads the symbol's name,
                         // "Close" (#134).
@@ -422,8 +448,10 @@ struct CNSearchBarSwiftUI: View {
             .padding(.horizontal, 12)
             .frame(height: expandedHeight)
             .frame(maxWidth: isExpanded ? .infinity : collapsedWidth)
-            .background(glassBackground)
-            .clipShape(Capsule())
+            .modifier(CNSearchBarBackground(
+                backgroundColor: backgroundColor,
+                glassShadow: glassShadow
+            ))
             .contentShape(Capsule())
             .onTapGesture {
                 if !isExpanded && expandable {
@@ -472,20 +500,33 @@ struct CNSearchBarSwiftUI: View {
             }
         }
     }
+}
 
-    @ViewBuilder
-    private var glassBackground: some View {
+// MARK: - Background
+
+/// The bar's capsule: Liquid Glass on iOS 26+, a fill before.
+///
+/// iOS 26 glass draws a soft shadow outside its shape, which is what lets
+/// a light capsule stand out on a light page. Clipping the bar to the
+/// capsule cut it off (#170), so the glass is applied to the bar itself and
+/// only clipped when [glassShadow] is false.
+private struct CNSearchBarBackground: ViewModifier {
+    let backgroundColor: Color?
+    let glassShadow: Bool
+
+    func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            // Use native glass effect on iOS 26+
-            Color.clear
-                .glassEffect(.regular, in: .capsule)
-        } else {
-            // Fallback to blur effect
-            if let bg = backgroundColor {
-                bg
+            if glassShadow {
+                content.glassEffect(.regular, in: .capsule)
             } else {
-                Color(.systemGray6)
+                content
+                    .background(Color.clear.glassEffect(.regular, in: .capsule))
+                    .clipShape(Capsule())
             }
+        } else {
+            content
+                .background(backgroundColor ?? Color(.systemGray6))
+                .clipShape(Capsule())
         }
     }
 }

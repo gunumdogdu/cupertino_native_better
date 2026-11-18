@@ -25,6 +25,9 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
   private var tint: NSColor?
   private var placeholder: String
   private var placeholderColor: NSColor?
+  /// `CNSearchBar.clearIcon.color`; the clear button otherwise takes
+  /// [placeholderColor] (#171).
+  private var clearIconColor: NSColor?
   private var searchIconName: String
   private var clearIconName: String
   /// The text Flutter last heard about, so each change is reported once.
@@ -42,6 +45,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     var backgroundColor: NSColor? = nil
     var textColor: NSColor? = nil
     var placeholderColor: NSColor? = nil
+    var clearIconColor: NSColor? = nil
     var autofocus = false
     var searchIconName = "magnifyingglass"
     var clearIconName = "xmark.circle.fill"
@@ -59,6 +63,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
       if let v = dict["backgroundColor"] as? NSNumber { backgroundColor = Self.colorFromARGB(v.intValue) }
       if let v = dict["textColor"] as? NSNumber { textColor = Self.colorFromARGB(v.intValue) }
       if let v = dict["placeholderColor"] as? NSNumber { placeholderColor = Self.colorFromARGB(v.intValue) }
+      if let v = dict["clearIconColor"] as? NSNumber { clearIconColor = Self.colorFromARGB(v.intValue) }
       if let v = dict["autofocus"] as? NSNumber { autofocus = v.boolValue }
       if let v = dict["searchIconName"] as? String, !v.isEmpty { searchIconName = v }
       if let v = dict["clearIconName"] as? String, !v.isEmpty { clearIconName = v }
@@ -77,6 +82,7 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     self.tint = tint
     self.placeholder = placeholder
     self.placeholderColor = placeholderColor
+    self.clearIconColor = clearIconColor
     self.searchIconName = searchIconName
     self.clearIconName = clearIconName
 
@@ -391,6 +397,9 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
     if dict.keys.contains("placeholderColor") {
       placeholderColor = (dict["placeholderColor"] as? NSNumber).map { Self.colorFromARGB($0.intValue) }
     }
+    if dict.keys.contains("clearIconColor") {
+      clearIconColor = (dict["clearIconColor"] as? NSNumber).map { Self.colorFromARGB($0.intValue) }
+    }
     if dict.keys.contains("textColor") {
       searchField.textColor = (dict["textColor"] as? NSNumber).map { Self.colorFromARGB($0.intValue) } ?? .controlTextColor
     }
@@ -446,8 +455,8 @@ class CupertinoSearchBarNSView: NSView, NSSearchFieldDelegate {
       cell.searchButtonCell?.alternateImage = image
     }
     cell.resetCancelButtonCell()
-    if clearIconName != "xmark.circle.fill" {
-      cell.cancelButtonCell?.image = Self.symbol(clearIconName, color: placeholderColor)
+    if clearIconName != "xmark.circle.fill" || clearIconColor != nil {
+      cell.cancelButtonCell?.image = Self.symbol(clearIconName, color: clearIconColor ?? placeholderColor)
     }
     searchField.needsDisplay = true
   }
