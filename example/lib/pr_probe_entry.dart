@@ -127,6 +127,10 @@
 //     --dart-define=OBSERVER=true
 //     (#159: a glass button under a page pushed over it and popped off it;
 //     AUTO=true pushes and pops twice, printing `CNB_SHOT`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue167
+//     (#167 to #169: CNPopupMenuButton RTL menu, checkedIcon and
+//     contentPadding; issue168 and issue169 are the same screen; open the
+//     menus by hand)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue161
 //     --dart-define=OBSERVER=true
 //     (#161: glass buttons on a page in a PageRouteBuilder under a sheet
@@ -220,6 +224,7 @@ import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue161_glass_button_page_route_builder_sheet_test.dart';
 import 'demos/issue162_tab_bar_touch_regions_test.dart';
+import 'demos/issue167_169_popup_rtl_checked_padding_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -388,6 +393,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue162') {
       return const Issue162TabBarTouchRegionsTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue167' || _probe == 'issue168' || _probe == 'issue169') {
+      return const Issue167169PopupMenuTestPage();
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();

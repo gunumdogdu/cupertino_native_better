@@ -63,6 +63,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   /// The label colour on light and on dark glass (#153).
   private var labelColorLight: UIColor? = nil
   private var labelColorDark: UIColor? = nil
+  /// `CNPopupMenuButton.contentPadding` (#169); nil keeps the style's own
+  /// insets.
+  private var contentInsets: NSDirectionalEdgeInsets? = nil
+  /// `CNPopupMenuButton.checkedIcon` (#168); nil keeps the system checkmark.
+  private var checkedImage: UIImage? = nil
   /// Changes held until the view has a given width: a new title with the
   /// width it needs, or the first appearance at the measured width (#147).
   private var widthActions: [(id: Int, width: CGFloat, run: () -> Void)] = []
@@ -95,9 +100,17 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     var buttonIconPalette: [NSNumber] = []
     var buttonCustomIconBytes: Data? = nil
     var hiddenUntilSized = false
+    var rtl: Bool? = nil
 
     if let dict = args as? [String: Any] {
       hiddenUntilSized = (dict["hiddenUntilSized"] as? NSNumber)?.boolValue ?? false
+      rtl = CNLayoutDirection.read(dict)
+      if let p = dict["contentPadding"] as? [String: Any] {
+        func v(_ key: String) -> CGFloat { CGFloat((p[key] as? NSNumber)?.doubleValue ?? 0) }
+        self.contentInsets = NSDirectionalEdgeInsets(
+          top: v("top"), leading: v("leading"), bottom: v("bottom"), trailing: v("trailing"))
+      }
+      self.checkedImage = PopupMenuBuilder.checkedImage(dict["checkedIcon"] as? [String: Any])
       if let t = dict["buttonTitle"] as? String { title = t }
       switch dict["imagePlacement"] as? String {
       case "trailing": self.imagePlacement = .trailing
@@ -172,6 +185,10 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     button.onMenuDidHide = { [weak self] in self?.channel.invokeMethod("menuClosed", arguments: nil) }
 
     container.backgroundColor = .clear
+    // Flutter's direction (#167): the button and, from its traits, the menu
+    // it opens lay out right to left in an app that picks Arabic in Dart.
+    CNLayoutDirection.apply(rtl, to: container)
+    button.menuRtl = rtl
     container.onLayout = { [weak self] in self?.runDueWidthActions() }
     // Not measured yet: shown by `reveal` once Flutter has given the view
     // the measured width, so the first frame isn't at a placeholder width
@@ -266,6 +283,11 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
+      case "setLayoutDirection":
+        let rtl = CNLayoutDirection.read(call.arguments as? [String: Any])
+        CNLayoutDirection.apply(rtl, to: self.container)
+        if rtl != nil { self.button.menuRtl = rtl }
+        result(nil)
       case "setSemanticLabel":
         let label = (call.arguments as? [String: Any])?["label"] as? String
         self.button.accessibilityLabel = (label?.isEmpty ?? true) ? nil : label
@@ -560,7 +582,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   }
 
   private func buildMenuItems(level: PopupMenuLevel) -> [UIMenuElement] {
-    PopupMenuBuilder.elements(level: level, iconScale: iconScale) { [weak self] path in
+    PopupMenuBuilder.elements(level: level, iconScale: iconScale, checkedImage: checkedImage) { [weak self] path in
       // `index` is the top-level entry, as before; `path` the full path.
       self?.channel.invokeMethod("itemSelected", arguments: ["index": path[0], "path": path])
     }
@@ -794,6 +816,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
   private func applyContentOptions(to cfg: inout UIButton.Configuration) {
     cfg.imagePlacement = imagePlacement
     if let padding = imagePadding { cfg.imagePadding = padding }
+    if let insets = contentInsets { cfg.contentInsets = insets }
     guard labelFontFamily != nil || labelFontSize != nil || labelFontWeight != nil || labelColor != nil ||
       labelColorLight != nil || labelColorDark != nil else { return }
     let family = labelFontFamily, size = labelFontSize, color = labelColor
@@ -833,7 +856,12 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     } else {
       button.setTitle(title, for: .normal)
       button.setImage(image, for: .normal)
-      if iconOnly {
+      if let insets = contentInsets {
+        let rtl = button.effectiveUserInterfaceLayoutDirection == .rightToLeft
+        button.contentEdgeInsets = UIEdgeInsets(
+          top: insets.top, left: rtl ? insets.trailing : insets.leading,
+          bottom: insets.bottom, right: rtl ? insets.leading : insets.trailing)
+      } else if iconOnly {
         button.contentEdgeInsets = UIEdgeInsets(top: 2, left: 2, bottom: 2, right: 2)
       }
     }
@@ -880,6 +908,28 @@ final class CNPopupMenuUIButton: UIButton {
   var onMenuDidHide: (() -> Void)?
   var keepsSourceVisible = false
   private var standIn: UIView?
+  /// Flutter's direction for the menu (#167); nil leaves the system's.
+  var menuRtl: Bool?
+  /// Puts back the appearance changed for an open menu.
+  private var restoreMenuDirection: (() -> Void)?
+
+  /// The menu is drawn by UIKit in views of its own, outside the button,
+  /// which take the app's language, not the button's direction. While this
+  /// menu is up, new views are created in Flutter's direction (#167).
+  override func contextMenuInteraction(
+    _ interaction: UIContextMenuInteraction,
+    configurationForMenuAtLocation location: CGPoint
+  ) -> UIContextMenuConfiguration? {
+    restoreMenuDirection?()
+    restoreMenuDirection = nil
+    if let rtl = menuRtl {
+      let proxy = UIView.appearance()
+      let previous = proxy.semanticContentAttribute
+      proxy.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
+      restoreMenuDirection = { proxy.semanticContentAttribute = previous }
+    }
+    return super.contextMenuInteraction(interaction, configurationForMenuAtLocation: location)
+  }
 
   private func standInPreview() -> UITargetedPreview? {
     guard keepsSourceVisible, let superview, window != nil else { return nil }
@@ -929,6 +979,8 @@ final class CNPopupMenuUIButton: UIButton {
   ) {
     super.contextMenuInteraction(interaction, willEndFor: configuration, animator: animator)
     let done = { [weak self] in
+      self?.restoreMenuDirection?()
+      self?.restoreMenuDirection = nil
       self?.standIn?.removeFromSuperview()
       self?.standIn = nil
       self?.onMenuDidHide?()

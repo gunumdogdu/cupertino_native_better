@@ -8,6 +8,7 @@ import '../style/button_style.dart';
 import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/layout_direction.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/popup_menu_encoder.dart';
 import '../utils/popup_menu_fallback_sheet.dart';
@@ -232,6 +233,9 @@ class CNPopupMenuButton extends StatefulWidget {
     this.keepsSourceVisible = false,
     this.onOpened,
     this.onClosed,
+    this.textDirection,
+    this.checkedIcon,
+    this.contentPadding,
   }) : width = null,
        round = false,
        assert(
@@ -258,7 +262,10 @@ class CNPopupMenuButton extends StatefulWidget {
     this.keepsSourceVisible = false,
     this.onOpened,
     this.onClosed,
+    this.textDirection,
+    this.checkedIcon,
   }) : buttonLabel = null,
+       contentPadding = null,
        imagePlacement = CNImagePlacement.leading,
        imagePadding = null,
        labelFontFamily = null,
@@ -373,6 +380,37 @@ class CNPopupMenuButton extends StatefulWidget {
   /// well, around the same moment.
   final VoidCallback? onClosed;
 
+  /// The direction the button and its menu are laid out in: titles
+  /// right-aligned, with icons, checkmarks and submenu chevrons mirrored, for
+  /// [TextDirection.rtl]. Null takes the ambient [Directionality] (#167), so
+  /// an app that switches to Arabic in Dart gets a right-to-left menu
+  /// although the system language stays English.
+  final TextDirection? textDirection;
+
+  /// The symbol that marks a [CNPopupMenuItem.checked] item, in place of the
+  /// system checkmark (#168), e.g. `CNSymbol('checkmark.circle.fill',
+  /// size: 18, color: ...)`. Applies to every checked item, in submenus too.
+  /// Null keeps the system checkmark.
+  ///
+  /// UIKit cannot restyle the checkmark it draws for a selected item, so on
+  /// iOS the symbol is the checked item's image (it replaces that item's own
+  /// icon) and VoiceOver still reads the item as selected. A
+  /// [CNSymbol.size] of 24, the default, keeps the menu's own icon size.
+  /// Without a [CNSymbol.color] it takes the menu's text colour, as the
+  /// system checkmark does. On macOS it is the item's `onStateImage`.
+  final CNSymbol? checkedIcon;
+
+  /// The space between the button's edges and its label and icon, in place
+  /// of the button style's own insets (#169). [EdgeInsetsDirectional.zero]
+  /// makes the button exactly as wide as its label, so a button at the end
+  /// of a row lines its label up with the row's padding, and the menu, which
+  /// iOS aligns to the button, keeps its distance from the screen edge.
+  ///
+  /// Included in the width a [shrinkWrap] button measures. Null keeps the
+  /// style's insets. With a background style (glass, filled, ...) zero puts
+  /// the background's edge at the label. iOS only; text buttons only.
+  final EdgeInsetsDirectional? contentPadding;
+
   /// Entries that populate the popup menu.
   final List<CNPopupMenuEntry> items;
 
@@ -475,6 +513,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   int? _lastIconColor;
   double? _intrinsicWidth;
   CNButtonStyle? _lastStyle;
+  bool? _lastRtl;
 
   /// Whether the last layout sized the button to its label (shrink-wrapped
   /// or in an unbounded row), so a new label changes its width.
@@ -566,6 +605,18 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncBrightnessIfNeeded();
+    _syncLayoutDirectionIfNeeded();
+  }
+
+  /// Sends a new direction to the native button, e.g. after a language
+  /// switch changed the ambient [Directionality] (#167).
+  void _syncLayoutDirectionIfNeeded() {
+    final ch = _channel;
+    if (ch == null) return;
+    final rtl = nativeRtl(context, widget.textDirection);
+    if (_lastRtl == rtl || rtl == null) return;
+    _lastRtl = rtl;
+    ch.invokeOptionalMethod('setLayoutDirection', {'rtl': rtl});
   }
 
   @override
@@ -765,6 +816,10 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
 
     // Capture all context-derived values before any async operations
     final capturedIsDark = _isDark;
+    final capturedRtl = nativeRtl(context, widget.textDirection);
+    final capturedCheckedIcon = widget.checkedIcon == null
+        ? null
+        : _encodeCheckedIcon(widget.checkedIcon!);
     final capturedStyle = encodeStyle(context, tint: _effectiveTint);
     final capturedButtonIconColor = resolveColorToArgb(
       widget.buttonImageAsset?.color ??
@@ -875,6 +930,15 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       'labelColorLight': ?capturedLabelColorLight,
       'labelColorDark': ?capturedLabelColorDark,
       if (widget.keepsSourceVisible) 'keepsSourceVisible': true,
+      'rtl': ?capturedRtl,
+      'checkedIcon': ?capturedCheckedIcon,
+      if (widget.contentPadding != null)
+        'contentPadding': <String, double>{
+          'top': widget.contentPadding!.top,
+          'leading': widget.contentPadding!.start,
+          'bottom': widget.contentPadding!.bottom,
+          'trailing': widget.contentPadding!.end,
+        },
     };
 
     final viewKey = ValueKey(_viewKeyString());
@@ -964,6 +1028,19 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     );
   }
 
+  /// [CNPopupMenuButton.checkedIcon] for the native view. The default
+  /// [CNSymbol.size] (24) is left out, so the menu keeps its own icon size.
+  Map<String, Object?> _encodeCheckedIcon(CNSymbol symbol) => {
+    'name': symbol.name,
+    if (symbol.size != 24.0) 'size': symbol.size,
+    'color': ?resolveColorToArgb(symbol.color, context),
+    if (symbol.mode != null) 'mode': symbol.mode!.name,
+    if (symbol.paletteColors != null)
+      'paletteColors': [
+        for (final c in symbol.paletteColors!) resolveColorToArgb(c, context),
+      ],
+  };
+
   /// The platform view's key: every parameter that needs a new native
   /// button. The labels are left out: `setButtonTitle` and `setItems` change
   /// them in place. With them in the key, a new label created the native
@@ -995,7 +1072,16 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         '${widget.labelColorLight?.toARGB32()}_'
         '${widget.labelColorDark?.toARGB32()}_'
         '${widget.keepsSourceVisible}_'
+        '${_checkedIconKey()}_${widget.contentPadding}_'
         '$_isDark';
+  }
+
+  String? _checkedIconKey() {
+    final icon = widget.checkedIcon;
+    if (icon == null) return null;
+    return '${icon.name}/${icon.size}/${icon.color?.toARGB32()}/'
+        '${icon.mode?.name}/'
+        '${icon.paletteColors?.map((c) => c.toARGB32()).join(',')}';
   }
 
   void _onCreated(int id) {
@@ -1011,6 +1097,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     _lastIconSize = widget.buttonIcon?.size;
     _lastIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
     _lastStyle = widget.buttonStyle;
+    _lastRtl = nativeRtl(context, widget.textDirection);
     if (widget.isIconButton) return;
     final key = _sizeKey(widget.buttonLabel);
     _requestIntrinsicSize(ch, key, reveal: true);
@@ -1111,6 +1198,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
     final preIconName = widget.buttonIcon?.name;
     final preIconSize = widget.buttonIcon?.size;
     final preIconColor = resolveColorToArgb(widget.buttonIcon?.color, context);
+    _syncLayoutDirectionIfNeeded();
     if (_lastTint != tint && tint != null) {
       await ch.invokeMethod('setStyle', {'tint': tint});
       _lastTint = tint;

@@ -73,6 +73,7 @@ import 'demos/issue144_alert_font_rtl_test.dart';
 import 'demos/issue146_tab_rail_pushed_page_test.dart';
 import 'demos/issue147_popup_label_change_test.dart';
 import 'demos/issue149_glass_button_under_sheet_test.dart';
+import 'demos/issue167_169_popup_rtl_checked_padding_test.dart';
 import 'demos/issue156_glass_button_package_sheet_test.dart';
 import 'demos/issue159_glass_button_page_pop_test.dart';
 import 'demos/issue161_glass_button_page_route_builder_sheet_test.dart';
@@ -1366,6 +1367,23 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue147PopupLabelChangeTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#167 / #168 / #169: Popup RTL, check, padding'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'filemenu.and.selection',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) => const Issue167169PopupMenuTestPage(),
                       ),
                     );
                   },

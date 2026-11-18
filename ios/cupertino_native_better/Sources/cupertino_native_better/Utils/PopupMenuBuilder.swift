@@ -11,6 +11,7 @@ enum PopupMenuBuilder {
     level: PopupMenuLevel,
     path: [Int] = [],
     iconScale: CGFloat,
+    checkedImage: UIImage? = nil,
     onSelect: @escaping ([Int]) -> Void
   ) -> [UIMenuElement] {
     var groups: [[UIMenuElement]] = []
@@ -35,7 +36,9 @@ enum PopupMenuBuilder {
           let childLevel = (i < level.submenus.count ? level.submenus[i] : nil)
             .map { PopupMenuLevel(dict: $0) } ?? PopupMenuLevel()
           let style = i < level.submenuStyles.count ? level.submenuStyles[i] : nil
-          var children = elements(level: childLevel, path: itemPath, iconScale: iconScale, onSelect: onSelect)
+          var children = elements(
+            level: childLevel, path: itemPath, iconScale: iconScale,
+            checkedImage: checkedImage, onSelect: onSelect)
           // A level without dividers is one untitled group; a palette or an
           // element size lays out the submenu's own children, so it gets the
           // items themselves.
@@ -74,10 +77,21 @@ enum PopupMenuBuilder {
         }
         // The subtitle goes through the initializer: `action.subtitle` is
         // UIMenuLeaf's setter, which needs iOS 16.
-        let action = UIAction(title: title, subtitle: subtitle, image: image, attributes: attrs) { _ in
+        // `CNPopupMenuButton.checkedIcon` (#168): UIKit has no way to restyle
+        // the checkmark `.on` draws, so a checked item shows the symbol as its
+        // image instead, and VoiceOver still hears that it is selected.
+        let customCheck = isChecked ? checkedImage : nil
+        let action = UIAction(
+          title: title, subtitle: subtitle, image: customCheck ?? image, attributes: attrs
+        ) { _ in
           onSelect(itemPath)
         }
-        action.state = isChecked ? .on : .off
+        if customCheck != nil {
+          action.state = .off
+          action.accessibilityTraits.insert(.selected)
+        } else {
+          action.state = isChecked ? .on : .off
+        }
         current.append(action)
       }
     flushGroup()
@@ -88,6 +102,39 @@ enum PopupMenuBuilder {
       return UIMenu(title: "", options: .displayInline, children: group)
     }
     return children
+  }
+
+  /// The image of `CNPopupMenuButton.checkedIcon` (#168): an SF Symbol
+  /// encoded as `name`, optional `size`, `color`, `mode` and `paletteColors`.
+  /// Without a colour it is a template and takes the menu's text colour, as
+  /// the system checkmark does.
+  static func checkedImage(_ dict: [String: Any]?) -> UIImage? {
+    guard let dict, let name = dict["name"] as? String, !name.isEmpty,
+          var image = UIImage(systemName: name) else { return nil }
+    if let size = dict["size"] as? NSNumber, size.doubleValue > 0 {
+      image = image.applyingSymbolConfiguration(
+        UIImage.SymbolConfiguration(pointSize: CGFloat(size.doubleValue))) ?? image
+    }
+    let color = (dict["color"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
+    switch dict["mode"] as? String {
+    case "hierarchical":
+      if #available(iOS 15.0, *), let color {
+        return image.applyingSymbolConfiguration(UIImage.SymbolConfiguration(hierarchicalColor: color)) ?? image
+      }
+    case "palette":
+      let palette = ((dict["paletteColors"] as? [NSNumber]) ?? []).map { ImageUtils.colorFromARGB($0.intValue) }
+      if #available(iOS 15.0, *), !palette.isEmpty {
+        return image.applyingSymbolConfiguration(UIImage.SymbolConfiguration(paletteColors: palette)) ?? image
+      }
+    case "multicolor":
+      if #available(iOS 15.0, *) {
+        return image.applyingSymbolConfiguration(.preferringMulticolor()) ?? image
+      }
+    default:
+      break
+    }
+    if let color { return image.withTintColor(color, renderingMode: .alwaysOriginal) }
+    return image
   }
 
   /// A submenu shown in place: a section for `inline`, a row of icons for

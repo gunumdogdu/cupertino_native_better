@@ -16,9 +16,10 @@ enum MacMenuBuilder {
   static func menu(
     level: MacMenuLevel,
     appearance: NSAppearance? = nil,
+    checkedImage: NSImage? = nil,
     onSelect: @escaping ([Int]) -> Void
   ) -> NSMenu {
-    let menu = build(level: level, path: [], onSelect: onSelect)
+    let menu = build(level: level, path: [], checkedImage: checkedImage, onSelect: onSelect)
     if let appearance { menu.appearance = appearance }
     // Exactly the items the app gave: no system items appended when the
     // menu opens as a context menu (on macOS 27, "Ask Siri" at the top).
@@ -34,6 +35,7 @@ enum MacMenuBuilder {
   private static func build(
     level: MacMenuLevel,
     path: [Int],
+    checkedImage: NSImage? = nil,
     onSelect: @escaping ([Int]) -> Void
   ) -> NSMenu {
     let menu = NSMenu()
@@ -67,7 +69,7 @@ enum MacMenuBuilder {
           if !title.isEmpty {
             menu.addItem(sectionHeader(title))
           }
-          let section = build(level: childLevel, path: itemPath, onSelect: onSelect)
+          let section = build(level: childLevel, path: itemPath, checkedImage: checkedImage, onSelect: onSelect)
           for item in section.items {
             section.removeItem(item)
             menu.addItem(item)
@@ -83,7 +85,7 @@ enum MacMenuBuilder {
         // An item with neither an action nor a submenu is disabled: a
         // disabled submenu simply gets no submenu.
         if enabled {
-          let submenu = build(level: childLevel, path: itemPath, onSelect: onSelect)
+          let submenu = build(level: childLevel, path: itemPath, checkedImage: checkedImage, onSelect: onSelect)
           submenu.title = title
           item.submenu = submenu
         }
@@ -101,6 +103,8 @@ enum MacMenuBuilder {
       item.representedObject = action
       item.isEnabled = enabled
       item.state = level.isChecked(i) ? .on : .off
+      // `CNPopupMenuButton.checkedIcon` (#168) in place of the checkmark.
+      if let checkedImage { item.onStateImage = checkedImage }
       decorate(item, level: level, at: i)
       if level.isDestructive(i) {
         // AppKit has no destructive menu item style; the label and a

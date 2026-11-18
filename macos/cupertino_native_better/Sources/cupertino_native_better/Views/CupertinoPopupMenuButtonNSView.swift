@@ -13,6 +13,10 @@ class CupertinoPopupMenuButtonNSView: NSView {
   private var rootLevel: [String: Any] = [:]
   private var icon = IconSource()
   private var isInteractive = true
+  /// Flutter's direction (#167); nil leaves the system's.
+  private var rtl: Bool?
+  /// `CNPopupMenuButton.checkedIcon` (#168); nil keeps the checkmark.
+  private var checkedImage: NSImage?
   /// Changes held until the view has a given width: a new title with the
   /// width it needs, or the first appearance at the measured width (#147).
   private var widthActions: [(id: Int, width: CGFloat, run: () -> Void)] = []
@@ -27,6 +31,15 @@ class CupertinoPopupMenuButtonNSView: NSView {
     let isDark = (dict["isDark"] as? NSNumber)?.boolValue ?? false
     icon.read(dict)
     rootLevel = dict
+    rtl = CNLayoutDirection.read(dict)
+    if let c = dict["checkedIcon"] as? [String: Any], let name = c["name"] as? String {
+      checkedImage = ImageUtils.symbolImage(
+        name: name,
+        size: (c["size"] as? NSNumber).map { min(CGFloat(truncating: $0), MacMenuBuilder.maxImageSize) },
+        color: (c["color"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) },
+        mode: c["mode"] as? String,
+        palette: ((c["paletteColors"] as? [NSNumber]) ?? []).map { ImageUtils.colorFromARGB($0.intValue) })
+    }
 
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
@@ -57,6 +70,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
       $0.labelColorLight = (dict["labelColorLight"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
       $0.labelColorDark = (dict["labelColorDark"] as? NSNumber).map { ImageUtils.colorFromARGB($0.intValue) }
     }
+    CNLayoutDirection.apply(rtl, to: self)
     rebuildMenu()
     // Not measured yet: shown by `reveal` once Flutter has given the view
     // the measured width (#147).
@@ -147,6 +161,11 @@ class CupertinoPopupMenuButtonNSView: NSView {
         self?.host.title = t
         result(nil)
       }
+    case "setLayoutDirection":
+      rtl = CNLayoutDirection.read(args)
+      CNLayoutDirection.apply(rtl, to: self)
+      rebuildMenu()
+      result(nil)
     case "setSemanticLabel":
       let label = args?["label"] as? String
       host.accessibilityText = (label?.isEmpty ?? true) ? nil : label
@@ -209,10 +228,19 @@ class CupertinoPopupMenuButtonNSView: NSView {
   }
 
   private func rebuildMenu() {
-    popupMenu = MacMenuBuilder.menu(level: MacMenuLevel(dict: rootLevel)) { [weak self] path in
+    popupMenu = MacMenuBuilder.menu(
+      level: MacMenuLevel(dict: rootLevel), checkedImage: checkedImage
+    ) { [weak self] path in
       // `index` is the top-level entry, as before; `path` the full path.
       guard let self = self, let first = path.first else { return }
       self.channel.invokeMethod("itemSelected", arguments: ["index": first, "path": path])
     }
+    if let rtl { Self.applyDirection(rtl, to: popupMenu) }
+  }
+
+  /// The menu and its submenus right to left, or left to right (#167).
+  private static func applyDirection(_ rtl: Bool, to menu: NSMenu) {
+    menu.userInterfaceLayoutDirection = rtl ? .rightToLeft : .leftToRight
+    for item in menu.items { if let sub = item.submenu { applyDirection(rtl, to: sub) } }
   }
 }
