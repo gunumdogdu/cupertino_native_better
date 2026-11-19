@@ -170,6 +170,10 @@
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue179
 //     (#179: right to left, an icon and zero content padding keep the
 //     popup button's label on one line; AUTO=true prints `CNB_READY 179`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue181
+//     (#181: itemLabelFontFamily on the popup menu's item titles, left to
+//     right and right to left; ITEM_FONT=system|Tajawal|Georgia; AUTO=true
+//     prints `CNB_READY 181`)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -265,6 +269,7 @@ import 'demos/issue173_search_bar_rtl_test.dart';
 import 'demos/issue176_reduce_transparency_test.dart';
 import 'demos/issue178_popup_menu_rtl_open_test.dart';
 import 'demos/issue179_popup_menu_rtl_zero_padding_test.dart';
+import 'demos/issue181_popup_menu_item_font_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -469,6 +474,15 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue179') {
       return const Issue179PopupMenuRtlZeroPaddingTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue181') {
+      return const Issue181PopupMenuItemFontTestPage(
+        autoCycle: _auto,
+        initialFont: String.fromEnvironment(
+          'ITEM_FONT',
+          defaultValue: 'Tajawal',
+        ),
+      );
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();
