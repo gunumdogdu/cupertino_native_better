@@ -1,3 +1,17 @@
+## 2.10.1
+
+> Full pub.dev analysis points again with Flutter 3.50. No change in behaviour.
+
+### Fixed — 48 deprecation infos on Flutter 3.50
+Flutter 3.50 deprecates `package:flutter/cupertino.dart` and `package:flutter/material.dart` in favour of the `cupertino_ui` and `material_ui` packages, so pub.dev's analysis, now on Flutter 3.50, reported each of the package's 48 imports and gave 40 of 50 static analysis points (150/160 in total, for earlier versions too).
+
+The package keeps importing Flutter's own libraries, with the deprecation ignored on each import. The new packages need Flutter 3.47 and Dart 3.13, while this package supports Dart 3.9 and later. They are also separate copies of the widgets, so a theme set with Flutter's own `CupertinoApp`, as most apps have, isn't found by a widget that looks it up through `cupertino_ui`. The package will move once its minimum Flutter is past 3.47.
+
+### Checked
+- pana with Flutter 3.50.0: 160/160, static analysis 50/50.
+- `flutter analyze lib` is clean with Flutter 3.38, 3.44, 3.47.9 and 3.50.0, and `dart format` with Dart 3.12 and 3.14.
+- 728 tests pass.
+
 ## 2.10.0
 
 > A right-to-left `CNPopupMenuButton` menu is laid out right to left from the first frame of its open animation (#178). A right-to-left button with an icon and no content padding keeps its label on one line (#179). `itemLabelFontFamily` gives the menu's item titles your font (#181).
