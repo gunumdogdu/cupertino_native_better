@@ -1,3 +1,4 @@
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 
 /// Converts a [Color] to ARGB int (0xAARRGGBB). Private helper.

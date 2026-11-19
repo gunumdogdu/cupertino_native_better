@@ -1,6 +1,8 @@
 import 'dart:async';
 
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart' show Material, MaterialType;
 
 import '../utils/theme_helper.dart';

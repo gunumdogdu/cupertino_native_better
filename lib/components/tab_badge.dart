@@ -1,3 +1,4 @@
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 
 // The badges the CNTabBar and CNTabRail fallbacks draw for

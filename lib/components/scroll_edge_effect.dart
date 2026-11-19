@@ -5,6 +5,7 @@ library;
 
 import 'dart:math' as math;
 
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart'
     show CupertinoColors, CupertinoDynamicColor, CupertinoTheme;
 import 'package:flutter/foundation.dart';

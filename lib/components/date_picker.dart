@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart' show MaterialLocalizations, TimeOfDay;
 import 'package:flutter/services.dart';
 import '../channel/params.dart';

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 
 /// Rendering modes for SF Symbols.

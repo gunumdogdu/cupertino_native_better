@@ -1,4 +1,6 @@
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
 /// Utility class for accessing theme data with fallback support.

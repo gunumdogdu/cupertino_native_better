@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' show ColorSpace;
 
 import 'package:flutter/foundation.dart';
+// ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
