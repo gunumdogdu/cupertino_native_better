@@ -20,6 +20,9 @@ class CupertinoPopupMenuButtonNSView: NSView {
   /// The newest title Flutter sent, set at once or held until the view has
   /// its width (#166).
   private var requestedTitle: String?
+  /// The font family of the menu's item titles (#181), from the creation
+  /// parameters: `setItems` sends only the items.
+  private var itemFontFamily: String?
   /// Flutter's text direction for the button and its menu (#167); nil
   /// keeps the system's.
   private var rtl: Bool?
@@ -33,6 +36,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
     let isDark = (dict["isDark"] as? NSNumber)?.boolValue ?? false
     icon.read(dict)
     rootLevel = dict
+    itemFontFamily = (dict["itemLabelFontFamily"] as? String).flatMap { $0.isEmpty ? nil : $0 }
 
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
@@ -245,7 +249,7 @@ class CupertinoPopupMenuButtonNSView: NSView {
   }
 
   private func rebuildMenu() {
-    popupMenu = MacMenuBuilder.menu(level: MacMenuLevel(dict: rootLevel)) { [weak self] path in
+    popupMenu = MacMenuBuilder.menu(level: MacMenuLevel(dict: rootLevel), itemFontFamily: itemFontFamily) { [weak self] path in
       // `index` is the top-level entry, as before; `path` the full path.
       guard let self = self, let first = path.first else { return }
       self.channel.invokeMethod("itemSelected", arguments: ["index": first, "path": path])

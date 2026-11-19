@@ -13,12 +13,20 @@ import FlutterMacOS
 enum MacMenuBuilder {
   /// Builds the menu of the top [level]; [onSelect] gets the path of the
   /// chosen item. Nothing is called when the menu closes without a choice.
+  ///
+  /// [itemFontFamily] is the family of the item and submenu titles
+  /// (`CNPopupMenuButton.itemLabelFontFamily`, #181), at the menu's own
+  /// size; section headers and subtitles keep the system font, as on iOS.
   static func menu(
     level: MacMenuLevel,
     appearance: NSAppearance? = nil,
+    itemFontFamily: String? = nil,
     onSelect: @escaping ([Int]) -> Void
   ) -> NSMenu {
-    let menu = build(level: level, path: [], onSelect: onSelect)
+    let itemFont = itemFontFamily.flatMap {
+      CNFontResolver.font(family: $0, size: NSFont.menuFont(ofSize: 0).pointSize)
+    }
+    let menu = build(level: level, path: [], itemFont: itemFont, onSelect: onSelect)
     if let appearance { menu.appearance = appearance }
     // Exactly the items the app gave: no system items appended when the
     // menu opens as a context menu (on macOS 27, "Ask Siri" at the top).
@@ -34,6 +42,7 @@ enum MacMenuBuilder {
   private static func build(
     level: MacMenuLevel,
     path: [Int],
+    itemFont: NSFont?,
     onSelect: @escaping ([Int]) -> Void
   ) -> NSMenu {
     let menu = NSMenu()
@@ -67,7 +76,7 @@ enum MacMenuBuilder {
           if !title.isEmpty {
             menu.addItem(sectionHeader(title))
           }
-          let section = build(level: childLevel, path: itemPath, onSelect: onSelect)
+          let section = build(level: childLevel, path: itemPath, itemFont: itemFont, onSelect: onSelect)
           for item in section.items {
             section.removeItem(item)
             menu.addItem(item)
@@ -83,12 +92,13 @@ enum MacMenuBuilder {
         // An item with neither an action nor a submenu is disabled: a
         // disabled submenu simply gets no submenu.
         if enabled {
-          let submenu = build(level: childLevel, path: itemPath, onSelect: onSelect)
+          let submenu = build(level: childLevel, path: itemPath, itemFont: itemFont, onSelect: onSelect)
           submenu.title = title
           item.submenu = submenu
         }
         item.isEnabled = enabled
         decorate(item, level: level, at: i)
+        if let itemFont { item.attributedTitle = titled(title, font: itemFont) }
         menu.addItem(item)
         continue
       }
@@ -102,6 +112,7 @@ enum MacMenuBuilder {
       item.isEnabled = enabled
       item.state = level.isChecked(i) ? .on : .off
       decorate(item, level: level, at: i)
+      if let itemFont { item.attributedTitle = titled(title, font: itemFont) }
       if level.isChecked(i), level.hasCheckedImage(i), let image = item.image {
         // A checked symbol (#168) goes in the check column, as the item's
         // on-state image.
@@ -117,12 +128,13 @@ enum MacMenuBuilder {
         // read.
         action.isDestructive = true
         action.plainTitle = title
+        action.plainFont = itemFont ?? NSFont.menuFont(ofSize: 0)
         action.plainImage = item.image
         let red = NSAttributedString(
           string: title,
           attributes: [
             .foregroundColor: enabled ? NSColor.systemRed : NSColor.systemRed.withAlphaComponent(0.4),
-            .font: NSFont.menuFont(ofSize: 0),
+            .font: action.plainFont,
           ])
         action.redTitle = red
         item.attributedTitle = red
@@ -144,6 +156,12 @@ enum MacMenuBuilder {
       menu.removeItem(last)
     }
     return menu
+  }
+
+  /// [title] in the item font (#181). Only the title: AppKit draws the
+  /// subtitle and the check column as usual.
+  private static func titled(_ title: String, font: NSFont) -> NSAttributedString {
+    NSAttributedString(string: title, attributes: [.font: font])
   }
 
   /// Subtitle and icon of entry [i].
@@ -235,6 +253,8 @@ final class MacMenuAction: NSObject {
   /// highlighted state.
   var isDestructive = false
   var plainTitle = ""
+  /// The font of [plainTitle]: the item font (#181) or the menu's.
+  var plainFont = NSFont.menuFont(ofSize: 0)
   var redTitle: NSAttributedString?
   var redImage: NSImage?
   var plainImage: NSImage?
@@ -262,7 +282,7 @@ final class MacMenuDelegate: NSObject, NSMenuDelegate {
       // The same title without a colour, which AppKit draws in the
       // highlight's text colour.
       item.attributedTitle = NSAttributedString(
-        string: action.plainTitle, attributes: [.font: NSFont.menuFont(ofSize: 0)])
+        string: action.plainTitle, attributes: [.font: action.plainFont])
       item.image = action.plainImage
     }
     highlighted = item

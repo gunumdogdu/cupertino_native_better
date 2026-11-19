@@ -350,7 +350,8 @@ class CNPopupMenuButton extends StatefulWidget {
   /// system font. Only the family changes: the titles keep the menu's own
   /// size (Dynamic Type included) and weight, so the menu keeps the layout
   /// the system gives it. Subtitles and section titles keep the system font.
-  /// The fallback action sheet uses it too.
+  /// On macOS the menu's items take it at the menu's size, and the fallback
+  /// action sheet uses it too.
   final String? itemLabelFontFamily;
 
   /// The size of [buttonLabel], in points. Null keeps the system's.
