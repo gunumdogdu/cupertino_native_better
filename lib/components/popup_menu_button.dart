@@ -246,6 +246,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.textDirection,
     this.contentPadding,
     this.checkedIcon,
+    this.itemLabelFontFamily,
   }) : width = null,
        round = false,
        assert(
@@ -274,6 +275,7 @@ class CNPopupMenuButton extends StatefulWidget {
     this.onClosed,
     this.textDirection,
     this.checkedIcon,
+    this.itemLabelFontFamily,
   }) : buttonLabel = null,
        imagePlacement = CNImagePlacement.leading,
        imagePadding = null,
@@ -339,9 +341,17 @@ class CNPopupMenuButton extends StatefulWidget {
 
   /// The font family of [buttonLabel], e.g. a font declared under `fonts:`
   /// in `pubspec.yaml`, which the package registers with the system the
-  /// first time it is used. Null keeps the system font. The menu's own item
-  /// titles always use the system font: a native menu has no font setting.
+  /// first time it is used. Null keeps the system font. For the menu's item
+  /// titles, see [itemLabelFontFamily].
   final String? labelFontFamily;
+
+  /// The font family of the menu's item titles, submenu rows included, e.g.
+  /// a font declared under `fonts:` in `pubspec.yaml` (#181). Null keeps the
+  /// system font. Only the family changes: the titles keep the menu's own
+  /// size (Dynamic Type included) and weight, so the menu keeps the layout
+  /// the system gives it. Subtitles and section titles keep the system font.
+  /// The fallback action sheet uses it too.
+  final String? itemLabelFontFamily;
 
   /// The size of [buttonLabel], in points. Null keeps the system's.
   final double? labelFontSize;
@@ -540,10 +550,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   /// rebuilt, a label set back) takes its width from the first frame (#147).
   static final Map<String, double> _measuredWidths = <String, double>{};
 
-  /// The [_measuredWidths] key for [label] with the current options.
+  /// The [_measuredWidths] key for [label] with the current options. With
+  /// the direction: right to left, a label with an image can need a point
+  /// more than left to right, and a width measured for the other direction
+  /// wrapped it (#179).
   String _sizeKey(String? label) =>
       '${_viewKeyString()}|${MediaQuery.maybeTextScalerOf(context)?.scale(17)}'
-      '|$label';
+      '|${nativeRtl(context, widget.textDirection)}|$label';
 
   double? _measuredWidth(String? label) => _measuredWidths[_sizeKey(label)];
 
@@ -961,6 +974,8 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       if (widget.labelFontSize != null) 'labelFontSize': widget.labelFontSize,
       if (widget.labelFontWeight != null)
         'labelFontWeight': widget.labelFontWeight!.value,
+      if (widget.itemLabelFontFamily != null)
+        'itemLabelFontFamily': widget.itemLabelFontFamily,
       'labelColor': ?capturedLabelColor,
       'labelColorLight': ?capturedLabelColorLight,
       'labelColorDark': ?capturedLabelColorDark,
@@ -1086,6 +1101,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
         '${widget.labelColorDark?.toARGB32()}_'
         '${widget.keepsSourceVisible}_'
         '${widget.contentPadding}_'
+        '${widget.itemLabelFontFamily}_'
         '$_isDark';
   }
 
@@ -1464,6 +1480,7 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
             context,
             widget.items,
             title: widget.buttonLabel,
+            itemFontFamily: widget.itemLabelFontFamily,
           );
           widget.onClosed?.call();
           if (path != null) _dispatchSelection(path);

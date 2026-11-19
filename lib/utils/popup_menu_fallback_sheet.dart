@@ -12,11 +12,17 @@ import '../components/popup_menu_button.dart';
 ///
 /// An inline or palette submenu is listed in place, its label above its
 /// items, which report the same paths as if it were nested.
+///
+/// [itemFontFamily] is the font family of the item and submenu titles (#181).
 Future<List<int>?> showPopupMenuFallbackSheet(
   BuildContext context,
   List<CNPopupMenuEntry> entries, {
   String? title,
+  String? itemFontFamily,
 }) async {
+  final itemStyle = itemFontFamily == null
+      ? null
+      : TextStyle(fontFamily: itemFontFamily);
   final rows = _rows(entries, const []).toList();
   final selected = await showCupertinoModalPopup<List<int>>(
     context: context,
@@ -42,7 +48,12 @@ Future<List<int>?> showPopupMenuFallbackSheet(
                 enabled: item.enabled,
                 onPressed: () => Navigator.of(ctx).pop(path),
                 isDestructiveAction: item.isDestructive,
-                child: _fallbackLabel(ctx, item.label, item.subtitle),
+                child: _fallbackLabel(
+                  ctx,
+                  item.label,
+                  item.subtitle,
+                  itemStyle,
+                ),
               )
             else if (entry case final CNPopupMenuSubmenu submenu)
               _fallbackAction(
@@ -56,6 +67,7 @@ Future<List<int>?> showPopupMenuFallbackSheet(
                         ctx,
                         submenu.label,
                         submenu.subtitle,
+                        itemStyle,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -82,6 +94,7 @@ Future<List<int>?> showPopupMenuFallbackSheet(
     context,
     entry.items,
     title: entry.label,
+    itemFontFamily: itemFontFamily,
   );
   return rest == null ? null : [...selected, ...rest];
 }
@@ -128,13 +141,18 @@ Widget _fallbackAction({
 }
 
 /// An action sheet row's label, with the [subtitle] as a smaller second
-/// line when there is one.
-Widget _fallbackLabel(BuildContext context, String label, String? subtitle) {
-  if (subtitle == null || subtitle.isEmpty) return Text(label);
+/// line when there is one. [style] is merged into the label only.
+Widget _fallbackLabel(
+  BuildContext context,
+  String label,
+  String? subtitle, [
+  TextStyle? style,
+]) {
+  if (subtitle == null || subtitle.isEmpty) return Text(label, style: style);
   return Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(label),
+      Text(label, style: style),
       Text(
         subtitle,
         style: TextStyle(
