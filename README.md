@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.9.0
+  cupertino_native_better: ^2.10.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -1675,6 +1675,7 @@ CNPopupMenuButton(
   imagePlacement: CNImagePlacement.trailing,
   labelFontFamily: 'Nunito', // a pubspec.yaml font
   labelFontWeight: FontWeight.w600,
+  itemLabelFontFamily: 'Nunito', // the menu's item titles (2.10)
   shrinkWrap: true,
   items: sortItems,
   onSelected: (i) {},
@@ -1683,8 +1684,11 @@ CNPopupMenuButton(
 )
 ```
 
-A native menu has no font setting, so the menu's item titles keep the system
-font.
+`itemLabelFontFamily` gives the menu's item and submenu titles your font, so
+the menu matches the button and the screen (2.10). Only the family changes:
+the titles keep the menu's size, Dynamic Type included, and weight, so the
+rows keep the system's layout. Subtitles and section titles stay in the
+system font. It works on iOS, on macOS and in the fallback action sheet.
 
 #### Subtitles and submenus
 
@@ -2050,7 +2054,7 @@ addTearDown(PlatformVersion.reset);
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.9.0
+   cupertino_native_better: ^2.10.0
    ```
 
 2. Update imports:

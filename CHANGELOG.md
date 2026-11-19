@@ -1,3 +1,26 @@
+## 2.10.0
+
+> A right-to-left `CNPopupMenuButton` menu is laid out right to left from the first frame of its open animation (#178). A right-to-left button with an icon and no content padding keeps its label on one line (#179). `itemLabelFontFamily` gives the menu's item titles your font (#181).
+
+### Added — a font family for the menu's item titles (#181)
+- `CNPopupMenuButton.itemLabelFontFamily` (also on `.icon`): the font family of the menu's item and submenu titles, a pubspec font included. Null keeps the system font. Only the family changes: each title keeps the menu's size, Dynamic Type included, and weight, so the rows keep the system's layout. Subtitles and section titles keep the system font.
+- A native iOS menu has no font setting, so the titles get the family once UIKit has made the menu's views, before the frame that first shows them. On macOS the `NSMenu` items take it at the menu's size. The fallback action sheet uses it for its item and submenu titles.
+
+### Fixed — a right-to-left menu opened left to right, then jumped (#178)
+Since 2.8.0 (#167) the menu of a button laid out right to left is mirrored when the system language is left to right. But UIKit adds the menu's views only after the menu is about to show, so they were found, and mirrored, only once the open animation had ended: the menu grew left to right for about a second, then jumped. Now the menu's views get the direction just before the frame that first shows them is drawn, so the menu is right to left from its first frame. Nothing outside the menu is changed.
+
+### Fixed — a right-to-left label with an icon and no content padding wrapped (#179)
+A shrink-wrapped `CNPopupMenuButton` with an icon and `contentPadding: EdgeInsetsDirectional.zero` (#169), laid out right to left, came out about a point too narrow, so its label wrapped onto a second line, cut at a small `height`. The width is now measured in the button's own direction, a width measured for one direction is no longer reused for the other, and the button itself takes the direction.
+
+Thanks to @Ashhad08 for the three reports, with screenshots, recordings and repro apps, and for PR #180, which fixes all three; it ships here with one change to the #178 fix and macOS support for `itemLabelFontFamily`.
+
+### Checked
+These checks use the iPhone 17 Pro simulator on iOS 26.0 and the iPhone 17 simulator on iOS 27.0, with the system language in English.
+- #178: recorded frame by frame, a right-to-left menu, from `Directionality` and from `textDirection`, is right to left from its first frame on iOS 26.0 and 27.0, with no jump. Before, it stayed left to right for about a second on iOS 26.0.
+- #179: the six rows from the issue (right to left and left to right, with and without an icon or content padding, 22 and 44 pt) all show their label on one line on iOS 26.0 and 27.0. Before, the two right-to-left rows with an icon and no padding wrapped.
+- #181: with Tajawal and with Georgia, item and submenu titles take the family, from the first frame, left to right and right to left, while the subtitle and the section title keep the system font. On macOS the menu's items were checked in the running app: the titles have the family at the menu's 13 pt, section headers and subtitles don't.
+- The iOS sources typecheck against the iOS 26.0 SDK and the macOS ones against the current SDK, `flutter analyze` passes with Flutter 3.44 and 3.38, and 728 tests pass (5 new).
+
 ## 2.9.0
 
 > `CNAccessibility.reduceTransparency` tells Flutter whether Reduce Transparency is on, and `CNScrollEdgeEffect.reduceTransparencyHeight` sets a shorter band for that mode (#176).
