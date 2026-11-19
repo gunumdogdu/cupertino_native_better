@@ -540,10 +540,13 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
   /// rebuilt, a label set back) takes its width from the first frame (#147).
   static final Map<String, double> _measuredWidths = <String, double>{};
 
-  /// The [_measuredWidths] key for [label] with the current options.
+  /// The [_measuredWidths] key for [label] with the current options. With
+  /// the direction: right to left, a label with an image can need a point
+  /// more than left to right, and a width measured for the other direction
+  /// wrapped it (#179).
   String _sizeKey(String? label) =>
       '${_viewKeyString()}|${MediaQuery.maybeTextScalerOf(context)?.scale(17)}'
-      '|$label';
+      '|${nativeRtl(context, widget.textDirection)}|$label';
 
   double? _measuredWidth(String? label) => _measuredWidths[_sizeKey(label)];
 
