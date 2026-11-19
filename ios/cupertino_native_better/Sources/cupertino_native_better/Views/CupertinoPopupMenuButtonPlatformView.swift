@@ -929,7 +929,7 @@ final class CNPopupMenuUIButton: UIButton {
 
   deinit {
     directionLink?.invalidate()
-    restoreMenuAppearance?()
+    if let commitObserver { CFRunLoopObserverInvalidate(commitObserver) }
   }
   private var standIn: UIView?
   /// The direction the menu is laid out in, from Flutter (#167); nil keeps
@@ -945,32 +945,34 @@ final class CNPopupMenuUIButton: UIButton {
   /// that gives views it adds later (a submenu's rows) the direction too.
   private var menuViews: [UIView] = []
   private var directionLink: CADisplayLink?
-  /// Puts back the appearance changed while the menu opens (#178).
-  private var restoreMenuAppearance: (() -> Void)?
+  /// Gives the menu's views the direction before each frame is drawn while
+  /// the menu is up (#178).
+  private var commitObserver: CFRunLoopObserver?
 
   override func contextMenuInteraction(
     _ interaction: UIContextMenuInteraction,
     configurationForMenuAtLocation location: CGPoint
   ) -> UIContextMenuConfiguration? {
     viewsBeforeMenu = Set((window?.subviews ?? []).map(ObjectIdentifier.init))
-    beginMenuAppearance()
     return super.contextMenuInteraction(interaction, configurationForMenuAtLocation: location)
   }
 
-  /// The menu's views don't exist yet when it is about to show, so finding
-  /// them then gives the direction only once the open animation has ended,
-  /// and the menu jumped from one direction to the other (#178). While the
-  /// menu opens, views are created in Flutter's direction instead, so they
-  /// are laid out in it from their first frame.
-  private func beginMenuAppearance() {
-    restoreMenuAppearance?()
-    restoreMenuAppearance = nil
-    guard let rtl = menuRtl,
-          rtl != (UIApplication.shared.userInterfaceLayoutDirection == .rightToLeft) else { return }
-    let proxy = UIView.appearance()
-    let previous = proxy.semanticContentAttribute
-    proxy.semanticContentAttribute = rtl ? .forceRightToLeft : .forceLeftToRight
-    restoreMenuAppearance = { proxy.semanticContentAttribute = previous }
+  /// The menu's views don't exist yet when it is about to show: UIKit adds
+  /// them right after, in the same turn of the run loop. Found only once the
+  /// open animation had ended, the menu jumped from one direction to the
+  /// other (#178). This observer runs at the end of every turn while the
+  /// menu is up, just before Core Animation commits the frame (its own
+  /// observer, order 2000000), so views added in a turn get the direction,
+  /// and the family, before the frame that first shows them is drawn. No
+  /// state outside the menu is changed.
+  private func startCommitObserver() {
+    guard commitObserver == nil else { return }
+    let activities = CFRunLoopActivity.beforeWaiting.rawValue | CFRunLoopActivity.exit.rawValue
+    let observer = CFRunLoopObserverCreateWithHandler(kCFAllocatorDefault, activities, true, 1_999_000) {
+      [weak self] _, _ in self?.applyMenuDirection()
+    }
+    CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+    commitObserver = observer
   }
 
   /// Lays the menu out in Flutter's direction (#167). UIKit shows the menu
@@ -1016,9 +1018,9 @@ final class CNPopupMenuUIButton: UIButton {
   private func endMenuDirection() {
     directionLink?.invalidate()
     directionLink = nil
+    if let commitObserver { CFRunLoopObserverInvalidate(commitObserver) }
+    commitObserver = nil
     menuViews = []
-    restoreMenuAppearance?()
-    restoreMenuAppearance = nil
   }
 
   private static func titles(of menu: UIMenu?) -> Set<String> {
@@ -1100,13 +1102,8 @@ final class CNPopupMenuUIButton: UIButton {
   ) {
     super.contextMenuInteraction(interaction, willDisplayMenuFor: configuration, animator: animator)
     applyMenuDirection()
-    animator?.addCompletion { [weak self] in
-      self?.applyMenuDirection()
-      // The menu's views exist now; the display link keeps rows added later
-      // in the direction, so other views are created as usual again.
-      self?.restoreMenuAppearance?()
-      self?.restoreMenuAppearance = nil
-    }
+    startCommitObserver()
+    animator?.addCompletion { [weak self] in self?.applyMenuDirection() }
     onMenuWillShow?()
   }
 
