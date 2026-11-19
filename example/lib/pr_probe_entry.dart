@@ -164,6 +164,12 @@
 //     (#176: CNAccessibility.reduceTransparency and
 //     CNScrollEdgeEffect.reduceTransparencyHeight; RT_MODE=34|none|0 picks
 //     the height; AUTO=true prints `CNB_RT on|off` on every change)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue178
+//     (#178: a right-to-left popup menu laid out right to left from the
+//     first frame of its open animation; AUTO=true prints `CNB_READY 178`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue179
+//     (#179: right to left, an icon and zero content padding keep the
+//     popup button's label on one line; AUTO=true prints `CNB_READY 179`)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -257,6 +263,8 @@ import 'demos/issue170_search_bar_glass_shadow_test.dart';
 import 'demos/issue171_search_bar_placeholder_color_test.dart';
 import 'demos/issue173_search_bar_rtl_test.dart';
 import 'demos/issue176_reduce_transparency_test.dart';
+import 'demos/issue178_popup_menu_rtl_open_test.dart';
+import 'demos/issue179_popup_menu_rtl_zero_padding_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -455,6 +463,12 @@ class _ProbeApp extends StatelessWidget {
         autoCycle: _auto,
         initialMode: String.fromEnvironment('RT_MODE', defaultValue: '34'),
       );
+    }
+    if (_probe == 'issue178') {
+      return const Issue178PopupMenuRtlOpenTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue179') {
+      return const Issue179PopupMenuRtlZeroPaddingTestPage(autoCycle: _auto);
     }
     if (_probe == 'issue151') {
       return const Issue151ThumblessSliderSeekTestPage();
