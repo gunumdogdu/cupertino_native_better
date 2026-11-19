@@ -103,6 +103,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     var buttonCustomIconBytes: Data? = nil
     var hiddenUntilSized = false
 
+    var itemFontFamily: String?
     if let dict = args as? [String: Any] {
       hiddenUntilSized = (dict["hiddenUntilSized"] as? NSNumber)?.boolValue ?? false
       if let t = dict["buttonTitle"] as? String { title = t }
@@ -121,6 +122,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
       if let f = dict["labelFontFamily"] as? String, !f.isEmpty { self.labelFontFamily = f }
       if let v = dict["labelFontSize"] as? NSNumber, v.doubleValue > 0 { self.labelFontSize = CGFloat(v.doubleValue) }
       if let v = dict["labelFontWeight"] as? NSNumber { self.labelFontWeight = v.intValue }
+      if let f = dict["itemLabelFontFamily"] as? String, !f.isEmpty { itemFontFamily = f }
       if let v = dict["labelColor"] as? NSNumber { self.labelColor = Self.colorFromARGB(v.intValue) }
       if let v = dict["labelColorLight"] as? NSNumber { self.labelColorLight = Self.colorFromARGB(v.intValue) }
       if let v = dict["labelColorDark"] as? NSNumber { self.labelColorDark = Self.colorFromARGB(v.intValue) }
@@ -193,6 +195,7 @@ class CupertinoPopupMenuButtonPlatformView: NSObject, FlutterPlatformView {
     // and the title that its measured size didn't have, so the title wrapped.
     CNLayoutDirection.apply(CNLayoutDirection.read(args as? [String: Any]), to: button)
     button.menuRtl = CNLayoutDirection.read(args as? [String: Any])
+    button.menuItemFontFamily = itemFontFamily
     container.onLayout = { [weak self] in self?.runDueWidthActions() }
     // Not measured yet: shown by `reveal` once Flutter has given the view
     // the measured width, so the first frame isn't at a placeholder width
@@ -932,6 +935,9 @@ final class CNPopupMenuUIButton: UIButton {
   /// The direction the menu is laid out in, from Flutter (#167); nil keeps
   /// the system's.
   var menuRtl: Bool?
+  /// The font family of the menu's item titles (#181); nil keeps the
+  /// system's.
+  var menuItemFontFamily: String?
   /// The window's views from before the menu opened, so the views the
   /// system adds for the menu can be told apart.
   private var viewsBeforeMenu: Set<ObjectIdentifier> = []
@@ -973,19 +979,27 @@ final class CNPopupMenuUIButton: UIButton {
   /// the layout direction trait, which views it adds later inherit, and the
   /// semantic content attribute, which aligns the titles.
   private func applyMenuDirection() {
-    guard let rtl = menuRtl, let window else { return }
+    guard let window else { return }
     // Already the app's direction: nothing to change.
     let appRtl = UIApplication.shared.userInterfaceLayoutDirection == .rightToLeft
-    guard rtl != appRtl else { return }
+    let rtl = menuRtl.flatMap { $0 != appRtl ? $0 : nil }
+    guard rtl != nil || menuItemFontFamily != nil else { return }
     for view in window.subviews
     where !viewsBeforeMenu.contains(ObjectIdentifier(view)) && !isDescendant(of: view)
       && !menuViews.contains(where: { $0 === view }) {
-      if #available(iOS 17.0, *) {
+      if let rtl, #available(iOS 17.0, *) {
         view.traitOverrides.layoutDirection = rtl ? .rightToLeft : .leftToRight
       }
       menuViews.append(view)
     }
-    for view in menuViews { Self.force(rtl, on: view) }
+    if let rtl { for view in menuViews { Self.force(rtl, on: view) } }
+    if let family = menuItemFontFamily {
+      // A menu has no font setting, so its title labels get the family
+      // (#181): only labels showing an item's or a submenu's title, each at
+      // its own size and weight, so the rows keep the system's layout.
+      let titles = Self.titles(of: menu)
+      for view in menuViews { Self.apply(family: family, to: view, titles: titles) }
+    }
     if directionLink == nil {
       // Titles take their alignment from the attribute, not the trait, so
       // rows added after this (a submenu opening) need it as well.
@@ -1005,6 +1019,37 @@ final class CNPopupMenuUIButton: UIButton {
     menuViews = []
     restoreMenuAppearance?()
     restoreMenuAppearance = nil
+  }
+
+  private static func titles(of menu: UIMenu?) -> Set<String> {
+    var titles = Set<String>()
+    func walk(_ elements: [UIMenuElement]) {
+      for element in elements {
+        if let action = element as? UIAction {
+          titles.insert(action.title)
+        } else if let submenu = element as? UIMenu {
+          // An inline group's title is a section header, not a row.
+          if !submenu.options.contains(.displayInline) { titles.insert(submenu.title) }
+          walk(submenu.children)
+        }
+      }
+    }
+    walk(menu?.children ?? [])
+    titles.remove("")
+    return titles
+  }
+
+  private static func apply(family: String, to view: UIView, titles: Set<String>) {
+    if let label = view as? UILabel, let text = label.text, titles.contains(text) {
+      let current = label.font ?? UIFont.preferredFont(forTextStyle: .body)
+      let traits = current.fontDescriptor.object(forKey: .traits) as? [UIFontDescriptor.TraitKey: Any]
+      let weight = (traits?[.weight] as? CGFloat).map { UIFont.Weight(rawValue: $0) }
+      if let font = CNFontResolver.font(family: family, size: current.pointSize, weight: weight),
+         font.fontName != current.fontName {
+        label.font = font
+      }
+    }
+    for sub in view.subviews { apply(family: family, to: sub, titles: titles) }
   }
 
   private static func force(_ rtl: Bool, on view: UIView) {
