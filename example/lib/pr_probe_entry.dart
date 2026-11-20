@@ -180,6 +180,12 @@
 //     and in a sheet header opened four times; AUTO=true prints `CNB_RECT`
 //     and `CNB_SHOT` lines; ISLAND=true shows three CNFloatingIslands
 //     instead, in the status bar, the middle and the home-indicator area)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue188
+//     --dart-define=OBSERVER=true
+//     (#188: glass CNButtons in a Material app bar, and a DropdownButton,
+//     a PopupMenuButton, a small sheet and a dialog below; AUTO=true opens
+//     each and prints `CNB_RECT188` with the measured modal rect and
+//     `CNB_SHOT` lines)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -277,6 +283,7 @@ import 'demos/issue178_popup_menu_rtl_open_test.dart';
 import 'demos/issue179_popup_menu_rtl_zero_padding_test.dart';
 import 'demos/issue181_popup_menu_item_font_test.dart';
 import 'demos/issue184_search_bar_safe_area_test.dart';
+import 'demos/issue188_dropdown_modal_rect_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -481,6 +488,9 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue179') {
       return const Issue179PopupMenuRtlZeroPaddingTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue188') {
+      return const Issue188DropdownModalRectTestPage(autoCycle: _auto);
     }
     if (_probe == 'issue184') {
       return const Issue184SearchBarSafeAreaTestPage(
