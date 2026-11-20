@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.10.2
+  cupertino_native_better: ^2.11.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -1558,6 +1558,21 @@ CNButton(
 )
 ```
 
+### A fixed light or dark look
+
+`appearance` keeps a button light in a dark app, or dark in a light one, as `LiquidGlassConfig.appearance` does for a `LiquidGlassContainer`. The label follows the look, so a light button uses `labelColorLight`. On iOS 26 the system still switches glass under about 65 pt by itself over near-black or near-white content; a `minHeight` of 66 or more keeps the look there too. iOS 27 and macOS keep it at any size.
+
+```dart
+CNButton(
+  label: 'Call',
+  onPressed: () {},
+  config: const CNButtonConfig(
+    style: CNButtonStyle.glass,
+    appearance: CNGlassAppearance.light,
+  ),
+)
+```
+
 ### Button Styles Gallery
 
 ### Icon-Only Button
@@ -2054,7 +2069,7 @@ addTearDown(PlatformVersion.reset);
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.10.2
+   cupertino_native_better: ^2.11.0
    ```
 
 2. Update imports:

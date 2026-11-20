@@ -1,3 +1,26 @@
+## 2.11.0
+
+> `CNButtonConfig.appearance` keeps a glass `CNButton` light or dark, as `LiquidGlassConfig.appearance` does for a container (#187). A Material dropdown or popup menu no longer hides every `autoHideOnModal` widget on the page (#188).
+
+### Added — a fixed light or dark look for `CNButton` (#187)
+- `CNButtonConfig.appearance` (`CNGlassAppearance.adaptive`, `.light`, `.dark`; also on `CNButton.icon`). The default, `adaptive`, follows the app's brightness as before. `light` keeps the button light in a dark app, and `dark` keeps it dark in a light app. For the glass styles that is the glass, for the other styles their system colours. It applies to the UIKit button and to the SwiftUI one (`glassEffectUnionId`, `glassEffectId`) on iOS, and to the `NSButton` on macOS.
+- The label follows the look: with `light` it takes `labelColorLight` (#153), with `dark` `labelColorDark`.
+- The iOS 26 limit from #165 applies to buttons too. On iOS 26.0 and 26.2 the system switches glass under about 65 pt on its shorter side by itself: a 44 pt `light` button turns dark while near-black content is behind it, and its label turns with it, and a `dark` button turns light over near-white content. No public API stops this. A button with `minHeight: 66` or more keeps its look over any content (64 pt still switches). iOS 27 and macOS keep the look at any size.
+
+### Fixed — a dropdown or popup menu hid every `autoHideOnModal` widget (#188)
+While a Material `DropdownButton` or `PopupMenuButton` menu was open, every CN widget with `autoHideOnModal: true` was removed, app bar buttons the menu doesn't come near included. Since #149 a sheet or a dialog hides only the widgets it covers, but these menus were measured as the whole screen. Their route page starts with a `LayoutBuilder` as big as the screen, and the measure didn't see through it. It now does, so a menu counts as its own bounds. A route of your own whose page starts with a `LayoutBuilder` is measured right too.
+- The `LayoutBuilder` is matched by its public type, not by its class name, which an app built with `--obfuscate` renames. For the same reason `CNTabBarRouteObserver` now matches `CupertinoSheetRoute` and `ModalBottomSheetRoute` by type, so the tab bar hides under these sheets in an obfuscated app too. Sheet routes of other packages are still matched by a name containing `Sheet`, which only works without obfuscation.
+
+Thanks to @LucasLau00 for the report and the diagnosis, and to @Ashhad08 for the request.
+
+### Also
+- @enesgunumdogdu joins the contributors in the README.
+
+### Checked
+- #187, with glass buttons over white, 30 % grey, black and a dark gradient, in a light and a dark app (example: `issue187_button_glass_appearance_test.dart`). On iOS 26.0 and 26.2 (iPhone 17 Pro and 17 Pro Max simulators), over the grey in the dark app `light` buttons are light with the light label while `adaptive` is dark; over black every 44 pt button is dark, and a 72 pt or 66 pt `light` button stays light; 64 pt switches. On iOS 27.0 (iPhone 17 simulator) and macOS 27.2, every button keeps its look over every section.
+- #188, with glass `CNButton`s in a Material app bar and a dropdown, a popup menu, a small sheet and a dialog below (example: `issue188_dropdown_modal_rect_test.dart`). On the iOS 27.0 simulator the dropdown and the popup menu were measured as the full 402 × 874 screen and both app bar buttons were removed. Now they are measured as the menus (122 × 208 and 168 × 112) and the buttons stay, as with the sheet and the dialog. In a test on Flutter 3.44, dialogs, action sheets, a picker popup, `showMenu`, the date and time pickers and the Cupertino sheet are measured as their own bounds too.
+- The Swift sources typecheck against the iOS 26.0 SDK.
+
 ## 2.10.2
 
 > A `CNSearchBar`, a glass `CNButton` with a glass effect id and a `CNFloatingIsland` are drawn where Flutter puts them, also when they reach into the home-indicator area, the status bar or the keyboard (#184).
