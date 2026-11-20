@@ -57,7 +57,17 @@ class FloatingIslandPlatformView: NSObject, FlutterPlatformView {
 
         // Create SwiftUI view
         let floatingIslandView = FloatingIslandSwiftUI(viewModel: viewModel)
-        self.hostingController = UIHostingController(rootView: floatingIslandView)
+        let host = UIHostingController(rootView: floatingIslandView)
+        // Flutter places the island and draws its content over the pill, so
+        // the host must not take the window's safe area (#184). An island
+        // reaching into the status bar had its glass pill pushed down by the
+        // overlap, below its own content; one reaching into the
+        // home-indicator area was off by a few points. The native island is
+        // only used on iOS 26, so the check always passes there.
+        if #available(iOS 16.4, *) {
+            host.safeAreaRegions = []
+        }
+        self.hostingController = host
 
         super.init()
 
@@ -245,9 +255,14 @@ struct FloatingIslandSwiftUI: View {
             let currentHeight = viewModel.isExpanded ? viewModel.expandedHeight : viewModel.collapsedHeight
             let currentRadius = viewModel.isExpanded ? 24 : viewModel.cornerRadius
 
-            VStack {
+            // No spacing and no minimum spacer length: when Flutter gives
+            // the island just the pill's height, as a bottom island whose
+            // content is the pill's size has, the default 8 pt spacing and
+            // 8 pt spacer overflowed the stack and pushed the pill 8 pt below
+            // its frame. With room to spare the pill sits as before.
+            VStack(spacing: 0) {
                 if !viewModel.isTop {
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
 
                 islandContent(width: currentWidth, height: currentHeight, cornerRadius: currentRadius)
@@ -255,7 +270,7 @@ struct FloatingIslandSwiftUI: View {
                     .matchedGeometryEffect(id: "island", in: animation)
 
                 if viewModel.isTop {
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
             }
             .frame(maxWidth: .infinity)

@@ -1,9 +1,24 @@
-## Unreleased
+## 2.10.2
+
+> A `CNSearchBar`, a glass `CNButton` with a glass effect id and a `CNFloatingIsland` are drawn where Flutter puts them, also when they reach into the home-indicator area, the status bar or the keyboard (#184).
 
 ### Fixed — `CNSearchBar` drawn a few points off in a bottom sheet (#184)
 On some opens of a modal bottom sheet, a `CNSearchBar` was drawn about 5 pt higher inside its own frame, and stayed there until the sheet closed. The SwiftUI bar's `UIHostingController` took the window's safe area: when the platform view was laid out while overlapping the home indicator (the sheet sliding up) or the keyboard (the sheet sliding down), it inset the fixed-height bar by that overlap. The host now ignores safe areas (`safeAreaRegions = []`), as `CNGlassContainer`, the tab rail and the gauge already do, so the bar always fills the slot Flutter gives it.
 
-Thanks to the reporter of #184 for the diagnosis and the suggested fix.
+### Fixed — the same for a glass `CNButton` and `CNFloatingIsland`
+- A `CNButton` with `glassEffectUnionId` or `glassEffectId` (drawn by SwiftUI) was off-centre in its frame by half of its overlap with a safe area: 8 pt higher for a button whose lowest 16 pt are in the home-indicator area. Its host now ignores safe areas too.
+- A `CNFloatingIsland` reaching into the status bar had its glass pill pushed down by the overlap, below its own content: 42 pt for an island 20 pt from the top of an iPhone 17 Pro. Its host now ignores safe areas.
+- A bottom `CNFloatingIsland` whose content is the pill's height had its pill drawn 8 pt below its frame, wherever it was: the pill's stack added SwiftUI's default 8 pt spacing and an 8 pt spacer. The stack now has no spacing and the spacer no minimum length. An island with room to spare looks as before.
+
+`CNSwitch`, `CNStepper` and `CNGlassButtonGroup` already kept their place.
+
+Thanks to @FaaizParacha for the report and the diagnosis, and to @enesgunumdogdu for PR #185, which fixes the search bar and ships here as is.
+
+### Checked
+These checks use the iPhone 17 Pro simulator on iOS 26.0 and the iPhone 17 simulator on iOS 27.0, with a magenta outline drawn at each native view's Flutter frame (example: `issue184_search_bar_safe_area_test.dart`).
+- A row with a 48 pt search bar, a switch, a stepper and a glass button whose lowest 16 pt are in the home-indicator area. Before (iOS 26.0), the search bar's and the button's hosts applied a 16 pt bottom inset and both were drawn 8.0 pt higher than their outline. Now they are centred (0.0 pt) on iOS 26.0 and 27.0, as in the same row in the middle of the screen.
+- Three floating islands, at the top (42 pt in the status bar), in the middle and at the bottom (16 pt in the home-indicator area). Before (iOS 26.0), the top pill was 42 pt below its outline and the bottom one 8 pt below. Now each pill fills its outline on iOS 26.0 and 27.0.
+- A sheet with a search bar and a button in its header, opened four times, each right after the last one closed, twice with the keyboard up: in place every time, before and after. As in the report, the sheet case doesn't happen on the simulator; it is the same cause.
 
 ## 2.10.1
 

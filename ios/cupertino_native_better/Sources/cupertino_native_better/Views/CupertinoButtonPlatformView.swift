@@ -955,6 +955,11 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     self.swiftUIBase = base
     let hostingController = UIHostingController(rootView: base)
     hostingController.view.backgroundColor = UIColor.clear
+    // Flutter places the button, so the host must not take the window's
+    // safe area (#184): a button reaching into the home-indicator area (or
+    // the status bar, or the keyboard) was otherwise drawn off-centre in its
+    // frame, by half the overlap.
+    hostingController.safeAreaRegions = []
     self.hostingController = hostingController
     
     hostingController.view.translatesAutoresizingMaskIntoConstraints = false

@@ -350,6 +350,32 @@ class _Islands extends StatelessWidget {
     );
   }
 
+  Widget _group() {
+    return SizedBox(
+      width: 100,
+      child: CNGlassButtonGroup(
+        buttons: [
+          CNButtonData.icon(
+            icon: const CNSymbol('house'),
+            onPressed: () {},
+            config: const CNButtonDataConfig(
+              style: CNButtonStyle.glass,
+              glassEffectUnionId: 'issue184-group',
+            ),
+          ),
+          CNButtonData.icon(
+            icon: const CNSymbol('gear'),
+            onPressed: () {},
+            config: const CNButtonDataConfig(
+              style: CNButtonStyle.glass,
+              glassEffectUnionId: 'issue184-group',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -400,6 +426,21 @@ class _Islands extends StatelessWidget {
           outline(topMargin),
           outline(midTop),
           outline(size.height - bottomMargin - _h),
+          // A glass button group at the left, in the middle and reaching
+          // into the home-indicator area.
+          Positioned(
+            left: 12,
+            top: midTop,
+            child: _Outlined(key: const ValueKey('mid_group'), child: _group()),
+          ),
+          Positioned(
+            left: 12,
+            bottom: bottomMargin,
+            child: _Outlined(
+              key: const ValueKey('bottom_group'),
+              child: _group(),
+            ),
+          ),
         ],
       ),
     );
