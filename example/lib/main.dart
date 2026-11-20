@@ -90,6 +90,7 @@ import 'demos/issue178_popup_menu_rtl_open_test.dart';
 import 'demos/issue179_popup_menu_rtl_zero_padding_test.dart';
 import 'demos/issue181_popup_menu_item_font_test.dart';
 import 'demos/issue184_search_bar_safe_area_test.dart';
+import 'demos/issue187_button_glass_appearance_test.dart';
 import 'demos/issue188_dropdown_modal_rect_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
@@ -1669,6 +1670,24 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue184SearchBarSafeAreaTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#187: Button glass appearance'),
+                  leading: CNIcon(
+                    symbol: CNSymbol(
+                      'circle.lefthalf.filled',
+                      color: accentColor,
+                    ),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue187ButtonGlassAppearanceTestPage(),
                       ),
                     );
                   },
