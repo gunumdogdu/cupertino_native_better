@@ -1,3 +1,10 @@
+## Unreleased
+
+### Fixed — `CNSearchBar` drawn a few points off in a bottom sheet (#184)
+On some opens of a modal bottom sheet, a `CNSearchBar` was drawn about 5 pt higher inside its own frame, and stayed there until the sheet closed. The SwiftUI bar's `UIHostingController` took the window's safe area: when the platform view was laid out while overlapping the home indicator (the sheet sliding up) or the keyboard (the sheet sliding down), it inset the fixed-height bar by that overlap. The host now ignores safe areas (`safeAreaRegions = []`), as `CNGlassContainer`, the tab rail and the gauge already do, so the bar always fills the slot Flutter gives it.
+
+Thanks to the reporter of #184 for the diagnosis and the suggested fix.
+
 ## 2.10.1
 
 > Full pub.dev analysis points again with Flutter 3.50. No change in behaviour.

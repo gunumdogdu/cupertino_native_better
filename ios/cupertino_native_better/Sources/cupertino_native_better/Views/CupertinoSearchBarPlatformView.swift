@@ -125,7 +125,21 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             }
         )
 
-        self.hostingController = UIHostingController(rootView: searchBarView)
+        let host = UIHostingController(rootView: searchBarView)
+        // Don't propagate the window's safe area into the SwiftUI bar (#184).
+        // While a bottom sheet slides up over the home indicator, or slides
+        // down with the keyboard still up, the platform view is laid out
+        // overlapping a safe-area region. UIHostingController then insets the
+        // fixed-height SwiftUI content by that overlap, so the field is drawn
+        // a few points off inside its own frame, by an amount that depends on
+        // where the sheet was at that moment, until the sheet closes. Flutter
+        // already places the bar, so the host must use its full frame. Same
+        // fix as LiquidGlassContainerView, CNTabRailView and the gauge. The
+        // native bar is only used on iOS 26, so the check always passes there.
+        if #available(iOS 16.4, *) {
+            host.safeAreaRegions = []
+        }
+        self.hostingController = host
 
         super.init()
 
