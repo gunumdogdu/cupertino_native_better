@@ -29,6 +29,10 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
   /// the place of [labelColor] in that appearance.
   private var labelColorLight: UIColor? = nil
   private var labelColorDark: UIColor? = nil
+  /// `CNButtonConfig.appearance` (#187): "light" or "dark" fixes the look,
+  /// nil follows the app's brightness ([isDark]).
+  private var appearance: String? = nil
+  private var isDark: Bool = false
   private var labelFontWeight: Int? = nil  // Flutter FontWeight.value (0..8)
   /// `CNButtonConfig.padding`, by side; nil keeps the style's own inset.
   /// The vertical ones apply to a button with a title (#154).
@@ -107,6 +111,7 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         self.makeRound = makeRound
       }
       if let v = dict["isDark"] as? NSNumber { isDark = v.boolValue }
+      self.appearance = dict["appearance"] as? String
       if let style = dict["style"] as? [String: Any], let n = style["tint"] as? NSNumber { tint = Self.colorFromARGB(n.intValue) }
       if let bs = dict["buttonStyle"] as? String { buttonStyle = bs }
       if let e = dict["enabled"] as? NSNumber { enabled = e.boolValue }
@@ -148,7 +153,8 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
       self?.fitTitleToWidth()
       self?.runDueSizeActions()
     }
-    if #available(iOS 13.0, *) { container.overrideUserInterfaceStyle = isDark ? .dark : .light }
+    self.isDark = isDark
+    applyInterfaceStyle()
 
     // Create final image first (needed for both SwiftUI and UIKit paths)
     var finalImage: UIImage? = nil
@@ -625,7 +631,13 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
         } else { result(FlutterError(code: "bad_args", message: "Missing icon args", details: nil)) }
       case "setBrightness":
         if let args = call.arguments as? [String: Any], let isDark = (args["isDark"] as? NSNumber)?.boolValue {
-          if #available(iOS 13.0, *) { self.container.overrideUserInterfaceStyle = isDark ? .dark : .light }
+          self.isDark = isDark
+          // Sent with the brightness since #187; an older caller sends none.
+          if args.keys.contains("appearance") {
+            let a = args["appearance"] as? String
+            self.appearance = (a == "light" || a == "dark") ? a : nil
+          }
+          self.applyInterfaceStyle()
           result(nil)
         } else { result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)) }
       case "setImagePlacement":
@@ -731,6 +743,19 @@ class CupertinoButtonPlatformView: NSObject, FlutterPlatformView {
     guard let view = view else { return }
     view.isUserInteractionEnabled = interactive
     for sub in view.subviews { _cnSetInteractiveRecursive(sub, interactive) }
+  }
+
+  /// The light or dark look: the app's brightness, or the one fixed by
+  /// `CNButtonConfig.appearance` (#187), as for a `LiquidGlassContainer`
+  /// (#165). The glass and the default label take it from the container.
+  /// On iOS 26 the system still switches glass under about 65 pt by itself
+  /// over near-black or near-white content, whatever this trait.
+  private func applyInterfaceStyle() {
+    switch appearance {
+    case "light": container.overrideUserInterfaceStyle = .light
+    case "dark": container.overrideUserInterfaceStyle = .dark
+    default: container.overrideUserInterfaceStyle = isDark ? .dark : .light
+    }
   }
 
   /// Issue #40: build a title-text-attributes transformer that applies

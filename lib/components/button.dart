@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../style/button_style.dart';
+import '../style/glass_effect.dart';
 import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
@@ -188,6 +189,29 @@ class CNButtonConfig {
   /// [Curves.easeOut].
   final Curve sizeAnimationCurve;
 
+  /// Whether the button takes the light or the dark look (#187).
+  ///
+  /// Defaults to [CNGlassAppearance.adaptive], which follows the app's
+  /// brightness. [CNGlassAppearance.light] keeps a light button in a dark
+  /// app, and [CNGlassAppearance.dark] a dark one in a light app, as
+  /// [LiquidGlassConfig.appearance] does for a [LiquidGlassContainer]. For
+  /// the glass styles that is the glass; the system colours of the other
+  /// styles follow it too. The label follows the look, so with
+  /// [CNGlassAppearance.light] it takes [labelColorLight].
+  ///
+  /// On iOS 26 (seen on 26.0 and 26.2) the system still switches glass less
+  /// than about 65 pt on its shorter side by itself: light glass turns dark
+  /// while near-black content is behind it, and dark glass turns light over
+  /// near-white content, and the label switches with it. A button is 44 pt
+  /// high, so this applies unless [minHeight] is 66 or more: such a button
+  /// keeps the look you choose over any content. On iOS 27 and macOS the
+  /// glass keeps it at any size. See [CNGlassAppearance].
+  ///
+  /// Colours given as [CupertinoDynamicColor] (a tint, [labelColor]) are
+  /// resolved with the app's brightness. Applies to the native button (iOS
+  /// 26 and later, macOS).
+  final CNGlassAppearance appearance;
+
   /// Creates a configuration for [CNButton].
   const CNButtonConfig({
     this.padding,
@@ -214,6 +238,7 @@ class CNButtonConfig {
     this.animateSizeChanges = false,
     this.sizeAnimationDuration = const Duration(milliseconds: 200),
     this.sizeAnimationCurve = Curves.easeOut,
+    this.appearance = CNGlassAppearance.adaptive,
   });
 }
 
@@ -350,6 +375,7 @@ class _CNButtonState extends State<CNButton>
 
   MethodChannel? _channel;
   bool? _lastIsDark;
+  CNGlassAppearance? _lastAppearance;
   int? _lastTint;
   String? _lastTitle;
   String? _lastIconName;
@@ -506,6 +532,9 @@ class _CNButtonState extends State<CNButton>
   @override
   void didUpdateWidget(covariant CNButton oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.config.appearance != widget.config.appearance) {
+      _syncBrightnessIfNeeded();
+    }
     _syncPropsToNativeIfNeeded();
   }
 
@@ -683,6 +712,8 @@ class _CNButtonState extends State<CNButton>
       'buttonStyle': widget.config.style.name,
       'enabled': (widget.enabled && widget.onPressed != null),
       'isDark': _isDark,
+      if (widget.config.appearance != CNGlassAppearance.adaptive)
+        'appearance': widget.config.appearance.name,
       'style': encodeStyle(context, tint: _effectiveTint),
       'imagePlacement': widget.config.imagePlacement.name,
       if (widget.config.imagePadding != null)
@@ -924,6 +955,7 @@ class _CNButtonState extends State<CNButton>
     _intrinsicHeight = null;
     _lastTint = resolveColorToArgb(_effectiveTint, context);
     _lastIsDark = _isDark;
+    _lastAppearance = widget.config.appearance;
     _lastTitle = widget.label;
     _lastIconName = widget.icon?.name;
     _lastIconSize = widget.icon?.size;
@@ -1394,10 +1426,15 @@ class _CNButtonState extends State<CNButton>
     if (ch == null) return;
     // Capture context-derived values before any awaits
     final isDark = _isDark;
+    final appearance = widget.config.appearance;
     final tint = resolveColorToArgb(_effectiveTint, context);
-    if (_lastIsDark != isDark) {
-      await ch.invokeMethod('setBrightness', {'isDark': isDark});
+    if (_lastIsDark != isDark || _lastAppearance != appearance) {
       _lastIsDark = isDark;
+      _lastAppearance = appearance;
+      await ch.invokeMethod('setBrightness', {
+        'isDark': isDark,
+        'appearance': appearance.name,
+      });
     }
     // Also propagate theme-driven tint changes (e.g., accent color changes)
     if (_lastTint != tint) {

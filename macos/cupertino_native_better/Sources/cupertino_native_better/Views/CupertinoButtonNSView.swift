@@ -16,6 +16,10 @@ class CupertinoButtonNSView: NSView {
   private var isInteractive: Bool = true
   private var usesSwiftUI: Bool = false
   private var semanticLabel: String?
+  /// `CNButtonConfig.appearance` (#187): "light" or "dark" fixes the look,
+  /// nil follows the app's brightness ([isDark]).
+  private var fixedAppearance: String?
+  private var isDark = false
   /// Changes held until the view has a given size: a new title with the size
   /// it needs, or the first appearance at the measured size (#154).
   private var sizeActions: [(id: Int, width: CGFloat?, height: CGFloat?, minWidth: CGFloat?, run: () -> Void)] = []
@@ -60,7 +64,9 @@ class CupertinoButtonNSView: NSView {
 
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
-    appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+    self.isDark = isDark
+    fixedAppearance = dict["appearance"] as? String
+    applyAppearance()
 
     let image = icon.makeImage()
 
@@ -155,6 +161,19 @@ class CupertinoButtonNSView: NSView {
   }
 
   // MARK: - Method calls
+
+  /// The light or dark look: the app's brightness, or the one fixed by
+  /// `CNButtonConfig.appearance` (#187). The glass bezel and the label take
+  /// it from the view.
+  private func applyAppearance() {
+    let dark: Bool
+    switch fixedAppearance {
+    case "light": dark = false
+    case "dark": dark = true
+    default: dark = isDark
+    }
+    appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+  }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     let args = call.arguments as? [String: Any]
@@ -291,7 +310,13 @@ class CupertinoButtonNSView: NSView {
       guard let isDark = (args?["isDark"] as? NSNumber)?.boolValue else {
         result(FlutterError(code: "bad_args", message: "Missing isDark", details: nil)); return
       }
-      appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+      self.isDark = isDark
+      // Sent with the brightness since #187; an older caller sends none.
+      if let args = args, args.keys.contains("appearance") {
+        let a = args["appearance"] as? String
+        fixedAppearance = (a == "light" || a == "dark") ? a : nil
+      }
+      applyAppearance()
       result(nil)
     case "setPressed":
       // NSButton draws its own pressed state; only the SwiftUI button needs
