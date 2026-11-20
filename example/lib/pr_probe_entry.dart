@@ -174,6 +174,12 @@
 //     (#181: itemLabelFontFamily on the popup menu's item titles, left to
 //     right and right to left; ITEM_FONT=system|Tajawal|Georgia; AUTO=true
 //     prints `CNB_READY 181`)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue184
+//     (#184: CNSearchBar, CNSwitch, CNStepper and a glass union CNButton
+//     in the middle of the screen, reaching into the home-indicator area,
+//     and in a sheet header opened four times; AUTO=true prints `CNB_RECT`
+//     and `CNB_SHOT` lines; ISLAND=true shows three CNFloatingIslands
+//     instead, in the status bar, the middle and the home-indicator area)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -270,6 +276,7 @@ import 'demos/issue176_reduce_transparency_test.dart';
 import 'demos/issue178_popup_menu_rtl_open_test.dart';
 import 'demos/issue179_popup_menu_rtl_zero_padding_test.dart';
 import 'demos/issue181_popup_menu_item_font_test.dart';
+import 'demos/issue184_search_bar_safe_area_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -474,6 +481,12 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue179') {
       return const Issue179PopupMenuRtlZeroPaddingTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue184') {
+      return const Issue184SearchBarSafeAreaTestPage(
+        autoCycle: _auto,
+        islands: bool.fromEnvironment('ISLAND'),
+      );
     }
     if (_probe == 'issue181') {
       return const Issue181PopupMenuItemFontTestPage(

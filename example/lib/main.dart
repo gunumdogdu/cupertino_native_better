@@ -89,6 +89,7 @@ import 'demos/issue176_reduce_transparency_test.dart';
 import 'demos/issue178_popup_menu_rtl_open_test.dart';
 import 'demos/issue179_popup_menu_rtl_zero_padding_test.dart';
 import 'demos/issue181_popup_menu_item_font_test.dart';
+import 'demos/issue184_search_bar_safe_area_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -1652,6 +1653,21 @@ class HomePage extends StatelessWidget {
                       CupertinoPageRoute(
                         builder: (_) =>
                             const Issue181PopupMenuItemFontTestPage(),
+                      ),
+                    );
+                  },
+                ),
+                CupertinoListTile(
+                  title: Text('#184: Search bar safe area'),
+                  leading: CNIcon(
+                    symbol: CNSymbol('magnifyingglass', color: accentColor),
+                  ),
+                  trailing: CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            const Issue184SearchBarSafeAreaTestPage(),
                       ),
                     );
                   },
