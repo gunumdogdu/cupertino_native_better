@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+// ignore: deprecated_member_use
+import 'package:flutter/material.dart' show ModalBottomSheetRoute;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -2547,15 +2549,21 @@ class CNTabBarRouteObserver extends NavigatorObserver {
   ///   - Regular `PageRoute` pushes (Material/Cupertino page routes):
   ///     the new page replaces the current view entirely, so the tab
   ///     bar is offscreen anyway.
+  ///
+  /// The two framework sheet routes are matched by type first: an app
+  /// built with `--obfuscate` renames every class, so there the name test
+  /// matches nothing.
   bool _isModal(Route<dynamic> route) {
-    return route.runtimeType.toString().contains('Sheet');
+    return route is CupertinoSheetRoute ||
+        route is ModalBottomSheetRoute ||
+        route.runtimeType.toString().contains('Sheet');
   }
 
   /// Broader predicate: matches any modal-like route that visually covers
   /// (fully or partially) the underlying page. Used to drive the halo-
   /// containment counter for non-tab-bar glass widgets.
   bool _isAnyModal(Route<dynamic> route) {
-    if (route is PopupRoute) return true;
+    if (route is PopupRoute || route is CupertinoSheetRoute) return true;
     final name = route.runtimeType.toString();
     return name.contains('Sheet') ||
         name.contains('Popup') ||

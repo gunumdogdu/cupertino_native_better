@@ -88,7 +88,9 @@ class _ContentWalk {
 
   /// The render object of an `OverlayPortal`, private to the framework: it
   /// paints its child only (the portal's overlay child is painted by the
-  /// overlay). Sheet packages wrap their sheet in one (#156).
+  /// overlay). Sheet packages wrap their sheet in one (#156). It has no
+  /// public type to match, so in an app built with `--obfuscate`, which
+  /// renames classes, it counts as painting its whole box: more, never less.
   static bool _isOverlayPortal(RenderBox ro) =>
       ro.runtimeType.toString() == '_RenderLayoutSurrogateProxyBox';
 
@@ -97,6 +99,11 @@ class _ContentWalk {
       // Shifted boxes (padding, alignment, custom single-child layouts such
       // as the Material bottom sheet's) paint their child at an offset.
       ro is RenderShiftedBox ||
+      // A `LayoutBuilder` (and an `OverlayPortal`'s overlay child layout
+      // builder). The dropdown and popup menu routes start their page with
+      // one, and it is as big as the screen (#188). Matched by its public
+      // mixin, not by the private class name, which `--obfuscate` renames.
+      ro is RenderAbstractLayoutBuilderMixin ||
       ro is RenderRepaintBoundary ||
       ro is RenderSemanticsGestureHandler ||
       ro is RenderTapRegion ||
