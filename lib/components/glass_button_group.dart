@@ -116,6 +116,16 @@ class CNGlassButtonGroup extends StatefulWidget {
   int get _effectiveButtonCount =>
       _buttonWidgets != null ? _buttonWidgets.length : buttons.length;
 
+  /// Room on the right for a badge, which reaches 6px past the last button.
+  /// None when no button shows a badge, so the group's frame is its buttons
+  /// and it lines up with what's beside it.
+  double get _badgeOverflow {
+    final hasBadge = _buttonWidgets != null
+        ? _buttonWidgets.any((button) => (button.badgeCount ?? 0) > 0)
+        : buttons.any((button) => (button.badgeCount ?? 0) > 0);
+    return hasBadge ? 6.0 : 0.0;
+  }
+
   @override
   State<CNGlassButtonGroup> createState() => _CNGlassButtonGroupState();
 }
@@ -200,10 +210,10 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
         if (widget.axis == Axis.horizontal) {
           final totalHeight = _getEffectiveMinHeight() + 3.0;
           final width = constraints.hasBoundedWidth
-              ? constraints.maxWidth + 6.0
+              ? constraints.maxWidth + widget._badgeOverflow
               : (widget._effectiveButtonCount * 44.0 +
                     ((widget._effectiveButtonCount - 1) * widget.spacing) +
-                    6.0);
+                    widget._badgeOverflow);
           final hidden = maybeHiddenPlaceholder(
             height: totalHeight,
             width: width,
@@ -262,11 +272,11 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
               if (widget.axis == Axis.horizontal) {
                 final totalHeight = _getEffectiveMinHeight() + 3.0;
                 final width = constraints.hasBoundedWidth
-                    ? constraints.maxWidth + 6.0
+                    ? constraints.maxWidth + widget._badgeOverflow
                     : (widget._effectiveButtonCount * 44.0 +
                           ((widget._effectiveButtonCount - 1) *
                               widget.spacing) +
-                          6.0);
+                          widget._badgeOverflow);
                 return SizedBox(height: totalHeight, width: width);
               } else {
                 final rawHeight =
@@ -308,7 +318,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
         if (widget.axis == Axis.horizontal) {
           final buttonHeight = _getEffectiveMinHeight();
           // Add 3px to height for badge overflow at top (badge is 18px tall, positioned at y=0)
-          // Add 6px to width for badge overflow at right (badge extends 6px beyond last button)
+          // Add _badgeOverflow to width for a badge on the right (one extends 6px beyond the last button)
           // Native side offsets buttons by 3px vertically to keep badge within bounds
           final totalHeight = buttonHeight + 3.0;
           return LayoutBuilder(
@@ -318,9 +328,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
               // cutting the glass's glow into a box (#156).
               if (constraints.hasBoundedWidth) {
                 return SizedBox(
-                  width:
-                      constraints.maxWidth +
-                      6.0, // Add 6px for badge overflow on right
+                  width: constraints.maxWidth + widget._badgeOverflow,
                   height: totalHeight,
                   child: platformView,
                 );
@@ -328,7 +336,7 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
                 final estimatedWidth =
                     widget._effectiveButtonCount * 44.0 +
                     ((widget._effectiveButtonCount - 1) * widget.spacing) +
-                    6.0; // Add 6px for badge overflow on right
+                    widget._badgeOverflow;
                 return SizedBox(
                   width: estimatedWidth,
                   height: totalHeight,

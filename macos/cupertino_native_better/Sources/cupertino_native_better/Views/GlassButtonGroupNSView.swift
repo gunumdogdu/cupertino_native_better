@@ -290,7 +290,8 @@ private final class MacGroupBadgeView: NSView {
 
 /// `CNGlassButtonGroup` on macOS 26+: the buttons in a SwiftUI
 /// `GlassEffectContainer`, laid out like the iOS view (3 points above for
-/// the badges, 6 points to the right) so Flutter sizes both the same way.
+/// the badges, and 6 points to the right while a button shows one) so
+/// Flutter sizes both the same way.
 @available(macOS 26.0, *)
 class GlassButtonGroupNSView: NSView {
   private let channel: FlutterMethodChannel
@@ -298,6 +299,14 @@ class GlassButtonGroupNSView: NSView {
   private let hostingView: NSHostingView<MacGlassButtonGroupSwiftUI>
   private var buttonFrames: [Int: CGRect] = [:]
   private var badgeViews: [MacGroupBadgeView] = []
+  // the hosting view's right edge; moves in when a badge needs room
+  private var hostingTrailing: NSLayoutConstraint?
+
+  /// Room on the right for a badge, which reaches 6 points past the last
+  /// button. None without badges, so the buttons fill the group's frame.
+  private var badgeInset: CGFloat {
+    model.buttons.contains { ($0.badgeCount ?? 0) > 0 } ? 6 : 0
+  }
 
   init(viewId: Int64, args: Any?, messenger: FlutterBinaryMessenger) {
     self.channel = FlutterMethodChannel(
@@ -322,9 +331,11 @@ class GlassButtonGroupNSView: NSView {
     hostingView.sizingOptions = []
     hostingView.translatesAutoresizingMaskIntoConstraints = false
     addSubview(hostingView)
+    let trailing = hostingView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -badgeInset)
+    hostingTrailing = trailing
     let constraints = [
       hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
-      hostingView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+      trailing,
       hostingView.topAnchor.constraint(equalTo: topAnchor, constant: 3),
       hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
     ]
@@ -427,6 +438,11 @@ class GlassButtonGroupNSView: NSView {
 
   /// Puts a badge over the top-right corner of each button with a count.
   private func updateBadges() {
+    // badges came or went: the hosting view's right edge follows
+    if let trailing = hostingTrailing, trailing.constant != -badgeInset {
+      trailing.constant = -badgeInset
+    }
+
     badgeViews.forEach { $0.removeFromSuperview() }
     badgeViews.removeAll()
     let origin = hostingView.frame.origin
