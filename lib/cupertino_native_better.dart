@@ -96,6 +96,7 @@ export 'components/segmented_control.dart';
 export 'components/glass_button_group.dart';
 export 'components/liquid_glass_container.dart';
 export 'components/search_bar.dart';
+export 'components/search_bar_form_field.dart';
 export 'components/progress_indicator.dart';
 export 'components/pop_up_button.dart';
 export 'components/gauge.dart';

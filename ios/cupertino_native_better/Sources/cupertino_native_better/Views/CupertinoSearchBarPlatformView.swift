@@ -47,6 +47,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var clearButtonLabel = "Clear"
         var rtl: Bool? = nil
         var labelFont: CNSearchBarFont? = nil
+        var maxLength = 0
+        var errorColor: UIColor? = nil
 
         if let dict = args as? [String: Any] {
             if let v = dict["placeholder"] as? String { placeholder = v }
@@ -74,6 +76,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["clearButtonLabel"] as? String, !v.isEmpty { clearButtonLabel = v }
             rtl = CNLayoutDirection.read(dict)
             labelFont = CNSearchBarFont(dict)
+            if let v = dict["maxLength"] as? NSNumber { maxLength = v.intValue }
+            if let v = dict["errorColor"] as? NSNumber { errorColor = ImageUtils.colorFromARGB(v.intValue) }
         }
 
         let model = CNSearchBarModel(
@@ -93,6 +97,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         model.labelFont = labelFont
         model.placeholder = placeholder
         model.cancelText = cancelText
+        model.maxLength = maxLength
+        model.errorColor = errorColor.map { Color(uiColor: $0) }
         // ...and with its text, which Flutter already has (#134).
         if !text.isEmpty { model.setText(text, notify: false) }
 
@@ -204,6 +210,18 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
                     self.model.layoutDirection = direction
                 }
                 result(nil)
+            case "setMaxLength":
+                // #192: the longest text the field takes; 0 for no limit.
+                self.model.maxLength = (args?["maxLength"] as? NSNumber)?.intValue ?? 0
+                if self.model.maxLength > 0, self.model.searchText.count > self.model.maxLength {
+                    self.model.setText(self.model.limited(self.model.searchText), notify: true)
+                }
+                result(nil)
+            case "setError":
+                // #192: the outline of a field in error; no color clears it.
+                self.model.errorColor = (args?["color"] as? NSNumber)
+                    .map { Color(uiColor: ImageUtils.colorFromARGB($0.intValue)) }
+                result(nil)
             case "setLabelFont":
                 self.model.labelFont = CNSearchBarFont(args)
                 result(nil)
@@ -293,6 +311,11 @@ final class CNSearchBarModel: ObservableObject {
     /// app's language (#173).
     @Published var placeholder = "Search"
     @Published var cancelText = "Cancel"
+    /// The longest text the field takes (#192), in characters as the user
+    /// sees them; 0 for no limit. Longer input is cut before it is shown.
+    var maxLength = 0
+    /// The color of the outline of a field in error (#192); nil for none.
+    @Published var errorColor: Color? = nil
     /// Bumped on each `focus`/`unfocus` call; [wantsFocus] says which.
     @Published var focusToken: Int = 0
     private(set) var wantsFocus = false
@@ -326,7 +349,14 @@ final class CNSearchBarModel: ObservableObject {
         onTextChanged(text)
     }
 
+    /// [text] cut to [maxLength] (#192).
+    func limited(_ text: String) -> String {
+        guard maxLength > 0, text.count > maxLength else { return text }
+        return String(text.prefix(maxLength))
+    }
+
     func setText(_ text: String, notify: Bool) {
+        let text = limited(text)
         if !notify { reportedText = text }
         searchText = text
         if notify { report(text) }
@@ -478,7 +508,13 @@ struct CNSearchBarSwiftUI: View {
                     // Text field. The placeholder is the prompt, so
                     // `placeholderColor` reaches it; the label is what
                     // VoiceOver reads (#171).
-                    TextField(text: $model.searchText, prompt: prompt) {
+                    // The text goes through `limited` before the field
+                    // shows it, so input past `maxLength` never appears
+                    // (#192).
+                    TextField(text: Binding(
+                        get: { model.searchText },
+                        set: { model.searchText = model.limited($0) }
+                    ), prompt: prompt) {
                         Text(model.placeholder)
                     }
                     .font(labelFont)
@@ -524,6 +560,10 @@ struct CNSearchBarSwiftUI: View {
                 backgroundColor: backgroundColor,
                 shadow: shadow && !model.glassContained
             ))
+            // Error styling (#192): an outline in the error color.
+            .overlay(
+                Capsule().strokeBorder(model.errorColor ?? .clear, lineWidth: 1.5)
+            )
             .contentShape(Capsule())
             .onTapGesture {
                 if !isExpanded && expandable {

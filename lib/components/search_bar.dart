@@ -245,7 +245,51 @@ class CNSearchBar extends StatefulWidget {
     this.labelFontFamily,
     this.labelFontSize,
     this.labelFontWeight,
+    this.maxLength,
+    this.inputFormatters,
+    this.errorText,
+    this.errorStyle,
+    this.errorColor,
   });
+
+  /// The longest text the field takes, in characters as the user sees them
+  /// (grapheme clusters, as [LengthLimitingTextInputFormatter] counts). Null
+  /// for no limit (#192).
+  ///
+  /// On iOS 26+ it is enforced by the native field before the text changes,
+  /// so a character past the limit never appears. The bar drawn in Flutter
+  /// enforces it as its text field does; on macOS the text is cut right
+  /// after the change.
+  final int? maxLength;
+
+  /// Formatters run on every change of the text, in order, before
+  /// [onChanged] is called (#192), as [CupertinoTextField.inputFormatters]
+  /// do; [maxLength] runs after them.
+  ///
+  /// The bar drawn in Flutter applies them as its text field does. A native
+  /// bar (iOS 26+, macOS) runs them in Dart on each change and gives the
+  /// field the formatted text back, so a rejected character may show for a
+  /// frame before it is removed; use [maxLength] for a limit applied before
+  /// the text shows.
+  final List<TextInputFormatter>? inputFormatters;
+
+  /// An error to show under the bar, with the bar outlined in [errorColor]
+  /// (#192).
+  ///
+  /// Null shows the bar alone. Any other value, an empty string included,
+  /// lays the bar out with room for the error under it; an empty string
+  /// shows no error. To show and hide an error without the native field
+  /// being created again (which would end editing), keep the value non-null
+  /// and pass an empty string for "no error", as [CNSearchBarFormField]
+  /// does.
+  final String? errorText;
+
+  /// The style of [errorText]. Defaults to 13 pt text in [errorColor].
+  final TextStyle? errorStyle;
+
+  /// The color of the error outline and of [errorText]. Defaults to
+  /// [CupertinoColors.systemRed].
+  final Color? errorColor;
 
   /// Placeholder text shown when the search field is empty.
   final String placeholder;
@@ -470,7 +514,7 @@ class _CNSearchBarState extends State<CNSearchBar>
 
     // The initial text is the bar's text from the start: it is sent with
     // the native view's creation params and is not reported (#170).
-    _searchText = widget.initialText ?? '';
+    _searchText = _formatted('', widget.initialText ?? '');
     _textController = TextEditingController(text: _searchText);
     _textController.addListener(_onTextChanged);
 
@@ -507,7 +551,64 @@ class _CNSearchBarState extends State<CNSearchBar>
         widget.cancelText != oldWidget.cancelText) {
       _syncLabels();
     }
+    if (widget.maxLength != oldWidget.maxLength) {
+      _channel
+          ?.invokeOptionalMethod('setMaxLength', {
+            'maxLength': widget.maxLength ?? 0,
+          })
+          .catchError((Object _) {});
+      // The text already there is cut to a new, shorter limit.
+      final limited = _formatted(_searchText, _searchText);
+      if (limited != _searchText) _textController.text = limited;
+    }
+    final error = _errorArgb(context);
+    if (error != _lastErrorArgb) {
+      _lastErrorArgb = error;
+      _channel
+          ?.invokeOptionalMethod('setError', {'color': ?error})
+          .catchError((Object _) {});
+    }
   }
+
+  /// The formatters the text goes through: [CNSearchBar.inputFormatters],
+  /// then [CNSearchBar.maxLength] (#192).
+  List<TextInputFormatter> get _formatters => [
+    ...?widget.inputFormatters,
+    if (widget.maxLength != null)
+      LengthLimitingTextInputFormatter(widget.maxLength),
+  ];
+
+  /// [text] after [_formatters], as a change from [previous] with the
+  /// caret at the end.
+  String _formatted(String previous, String text) {
+    final formatters = _formatters;
+    if (formatters.isEmpty) return text;
+    var oldValue = TextEditingValue(
+      text: previous,
+      selection: TextSelection.collapsed(offset: previous.length),
+    );
+    var value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    for (final formatter in formatters) {
+      value = formatter.formatEditUpdate(oldValue, value);
+    }
+    return value.text;
+  }
+
+  /// Whether [CNSearchBar.errorText] has an error to show.
+  bool get _hasError => widget.errorText?.isNotEmpty ?? false;
+
+  Color _errorColor(BuildContext context) =>
+      widget.errorColor ?? CupertinoColors.systemRed.resolveFrom(context);
+
+  /// The error outline's color as sent to the native field, null for none.
+  int? _errorArgb(BuildContext context) =>
+      _hasError ? resolveColorToArgb(_errorColor(context), context) : null;
+
+  /// The error outline last sent to the native field.
+  int? _lastErrorArgb;
 
   /// Sends a new placeholder and Cancel title to the iOS bar, e.g. after an
   /// in-app language switch (#173); macOS takes the placeholder in
@@ -650,6 +751,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     _lastIsDark = ThemeHelper.isDark(context);
     _lastRtl = nativeRtl(context, widget.textDirection);
     _lastLabelFont = _labelFont;
+    _lastErrorArgb = _errorArgb(context);
     if (_usesMacSearchField) _lastMacConfig = _macConfig(context);
     // Sends a setText made before the view existed.
     _controller._attach(ch);
@@ -659,8 +761,22 @@ class _CNSearchBarState extends State<CNSearchBar>
   Future<dynamic> _onMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'textChanged':
-        final text = call.arguments['text'] as String? ?? '';
+        final typed = call.arguments['text'] as String? ?? '';
+        // Formatters and the length limit run in Dart for a native field;
+        // the field takes the formatted text back without reporting it
+        // again (#192).
+        final text = _formatted(_searchText, typed);
+        if (text != typed) {
+          _channel
+              ?.invokeMethod('textChanged', {'text': text})
+              .catchError((Object _) {});
+        }
         if (mounted) {
+          if (text == _searchText) {
+            // A change the formatters undid: nothing changed for Flutter.
+            if (_textController.text != text) _textController.text = text;
+            break;
+          }
           setState(() => _searchText = text);
           _textController.text = text;
           widget.onChanged?.call(text);
@@ -763,6 +879,34 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   @override
   Widget build(BuildContext context) {
+    final bar = _buildBar(context);
+    if (widget.errorText == null) return bar;
+    // Room for the error under the bar (#192). The bar stays the first
+    // child, so a native field isn't created again when the error comes or
+    // goes.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        bar,
+        if (_hasError)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 12, top: 6),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                widget.errorText!,
+                style:
+                    widget.errorStyle ??
+                    TextStyle(fontSize: 13, color: _errorColor(context)),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBar(BuildContext context) {
     // macOS: NSSearchField, which every supported macOS has.
     if (_usesMacSearchField) {
       return _buildMacOSSearchBar(context);
@@ -796,6 +940,8 @@ class _CNSearchBarState extends State<CNSearchBar>
     'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
     'clearButtonColor': resolveColorToArgb(_clearButtonColor, context),
     'shadow': widget.showShadow,
+    'maxLength': widget.maxLength ?? 0,
+    'errorColor': ?_errorArgb(context),
     'showCancelButton': widget.showCancelButton,
     'cancelText': widget.cancelText,
     'autofocus': widget.autofocus,
@@ -1010,6 +1156,17 @@ class _CNSearchBarState extends State<CNSearchBar>
                       curve: Curves.easeOutCubic,
                       width: currentWidth,
                       height: widget.expandedHeight,
+                      // Error styling (#192).
+                      foregroundDecoration: _hasError
+                          ? ShapeDecoration(
+                              shape: StadiumBorder(
+                                side: BorderSide(
+                                  color: _errorColor(context),
+                                  width: 1.5,
+                                ),
+                              ),
+                            )
+                          : null,
                       child: GestureDetector(
                         onTap: _onTap,
                         child: LiquidGlassContainer(
@@ -1057,6 +1214,7 @@ class _CNSearchBarState extends State<CNSearchBar>
                                               widget.textCapitalization,
                                           autocorrect: widget.autocorrect,
                                           keyboardType: widget.keyboardType,
+                                          inputFormatters: _formatters,
                                           textInputAction:
                                               TextInputAction.search,
                                         ),
