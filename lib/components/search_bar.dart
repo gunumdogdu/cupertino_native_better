@@ -248,8 +248,7 @@ class CNSearchBar extends StatefulWidget {
     this.maxLength,
     this.inputFormatters,
     this.errorText,
-    this.errorStyle,
-    this.errorColor,
+    this.errorStyle = const CNSearchBarErrorStyle(),
   });
 
   /// The longest text the field takes, in characters as the user sees them
@@ -273,8 +272,8 @@ class CNSearchBar extends StatefulWidget {
   /// the text shows.
   final List<TextInputFormatter>? inputFormatters;
 
-  /// An error to show under the bar, with the bar outlined in [errorColor]
-  /// (#192).
+  /// An error to show under the bar, with the bar outlined, as
+  /// [errorStyle] says (#192).
   ///
   /// Null shows the bar alone. Any other value, an empty string included,
   /// lays the bar out with room for the error under it; an empty string
@@ -284,12 +283,10 @@ class CNSearchBar extends StatefulWidget {
   /// does.
   final String? errorText;
 
-  /// The style of [errorText]. Defaults to 13 pt text in [errorColor].
-  final TextStyle? errorStyle;
-
-  /// The color of the error outline and of [errorText]. Defaults to
-  /// [CupertinoColors.systemRed].
-  final Color? errorColor;
+  /// How [errorText] and the error outline look: the text's style, color,
+  /// padding, icon and lines, whether the bar is outlined, and a builder
+  /// that replaces the default error widget (#192).
+  final CNSearchBarErrorStyle errorStyle;
 
   /// Placeholder text shown when the search field is empty.
   final String placeholder;
@@ -562,10 +559,12 @@ class _CNSearchBarState extends State<CNSearchBar>
       if (limited != _searchText) _textController.text = limited;
     }
     final error = _errorArgb(context);
-    if (error != _lastErrorArgb) {
+    final width = widget.errorStyle.outlineWidth;
+    if (error != _lastErrorArgb || width != _lastErrorWidth) {
       _lastErrorArgb = error;
+      _lastErrorWidth = width;
       _channel
-          ?.invokeOptionalMethod('setError', {'color': ?error})
+          ?.invokeOptionalMethod('setError', {'color': ?error, 'width': width})
           .catchError((Object _) {});
     }
   }
@@ -600,12 +599,27 @@ class _CNSearchBarState extends State<CNSearchBar>
   /// Whether [CNSearchBar.errorText] has an error to show.
   bool get _hasError => widget.errorText?.isNotEmpty ?? false;
 
+  /// [CNSearchBarErrorStyle.color], by default the system red.
   Color _errorColor(BuildContext context) =>
-      widget.errorColor ?? CupertinoColors.systemRed.resolveFrom(context);
+      widget.errorStyle.color ?? CupertinoColors.systemRed.resolveFrom(context);
+
+  /// The color of the error outline, null when there is none.
+  Color? _outlineColor(BuildContext context) {
+    final style = widget.errorStyle;
+    if (!_hasError || !style.showOutline || style.outlineWidth <= 0) {
+      return null;
+    }
+    return style.outlineColor ?? _errorColor(context);
+  }
 
   /// The error outline's color as sent to the native field, null for none.
-  int? _errorArgb(BuildContext context) =>
-      _hasError ? resolveColorToArgb(_errorColor(context), context) : null;
+  int? _errorArgb(BuildContext context) {
+    final color = _outlineColor(context);
+    return color == null ? null : resolveColorToArgb(color, context);
+  }
+
+  /// The error outline's width last sent to the native field.
+  double? _lastErrorWidth;
 
   /// The error outline last sent to the native field.
   int? _lastErrorArgb;
@@ -752,6 +766,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     _lastRtl = nativeRtl(context, widget.textDirection);
     _lastLabelFont = _labelFont;
     _lastErrorArgb = _errorArgb(context);
+    _lastErrorWidth = widget.errorStyle.outlineWidth;
     if (_usesMacSearchField) _lastMacConfig = _macConfig(context);
     // Sends a setText made before the view existed.
     _controller._attach(ch);
@@ -887,22 +902,54 @@ class _CNSearchBarState extends State<CNSearchBar>
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        bar,
-        if (_hasError)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 12, top: 6),
-            child: Semantics(
-              liveRegion: true,
-              child: Text(
-                widget.errorText!,
-                style:
-                    widget.errorStyle ??
-                    TextStyle(fontSize: 13, color: _errorColor(context)),
-              ),
-            ),
-          ),
-      ],
+      children: [bar, if (_hasError) _buildError(context, widget.errorText!)],
+    );
+  }
+
+  /// The error under the bar, as [CNSearchBar.errorStyle] says (#192).
+  Widget _buildError(BuildContext context, String message) {
+    final style = widget.errorStyle;
+    final Widget content;
+    final builder = style.builder;
+    if (builder != null) {
+      content = builder(context, message);
+    } else {
+      // The bar's label font, 13 pt, in the error color, under what the
+      // style sets.
+      final textStyle = TextStyle(
+        fontSize: 13,
+        color: _errorColor(context),
+        fontFamily: widget.labelFontFamily,
+      ).merge(style.textStyle);
+      final text = Text(
+        message,
+        style: textStyle,
+        textAlign: style.textAlign,
+        maxLines: style.maxLines,
+        overflow: style.overflow,
+      );
+      final icon = style.icon;
+      content = icon == null
+          ? text
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: style.iconAlignment,
+              children: [
+                IconTheme.merge(
+                  data: IconThemeData(
+                    color: textStyle.color,
+                    size: textStyle.fontSize,
+                  ),
+                  child: icon,
+                ),
+                SizedBox(width: style.iconSpacing),
+                Flexible(child: text),
+              ],
+            );
+    }
+    return Padding(
+      padding: style.padding,
+      child: Semantics(liveRegion: true, child: content),
     );
   }
 
@@ -942,6 +989,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     'shadow': widget.showShadow,
     'maxLength': widget.maxLength ?? 0,
     'errorColor': ?_errorArgb(context),
+    'errorWidth': widget.errorStyle.outlineWidth,
     'showCancelButton': widget.showCancelButton,
     'cancelText': widget.cancelText,
     'autofocus': widget.autofocus,
@@ -1157,16 +1205,16 @@ class _CNSearchBarState extends State<CNSearchBar>
                       width: currentWidth,
                       height: widget.expandedHeight,
                       // Error styling (#192).
-                      foregroundDecoration: _hasError
-                          ? ShapeDecoration(
+                      foregroundDecoration: _outlineColor(context) == null
+                          ? null
+                          : ShapeDecoration(
                               shape: StadiumBorder(
                                 side: BorderSide(
-                                  color: _errorColor(context),
-                                  width: 1.5,
+                                  color: _outlineColor(context)!,
+                                  width: widget.errorStyle.outlineWidth,
                                 ),
                               ),
-                            )
-                          : null,
+                            ),
                       child: GestureDetector(
                         onTap: _onTap,
                         child: LiquidGlassContainer(
@@ -1337,5 +1385,124 @@ class _RenderBarIntrinsics extends RenderProxyBox {
       constraints.hasBoundedWidth ? constraints.maxWidth : _maxWidth,
       _height,
     ),
+  );
+}
+
+/// How a [CNSearchBar]'s error looks (#192): the message under the bar and
+/// the outline of the bar.
+///
+/// Every value is optional. By default the message is 13 pt text in the
+/// bar's label font and the system red, 12 pt in from the start and 6 pt
+/// below the bar, and the bar is outlined 1.5 pt wide in the same red.
+///
+/// ```dart
+/// CNSearchBar(
+///   errorText: 'Please enter a name',
+///   errorStyle: CNSearchBarErrorStyle(
+///     textStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+///     color: Color(0xFFD70007),
+///     showOutline: false, // the message only
+///     icon: Icon(CupertinoIcons.exclamationmark_circle),
+///   ),
+/// )
+/// ```
+@immutable
+class CNSearchBarErrorStyle {
+  /// Creates the look of a [CNSearchBar]'s error.
+  const CNSearchBarErrorStyle({
+    this.textStyle,
+    this.color,
+    this.showOutline = true,
+    this.outlineColor,
+    this.outlineWidth = 1.5,
+    this.padding = const EdgeInsetsDirectional.only(start: 12, top: 6),
+    this.textAlign,
+    this.maxLines,
+    this.overflow,
+    this.icon,
+    this.iconSpacing = 4,
+    this.iconAlignment = CrossAxisAlignment.center,
+    this.builder,
+  });
+
+  /// The style of the message, merged over the default: 13 pt, [color],
+  /// the bar's `labelFontFamily`. Set any of its values, such as the font
+  /// size, family, weight, color, letter spacing or line height.
+  final TextStyle? textStyle;
+
+  /// The color of the message and of the outline, unless [textStyle] or
+  /// [outlineColor] sets its own. Defaults to [CupertinoColors.systemRed].
+  final Color? color;
+
+  /// Whether the bar is outlined while there is an error. False shows the
+  /// message only.
+  final bool showOutline;
+
+  /// The color of the outline. Defaults to [color].
+  final Color? outlineColor;
+
+  /// The width of the outline, in points. 0 draws none.
+  final double outlineWidth;
+
+  /// The space around the message.
+  final EdgeInsetsGeometry padding;
+
+  /// How the message's lines are aligned.
+  final TextAlign? textAlign;
+
+  /// The most lines the message takes; null wraps it on as many as it
+  /// needs.
+  final int? maxLines;
+
+  /// How a message longer than [maxLines] ends, for example
+  /// [TextOverflow.ellipsis].
+  final TextOverflow? overflow;
+
+  /// A widget before the message, such as an [Icon]. An icon takes the
+  /// message's color and font size unless it sets its own.
+  final Widget? icon;
+
+  /// The space between [icon] and the message.
+  final double iconSpacing;
+
+  /// How [icon] is aligned with a message on several lines.
+  final CrossAxisAlignment iconAlignment;
+
+  /// Builds the error widget in place of the default message, from the
+  /// error text. [padding] is still applied around it.
+  final Widget Function(BuildContext context, String errorText)? builder;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CNSearchBarErrorStyle &&
+      other.textStyle == textStyle &&
+      other.color == color &&
+      other.showOutline == showOutline &&
+      other.outlineColor == outlineColor &&
+      other.outlineWidth == outlineWidth &&
+      other.padding == padding &&
+      other.textAlign == textAlign &&
+      other.maxLines == maxLines &&
+      other.overflow == overflow &&
+      other.icon == icon &&
+      other.iconSpacing == iconSpacing &&
+      other.iconAlignment == iconAlignment &&
+      other.builder == builder;
+
+  @override
+  int get hashCode => Object.hash(
+    textStyle,
+    color,
+    showOutline,
+    outlineColor,
+    outlineWidth,
+    padding,
+    textAlign,
+    maxLines,
+    overflow,
+    icon,
+    iconSpacing,
+    iconAlignment,
+    builder,
   );
 }

@@ -207,6 +207,111 @@ void main() {
     }, skip: skip);
   });
 
+  group('#192 CNSearchBarErrorStyle', () {
+    testWidgets('showOutline: false shows the message only', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester, 'CNSearchBar');
+      await tester.pumpWidget(
+        host(
+          const CNSearchBar(
+            expandable: false,
+            errorText: 'Required',
+            errorStyle: CNSearchBarErrorStyle(showOutline: false),
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(find.text('Required'), findsOneWidget);
+      expect(creationParams().containsKey('errorColor'), isFalse);
+      await tearDownView(tester);
+    }, skip: skip);
+
+    testWidgets('outline color and width reach the native field', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester, 'CNSearchBar');
+      Widget bar(String error) => host(
+        CNSearchBar(
+          expandable: false,
+          errorText: error,
+          errorStyle: const CNSearchBarErrorStyle(
+            outlineColor: Color(0xFF00FF00),
+            outlineWidth: 3,
+          ),
+        ),
+      );
+      await tester.pumpWidget(bar(''));
+      await settle(tester);
+      await tester.pumpWidget(bar('Required'));
+      await settle(tester);
+      final args = named('setError').last.arguments as Map;
+      expect(args['color'], 0xFF00FF00);
+      expect(args['width'], 3.0);
+      await tearDownView(tester);
+    }, skip: skip);
+
+    testWidgets('text style merges over the bar font; icon; lines', (
+      tester,
+    ) async {
+      PlatformVersion.debugForceFallbacks = true;
+      addTearDown(PlatformVersion.reset);
+      await tester.pumpWidget(
+        host(
+          const CNSearchBar(
+            expandable: false,
+            labelFontFamily: 'Nunito',
+            errorText: 'Too short',
+            errorStyle: CNSearchBarErrorStyle(
+              color: Color(0xFFD70007),
+              textStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              icon: Icon(CupertinoIcons.exclamationmark_circle),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final text = tester.widget<Text>(find.text('Too short'));
+      expect(text.style!.fontSize, 15);
+      expect(text.style!.fontWeight, FontWeight.w600);
+      expect(text.style!.fontFamily, 'Nunito');
+      expect(text.style!.color, const Color(0xFFD70007));
+      expect(text.maxLines, 1);
+      expect(text.overflow, TextOverflow.ellipsis);
+      expect(text.textAlign, TextAlign.end);
+      expect(
+        find.byIcon(CupertinoIcons.exclamationmark_circle),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('builder replaces the message', (tester) async {
+      PlatformVersion.debugForceFallbacks = true;
+      addTearDown(PlatformVersion.reset);
+      await tester.pumpWidget(
+        host(
+          CNSearchBar(
+            expandable: false,
+            errorText: 'Taken',
+            errorStyle: CNSearchBarErrorStyle(
+              builder: (context, message) => Text('!! $message'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('!! Taken'), findsOneWidget);
+      expect(find.text('Taken'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    });
+  });
+
   group('#192 bar drawn in Flutter', () {
     testWidgets('maxLength and inputFormatters limit typing', (tester) async {
       PlatformVersion.debugForceFallbacks = true;

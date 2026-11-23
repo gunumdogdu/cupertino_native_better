@@ -49,6 +49,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var labelFont: CNSearchBarFont? = nil
         var maxLength = 0
         var errorColor: UIColor? = nil
+        var errorWidth: CGFloat = 1.5
 
         if let dict = args as? [String: Any] {
             if let v = dict["placeholder"] as? String { placeholder = v }
@@ -78,6 +79,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             labelFont = CNSearchBarFont(dict)
             if let v = dict["maxLength"] as? NSNumber { maxLength = v.intValue }
             if let v = dict["errorColor"] as? NSNumber { errorColor = ImageUtils.colorFromARGB(v.intValue) }
+            if let v = dict["errorWidth"] as? NSNumber { errorWidth = CGFloat(truncating: v) }
         }
 
         let model = CNSearchBarModel(
@@ -99,6 +101,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         model.cancelText = cancelText
         model.maxLength = maxLength
         model.errorColor = errorColor.map { Color(uiColor: $0) }
+        model.errorWidth = errorWidth
         // ...and with its text, which Flutter already has (#134).
         if !text.isEmpty { model.setText(text, notify: false) }
 
@@ -221,6 +224,9 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
                 // #192: the outline of a field in error; no color clears it.
                 self.model.errorColor = (args?["color"] as? NSNumber)
                     .map { Color(uiColor: ImageUtils.colorFromARGB($0.intValue)) }
+                if let width = args?["width"] as? NSNumber {
+                    self.model.errorWidth = CGFloat(truncating: width)
+                }
                 result(nil)
             case "setLabelFont":
                 self.model.labelFont = CNSearchBarFont(args)
@@ -316,6 +322,8 @@ final class CNSearchBarModel: ObservableObject {
     var maxLength = 0
     /// The color of the outline of a field in error (#192); nil for none.
     @Published var errorColor: Color? = nil
+    /// The width of that outline, in points (#192).
+    @Published var errorWidth: CGFloat = 1.5
     /// Bumped on each `focus`/`unfocus` call; [wantsFocus] says which.
     @Published var focusToken: Int = 0
     private(set) var wantsFocus = false
@@ -562,7 +570,7 @@ struct CNSearchBarSwiftUI: View {
             ))
             // Error styling (#192): an outline in the error color.
             .overlay(
-                Capsule().strokeBorder(model.errorColor ?? .clear, lineWidth: 1.5)
+                Capsule().strokeBorder(model.errorColor ?? .clear, lineWidth: model.errorWidth)
             )
             .contentShape(Capsule())
             .onTapGesture {

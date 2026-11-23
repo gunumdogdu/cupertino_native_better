@@ -6,8 +6,8 @@ import 'search_bar.dart';
 
 /// A [CNSearchBar] in a [Form] (#192): it takes a [validator], is checked
 /// with [FormState.validate], saved with [FormState.save] and cleared with
-/// [FormState.reset], and shows the validator's message under the bar with
-/// the bar outlined in [errorColor].
+/// [FormState.reset], and shows the validator's message under the bar,
+/// styled by its `errorStyle` ([CNSearchBarErrorStyle]).
 ///
 /// The bar is a single-line text field here, for example to name or rename
 /// something, so it is not expandable and has no Cancel button by default.
@@ -69,8 +69,7 @@ class CNSearchBarFormField extends FormField<String> {
     FontWeight? labelFontWeight,
     int? maxLength,
     List<TextInputFormatter>? inputFormatters,
-    TextStyle? errorStyle,
-    Color? errorColor,
+    CNSearchBarErrorStyle errorStyle = const CNSearchBarErrorStyle(),
   }) : super(
          initialValue: initialValue ?? '',
          builder: (field) {
@@ -83,7 +82,6 @@ class CNSearchBarFormField extends FormField<String> {
              // goes.
              errorText: field.errorText ?? '',
              errorStyle: errorStyle,
-             errorColor: errorColor,
              onChanged: (value) {
                field.didChange(value);
                onChanged?.call(value);
