@@ -7,8 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// #192: a CNTabBar kept under modals is left out of the scene while the
-/// keyboard is up over a modal; CNSearchBar takes maxLength,
-/// inputFormatters and errorText, and CNSearchBarFormField works in a Form.
+/// keyboard is up over a modal; CNSearchBar takes maxLength and
+/// inputFormatters, autofocus works on a bar open from the start, and
+/// CNSearchBarFormField works in a Form.
 void main() {
   final skip = !(Platform.isMacOS || Platform.isIOS);
   late List<MethodCall> calls;
@@ -175,137 +176,38 @@ void main() {
     }, skip: skip);
   });
 
-  group('#192 CNSearchBar errorText (native)', () {
-    testWidgets('error text and outline, without a new native view', (
+  group('#192 autofocus on a bar open from the start', () {
+    testWidgets('sent for an open bar, not for a collapsed one', (
       tester,
     ) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      listen(tester, 'CNSearchBar');
-      Widget bar(String error) =>
-          host(CNSearchBar(expandable: false, errorText: error));
-      await tester.pumpWidget(bar(''));
-      await settle(tester);
-      expect(creationParams().containsKey('errorColor'), isFalse);
-      expect(find.text('Required'), findsNothing);
-
-      await tester.pumpWidget(bar('Required'));
-      await settle(tester);
-      expect(find.text('Required'), findsOneWidget);
-      expect((named('setError').last.arguments as Map)['color'], isA<int>());
-
-      await tester.pumpWidget(bar(''));
-      await settle(tester);
-      expect(find.text('Required'), findsNothing);
-      expect(
-        (named('setError').last.arguments as Map).containsKey('color'),
-        isFalse,
-      );
-      // The field was never created again.
-      expect(named('create'), hasLength(1));
-      await tearDownView(tester);
-    }, skip: skip);
-  });
-
-  group('#192 CNSearchBarErrorStyle', () {
-    testWidgets('showOutline: false shows the message only', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       listen(tester, 'CNSearchBar');
       await tester.pumpWidget(
-        host(
-          const CNSearchBar(
-            expandable: false,
-            errorText: 'Required',
-            errorStyle: CNSearchBarErrorStyle(showOutline: false),
-          ),
-        ),
+        host(const CNSearchBar(expandable: false, autofocus: true)),
       );
       await settle(tester);
-      expect(find.text('Required'), findsOneWidget);
-      expect(creationParams().containsKey('errorColor'), isFalse);
-      await tearDownView(tester);
-    }, skip: skip);
-
-    testWidgets('outline color and width reach the native field', (
-      tester,
-    ) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      listen(tester, 'CNSearchBar');
-      Widget bar(String error) => host(
-        CNSearchBar(
-          expandable: false,
-          errorText: error,
-          errorStyle: const CNSearchBarErrorStyle(
-            outlineColor: Color(0xFF00FF00),
-            outlineWidth: 3,
-          ),
-        ),
-      );
-      await tester.pumpWidget(bar(''));
-      await settle(tester);
-      await tester.pumpWidget(bar('Required'));
-      await settle(tester);
-      final args = named('setError').last.arguments as Map;
-      expect(args['color'], 0xFF00FF00);
-      expect(args['width'], 3.0);
-      await tearDownView(tester);
-    }, skip: skip);
-
-    testWidgets('text style merges over the bar font; icon; lines', (
-      tester,
-    ) async {
-      PlatformVersion.debugForceFallbacks = true;
-      addTearDown(PlatformVersion.reset);
-      await tester.pumpWidget(
-        host(
-          const CNSearchBar(
-            expandable: false,
-            labelFontFamily: 'Nunito',
-            errorText: 'Too short',
-            errorStyle: CNSearchBarErrorStyle(
-              color: Color(0xFFD70007),
-              textStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
-              icon: Icon(CupertinoIcons.exclamationmark_circle),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final text = tester.widget<Text>(find.text('Too short'));
-      expect(text.style!.fontSize, 15);
-      expect(text.style!.fontWeight, FontWeight.w600);
-      expect(text.style!.fontFamily, 'Nunito');
-      expect(text.style!.color, const Color(0xFFD70007));
-      expect(text.maxLines, 1);
-      expect(text.overflow, TextOverflow.ellipsis);
-      expect(text.textAlign, TextAlign.end);
-      expect(
-        find.byIcon(CupertinoIcons.exclamationmark_circle),
-        findsOneWidget,
-      );
+      expect(creationParams()['autofocusOnOpen'], isTrue);
       await tester.pumpWidget(const SizedBox());
-      await tester.pump(const Duration(seconds: 1));
-    });
+      await settle(tester);
+      await tester.pumpWidget(host(const CNSearchBar(autofocus: true)));
+      await settle(tester);
+      expect(creationParams()['autofocusOnOpen'], isFalse);
+      await tearDownView(tester);
+    }, skip: skip);
 
-    testWidgets('builder replaces the message', (tester) async {
+    testWidgets('the bar drawn in Flutter focuses its field', (tester) async {
       PlatformVersion.debugForceFallbacks = true;
       addTearDown(PlatformVersion.reset);
       await tester.pumpWidget(
-        host(
-          CNSearchBar(
-            expandable: false,
-            errorText: 'Taken',
-            errorStyle: CNSearchBarErrorStyle(
-              builder: (context, message) => Text('!! $message'),
-            ),
-          ),
-        ),
+        host(const CNSearchBar(expandable: false, autofocus: true)),
       );
       await tester.pumpAndSettle();
-      expect(find.text('!! Taken'), findsOneWidget);
-      expect(find.text('Taken'), findsNothing);
+      expect(
+        tester
+            .widget<CupertinoTextField>(find.byType(CupertinoTextField))
+            .autofocus,
+        isTrue,
+      );
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 1));
     });
@@ -333,21 +235,10 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 1));
     });
-
-    testWidgets('errorText shows under the bar', (tester) async {
-      PlatformVersion.debugForceFallbacks = true;
-      addTearDown(PlatformVersion.reset);
-      await tester.pumpWidget(
-        host(const CNSearchBar(expandable: false, errorText: 'Too short')),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Too short'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-    });
   });
 
   group('#192 CNSearchBarFormField', () {
-    testWidgets('validate, save and reset', (tester) async {
+    testWidgets('validate, save and reset; no error shown', (tester) async {
       PlatformVersion.debugForceFallbacks = true;
       addTearDown(PlatformVersion.reset);
       final formKey = GlobalKey<FormState>();
@@ -372,13 +263,12 @@ void main() {
       await tester.pump();
       expect(formKey.currentState!.validate(), isFalse);
       await tester.pump();
-      expect(find.text('Please enter a name'), findsOneWidget);
+      // No error state: the system search field has none.
+      expect(find.text('Please enter a name'), findsNothing);
 
       await tester.enterText(find.byType(CupertinoTextField), 'Van');
       await tester.pump();
       expect(formKey.currentState!.validate(), isTrue);
-      await tester.pump();
-      expect(find.text('Please enter a name'), findsNothing);
       formKey.currentState!.save();
       expect(saved, 'Van');
 
@@ -392,25 +282,7 @@ void main() {
         'Car',
       );
       await tester.pumpWidget(const SizedBox());
-    });
-
-    testWidgets('autovalidateMode.onUserInteraction', (tester) async {
-      PlatformVersion.debugForceFallbacks = true;
-      addTearDown(PlatformVersion.reset);
-      await tester.pumpWidget(
-        host(
-          CNSearchBarFormField(
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator: (v) => (v ?? '').length < 3 ? 'At least 3' : null,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('At least 3'), findsNothing);
-      await tester.enterText(find.byType(CupertinoTextField), 'ab');
-      await tester.pump();
-      expect(find.text('At least 3'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
     });
   });
 

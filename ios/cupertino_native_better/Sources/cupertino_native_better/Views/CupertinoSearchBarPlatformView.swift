@@ -36,6 +36,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var showCancelButton = true
         var cancelText = "Cancel"
         var autofocus = false
+        var autofocusOnOpen = false
         var searchIconName = "magnifyingglass"
         var clearIconName = "xmark.circle.fill"
         var isDark = false
@@ -48,8 +49,6 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var rtl: Bool? = nil
         var labelFont: CNSearchBarFont? = nil
         var maxLength = 0
-        var errorColor: UIColor? = nil
-        var errorWidth: CGFloat = 1.5
 
         if let dict = args as? [String: Any] {
             if let v = dict["placeholder"] as? String { placeholder = v }
@@ -66,6 +65,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["showCancelButton"] as? Bool { showCancelButton = v }
             if let v = dict["cancelText"] as? String { cancelText = v }
             if let v = dict["autofocus"] as? Bool { autofocus = v }
+            if let v = dict["autofocusOnOpen"] as? Bool { autofocusOnOpen = v }
             if let v = dict["searchIconName"] as? String { searchIconName = v }
             if let v = dict["clearIconName"] as? String { clearIconName = v }
             if let v = dict["isDark"] as? Bool { isDark = v }
@@ -78,8 +78,6 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             rtl = CNLayoutDirection.read(dict)
             labelFont = CNSearchBarFont(dict)
             if let v = dict["maxLength"] as? NSNumber { maxLength = v.intValue }
-            if let v = dict["errorColor"] as? NSNumber { errorColor = ImageUtils.colorFromARGB(v.intValue) }
-            if let v = dict["errorWidth"] as? NSNumber { errorWidth = CGFloat(truncating: v) }
         }
 
         let model = CNSearchBarModel(
@@ -100,8 +98,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         model.placeholder = placeholder
         model.cancelText = cancelText
         model.maxLength = maxLength
-        model.errorColor = errorColor.map { Color(uiColor: $0) }
-        model.errorWidth = errorWidth
+        model.autofocusOnOpen = autofocusOnOpen
         // ...and with its text, which Flutter already has (#134).
         if !text.isEmpty { model.setText(text, notify: false) }
 
@@ -220,14 +217,6 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
                     self.model.setText(self.model.limited(self.model.searchText), notify: true)
                 }
                 result(nil)
-            case "setError":
-                // #192: the outline of a field in error; no color clears it.
-                self.model.errorColor = (args?["color"] as? NSNumber)
-                    .map { Color(uiColor: ImageUtils.colorFromARGB($0.intValue)) }
-                if let width = args?["width"] as? NSNumber {
-                    self.model.errorWidth = CGFloat(truncating: width)
-                }
-                result(nil)
             case "setLabelFont":
                 self.model.labelFont = CNSearchBarFont(args)
                 result(nil)
@@ -320,10 +309,9 @@ final class CNSearchBarModel: ObservableObject {
     /// The longest text the field takes (#192), in characters as the user
     /// sees them; 0 for no limit. Longer input is cut before it is shown.
     var maxLength = 0
-    /// The color of the outline of a field in error (#192); nil for none.
-    @Published var errorColor: Color? = nil
-    /// The width of that outline, in points (#192).
-    @Published var errorWidth: CGFloat = 1.5
+    /// Whether the field takes focus when it first shows, open (#192):
+    /// `autofocus` on a bar created open, for the first view only.
+    var autofocusOnOpen = false
     /// Bumped on each `focus`/`unfocus` call; [wantsFocus] says which.
     @Published var focusToken: Int = 0
     private(set) var wantsFocus = false
@@ -502,6 +490,18 @@ struct CNSearchBarSwiftUI: View {
         self.onCancelTapped = onCancelTapped
     }
 
+    /// Focuses the field, again every 0.15 s (up to 2 s) until it has the
+    /// focus: the first tries can come before the field is in a window.
+    private func autofocusField(attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            guard model.isExpanded else { return }
+            isFocused = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if !isFocused && attempt < 12 { autofocusField(attempt: attempt + 1) }
+            }
+        }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             // Search bar container
@@ -568,10 +568,6 @@ struct CNSearchBarSwiftUI: View {
                 backgroundColor: backgroundColor,
                 shadow: shadow && !model.glassContained
             ))
-            // Error styling (#192): an outline in the error color.
-            .overlay(
-                Capsule().strokeBorder(model.errorColor ?? .clear, lineWidth: model.errorWidth)
-            )
             .contentShape(Capsule())
             .onTapGesture {
                 if !isExpanded && expandable {
@@ -611,6 +607,15 @@ struct CNSearchBarSwiftUI: View {
         // Typing and every other change of the text reach Flutter once.
         .onChange(of: model.searchText) { newValue in
             model.report(newValue)
+        }
+        // `autofocus` on a bar that is open from the start (#192): it used
+        // to apply only when the bar expanded. The view may appear before
+        // it is in a window (a sheet sliding up), so it tries again until
+        // the field has the focus.
+        .onAppear {
+            guard model.autofocusOnOpen, model.isExpanded else { return }
+            model.autofocusOnOpen = false
+            autofocusField(attempt: 0)
         }
         .onChange(of: model.focusToken) { _ in
             if model.wantsFocus {
