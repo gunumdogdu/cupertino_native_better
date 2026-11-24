@@ -194,6 +194,16 @@
 //     a PopupMenuButton, a small sheet and a dialog below; AUTO=true opens
 //     each and prints `CNB_RECT188` with the measured modal rect and
 //     `CNB_SHOT` lines)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue192
+//     --dart-define=OBSERVER=true
+//     (#192: a sheet with a CNSearchBar and a red bar below it over a
+//     CNTabScaffold page; TABHIDE / HOSTHIDE set the tab bar's and the host
+//     views' autoHideOnModal (default false), HOST=false / TAB=false leave
+//     them out, SHEET=cupertino uses a Cupertino sheet, CLIP=true clips the
+//     dialog, FORM=true adds a CNSwitch row after the red bars,
+//     AUTOFOCUS=true / MAXLEN=<n> set the bar's autofocus / maxLength; AUTO=true
+//     opens the sheet, focuses the bar, opens the dialog and prints
+//     `CNB_RECT192` and `CNB_SHOT` lines)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
 //     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
 //     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
@@ -294,6 +304,7 @@ import 'demos/issue184_search_bar_safe_area_test.dart';
 import 'demos/issue187_button_glass_appearance_test.dart';
 import 'demos/issue190_glass_button_group_resize_test.dart';
 import 'demos/issue188_dropdown_modal_rect_test.dart';
+import 'demos/issue192_search_bar_sheet_paint_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
@@ -301,6 +312,7 @@ import 'demos/scroll_edge_effect.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
 const bool _observer = bool.fromEnvironment('OBSERVER');
+const int _maxLength192 = int.fromEnvironment('MAXLEN');
 const String _backdrop = String.fromEnvironment(
   'BACKDROP',
   defaultValue: 'split',
@@ -513,6 +525,20 @@ class _ProbeApp extends StatelessWidget {
     }
     if (_probe == 'issue188') {
       return const Issue188DropdownModalRectTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue192') {
+      return const Issue192SearchBarSheetPaintTestPage(
+        autoCycle: _auto,
+        tabBarHides: bool.fromEnvironment('TABHIDE'),
+        hostHides: bool.fromEnvironment('HOSTHIDE'),
+        hostViews: bool.fromEnvironment('HOST', defaultValue: true),
+        tabBar: bool.fromEnvironment('TAB', defaultValue: true),
+        cupertinoSheet: String.fromEnvironment('SHEET') == 'cupertino',
+        clipDialog: bool.fromEnvironment('CLIP'),
+        form: bool.fromEnvironment('FORM'),
+        autofocus: bool.fromEnvironment('AUTOFOCUS'),
+        maxLength: _maxLength192 > 0 ? _maxLength192 : null,
+      );
     }
     if (_probe == 'issue184') {
       return const Issue184SearchBarSafeAreaTestPage(
