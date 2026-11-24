@@ -4,7 +4,6 @@ import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:cupertino_native_better/utils/slice_bridge.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

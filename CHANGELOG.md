@@ -1,3 +1,43 @@
+## 2.12.0
+
+> Flutter content that a sheet or dialog draws after one of its own CN widgets stays painted while CN widgets are live under it (#192). `CNSearchBar` gets `maxLength`, `inputFormatters`, `autofocus` on a bar that is open from the start, and `CNSearchBarFormField` (#192). `CNGlassButtonGroup` follows a change in its number of buttons and keeps room for a badge only when it has one (#190).
+
+### Fixed — content under a native view in a sheet or dialog wasn't painted (#192)
+With two or more CN widgets live under a sheet or dialog (a `CNTabBar` and a `CNSwitch` with `autoHideOnModal: false`, say), Flutter content that the modal drew after one of its own CN widgets could disappear. Two examples: a Save button under a focused `CNSearchBar` in a sheet, and text under a glass `CNButton` in a dialog. The content was laid out and took taps, but wasn't painted.
+- **Cause.** On iOS, Flutter puts the content painted after each native view into an overlay. The overlay is sized to the box around the places where that content touches native views, and the box is cut out of the layer beneath for the rest of the frame. The modal's barrier touches every live native view under it, so its box spans from the top one to the bottom one. Content painted after the modal's native view that touches no native view goes to the layer beneath, inside that box, and was cut out. The keyboard only mattered because it moves the sheet's content up, off the tab bar.
+- **Fix.** It applies to every iOS native view of the package that is in a modal route showing the page under it, while two or more of them are live in other routes. The view draws a hairline just outside the screen right after itself (outside its own clip), and draws it again from the route's overlay. No pixel on screen changes. The draw touches the native views below, so the content after it gets an overlay and is painted. Nothing is created again, and the tab bar keeps `autoHideOnModal: false`.
+- **Limit.** Some modals clip their own content, for example a dialog card in a `ClipRRect`. There, content between two native views inside the clip can still disappear when no live native view sits under the clip. Content after the last native view is fine.
+
+### Added — `CNSearchBar` input limits and `CNSearchBarFormField` (#192)
+- **`maxLength`:** the longest text, counted in characters as the user sees them.
+  - On iOS 26, the native field cuts the text as it changes, before it is reported. `initialText` and `setText` are cut too.
+  - The bar drawn in Flutter applies it the way its text field does.
+  - On macOS, the text is cut right after the change.
+- **`inputFormatters`:** run on every change, before `onChanged`. A native bar runs them in Dart and sends the formatted text back to the field, so a rejected character may show for a frame.
+- **`CNSearchBarFormField`:** a `FormField<String>` around the bar, with `validator`, `autovalidateMode`, `onSaved`, `initialValue`, `enabled`, `restorationId` and `reset`. By default it isn't expandable and has no Cancel button. Like the system search field, it has no error state: `validate` returns whether the field is valid, and the app shows any message itself.
+
+### Fixed — `autofocus` on a bar that is open from the start (#192)
+`autofocus` applied only when the bar expanded. Now a bar created open (`expandable: false` or `initiallyExpanded: true`) takes the focus when it first shows, also in a sheet as it slides up. A view created again later, after a modal, doesn't take the focus again. The field of the bar drawn in Flutter gets `autofocus` too.
+
+### Fixed — `CNGlassButtonGroup` after its button count changes, and badge room (#190)
+- A group that stayed mounted while its number of buttons changed kept drawing them in its old width on iOS: centred in that width and past the group's frame. The SwiftUI hosting view's edge constraints had the same priority as its own size; they now have a higher one.
+- The group always kept 6 pt on its right for a badge, so a right-aligned group without badges ended 6 pt short of its edge. Now the room is kept only while a button shows a badge, in the Dart width and in the iOS and macOS hosting views.
+
+Thanks to:
+- @FaaizParacha, for the report;
+- @Ashhad08, for narrowing #192 down and for PR #193 (its search bar changes ship as they are; its `CNTabBar` change is replaced by the fix above);
+- @peazz, for the report and PR #191, which ships as it is.
+
+### Checked
+- **#192**, on the iOS 26.2 simulator (iPhone 17 Pro Max). The page is a `CNTabScaffold` with a `CNTabBar`, a `CNSegmentedControl`, a `CNSwitch` and a popup, all with `autoHideOnModal: false` (example: `issue192_search_bar_sheet_paint_test.dart`).
+  - Before: with the keyboard up, the red bar and Save under the sheet's `CNSearchBar` weren't painted, and neither was the red bar under a glass button in a dialog. The page was fine with only the tab bar, with only the host views, or with the tab bar set to `autoHideOnModal: true`.
+  - Now both are painted with `showModalBottomSheet` and with `showCupertinoSheet`, in a plain and in a clipped dialog, and with content between two native views in the sheet and in the plain dialog. The dialog check also passes on iOS 26.0 and 27.0.
+  - With `autofocus: true` alone, the keyboard comes up as the sheet opens. With `maxLength: 10`, "Porsche 911" opens as "Porsche 91", and typing "ABC" after "Porsche " (through the field's `insertText`) shows "Porsche AB".
+- **#190**, on the iOS 26.2 simulator, with the page from #191 (example: `issue190_glass_button_group_resize_test.dart`).
+  - Before: going from 3 buttons to 1 drew the glass outside its frame, and so did going from 1 to 2 and from 2 to 1 with a badge.
+  - Now the glass fills its frame at every step, and without a badge the right group lines up with its edge. macOS 27.2 shows the same for the steps without a badge.
+- 750 tests pass. `flutter analyze` is clean with Flutter 3.44, and on `lib` with 3.38. The Swift sources typecheck against the iOS 26.0 SDK.
+
 ## 2.11.0
 
 > `CNButtonConfig.appearance` keeps a glass `CNButton` light or dark, as `LiquidGlassConfig.appearance` does for a container (#187). A Material dropdown or popup menu no longer hides every `autoHideOnModal` widget on the page (#188).

@@ -107,7 +107,7 @@
 
 ```yaml
 dependencies:
-  cupertino_native_better: ^2.11.0
+  cupertino_native_better: ^2.12.0
 ```
 
 The deployment targets are iOS&nbsp;15.0 and macOS&nbsp;12.0. Liquid Glass needs iOS&nbsp;26 or macOS&nbsp;26. Below iOS&nbsp;26 the widgets fall back to Cupertino widgets; on macOS they stay AppKit controls on every version. See [Platform Fallbacks](#platform-fallbacks).
@@ -201,6 +201,7 @@ The observer above also keeps CN-widgets right under modals (Issues #53, #124, #
 
 - **A sheet over a CN-widget removes it.** While a bottom sheet, popup or dialog covers a CN-widget on the page below, the widget's platform view is removed (a same-size placeholder keeps its space) and created again when the modal has gone, so it can't bleed through the sheet. This is **position-aware**: only the widgets the sheet actually covers are removed, so an app-bar button stays up under a 40%-high sheet.
 - **Widgets that stay keep their glass.** A CN-widget the sheet doesn't cover stays up, dimmed by the barrier like the rest of the page, with its full Liquid Glass. While the sheet, popup or dialog is within reach of it, only the part of its glow under the sheet is hidden. The rest keeps its full glass and shadow. A modal elsewhere leaves it its full glass while it fades in or out, and while it moves the page under it, as sheet packages that scale the page down do, also while their sheet is held mid-drag.
+- **The modal's own content stays painted (2.12).** With two or more CN-widgets live under a sheet or dialog (a `CNTabBar` and a `CNSwitch` with `autoHideOnModal: false`, say), Flutter content the modal draws after a CN-widget of its own, like a Save button under a `CNSearchBar`, is painted as it should be. Inside a modal that clips its own content (a dialog card in a `ClipRRect`), content *between* two CN-widgets can still disappear when no live CN-widget sits under the clip; content after the last one is fine.
 
 The observer measures where the sheet is from what the modal route paints, after every frame while it is up, so this works with `showModalBottomSheet`, `showCupertinoModalPopup`, `showDialog`, `CNBottomSheet` and sheet packages alike. For a sheet that isn't a route (`Scaffold.showBottomSheet`), wrap its content in `CNSheetGeometryProbe`, which publishes its rect, and call `CNTabBarRouteObserver.markAnyModalActive()` / `markAnyModalInactive()` around it:
 
@@ -721,6 +722,22 @@ CNSearchBar(
 ```
 
 `textCapitalization`, `autocorrect` and `keyboardType` set the keyboard (search fields don't capitalize by default), `clearButtonSemanticLabel` names the clear button for VoiceOver, and the icons take their `CNSymbol.size` and follow Dynamic Type. A bar created again after a modal keeps its text and expanded state (2.5).
+
+`maxLength` limits the text (in characters as the user sees them; the native field cuts it as it changes), `inputFormatters` run on every change, and `autofocus` also focuses a bar that is open from the start, in a sheet as it slides up (2.12). For a short single-line field in a `Form`, such as a name, `CNSearchBarFormField` takes a `validator`, `onSaved` and `reset`. Like the system search field it has no error state, so show the message yourself:
+
+```dart
+Form(
+  key: formKey,
+  child: CNSearchBarFormField(
+    initialValue: 'Porsche 911',
+    placeholder: 'Name',
+    maxLength: 40,
+    autofocus: true,
+    validator: (value) => (value ?? '').trim().isEmpty ? 'Enter a name' : null,
+    onSaved: (value) => name = value!,
+  ),
+)
+```
 
 A Mac search field has no Cancel button beside it, so on macOS `showCancelButton` and `cancelText` are not used. Escape clears the text; a second Escape ends the search, closes an expandable bar, calls `onCancelTap` and gives the keyboard back to Flutter. An expandable bar works like a toolbar's search button, and `tint` colours the magnifying glass and the insertion point.
 
@@ -2069,7 +2086,7 @@ addTearDown(PlatformVersion.reset);
    cupertino_native_plus: ^x.x.x
 
    # After
-   cupertino_native_better: ^2.11.0
+   cupertino_native_better: ^2.12.0
    ```
 
 2. Update imports:
