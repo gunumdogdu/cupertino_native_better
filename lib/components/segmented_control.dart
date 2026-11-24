@@ -9,6 +9,7 @@ import '../style/sf_symbol.dart';
 import '../utils/layout_direction.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 
@@ -287,11 +288,13 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
       final width = _intrinsicWidth;
       return wrapWithModalInteractionGuard(
         Center(
-          child: ClipRect(
-            child: SizedBox(
-              height: widget.height,
-              width: width, // if null, stretches initially until measured
-              child: platformView,
+          child: CNSliceBridge(
+            child: ClipRect(
+              child: SizedBox(
+                height: widget.height,
+                width: width, // if null, stretches initially until measured
+                child: platformView,
+              ),
             ),
           ),
         ),
@@ -299,8 +302,10 @@ class _CNSegmentedControlState extends State<CNSegmentedControl>
     }
 
     return wrapWithModalInteractionGuard(
-      ClipRect(
-        child: SizedBox(height: widget.height, child: platformView),
+      CNSliceBridge(
+        child: ClipRect(
+          child: SizedBox(height: widget.height, child: platformView),
+        ),
       ),
     );
   }

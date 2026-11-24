@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import '../channel/params.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -212,21 +213,23 @@ class _CNSwitchState extends State<CNSwitch> with ModalHideMixin<CNSwitch> {
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return wrapWithModalInteractionGuard(
-        ClipRect(
-          child: SizedBox(
-            height: widget.height,
-            width: width,
-            child: UiKitView(
-              viewType: viewType,
-              creationParamsCodec: const StandardMessageCodec(),
-              creationParams: creationParams,
-              onPlatformViewCreated: _onPlatformViewCreated,
-              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<HorizontalDragGestureRecognizer>(
-                  () => HorizontalDragGestureRecognizer(),
-                ),
-                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-              },
+        CNSliceBridge(
+          child: ClipRect(
+            child: SizedBox(
+              height: widget.height,
+              width: width,
+              child: UiKitView(
+                viewType: viewType,
+                creationParamsCodec: const StandardMessageCodec(),
+                creationParams: creationParams,
+                onPlatformViewCreated: _onPlatformViewCreated,
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<HorizontalDragGestureRecognizer>(
+                    () => HorizontalDragGestureRecognizer(),
+                  ),
+                  Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                },
+              ),
             ),
           ),
         ),

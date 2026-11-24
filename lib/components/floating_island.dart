@@ -7,6 +7,7 @@ import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
@@ -402,11 +403,13 @@ class _CNFloatingIslandState extends State<CNFloatingIsland>
       'isDark': ThemeHelper.isDark(context),
     };
 
-    final platformView = UiKitView(
-      viewType: viewType,
-      creationParams: creationParams,
-      creationParamsCodec: const StandardMessageCodec(),
-      onPlatformViewCreated: _onPlatformViewCreated,
+    final platformView = CNSliceBridge(
+      child: UiKitView(
+        viewType: viewType,
+        creationParams: creationParams,
+        creationParamsCodec: const StandardMessageCodec(),
+        onPlatformViewCreated: _onPlatformViewCreated,
+      ),
     );
 
     return wrapWithModalInteractionGuard(

@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' show MaterialLocalizations, TimeOfDay;
 import 'package:flutter/services.dart';
 import '../channel/params.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -352,16 +353,18 @@ class _CNDatePickerState extends State<CNDatePicker>
       return wrapWithModalInteractionGuard(
         _sizeNative(
           style,
-          ClipRect(
-            child: UiKitView(
-              // The style decides how the native view lays the picker out,
-              // so a new style is a new view.
-              key: ValueKey<CNDatePickerStyle>(style),
-              viewType: viewType,
-              creationParamsCodec: const StandardMessageCodec(),
-              creationParams: creationParams,
-              onPlatformViewCreated: _onPlatformViewCreated,
-              gestureRecognizers: gestures,
+          CNSliceBridge(
+            child: ClipRect(
+              child: UiKitView(
+                // The style decides how the native view lays the picker out,
+                // so a new style is a new view.
+                key: ValueKey<CNDatePickerStyle>(style),
+                viewType: viewType,
+                creationParamsCodec: const StandardMessageCodec(),
+                creationParams: creationParams,
+                onPlatformViewCreated: _onPlatformViewCreated,
+                gestureRecognizers: gestures,
+              ),
             ),
           ),
         ),

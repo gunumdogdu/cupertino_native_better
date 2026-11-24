@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -226,16 +227,18 @@ class _CNColorWellState extends State<CNColorWell>
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return wrapWithModalInteractionGuard(
-        ClipRect(
-          child: SizedBox(
-            width: size.width,
-            height: size.height,
-            child: UiKitView(
-              viewType: viewType,
-              creationParamsCodec: const StandardMessageCodec(),
-              creationParams: creationParams,
-              onPlatformViewCreated: _onPlatformViewCreated,
-              gestureRecognizers: gestureRecognizers,
+        CNSliceBridge(
+          child: ClipRect(
+            child: SizedBox(
+              width: size.width,
+              height: size.height,
+              child: UiKitView(
+                viewType: viewType,
+                creationParamsCodec: const StandardMessageCodec(),
+                creationParams: creationParams,
+                onPlatformViewCreated: _onPlatformViewCreated,
+                gestureRecognizers: gestureRecognizers,
+              ),
             ),
           ),
         ),

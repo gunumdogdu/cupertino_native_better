@@ -8,6 +8,7 @@ import '../channel/params.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
@@ -332,16 +333,18 @@ class _CNTabRailState extends State<CNTabRail>
     // A modal over the rail removes its platform view (#146, Issue #53).
     final hidden = maybeHiddenPlaceholder(width: width, height: height);
     if (hidden != null) return hidden;
-    final platformView = UiKitView(
-      viewType: 'CNTabRail',
-      creationParams: params,
-      creationParamsCodec: const StandardMessageCodec(),
-      onPlatformViewCreated: _onCreated,
-      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-        // Same as CNTabBar (Issue #62): claim every pointer so the rail
-        // gets its taps even under an ancestor's recognizer.
-        Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
-      },
+    final platformView = CNSliceBridge(
+      child: UiKitView(
+        viewType: 'CNTabRail',
+        creationParams: params,
+        creationParamsCodec: const StandardMessageCodec(),
+        onPlatformViewCreated: _onCreated,
+        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+          // Same as CNTabBar (Issue #62): claim every pointer so the rail
+          // gets its taps even under an ancestor's recognizer.
+          Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
+        },
+      ),
     );
     return SizedBox(
       width: width,

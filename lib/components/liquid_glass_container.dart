@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../channel/params.dart';
 import '../style/glass_effect.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
@@ -179,11 +180,13 @@ class _LiquidGlassContainerState extends State<LiquidGlassContainer>
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            viewType: viewType,
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,
+        ? CNSliceBridge(
+            child: UiKitView(
+              viewType: viewType,
+              creationParams: creationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+              onPlatformViewCreated: _onCreated,
+            ),
           )
         : AppKitView(
             viewType: viewType,

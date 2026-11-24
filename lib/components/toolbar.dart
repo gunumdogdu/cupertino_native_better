@@ -13,6 +13,7 @@ import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
 import '../utils/popup_menu_encoder.dart';
 import '../utils/popup_menu_fallback_sheet.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'icon.dart';
@@ -1173,11 +1174,13 @@ class _CNToolbarState extends State<CNToolbar> with ModalHideMixin<CNToolbar> {
       SizedBox(
         height: _kToolbarHeight,
         width: double.infinity,
-        child: UiKitView(
-          viewType: 'CNToolbar',
-          creationParams: payload,
-          creationParamsCodec: const StandardMessageCodec(),
-          onPlatformViewCreated: _onPlatformViewCreated,
+        child: CNSliceBridge(
+          child: UiKitView(
+            viewType: 'CNToolbar',
+            creationParams: payload,
+            creationParamsCodec: const StandardMessageCodec(),
+            onPlatformViewCreated: _onPlatformViewCreated,
+          ),
         ),
       ),
     );

@@ -13,6 +13,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import 'accessibility.dart';
 import '../utils/version_detector.dart';
@@ -326,12 +327,14 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     // setting changes; the native view picks the band.
     final rtBand = widget.reduceTransparencyHeight;
     final band = math.max(_band(context), rtBand ?? 0);
-    final view = UiKitView(
-      viewType: 'CNScrollEdgeEffect',
-      creationParams: _params(context),
-      creationParamsCodec: const StandardMessageCodec(),
-      onPlatformViewCreated: _onCreated,
-      hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+    final view = CNSliceBridge(
+      child: UiKitView(
+        viewType: 'CNScrollEdgeEffect',
+        creationParams: _params(context),
+        creationParamsCodec: const StandardMessageCodec(),
+        onPlatformViewCreated: _onCreated,
+        hitTestBehavior: PlatformViewHitTestBehavior.transparent,
+      ),
     );
     return Align(
       alignment: widget.edge == CNScrollEdge.top

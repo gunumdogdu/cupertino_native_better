@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -327,25 +328,27 @@ class _CNPageControlState extends State<CNPageControl>
         };
 
         return wrapWithModalInteractionGuard(
-          ClipRect(
-            child: SizedBox(
-              width: width,
-              height: widget.height,
-              child: UiKitView(
-                viewType: 'CupertinoNativePageControl',
-                creationParamsCodec: const StandardMessageCodec(),
-                creationParams: creationParams,
-                onPlatformViewCreated: _onPlatformViewCreated,
-                // Taps move one page; a press-and-drag scrubs.
-                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                  Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-                  Factory<HorizontalDragGestureRecognizer>(
-                    () => HorizontalDragGestureRecognizer(),
-                  ),
-                  Factory<LongPressGestureRecognizer>(
-                    () => LongPressGestureRecognizer(),
-                  ),
-                },
+          CNSliceBridge(
+            child: ClipRect(
+              child: SizedBox(
+                width: width,
+                height: widget.height,
+                child: UiKitView(
+                  viewType: 'CupertinoNativePageControl',
+                  creationParamsCodec: const StandardMessageCodec(),
+                  creationParams: creationParams,
+                  onPlatformViewCreated: _onPlatformViewCreated,
+                  // Taps move one page; a press-and-drag scrubs.
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                    Factory<HorizontalDragGestureRecognizer>(
+                      () => HorizontalDragGestureRecognizer(),
+                    ),
+                    Factory<LongPressGestureRecognizer>(
+                      () => LongPressGestureRecognizer(),
+                    ),
+                  },
+                ),
               ),
             ),
           ),

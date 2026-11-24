@@ -23,6 +23,7 @@ import '../style/image_placement.dart';
 import '../style/sf_symbol.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import '../utils/optional_method_call.dart';
@@ -870,26 +871,32 @@ class _CNButtonState extends State<CNButton>
           );
           if (hidden != null) return hidden;
 
-          final platformView = defaultTargetPlatform == TargetPlatform.iOS
-              ? UiKitView(
-                  viewType: viewType,
-                  creationParams: params,
-                  creationParamsCodec: const StandardMessageCodec(),
-                  onPlatformViewCreated: _onCreated,
-                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                    // Forward taps to native; let Flutter keep drags for scrolling.
-                    Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-                  },
-                )
-              : AppKitView(
-                  viewType: viewType,
-                  creationParams: params,
-                  creationParamsCodec: const StandardMessageCodec(),
-                  onPlatformViewCreated: _onCreated,
-                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                    Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-                  },
-                );
+          final platformView = CNSliceBridge(
+            child: defaultTargetPlatform == TargetPlatform.iOS
+                ? UiKitView(
+                    viewType: viewType,
+                    creationParams: params,
+                    creationParamsCodec: const StandardMessageCodec(),
+                    onPlatformViewCreated: _onCreated,
+                    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                      // Forward taps to native; let Flutter keep drags for scrolling.
+                      Factory<TapGestureRecognizer>(
+                        () => TapGestureRecognizer(),
+                      ),
+                    },
+                  )
+                : AppKitView(
+                    viewType: viewType,
+                    creationParams: params,
+                    creationParamsCodec: const StandardMessageCodec(),
+                    onPlatformViewCreated: _onCreated,
+                    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                      Factory<TapGestureRecognizer>(
+                        () => TapGestureRecognizer(),
+                      ),
+                    },
+                  ),
+          );
 
           final buttonWidget = Listener(
             onPointerDown: (e) {

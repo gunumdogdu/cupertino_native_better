@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../utils/native_context_menu.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import 'popup_menu_button.dart';
 
@@ -305,24 +306,26 @@ class CNContextMenuState extends State<CNContextMenu> {
       children: [
         RepaintBoundary(key: _previewKey, child: widget.child),
         Positioned.fill(
-          child: UiKitView(
-            viewType: 'CNContextMenuPreview',
-            // The child under it keeps its taps; only a long press, once it
-            // wins, goes to the native view (see _ChildFirstHitStack).
-            hitTestBehavior: PlatformViewHitTestBehavior.translucent,
-            creationParams: <String, Object?>{
-              'cornerRadius': widget.previewCornerRadius,
-              'isDark': ThemeHelper.isDark(context),
-            },
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPreviewViewCreated,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<LongPressGestureRecognizer>(
-                () =>
-                    LongPressGestureRecognizer(debugOwner: this)
-                      ..onLongPressDown = (_) => _sendPreview(),
-              ),
-            },
+          child: CNSliceBridge(
+            child: UiKitView(
+              viewType: 'CNContextMenuPreview',
+              // The child under it keeps its taps; only a long press, once it
+              // wins, goes to the native view (see _ChildFirstHitStack).
+              hitTestBehavior: PlatformViewHitTestBehavior.translucent,
+              creationParams: <String, Object?>{
+                'cornerRadius': widget.previewCornerRadius,
+                'isDark': ThemeHelper.isDark(context),
+              },
+              creationParamsCodec: const StandardMessageCodec(),
+              onPlatformViewCreated: _onPreviewViewCreated,
+              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                Factory<LongPressGestureRecognizer>(
+                  () =>
+                      LongPressGestureRecognizer(debugOwner: this)
+                        ..onLongPressDown = (_) => _sendPreview(),
+                ),
+              },
+            ),
           ),
         ),
       ],

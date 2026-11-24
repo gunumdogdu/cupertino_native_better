@@ -10,6 +10,7 @@ import '../style/sf_symbol.dart';
 import '../utils/layout_direction.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'liquid_glass_container.dart';
@@ -1004,25 +1005,27 @@ class _CNSearchBarState extends State<CNSearchBar>
       return hidden;
     }
 
-    final platformView = UiKitView(
-      // The keyboard options, icon sizes, clear-button name and shadow are
-      // set when the view is created; a change creates it again, with its
-      // text.
-      key: ValueKey<Object>(
-        Object.hash(
-          widget.textCapitalization,
-          widget.autocorrect,
-          widget.keyboardType,
-          widget.searchIcon?.size,
-          widget.clearIcon?.size,
-          _clearButtonLabel(context),
-          widget.showShadow,
+    final platformView = CNSliceBridge(
+      child: UiKitView(
+        // The keyboard options, icon sizes, clear-button name and shadow are
+        // set when the view is created; a change creates it again, with its
+        // text.
+        key: ValueKey<Object>(
+          Object.hash(
+            widget.textCapitalization,
+            widget.autocorrect,
+            widget.keyboardType,
+            widget.searchIcon?.size,
+            widget.clearIcon?.size,
+            _clearButtonLabel(context),
+            widget.showShadow,
+          ),
         ),
+        viewType: 'CNSearchBar',
+        creationParams: _creationParams(context),
+        creationParamsCodec: const StandardMessageCodec(),
+        onPlatformViewCreated: _onPlatformViewCreated,
       ),
-      viewType: 'CNSearchBar',
-      creationParams: _creationParams(context),
-      creationParamsCodec: const StandardMessageCodec(),
-      onPlatformViewCreated: _onPlatformViewCreated,
     );
 
     return wrapWithModalInteractionGuard(

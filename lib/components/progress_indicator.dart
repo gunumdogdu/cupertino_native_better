@@ -10,6 +10,7 @@ import '../channel/params.dart';
 import '../style/control_size.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 
@@ -243,11 +244,13 @@ class _CNProgressIndicatorState extends State<CNProgressIndicator>
     };
 
     final platformView = defaultTargetPlatform == TargetPlatform.iOS
-        ? UiKitView(
-            viewType: 'CupertinoNativeProgressIndicator',
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onPlatformViewCreated,
+        ? CNSliceBridge(
+            child: UiKitView(
+              viewType: 'CupertinoNativeProgressIndicator',
+              creationParams: creationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+              onPlatformViewCreated: _onPlatformViewCreated,
+            ),
           )
         : AppKitView(
             viewType: 'CupertinoNativeProgressIndicator',

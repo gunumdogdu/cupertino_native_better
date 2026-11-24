@@ -1,6 +1,8 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+import 'slice_bridge.dart';
+
 /// The global bounds of [box] as painted now, or null when it or any
 /// render object above it hasn't been laid out yet: a transition that
 /// starts inserts a wrapper the frame lays out (#159).
@@ -50,6 +52,9 @@ class _ContentWalk {
       return null;
     }
     if (!ro.hasSize || ro.size.isEmpty) return null;
+    // The draw a native view keeps in the route's overlay paints nothing on
+    // screen (#192).
+    if (CNSliceBridge.isOverlayBridge(ro)) return null;
     if (ro is RenderOffstage && ro.offstage) return null;
     if (ro is RenderOpacity && ro.opacity == 0) return null;
     final rect = MatrixUtils.transformRect(

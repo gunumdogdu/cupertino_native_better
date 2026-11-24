@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/icon_renderer.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -302,11 +303,13 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
         };
 
         final platformView = defaultTargetPlatform == TargetPlatform.iOS
-            ? UiKitView(
-                viewType: viewType,
-                creationParams: creationParams,
-                creationParamsCodec: const StandardMessageCodec(),
-                onPlatformViewCreated: _onCreated,
+            ? CNSliceBridge(
+                child: UiKitView(
+                  viewType: viewType,
+                  creationParams: creationParams,
+                  creationParamsCodec: const StandardMessageCodec(),
+                  onPlatformViewCreated: _onCreated,
+                ),
               )
             : AppKitView(
                 viewType: viewType,

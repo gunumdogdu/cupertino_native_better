@@ -24,6 +24,7 @@ import '../utils/optional_method_call.dart';
 import '../utils/layout_direction.dart';
 import '../utils/modal_geometry.dart';
 import '../utils/touch_regions.dart';
+import '../utils/slice_bridge.dart';
 import 'icon.dart';
 import 'popup_menu_button.dart';
 import 'tab_badge.dart';
@@ -419,7 +420,7 @@ double _customIconSize(CNTabBarItem item, double? iconSize) =>
 double _activeCustomIconSize(CNTabBarItem item, double? iconSize) =>
     iconSize ?? item.activeIcon?.size ?? item.icon?.size ?? 25.0;
 
-class _CNTabBarState extends State<CNTabBar> with WidgetsBindingObserver {
+class _CNTabBarState extends State<CNTabBar> {
   MethodChannel? _channel;
   int? _lastIndex;
   int? _lastTint;
@@ -473,13 +474,6 @@ class _CNTabBarState extends State<CNTabBar> with WidgetsBindingObserver {
   // platform view for a SizedBox during forward/reverse status makes the
   // page Flutter-only for the slide, eliminating the artifact.
   bool _pageTransitioning = false;
-
-  /// Whether a modal (sheet, dialog, popup) is up, tracked for every bar,
-  /// also one with `autoHideOnModal: false` (#192).
-  bool _anyModalUp = false;
-
-  /// Whether the software keyboard is up (the view has a bottom inset).
-  bool _keyboardUp = false;
   Animation<double>? _secondaryRouteAnim;
 
   bool get _isDark => ThemeHelper.isDark(context);
@@ -514,11 +508,6 @@ class _CNTabBarState extends State<CNTabBar> with WidgetsBindingObserver {
       PlatformViewGuard.ensureScheduled();
       PlatformViewGuard.readyNotifier.addListener(_onPlatformViewGuardReady);
     }
-    WidgetsBinding.instance.addObserver(this);
-    // A bar kept under modals (autoHideOnModal: false) stops being painted
-    // while the keyboard is up over a modal (#192), so it tracks modals too.
-    CNTabBarRouteObserver.anyModalDepth.addListener(_onAnyModalDepthChanged);
-    _anyModalUp = CNTabBarRouteObserver.anyModalDepth.value > 0;
     if (widget.autoHideOnModal) {
       // Split-search variant (iOS 26+) uses an UNCLIPPED native container
       // so the floating search orb can render above the bar's top edge.
@@ -535,18 +524,6 @@ class _CNTabBarState extends State<CNTabBar> with WidgetsBindingObserver {
       _onModalDepthChanged();
     }
     _scheduleNativePreparation();
-  }
-
-  void _onAnyModalDepthChanged() {
-    final up = CNTabBarRouteObserver.anyModalDepth.value > 0;
-    if (up != _anyModalUp && mounted) setState(() => _anyModalUp = up);
-  }
-
-  @override
-  void didChangeMetrics() {
-    if (!mounted) return;
-    final up = View.of(context).viewInsets.bottom > 0;
-    if (up != _keyboardUp) setState(() => _keyboardUp = up);
   }
 
   void _onModalDepthChanged() {
@@ -655,8 +632,6 @@ class _CNTabBarState extends State<CNTabBar> with WidgetsBindingObserver {
     // dispose).
     CNTabBarRouteObserver.modalDepth.removeListener(_onModalDepthChanged);
     CNTabBarRouteObserver.anyModalDepth.removeListener(_onModalDepthChanged);
-    CNTabBarRouteObserver.anyModalDepth.removeListener(_onAnyModalDepthChanged);
-    WidgetsBinding.instance.removeObserver(this);
     _secondaryRouteAnim?.removeListener(_onSecondaryRouteAnimChanged);
     _secondaryRouteAnim = null;
     _searchFocusNode?.dispose();
@@ -829,22 +804,9 @@ class _CNTabBarState extends State<CNTabBar> with WidgetsBindingObserver {
     // transition ends, the tree shape would change and the UiKitView
     // would be destroyed and re-created (visible "animate to index" on
     // return — Issue #35).
-    //
-    // Issue #192: a bar kept under modals (autoHideOnModal: false) is also
-    // left out of the scene while the keyboard is up over a modal. While it
-    // is in the scene, Flutter draws the modal's content into an overlay
-    // above the bar, and with the keyboard up over a sheet whose text field
-    // is a platform view (CNSearchBar), the part of the sheet below that
-    // field was no longer painted when another platform view was on the
-    // page too. The keyboard covers the bar then, so nothing visible
-    // changes, and the bar stays mounted: no re-creation when the keyboard
-    // goes down. Wrapped from the first build so the tree shape never
-    // changes.
-    final hideUnderKeyboard =
-        !widget.autoHideOnModal && _anyModalUp && _keyboardUp;
-    if (widget.autoHideOnPageTransition || !widget.autoHideOnModal) {
+    if (widget.autoHideOnPageTransition) {
       return IndexedStack(
-        index: (_pageTransitioning || hideUnderKeyboard) ? 0 : 1,
+        index: _pageTransitioning ? 0 : 1,
         sizing: StackFit.passthrough,
         children: [
           SizedBox(height: h),
@@ -1144,14 +1106,18 @@ class _CNTabBarState extends State<CNTabBar> with WidgetsBindingObserver {
           alignment: Alignment.bottomCenter,
           minHeight: own,
           maxHeight: own,
-          child: ClipRect(
-            child: SizedBox(height: own, width: w, child: platformView),
+          child: CNSliceBridge(
+            child: ClipRect(
+              child: SizedBox(height: own, width: w, child: platformView),
+            ),
           ),
         ),
       );
     }
-    return ClipRect(
-      child: SizedBox(height: h, width: w, child: platformView),
+    return CNSliceBridge(
+      child: ClipRect(
+        child: SizedBox(height: h, width: w, child: platformView),
+      ),
     );
   }
 

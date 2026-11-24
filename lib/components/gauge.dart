@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 
 import '../channel/params.dart';
 import '../utils/modal_hide_mixin.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 
@@ -471,26 +472,28 @@ class _CNGaugeState extends State<CNGauge> with ModalHideMixin<CNGauge> {
     const viewType = 'CupertinoNativeGauge';
     final Widget platformView;
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      platformView = UiKitView(
-        viewType: viewType,
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: _onPlatformViewCreated,
-        // A gauge that only shows a value takes no touches: they reach the
-        // widgets under it (a tappable row) and scroll a list. An editable
-        // rating takes taps and horizontal drags; a vertical drag that
-        // starts on it still scrolls.
-        hitTestBehavior: _editable
-            ? PlatformViewHitTestBehavior.opaque
-            : PlatformViewHitTestBehavior.transparent,
-        gestureRecognizers: _editable
-            ? <Factory<OneSequenceGestureRecognizer>>{
-                Factory<TapGestureRecognizer>(TapGestureRecognizer.new),
-                Factory<HorizontalDragGestureRecognizer>(
-                  HorizontalDragGestureRecognizer.new,
-                ),
-              }
-            : null,
+      platformView = CNSliceBridge(
+        child: UiKitView(
+          viewType: viewType,
+          creationParams: creationParams,
+          creationParamsCodec: const StandardMessageCodec(),
+          onPlatformViewCreated: _onPlatformViewCreated,
+          // A gauge that only shows a value takes no touches: they reach the
+          // widgets under it (a tappable row) and scroll a list. An editable
+          // rating takes taps and horizontal drags; a vertical drag that
+          // starts on it still scrolls.
+          hitTestBehavior: _editable
+              ? PlatformViewHitTestBehavior.opaque
+              : PlatformViewHitTestBehavior.transparent,
+          gestureRecognizers: _editable
+              ? <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<TapGestureRecognizer>(TapGestureRecognizer.new),
+                  Factory<HorizontalDragGestureRecognizer>(
+                    HorizontalDragGestureRecognizer.new,
+                  ),
+                }
+              : null,
+        ),
       );
     } else {
       // The NSView takes clicks only when the rating is editable; otherwise

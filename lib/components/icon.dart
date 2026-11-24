@@ -7,6 +7,7 @@ import '../channel/params.dart';
 import '../style/sf_symbol.dart';
 import '../style/symbol_effect.dart';
 import '../utils/icon_renderer.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/platform_view_guard.dart';
 import '../utils/version_detector.dart';
@@ -317,11 +318,13 @@ class _CNIconState extends State<CNIcon> {
     // AbsorbPointer keeps the icon's hit area for ancestors but keeps the
     // UIKit view out of the gesture arena, where it would otherwise win the
     // sweep and cancel an enclosing button's tap.
-    return ClipRect(
-      child: SizedBox(
-        width: w,
-        height: h,
-        child: AbsorbPointer(child: platformView),
+    return CNSliceBridge(
+      child: ClipRect(
+        child: SizedBox(
+          width: w,
+          height: h,
+          child: AbsorbPointer(child: platformView),
+        ),
       ),
     );
   }

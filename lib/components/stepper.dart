@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import '../channel/params.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -228,16 +229,18 @@ class _CNStepperState extends State<CNStepper> with ModalHideMixin<CNStepper> {
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return wrapWithModalInteractionGuard(
-        ClipRect(
-          child: SizedBox(
-            width: size.width,
-            height: size.height,
-            child: UiKitView(
-              viewType: viewType,
-              creationParamsCodec: const StandardMessageCodec(),
-              creationParams: creationParams,
-              onPlatformViewCreated: _onPlatformViewCreated,
-              gestureRecognizers: gestureRecognizers,
+        CNSliceBridge(
+          child: ClipRect(
+            child: SizedBox(
+              width: size.width,
+              height: size.height,
+              child: UiKitView(
+                viewType: viewType,
+                creationParamsCodec: const StandardMessageCodec(),
+                creationParams: creationParams,
+                onPlatformViewCreated: _onPlatformViewCreated,
+                gestureRecognizers: gestureRecognizers,
+              ),
             ),
           ),
         ),

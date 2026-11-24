@@ -11,6 +11,7 @@ import '../utils/icon_renderer.dart';
 import '../utils/modal_hide_mixin.dart';
 import '../utils/optional_method_call.dart';
 import '../utils/popup_menu_encoder.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import 'button.dart' show CNButton;
@@ -592,21 +593,24 @@ class _CNPopUpButtonState<T> extends State<CNPopUpButton<T>>
     const viewType = 'CupertinoNativePopUpButton';
     final Widget platformView;
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      platformView = UiKitView(
-        viewType: viewType,
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: _onPlatformViewCreated,
-        // In a scrolling parent, a touch that starts to scroll scrolls; a
-        // tap opens the menu, and a finger that rests on the button presses
-        // it, so the menu opens under the finger and a drag picks an item.
-        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-          Factory<TapGestureRecognizer>(TapGestureRecognizer.new),
-          Factory<LongPressGestureRecognizer>(
-            () =>
-                LongPressGestureRecognizer(duration: kCNPopUpButtonPressDelay),
-          ),
-        },
+      platformView = CNSliceBridge(
+        child: UiKitView(
+          viewType: viewType,
+          creationParams: creationParams,
+          creationParamsCodec: const StandardMessageCodec(),
+          onPlatformViewCreated: _onPlatformViewCreated,
+          // In a scrolling parent, a touch that starts to scroll scrolls; a
+          // tap opens the menu, and a finger that rests on the button presses
+          // it, so the menu opens under the finger and a drag picks an item.
+          gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+            Factory<TapGestureRecognizer>(TapGestureRecognizer.new),
+            Factory<LongPressGestureRecognizer>(
+              () => LongPressGestureRecognizer(
+                duration: kCNPopUpButtonPressDelay,
+              ),
+            ),
+          },
+        ),
       );
     } else {
       // AppKit hit-tests the NSPopUpButton itself: clicks open its menu and

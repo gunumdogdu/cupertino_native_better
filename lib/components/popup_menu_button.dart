@@ -17,6 +17,7 @@ import '../utils/modal_hide_mixin.dart';
 import '../utils/popup_menu_encoder.dart';
 import '../utils/popup_menu_fallback_sheet.dart';
 import '../utils/reusable_platform_view.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/theme_helper.dart';
 import '../utils/version_detector.dart';
 import '../utils/optional_method_call.dart';
@@ -1005,18 +1006,20 @@ class _CNPopupMenuButtonState extends State<CNPopupMenuButton>
       // and a button built again with the same configuration shows it in
       // its first frame (#166). Not for a label that hasn't been measured:
       // its width isn't known for that frame.
-      return ReusableDarwinPlatformView(
-        key: viewKey,
-        viewType: viewType,
-        creationParams: params,
-        onPlatformViewCreated: _onCreated,
-        onPlatformViewReused: _onReused,
-        reuseKey: viewKey.value,
-        reuse: !hidden,
-        memo: _keep,
-        gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-          Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-        },
+      return CNSliceBridge(
+        child: ReusableDarwinPlatformView(
+          key: viewKey,
+          viewType: viewType,
+          creationParams: params,
+          onPlatformViewCreated: _onCreated,
+          onPlatformViewReused: _onReused,
+          reuseKey: viewKey.value,
+          reuse: !hidden,
+          memo: _keep,
+          gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+            Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+          },
+        ),
       );
     }
 

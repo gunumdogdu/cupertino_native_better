@@ -6,10 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// #192: a CNTabBar kept under modals is left out of the scene while the
-/// keyboard is up over a modal; CNSearchBar takes maxLength and
-/// inputFormatters, autofocus works on a bar open from the start, and
-/// CNSearchBarFormField works in a Form.
+/// #192: CNSearchBar takes maxLength and inputFormatters, autofocus works on
+/// a bar open from the start, and CNSearchBarFormField works in a Form. The
+/// sheet content painted after a native view is covered in
+/// `issue192_slice_bridge_test.dart`.
 void main() {
   final skip = !(Platform.isMacOS || Platform.isIOS);
   late List<MethodCall> calls;
@@ -284,91 +284,5 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 1));
     });
-  });
-
-  group('#192 CNTabBar under the keyboard over a modal', () {
-    Future<void> pumpTabBar(WidgetTester tester, {required bool hide}) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      listen(
-        tester,
-        'CupertinoNativeTabBar',
-        reply: (call) => call.method == 'getIntrinsicSize'
-            ? {'width': 300.0, 'height': 63.0}
-            : null,
-      );
-      await tester.pumpWidget(
-        CupertinoApp(
-          navigatorObservers: [CNTabBarRouteObserver()],
-          home: Align(
-            alignment: Alignment.bottomCenter,
-            child: CNTabBar(
-              autoHideOnModal: hide,
-              items: const [
-                CNTabBarItem(label: 'One', icon: CNSymbol('1.circle')),
-                CNTabBarItem(label: 'Two', icon: CNSymbol('2.circle')),
-              ],
-              currentIndex: 0,
-              onTap: (_) {},
-            ),
-          ),
-        ),
-      );
-      await tester.pump(const Duration(milliseconds: 600));
-      await settle(tester);
-    }
-
-    int? paintedIndex(WidgetTester tester) {
-      final stacks = find.descendant(
-        of: find.byType(CNTabBar, skipOffstage: false),
-        matching: find.byType(IndexedStack, skipOffstage: false),
-        skipOffstage: false,
-      );
-      if (stacks.evaluate().isEmpty) return null;
-      return tester.widget<IndexedStack>(stacks.first).index;
-    }
-
-    Future<void> openModal(WidgetTester tester) async {
-      final context = tester.element(find.byType(CNTabBar));
-      showCupertinoModalPopup<void>(
-        context: context,
-        builder: (_) => const SizedBox(height: 200),
-      );
-      await settle(tester);
-    }
-
-    testWidgets('is left out of the scene, and kept mounted', (tester) async {
-      await pumpTabBar(tester, hide: false);
-      expect(paintedIndex(tester), 1);
-      final creates = named('create').length;
-
-      // A modal without the keyboard: the bar stays painted.
-      await openModal(tester);
-      expect(paintedIndex(tester), 1);
-
-      // The keyboard comes up over the modal.
-      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
-      addTearDown(tester.view.resetViewInsets);
-      await settle(tester);
-      expect(paintedIndex(tester), 0);
-
-      // It goes down: painted again, by the same native view.
-      tester.view.viewInsets = FakeViewPadding.zero;
-      await settle(tester);
-      expect(paintedIndex(tester), 1);
-      expect(named('create'), hasLength(creates));
-      // Close the modal: the observer's depth is shared by every test.
-      Navigator.of(tester.element(find.byType(CNTabBar))).pop();
-      await settle(tester);
-      await tearDownView(tester);
-    }, skip: skip);
-
-    testWidgets('the keyboard without a modal changes nothing', (tester) async {
-      await pumpTabBar(tester, hide: false);
-      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
-      addTearDown(tester.view.resetViewInsets);
-      await settle(tester);
-      expect(paintedIndex(tester), 1);
-      await tearDownView(tester);
-    }, skip: skip);
   });
 }

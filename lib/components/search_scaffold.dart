@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../channel/params.dart';
 import '../style/sf_symbol.dart';
 import '../style/tab_bar_search_item.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import 'icon.dart';
@@ -244,11 +245,13 @@ class _CNSearchScaffoldState extends State<CNSearchScaffold> {
       children: [
         // Native UITabBarController fills the screen
         Positioned.fill(
-          child: UiKitView(
-            viewType: 'CNSearchScaffold',
-            creationParams: creationParams,
-            creationParamsCodec: const StandardMessageCodec(),
-            onPlatformViewCreated: _onCreated,
+          child: CNSliceBridge(
+            child: UiKitView(
+              viewType: 'CNSearchScaffold',
+              creationParams: creationParams,
+              creationParamsCodec: const StandardMessageCodec(),
+              onPlatformViewCreated: _onCreated,
+            ),
           ),
         ),
         // Flutter content rendered on top

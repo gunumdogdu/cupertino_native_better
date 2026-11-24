@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import '../channel/params.dart';
+import '../utils/slice_bridge.dart';
 import '../utils/version_detector.dart';
 import '../utils/theme_helper.dart';
 import '../utils/modal_hide_mixin.dart';
@@ -436,23 +437,25 @@ class _CNSliderState extends State<CNSlider> with ModalHideMixin<CNSlider> {
 
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return wrapWithModalInteractionGuard(
-        ClipRect(
-          child: SizedBox(
-            height: widget.height,
-            width: double.infinity,
-            child: UiKitView(
-              viewType: viewType,
-              creationParamsCodec: const StandardMessageCodec(),
-              creationParams: creationParams,
-              onPlatformViewCreated: _onPlatformViewCreated,
-              // Forward horizontal drags and taps to the native slider so it
-              // works correctly inside Flutter scroll views.
-              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<HorizontalDragGestureRecognizer>(
-                  () => HorizontalDragGestureRecognizer(),
-                ),
-                Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-              },
+        CNSliceBridge(
+          child: ClipRect(
+            child: SizedBox(
+              height: widget.height,
+              width: double.infinity,
+              child: UiKitView(
+                viewType: viewType,
+                creationParamsCodec: const StandardMessageCodec(),
+                creationParams: creationParams,
+                onPlatformViewCreated: _onPlatformViewCreated,
+                // Forward horizontal drags and taps to the native slider so it
+                // works correctly inside Flutter scroll views.
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<HorizontalDragGestureRecognizer>(
+                    () => HorizontalDragGestureRecognizer(),
+                  ),
+                  Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                },
+              ),
             ),
           ),
         ),
