@@ -36,6 +36,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var showCancelButton = true
         var cancelText = "Cancel"
         var autofocus = false
+        var autofocusOnOpen = false
         var searchIconName = "magnifyingglass"
         var clearIconName = "xmark.circle.fill"
         var isDark = false
@@ -47,6 +48,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         var clearButtonLabel = "Clear"
         var rtl: Bool? = nil
         var labelFont: CNSearchBarFont? = nil
+        var maxLength = 0
 
         if let dict = args as? [String: Any] {
             if let v = dict["placeholder"] as? String { placeholder = v }
@@ -63,6 +65,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["showCancelButton"] as? Bool { showCancelButton = v }
             if let v = dict["cancelText"] as? String { cancelText = v }
             if let v = dict["autofocus"] as? Bool { autofocus = v }
+            if let v = dict["autofocusOnOpen"] as? Bool { autofocusOnOpen = v }
             if let v = dict["searchIconName"] as? String { searchIconName = v }
             if let v = dict["clearIconName"] as? String { clearIconName = v }
             if let v = dict["isDark"] as? Bool { isDark = v }
@@ -74,6 +77,7 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
             if let v = dict["clearButtonLabel"] as? String, !v.isEmpty { clearButtonLabel = v }
             rtl = CNLayoutDirection.read(dict)
             labelFont = CNSearchBarFont(dict)
+            if let v = dict["maxLength"] as? NSNumber { maxLength = v.intValue }
         }
 
         let model = CNSearchBarModel(
@@ -93,6 +97,8 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
         model.labelFont = labelFont
         model.placeholder = placeholder
         model.cancelText = cancelText
+        model.maxLength = maxLength
+        model.autofocusOnOpen = autofocusOnOpen
         // ...and with its text, which Flutter already has (#134).
         if !text.isEmpty { model.setText(text, notify: false) }
 
@@ -204,6 +210,13 @@ class CupertinoSearchBarPlatformView: NSObject, FlutterPlatformView {
                     self.model.layoutDirection = direction
                 }
                 result(nil)
+            case "setMaxLength":
+                // #192: the longest text the field takes; 0 for no limit.
+                self.model.maxLength = (args?["maxLength"] as? NSNumber)?.intValue ?? 0
+                if self.model.maxLength > 0, self.model.searchText.count > self.model.maxLength {
+                    self.model.setText(self.model.limited(self.model.searchText), notify: true)
+                }
+                result(nil)
             case "setLabelFont":
                 self.model.labelFont = CNSearchBarFont(args)
                 result(nil)
@@ -293,6 +306,12 @@ final class CNSearchBarModel: ObservableObject {
     /// app's language (#173).
     @Published var placeholder = "Search"
     @Published var cancelText = "Cancel"
+    /// The longest text the field takes (#192), in characters as the user
+    /// sees them; 0 for no limit. Longer input is cut before it is shown.
+    var maxLength = 0
+    /// Whether the field takes focus when it first shows, open (#192):
+    /// `autofocus` on a bar created open, for the first view only.
+    var autofocusOnOpen = false
     /// Bumped on each `focus`/`unfocus` call; [wantsFocus] says which.
     @Published var focusToken: Int = 0
     private(set) var wantsFocus = false
@@ -326,7 +345,14 @@ final class CNSearchBarModel: ObservableObject {
         onTextChanged(text)
     }
 
+    /// [text] cut to [maxLength] (#192).
+    func limited(_ text: String) -> String {
+        guard maxLength > 0, text.count > maxLength else { return text }
+        return String(text.prefix(maxLength))
+    }
+
     func setText(_ text: String, notify: Bool) {
+        let text = limited(text)
         if !notify { reportedText = text }
         searchText = text
         if notify { report(text) }
@@ -464,6 +490,18 @@ struct CNSearchBarSwiftUI: View {
         self.onCancelTapped = onCancelTapped
     }
 
+    /// Focuses the field, again every 0.15 s (up to 2 s) until it has the
+    /// focus: the first tries can come before the field is in a window.
+    private func autofocusField(attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            guard model.isExpanded else { return }
+            isFocused = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if !isFocused && attempt < 12 { autofocusField(attempt: attempt + 1) }
+            }
+        }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             // Search bar container
@@ -478,7 +516,13 @@ struct CNSearchBarSwiftUI: View {
                     // Text field. The placeholder is the prompt, so
                     // `placeholderColor` reaches it; the label is what
                     // VoiceOver reads (#171).
-                    TextField(text: $model.searchText, prompt: prompt) {
+                    // The text goes through `limited` before the field
+                    // shows it, so input past `maxLength` never appears
+                    // (#192).
+                    TextField(text: Binding(
+                        get: { model.searchText },
+                        set: { model.searchText = model.limited($0) }
+                    ), prompt: prompt) {
                         Text(model.placeholder)
                     }
                     .font(labelFont)
@@ -563,6 +607,15 @@ struct CNSearchBarSwiftUI: View {
         // Typing and every other change of the text reach Flutter once.
         .onChange(of: model.searchText) { newValue in
             model.report(newValue)
+        }
+        // `autofocus` on a bar that is open from the start (#192): it used
+        // to apply only when the bar expanded. The view may appear before
+        // it is in a window (a sheet sliding up), so it tries again until
+        // the field has the focus.
+        .onAppear {
+            guard model.autofocusOnOpen, model.isExpanded else { return }
+            model.autofocusOnOpen = false
+            autofocusField(attempt: 0)
         }
         .onChange(of: model.focusToken) { _ in
             if model.wantsFocus {

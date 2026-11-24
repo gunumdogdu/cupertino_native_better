@@ -245,7 +245,30 @@ class CNSearchBar extends StatefulWidget {
     this.labelFontFamily,
     this.labelFontSize,
     this.labelFontWeight,
+    this.maxLength,
+    this.inputFormatters,
   });
+
+  /// The longest text the field takes, in characters as the user sees them
+  /// (grapheme clusters, as [LengthLimitingTextInputFormatter] counts). Null
+  /// for no limit (#192).
+  ///
+  /// On iOS 26+ it is enforced by the native field before the text changes,
+  /// so a character past the limit never appears. The bar drawn in Flutter
+  /// enforces it as its text field does; on macOS the text is cut right
+  /// after the change.
+  final int? maxLength;
+
+  /// Formatters run on every change of the text, in order, before
+  /// [onChanged] is called (#192), as [CupertinoTextField.inputFormatters]
+  /// do; [maxLength] runs after them.
+  ///
+  /// The bar drawn in Flutter applies them as its text field does. A native
+  /// bar (iOS 26+, macOS) runs them in Dart on each change and gives the
+  /// field the formatted text back, so a rejected character may show for a
+  /// frame before it is removed; use [maxLength] for a limit applied before
+  /// the text shows.
+  final List<TextInputFormatter>? inputFormatters;
 
   /// Placeholder text shown when the search field is empty.
   final String placeholder;
@@ -470,7 +493,7 @@ class _CNSearchBarState extends State<CNSearchBar>
 
     // The initial text is the bar's text from the start: it is sent with
     // the native view's creation params and is not reported (#170).
-    _searchText = widget.initialText ?? '';
+    _searchText = _formatted('', widget.initialText ?? '');
     _textController = TextEditingController(text: _searchText);
     _textController.addListener(_onTextChanged);
 
@@ -507,6 +530,43 @@ class _CNSearchBarState extends State<CNSearchBar>
         widget.cancelText != oldWidget.cancelText) {
       _syncLabels();
     }
+    if (widget.maxLength != oldWidget.maxLength) {
+      _channel
+          ?.invokeOptionalMethod('setMaxLength', {
+            'maxLength': widget.maxLength ?? 0,
+          })
+          .catchError((Object _) {});
+      // The text already there is cut to a new, shorter limit.
+      final limited = _formatted(_searchText, _searchText);
+      if (limited != _searchText) _textController.text = limited;
+    }
+  }
+
+  /// The formatters the text goes through: [CNSearchBar.inputFormatters],
+  /// then [CNSearchBar.maxLength] (#192).
+  List<TextInputFormatter> get _formatters => [
+    ...?widget.inputFormatters,
+    if (widget.maxLength != null)
+      LengthLimitingTextInputFormatter(widget.maxLength),
+  ];
+
+  /// [text] after [_formatters], as a change from [previous] with the
+  /// caret at the end.
+  String _formatted(String previous, String text) {
+    final formatters = _formatters;
+    if (formatters.isEmpty) return text;
+    var oldValue = TextEditingValue(
+      text: previous,
+      selection: TextSelection.collapsed(offset: previous.length),
+    );
+    var value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    for (final formatter in formatters) {
+      value = formatter.formatEditUpdate(oldValue, value);
+    }
+    return value.text;
   }
 
   /// Sends a new placeholder and Cancel title to the iOS bar, e.g. after an
@@ -538,6 +598,15 @@ class _CNSearchBarState extends State<CNSearchBar>
 
   /// [CNSearchBar.labelFontFamily], [CNSearchBar.labelFontSize] and
   /// [CNSearchBar.labelFontWeight] for the native views; empty for none.
+  /// Whether a native view was already created, so `autofocus` on a bar
+  /// open from the start was already used (#192).
+  bool _autofocusUsed = false;
+
+  /// Whether the bar was open when it was first built, for `autofocus` on
+  /// the bar drawn in Flutter (#192).
+  late final bool _openedExpanded =
+      widget.initiallyExpanded || !widget.expandable;
+
   Map<String, Object> get _labelFont => <String, Object>{
     'labelFontFamily': ?widget.labelFontFamily,
     'labelFontSize': ?widget.labelFontSize,
@@ -650,6 +719,7 @@ class _CNSearchBarState extends State<CNSearchBar>
     _lastIsDark = ThemeHelper.isDark(context);
     _lastRtl = nativeRtl(context, widget.textDirection);
     _lastLabelFont = _labelFont;
+    _autofocusUsed = true;
     if (_usesMacSearchField) _lastMacConfig = _macConfig(context);
     // Sends a setText made before the view existed.
     _controller._attach(ch);
@@ -659,8 +729,22 @@ class _CNSearchBarState extends State<CNSearchBar>
   Future<dynamic> _onMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'textChanged':
-        final text = call.arguments['text'] as String? ?? '';
+        final typed = call.arguments['text'] as String? ?? '';
+        // Formatters and the length limit run in Dart for a native field;
+        // the field takes the formatted text back without reporting it
+        // again (#192).
+        final text = _formatted(_searchText, typed);
+        if (text != typed) {
+          _channel
+              ?.invokeMethod('textChanged', {'text': text})
+              .catchError((Object _) {});
+        }
         if (mounted) {
+          if (text == _searchText) {
+            // A change the formatters undid: nothing changed for Flutter.
+            if (_textController.text != text) _textController.text = text;
+            break;
+          }
           setState(() => _searchText = text);
           _textController.text = text;
           widget.onChanged?.call(text);
@@ -796,9 +880,14 @@ class _CNSearchBarState extends State<CNSearchBar>
     'placeholderColor': resolveColorToArgb(widget.placeholderColor, context),
     'clearButtonColor': resolveColorToArgb(_clearButtonColor, context),
     'shadow': widget.showShadow,
+    'maxLength': widget.maxLength ?? 0,
     'showCancelButton': widget.showCancelButton,
     'cancelText': widget.cancelText,
     'autofocus': widget.autofocus,
+    // A bar open from the start takes the focus when it first shows; a
+    // view created again later (after a modal) doesn't take it again
+    // (#192).
+    'autofocusOnOpen': widget.autofocus && _isExpanded && !_autofocusUsed,
     'searchIconName': widget.searchIcon?.name ?? 'magnifyingglass',
     'clearIconName': widget.clearIcon?.name ?? 'xmark.circle.fill',
     if (widget.searchIcon?.size != null)
@@ -1057,6 +1146,12 @@ class _CNSearchBarState extends State<CNSearchBar>
                                               widget.textCapitalization,
                                           autocorrect: widget.autocorrect,
                                           keyboardType: widget.keyboardType,
+                                          inputFormatters: _formatters,
+                                          // A bar open from the start
+                                          // takes the focus (#192).
+                                          autofocus:
+                                              widget.autofocus &&
+                                              _openedExpanded,
                                           textInputAction:
                                               TextInputAction.search,
                                         ),
