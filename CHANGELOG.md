@@ -36,7 +36,7 @@ Thanks to:
 - **#190**, on the iOS 26.2 simulator, with the page from #191 (example: `issue190_glass_button_group_resize_test.dart`).
   - Before: going from 3 buttons to 1 drew the glass outside its frame, and so did going from 1 to 2 and from 2 to 1 with a badge.
   - Now the glass fills its frame at every step, and without a badge the right group lines up with its edge. macOS 27.2 shows the same for the steps without a badge.
-- 750 tests pass. `flutter analyze` is clean with Flutter 3.44, and on `lib` with 3.38. The Swift sources typecheck against the iOS 26.0 SDK.
+- 750 tests pass. `flutter analyze` is clean with Flutter 3.44, and on `lib` with 3.38 and 3.50. The Swift sources typecheck against the iOS 26.0 SDK. pana gives 160/160 with Flutter 3.50 and 3.38.
 
 ## 2.11.0
 
