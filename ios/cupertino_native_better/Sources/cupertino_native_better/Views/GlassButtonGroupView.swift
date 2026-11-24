@@ -227,6 +227,14 @@ struct GlassButtonData: Identifiable {
 @available(iOS 26.0, *)
 class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
   private let container: UIView
+  // the hosting view's right edge; moves in when a badge needs room
+  private var hostingTrailing: NSLayoutConstraint?
+
+  /// Room on the right for a badge, which reaches 6pt past the last button.
+  /// None without badges, so the buttons fill the group's frame.
+  private var badgeInset: CGFloat {
+    viewModel.buttons.contains { ($0.badgeCount ?? 0) > 0 } ? 6 : 0
+  }
   private let hostingController: UIHostingController<GlassButtonGroupSwiftUI>
   private var buttonCallbacks: [Int: (() -> Void)] = [:]
   private let viewModel: GlassButtonGroupViewModel
@@ -457,22 +465,31 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     // Position hosting controller to leave room for badge overflow
     // - 3px down from top (badge extends above buttons)
     // - 0px from left (no left overflow)
-    // - 6px inset from right (badge extends 6px beyond last button)
+    // - inset from right by `badgeInset` (a badge extends 6px beyond the last
+    //   button; no inset when no button shows one)
     // This ensures badges are positioned within container bounds for proper clipping.
     //
-    // Priority is .defaultHigh (750) instead of required (1000) so UIKit can
-    // silently break them during the brief moment when the parent container
-    // has `_UITemporaryLayoutWidth = 0` on initial mount. With required
-    // priority UIKit logs an "unsatisfiable constraints" warning every time.
+    // Priority is 999, just under required (1000), so UIKit can silently
+    // break them during the brief moment when the parent container has
+    // `_UITemporaryLayoutWidth = 0` on initial mount (with required priority
+    // it logs an "unsatisfiable constraints" warning every time).
+    //
+    // It must stay above the hosting view's own content hugging and
+    // compression resistance (750): at .defaultHigh (750) the two tied, and
+    // when Flutter resized the group (its button count changed, e.g. 2 to 1)
+    // the hosting view kept its old width, so the buttons were centred in the
+    // old width and drawn past the group's frame.
+    let edgePriority = UILayoutPriority(999)
     let leading = hostingController.view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 0)
-    let trailing = hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6)
+    let trailing = hostingController.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -badgeInset)
     let top = hostingController.view.topAnchor.constraint(equalTo: container.topAnchor, constant: 3)
     let bottom = hostingController.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: 0)
-    leading.priority = .defaultHigh
-    trailing.priority = .defaultHigh
-    top.priority = .defaultHigh
-    bottom.priority = .defaultHigh
+    leading.priority = edgePriority
+    trailing.priority = edgePriority
+    top.priority = edgePriority
+    bottom.priority = edgePriority
     NSLayoutConstraint.activate([leading, trailing, top, bottom])
+    hostingTrailing = trailing
 
     // Force immediate layout to ensure SwiftUI view calculates sizes correctly on first render
     hostingController.view.setNeedsLayout()
@@ -854,6 +871,11 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
   }
   
   private func updateBadgePositions() {
+    // badges came or went: the hosting view's right edge follows
+    if let trailing = hostingTrailing, trailing.constant != -badgeInset {
+      trailing.constant = -badgeInset
+    }
+
     // Remove existing badge views
     badgeViews.forEach { $0.removeFromSuperview() }
     badgeViews.removeAll()
@@ -893,9 +915,9 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
       let widths = buttons.map(estimatedWidth)
       let spacing = viewModel.spacing
       let hstackWidth = widths.reduce(0, +) + spacing * CGFloat(buttonCount - 1)
-      // Hosting view is inset 6pt from container's trailing edge; HStack is
+      // Hosting view is inset `badgeInset` from container's trailing edge; HStack is
       // centered inside that.
-      let hostingWidth = containerBounds.width - 6
+      let hostingWidth = containerBounds.width - badgeInset
       let hstackStart = max(0, (hostingWidth - hstackWidth) / 2)
 
       var cursor: CGFloat = hstackStart
