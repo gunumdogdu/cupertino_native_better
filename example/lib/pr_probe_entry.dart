@@ -201,7 +201,8 @@
 //     views' autoHideOnModal (default false), HOST=false / TAB=false leave
 //     them out, SHEET=cupertino uses a Cupertino sheet, CLIP=true clips the
 //     dialog, FORM=true adds a CNSwitch row after the red bars,
-//     AUTOFOCUS=true / MAXLEN=<n> set the bar's autofocus / maxLength; AUTO=true
+//     AUTOFOCUS=true / MAXLEN=<n> set the bar's autofocus / maxLength,
+//     STAY=true stops with the keyboard up; AUTO=true
 //     opens the sheet, focuses the bar, opens the dialog and prints
 //     `CNB_RECT192` and `CNB_SHOT` lines)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
@@ -538,6 +539,7 @@ class _ProbeApp extends StatelessWidget {
         form: bool.fromEnvironment('FORM'),
         autofocus: bool.fromEnvironment('AUTOFOCUS'),
         maxLength: _maxLength192 > 0 ? _maxLength192 : null,
+        stay: bool.fromEnvironment('STAY'),
       );
     }
     if (_probe == 'issue184') {

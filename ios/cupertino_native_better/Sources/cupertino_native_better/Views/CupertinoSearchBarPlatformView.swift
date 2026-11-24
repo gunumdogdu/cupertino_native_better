@@ -516,13 +516,7 @@ struct CNSearchBarSwiftUI: View {
                     // Text field. The placeholder is the prompt, so
                     // `placeholderColor` reaches it; the label is what
                     // VoiceOver reads (#171).
-                    // The text goes through `limited` before the field
-                    // shows it, so input past `maxLength` never appears
-                    // (#192).
-                    TextField(text: Binding(
-                        get: { model.searchText },
-                        set: { model.searchText = model.limited($0) }
-                    ), prompt: prompt) {
+                    TextField(text: $model.searchText, prompt: prompt) {
                         Text(model.placeholder)
                     }
                     .font(labelFont)
@@ -606,6 +600,14 @@ struct CNSearchBarSwiftUI: View {
         .animation(.easeInOut(duration: 0.2), value: model.searchText.isEmpty)
         // Typing and every other change of the text reach Flutter once.
         .onChange(of: model.searchText) { newValue in
+            // Input past `maxLength` is cut here, after the edit (#192).
+            // Cut in the binding instead, the field kept showing it: the
+            // text field ignores a value changed during its own edit.
+            let limited = model.limited(newValue)
+            if limited != newValue {
+                model.searchText = limited
+                return
+            }
             model.report(newValue)
         }
         // `autofocus` on a bar that is open from the start (#192): it used

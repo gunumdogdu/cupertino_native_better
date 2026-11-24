@@ -72,7 +72,7 @@ class _Issue190GlassButtonGroupResizeTestPageState
     super.initState();
     if (widget.autoCycle) {
       var step = 0;
-      _timer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      _timer = Timer.periodic(const Duration(milliseconds: 3000), (_) {
         if (step == _steps.length) {
           _timer?.cancel();
           return;
@@ -101,6 +101,10 @@ class _Issue190GlassButtonGroupResizeTestPageState
       'CNB_RECT190 count=$_count badge=$_badge '
       'x=${origin.dx.toStringAsFixed(1)} w=${box.size.width.toStringAsFixed(1)}',
     );
+    // The native view takes the new size a frame later; then a screenshot.
+    Future<void>.delayed(const Duration(milliseconds: 600), () {
+      debugPrint('CNB_SHOT 190-$_count${_badge ? '-badge' : ''}');
+    });
   }
 
   @override

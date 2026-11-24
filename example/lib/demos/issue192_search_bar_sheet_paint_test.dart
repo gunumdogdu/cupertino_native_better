@@ -46,6 +46,7 @@ class Issue192SearchBarSheetPaintTestPage extends StatefulWidget {
     this.form = false,
     this.autofocus = false,
     this.maxLength,
+    this.stay = false,
   });
 
   /// Opens the sheet, focuses the bar and prints the steps.
@@ -78,6 +79,9 @@ class Issue192SearchBarSheetPaintTestPage extends StatefulWidget {
 
   /// The search bar's `maxLength`.
   final int? maxLength;
+
+  /// AUTO stops with the keyboard up, for typing into the bar.
+  final bool stay;
 
   @override
   State<Issue192SearchBarSheetPaintTestPage> createState() =>
@@ -153,6 +157,7 @@ class _Issue192SearchBarSheetPaintTestPageState
     _printRect('marker', _markerKey);
     _printRect('save', _saveKey);
     debugPrint('CNB_SHOT 192-keyboard');
+    if (widget.stay) return;
     await Future<void>.delayed(const Duration(milliseconds: 3000));
     _search.unfocus();
     await Future<void>.delayed(const Duration(milliseconds: 1500));

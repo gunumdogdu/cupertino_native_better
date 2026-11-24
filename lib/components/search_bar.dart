@@ -254,10 +254,10 @@ class CNSearchBar extends StatefulWidget {
   /// (grapheme clusters, as [LengthLimitingTextInputFormatter] counts). Null
   /// for no limit (#192).
   ///
-  /// On iOS 26+ it is enforced by the native field before the text changes,
-  /// so a character past the limit never appears. The bar drawn in Flutter
-  /// enforces it as its text field does; on macOS the text is cut right
-  /// after the change.
+  /// On iOS 26+ the native field cuts the text as it changes, before it is
+  /// reported, so [onChanged] never gets a longer text. The bar drawn in
+  /// Flutter enforces it as its text field does; on macOS the text is cut
+  /// right after the change.
   final int? maxLength;
 
   /// Formatters run on every change of the text, in order, before
