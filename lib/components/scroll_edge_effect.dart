@@ -29,6 +29,11 @@ enum CNScrollEdge {
 
 /// The look of a [CNScrollEdgeEffect], as `UIScrollEdgeEffect.Style`.
 enum CNScrollEdgeStyle {
+  /// The system's own style for the iOS version (`UIScrollEdgeEffect.Style`'s
+  /// default, `.automatic`): soft on iOS 26, hard on iOS 27. The style isn't
+  /// set on the native view, so UIKit picks it, as for a native scroll view.
+  automatic,
+
   /// A soft, progressive blur that fades the content toward the
   /// [CNScrollEdgeEffect.backgroundColor] and out past the band.
   soft,
@@ -77,7 +82,7 @@ class CNScrollEdgeEffect extends StatefulWidget {
     this.edge = CNScrollEdge.top,
     this.height,
     this.reduceTransparencyHeight,
-    this.style = CNScrollEdgeStyle.soft,
+    this.style = CNScrollEdgeStyle.automatic,
     this.controller,
     this.scrollMetrics,
     this.brightness,
@@ -117,7 +122,8 @@ class CNScrollEdgeEffect extends StatefulWidget {
   /// setting itself is [CNAccessibility.reduceTransparency].
   final double? reduceTransparencyHeight;
 
-  /// The look of the effect. Defaults to [CNScrollEdgeStyle.soft].
+  /// The look of the effect. Defaults to [CNScrollEdgeStyle.automatic],
+  /// which follows the system: soft on iOS 26, hard on iOS 27.
   final CNScrollEdgeStyle style;
 
   /// The scroll view's controller: the effect shows while its content is

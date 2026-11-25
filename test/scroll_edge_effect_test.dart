@@ -104,7 +104,7 @@ void main() {
       await tester.pump();
       final params = creationParams();
       expect(params['edge'], 'top');
-      expect(params['style'], 'soft');
+      expect(params['style'], 'automatic', reason: 'UIKit picks it (#195)');
       expect(params['band'], 60.0);
       expect(params['underneath'], 0.0, reason: 'nothing under the edge');
       final rect = tester.getRect(find.byType(UiKitView));
@@ -209,12 +209,17 @@ void main() {
       );
       await tester.pump();
       expect(creationParams()['isDark'], isTrue);
+      expect(creationParams()['style'], 'soft', reason: 'an explicit style');
       expect(creationParams()['band'], 100.0);
       expect(creationParams()['underneath'], isNull, reason: 'always on');
       calls.clear();
       style.value = CNScrollEdgeStyle.hard;
       await tester.pump();
       expect(updates().single['style'], 'hard');
+      calls.clear();
+      style.value = CNScrollEdgeStyle.automatic;
+      await tester.pump();
+      expect(updates().single['style'], 'automatic', reason: '#195');
       await tearDownView(tester);
     },
     skip: skip || !PlatformVersion.shouldUseNativeGlass,
