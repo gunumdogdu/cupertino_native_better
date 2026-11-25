@@ -777,7 +777,7 @@ await CNNativeSheet.show(
 
 ### Scroll edge effect
 
-`CNScrollEdgeEffect` puts the iOS&nbsp;26 scroll edge effect over Flutter content: the soft blur native apps get where content scrolls under the status bar, a bar or the home indicator. iOS draws it (`UIScrollEdgeEffect`), over the Flutter content behind the view, so it matches native apps and follows accessibility settings. It fades the content toward the page's `backgroundColor` (by default the theme's scaffold background), and `style: CNScrollEdgeStyle.hard` makes it an opaque band of that colour. With a `ScrollController` it shows while content is under the edge and is gone at rest, as in a native scroll view.
+`CNScrollEdgeEffect` puts the iOS&nbsp;26 scroll edge effect over Flutter content: the soft blur native apps get where content scrolls under the status bar, a bar or the home indicator. iOS draws it (`UIScrollEdgeEffect`), over the Flutter content behind the view, so it matches native apps and follows accessibility settings. It fades the content toward the page's `backgroundColor` (by default the theme's scaffold background). Its `style` defaults to `CNScrollEdgeStyle.automatic`, the system's own style for the iOS version (soft on iOS&nbsp;26, hard on iOS&nbsp;27); `CNScrollEdgeStyle.soft` or `CNScrollEdgeStyle.hard` (an opaque band of that colour) sets one. With a `ScrollController` it shows while content is under the edge and is gone at rest, as in a native scroll view.
 
 ```dart
 Stack(
