@@ -206,8 +206,9 @@
 //     opens the sheet, focuses the bar, opens the dialog and prints
 //     `CNB_RECT192` and `CNB_SHOT` lines)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=edge
-//     (#150 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled, hard,
-//     off and the end of the list, printing `CNB_SHOT`; PROBE=edgetabs for
+//     (#150, #195 CNScrollEdgeEffect: AUTO=true steps through rest, scrolled
+//     (automatic), soft, hard, back to automatic, off and the end of the
+//     list, printing `CNB_SHOT`; PROBE=edgetabs for
 //     CNTabScaffold's bottomScrollEdgeEffect, NOEFFECT=true without it)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue154
 //     (#153 and #154, the former as issue153; AUTO=true flips #153's third

@@ -136,11 +136,16 @@ final class CNScrollEdgeEffectHost: UIView {
     if args.keys.contains("color") {
       scrollView.contentColor = (args["color"] as? NSNumber).map { Self.color(argb: $0.uint32Value) }
     }
-    // `automatic` sets no style: UIKit keeps its own (`.automatic`), soft on
-    // iOS 26 and hard on iOS 27, as in a native scroll view (#195).
-    if let style = args["style"] as? String, style != "automatic", #available(iOS 26.0, *) {
+    // `automatic` is UIKit's own default, soft on iOS 26 and hard on iOS 27,
+    // as in a native scroll view (#195). It's set, not left alone, so a
+    // change back from `soft` or `hard` applies too.
+    if let style = args["style"] as? String, #available(iOS 26.0, *) {
       let effect = bottom ? scrollView.bottomEdgeEffect : scrollView.topEdgeEffect
-      effect.style = style == "hard" ? .hard : .soft
+      switch style {
+      case "hard": effect.style = .hard
+      case "soft": effect.style = .soft
+      default: effect.style = .automatic
+      }
     }
     if let dark = args["isDark"] as? NSNumber {
       overrideUserInterfaceStyle = dark.boolValue ? .dark : .light

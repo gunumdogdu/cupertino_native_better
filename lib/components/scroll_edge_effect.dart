@@ -30,8 +30,8 @@ enum CNScrollEdge {
 /// The look of a [CNScrollEdgeEffect], as `UIScrollEdgeEffect.Style`.
 enum CNScrollEdgeStyle {
   /// The system's own style for the iOS version (`UIScrollEdgeEffect.Style`'s
-  /// default, `.automatic`): soft on iOS 26, hard on iOS 27. The style isn't
-  /// set on the native view, so UIKit picks it, as for a native scroll view.
+  /// default, `.automatic`): soft on iOS 26, hard on iOS 27. UIKit picks it,
+  /// as for a native scroll view.
   automatic,
 
   /// A soft, progressive blur that fades the content toward the

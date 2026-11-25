@@ -1,3 +1,16 @@
+## 2.13.0
+
+> `CNScrollEdgeEffect` follows the system's own style by default: soft on iOS 26, hard on iOS 27, like the native bars around it (#195).
+
+### Changed — `CNScrollEdgeEffect` uses the system's style by default (#195)
+- **New `CNScrollEdgeStyle.automatic`**, now the default for `CNScrollEdgeEffect` and so for `CNTabScaffold.bottomScrollEdgeEffect`. It is UIKit's own default for `UIScrollEdgeEffect.Style`, which picks the style for the iOS version.
+- **iOS 26:** no visible change. `automatic` looks exactly like `soft` did, which was the default before.
+- **iOS 27:** the default effect is now hard, like native scroll views and bars. Before, it was always soft there.
+- **`soft` and `hard`** still set a style, so apps that pass one see no change. A change from `soft` or `hard` back to `automatic` while the view is up applies at once.
+- If your code switches over `CNScrollEdgeStyle` exhaustively, add a case for `automatic`.
+
+Thanks to @Ashhad08, for the report and PR #196, which ships with one change: `automatic` is now set on the native view instead of being left out, so a change back to it while the view is up applies too.
+
 ## 2.12.0
 
 > Flutter content that a sheet or dialog draws after one of its own CN widgets stays painted while CN widgets are live under it (#192). `CNSearchBar` gets `maxLength`, `inputFormatters`, `autofocus` on a bar that is open from the start, and `CNSearchBarFormField` (#192). `CNGlassButtonGroup` follows a change in its number of buttons and keeps room for a badge only when it has one (#190).

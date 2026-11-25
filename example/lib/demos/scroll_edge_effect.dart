@@ -5,7 +5,8 @@ import 'package:flutter/cupertino.dart';
 
 /// CNScrollEdgeEffect: the iOS 26 scroll edge effect over a Flutter list,
 /// at the top (under the status bar) and the bottom (under the floating
-/// controls and the home indicator), soft or hard, and off for comparison.
+/// controls and the home indicator), in the system's style (soft on iOS 26,
+/// hard on iOS 27), soft or hard, and off for comparison.
 ///
 /// The list runs under both edges. At rest at the top, the top effect is
 /// gone, as in a native scroll view; scrolled, the rows under the status bar
@@ -13,7 +14,8 @@ import 'package:flutter/cupertino.dart';
 class ScrollEdgeEffectDemoPage extends StatefulWidget {
   const ScrollEdgeEffectDemoPage({super.key, this.autoCycle = false});
 
-  /// Steps through rest, scrolled, hard and off, printing `CNB_SHOT <step>`.
+  /// Steps through rest, scrolled, soft, hard, back to automatic and off,
+  /// printing `CNB_SHOT <step>`.
   final bool autoCycle;
 
   @override
@@ -34,7 +36,7 @@ const _tiles = [
 
 class _ScrollEdgeEffectDemoPageState extends State<ScrollEdgeEffectDemoPage> {
   final ScrollController _controller = ScrollController();
-  CNScrollEdgeStyle _style = CNScrollEdgeStyle.soft;
+  CNScrollEdgeStyle _style = CNScrollEdgeStyle.automatic;
   bool _enabled = true;
 
   @override
@@ -61,13 +63,15 @@ class _ScrollEdgeEffectDemoPageState extends State<ScrollEdgeEffectDemoPage> {
     if (!mounted) return;
     await step('rest', () {});
     await step('scrolled', () => _controller.jumpTo(260));
+    await step('soft', () => setState(() => _style = CNScrollEdgeStyle.soft));
     await step('hard', () => setState(() => _style = CNScrollEdgeStyle.hard));
+    await step(
+      'automatic',
+      () => setState(() => _style = CNScrollEdgeStyle.automatic),
+    );
     await step('off', () => setState(() => _enabled = false));
     await step('end', () {
-      setState(() {
-        _enabled = true;
-        _style = CNScrollEdgeStyle.soft;
-      });
+      setState(() => _enabled = true);
       _controller.jumpTo(_controller.position.maxScrollExtent);
     });
   }
@@ -118,12 +122,16 @@ class _ScrollEdgeEffectDemoPageState extends State<ScrollEdgeEffectDemoPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CNButton(
-                  label: _style == CNScrollEdgeStyle.soft ? 'Soft' : 'Hard',
+                  label: switch (_style) {
+                    CNScrollEdgeStyle.automatic => 'Automatic',
+                    CNScrollEdgeStyle.soft => 'Soft',
+                    CNScrollEdgeStyle.hard => 'Hard',
+                  },
                   config: const CNButtonConfig(shrinkWrap: true),
                   onPressed: () => setState(
-                    () => _style = _style == CNScrollEdgeStyle.soft
-                        ? CNScrollEdgeStyle.hard
-                        : CNScrollEdgeStyle.soft,
+                    () => _style = CNScrollEdgeStyle
+                        .values[(_style.index + 1) %
+                            CNScrollEdgeStyle.values.length],
                   ),
                 ),
                 const SizedBox(width: 12),
