@@ -87,6 +87,7 @@ class CNScrollEdgeEffect extends StatefulWidget {
     this.scrollMetrics,
     this.brightness,
     this.backgroundColor,
+    this.onAppearanceChanged,
   }) : assert(height == null || height >= 0),
        assert(
          reduceTransparencyHeight == null || reduceTransparencyHeight >= 0,
@@ -148,6 +149,28 @@ class CNScrollEdgeEffect extends StatefulWidget {
   /// leaves only the blur.
   final Color? backgroundColor;
 
+  /// Called when iOS switches the effect between its light and dark
+  /// appearance, with the new one.
+  ///
+  /// Over dark content iOS draws the effect dark, and native content in the
+  /// band, such as a navigation bar's title, switches to its dark
+  /// appearance with it. Flutter content in the band, such as a title in a
+  /// [Stack] over the effect, can't follow by itself; a [CupertinoDynamicColor]
+  /// follows the app's brightness, not the band. Use this to give it the
+  /// colour for the band's appearance:
+  ///
+  /// ```dart
+  /// CNScrollEdgeEffect(
+  ///   controller: controller,
+  ///   onAppearanceChanged: (b) => setState(() => bandBrightness = b),
+  /// )
+  /// ```
+  ///
+  /// It is called only on a switch, not for the starting appearance, which
+  /// is [brightness] (the app's brightness by default). A change of
+  /// [brightness] switches the appearance too, and is reported.
+  final ValueChanged<Brightness>? onAppearanceChanged;
+
   /// The extra height the view takes past [height], so the soft end of the
   /// effect isn't cut off.
   static const double _tail = 48;
@@ -169,6 +192,7 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
   double? _lastRtBand;
   bool? _lastDark;
   int? _lastColor;
+  Brightness? _lastAppearance;
 
   @override
   void initState() {
@@ -192,9 +216,23 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
 
   @override
   void dispose() {
+    _channel?.setMethodCallHandler(null);
     widget.controller?.removeListener(_onScroll);
     widget.scrollMetrics?.removeListener(_onScroll);
     super.dispose();
+  }
+
+  Future<dynamic> _onMethodCall(MethodCall call) async {
+    if (call.method != 'appearance') return null;
+    final args = call.arguments;
+    if (args is! Map || !mounted) return null;
+    final appearance = args['isDark'] == true
+        ? Brightness.dark
+        : Brightness.light;
+    if (appearance == _lastAppearance) return null;
+    _lastAppearance = appearance;
+    widget.onAppearanceChanged?.call(appearance);
+    return null;
   }
 
   bool get _isDark => switch (widget.brightness) {
@@ -310,13 +348,17 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
   }
 
   void _onCreated(int id) {
+    _channel?.setMethodCallHandler(null);
     final channel = MethodChannel('CNScrollEdgeEffect_$id');
     _channel = channel;
+    channel.setMethodCallHandler(_onMethodCall);
     _lastBand = _band(context);
     _lastRtBand = widget.reduceTransparencyHeight;
     _lastDark = _isDark;
     _lastStyle = widget.style.name;
     _lastColor = _color(context);
+    // The native view starts in this appearance and reports only switches.
+    _lastAppearance = _isDark ? Brightness.dark : Brightness.light;
     // The view was created with the value from the build, before the scroll
     // view's layout: always send the current one once.
     _lastUnderneath = double.nan;
