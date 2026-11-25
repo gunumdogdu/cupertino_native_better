@@ -129,8 +129,8 @@ class _ScrollEdgeEffectDemoPageState extends State<ScrollEdgeEffectDemoPage> {
                   },
                   config: const CNButtonConfig(shrinkWrap: true),
                   onPressed: () => setState(
-                    () => _style = CNScrollEdgeStyle
-                        .values[(_style.index + 1) %
+                    () => _style =
+                        CNScrollEdgeStyle.values[(_style.index + 1) %
                             CNScrollEdgeStyle.values.length],
                   ),
                 ),
