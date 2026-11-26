@@ -27,6 +27,11 @@ import UIKit
 /// band. `rtBand` (`reduceTransparencyHeight`, #176) is the band's height in
 /// that mode; the view follows the setting itself, so a change while the
 /// app runs applies at once.
+///
+/// Over dark content the system draws the effect dark, and switches the
+/// views in the container to the dark appearance, as it does for a
+/// navigation bar's title (#199). Flutter content in the band can't follow
+/// that by itself, so the view reports each switch (`appearance`).
 final class CNScrollEdgeEffectFactory: NSObject, FlutterPlatformViewFactory {
   private let messenger: FlutterBinaryMessenger
 
@@ -54,6 +59,9 @@ final class CNScrollEdgeEffectPlatformView: NSObject, FlutterPlatformView {
     channel = FlutterMethodChannel(name: "CNScrollEdgeEffect_\(viewId)", binaryMessenger: messenger)
     super.init()
     host.apply(dict)
+    host.onAppearanceChange = { [weak self] dark in
+      self?.channel.invokeMethod("appearance", arguments: ["isDark": dark])
+    }
     channel.setMethodCallHandler { [weak self] call, result in
       switch call.method {
       case "update":
@@ -80,6 +88,9 @@ final class CNScrollEdgeEffectHost: UIView {
   private var rtBand: CGFloat?
   /// How far Flutter's content is under the edge; nil: always under.
   private var underneath: CGFloat?
+  /// Called when the system switches the container's appearance; true:
+  /// dark.
+  var onAppearanceChange: ((Bool) -> Void)?
 
   init(frame: CGRect, bottom: Bool) {
     self.bottom = bottom
@@ -106,6 +117,11 @@ final class CNScrollEdgeEffectHost: UIView {
       interaction.scrollView = scrollView
       interaction.edge = bottom ? .bottom : .top
       element.addInteraction(interaction)
+      // The system switches the container to the dark appearance over dark
+      // content, and back over light content (#199).
+      element.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (view: UIView, _: UITraitCollection) in
+        self?.onAppearanceChange?(view.traitCollection.userInterfaceStyle == .dark)
+      }
     }
     NotificationCenter.default.addObserver(
       self, selector: #selector(reduceTransparencyChanged),

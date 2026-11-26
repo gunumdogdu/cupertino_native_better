@@ -226,6 +226,44 @@ void main() {
   );
 
   testWidgets(
+    'reports the appearance iOS switches the band to (#199)',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      listen(tester);
+      final seen = <Brightness>[];
+      await tester.pumpWidget(
+        CupertinoApp(
+          theme: const CupertinoThemeData(brightness: Brightness.light),
+          home: Stack(
+            children: [CNScrollEdgeEffect(onAppearanceChanged: seen.add)],
+          ),
+        ),
+      );
+      await tester.pump();
+      final create = calls.firstWhere((c) => c.method == 'create');
+      final id = (create.arguments as Map)['id'] as int;
+
+      Future<void> fromNative(bool dark) =>
+          tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+            'CNScrollEdgeEffect_$id',
+            const StandardMethodCodec().encodeMethodCall(
+              MethodCall('appearance', {'isDark': dark}),
+            ),
+            (_) {},
+          );
+
+      await fromNative(false);
+      expect(seen, isEmpty, reason: 'the starting appearance, no switch');
+      await fromNative(true);
+      await fromNative(true);
+      await fromNative(false);
+      expect(seen, [Brightness.dark, Brightness.light]);
+      await tearDownView(tester);
+    },
+    skip: skip || !PlatformVersion.shouldUseNativeGlass,
+  );
+
+  testWidgets(
     'the colour of the page under the edge goes with it: the theme scaffold '
     'background by default, so the effect fades toward it and hard is a band '
     'of it (#150)',
