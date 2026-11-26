@@ -7,7 +7,8 @@ class GlassButtonGroupViewModel: ObservableObject {
   @Published var buttons: [GlassButtonData] = []
   @Published var axis: Axis = .horizontal
   @Published var spacing: CGFloat = 8.0
-  @Published var spacingForGlass: CGFloat = 40.0
+  /// Set by the caller, or nil for the default; see `effectiveSpacingForGlass`.
+  @Published var spacingForGlass: CGFloat? = nil
 
   func updateButton(at index: Int, with buttonData: GlassButtonData) {
     guard index >= 0 && index < buttons.count else { return }
@@ -24,13 +25,15 @@ struct GlassButtonGroupSwiftUI: View {
   @ObservedObject var viewModel: GlassButtonGroupViewModel
   @Namespace private var namespace
 
-  /// Horizontal multi-button bars : spacingForGlass plus élevé pour que le
-  /// blend démarre plus tôt et réduise le rétrécissement entre icônes.
+  /// A value the caller passed is used as is (#201). By default a horizontal
+  /// bar of several buttons uses 80, so the blend starts earlier and the
+  /// glass does not pinch between the icons; any other group uses 40.
   private var effectiveSpacingForGlass: CGFloat {
+    if let explicit = viewModel.spacingForGlass { return explicit }
     if viewModel.axis == .horizontal, viewModel.buttons.count >= 2 {
-      return max(viewModel.spacingForGlass, 80)
+      return 80
     }
-    return viewModel.spacingForGlass
+    return 40
   }
 
   @ViewBuilder
@@ -263,7 +266,7 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     var buttons: [GlassButtonData] = []
     var axis: Axis = .horizontal
     var spacing: CGFloat = 8.0
-    var spacingForGlass: CGFloat = 40.0
+    var spacingForGlass: CGFloat? = nil
     var isDark: Bool = false
     
     // Set up method channel for button callbacks and updates
