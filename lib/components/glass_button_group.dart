@@ -56,15 +56,17 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// The [axis] determines whether buttons are laid out horizontally (Axis.horizontal)
   /// or vertically (Axis.vertical).
   /// The [spacing] controls the spacing between buttons in the layout (HStack/VStack).
-  /// The [spacingForGlass] controls how Liquid Glass effects blend together.
-  /// For proper blending, [spacingForGlass] should be larger than [spacing] so that
-  /// glass effects merge when buttons are close together.
+  /// The [spacingForGlass] controls how Liquid Glass effects blend together:
+  /// glass shapes closer than it blend into each other. Set it larger than
+  /// [spacing] for buttons that merge, or smaller for buttons that stay
+  /// separate and blend only when they come closer. When null, a horizontal
+  /// group of 2+ buttons uses 80 and any other group uses 40.
   const CNGlassButtonGroup({
     super.key,
     required this.buttons,
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
-    this.spacingForGlass = 40.0,
+    this.spacingForGlass,
     this.autoHideOnModal = true,
   }) : _buttonWidgets = null;
 
@@ -79,7 +81,7 @@ class CNGlassButtonGroup extends StatefulWidget {
     required List<CNButton> buttonWidgets,
     this.axis = Axis.horizontal,
     this.spacing = 8.0,
-    this.spacingForGlass = 40.0,
+    this.spacingForGlass,
     this.autoHideOnModal = true,
   }) : buttons = const [],
        _buttonWidgets = buttonWidgets;
@@ -96,8 +98,13 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// Spacing between buttons.
   final double spacing;
 
-  /// Spacing value for Liquid Glass blending (affects how glass effects merge).
-  final double spacingForGlass;
+  /// Distance under which the buttons' Liquid Glass shapes blend, passed to
+  /// the native `GlassEffectContainer(spacing:)`.
+  ///
+  /// When null (the default), a horizontal group of 2+ buttons uses 80 so
+  /// that the glass does not pinch between them, and any other group uses
+  /// 40. A value you pass is used as is.
+  final double? spacingForGlass;
 
   /// When true (default), destroys the native group's PlatformView while a
   /// modal sheet is presented above this widget's host route. Fixes the
@@ -298,7 +305,8 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
           'buttons': snapshot.data!,
           'axis': widget.axis == Axis.horizontal ? 'horizontal' : 'vertical',
           'spacing': widget.spacing,
-          'spacingForGlass': widget.spacingForGlass,
+          if (widget.spacingForGlass != null)
+            'spacingForGlass': widget.spacingForGlass,
           'isDark': ThemeHelper.isDark(context),
         };
 

@@ -87,7 +87,8 @@ final class MacGlassButtonGroupModel: ObservableObject {
   @Published var buttons: [MacGlassGroupButtonData] = []
   @Published var axis: Axis = .horizontal
   @Published var spacing: CGFloat = 8
-  @Published var spacingForGlass: CGFloat = 40
+  /// Set by the caller, or nil for the default; see `effectiveSpacingForGlass`.
+  @Published var spacingForGlass: CGFloat? = nil
   @Published var interactive = true
   /// Called with the button's index when it is clicked.
   var onPressed: (Int) -> Void = { _ in }
@@ -110,13 +111,15 @@ struct MacGlassButtonGroupSwiftUI: View {
   @ObservedObject var model: MacGlassButtonGroupModel
   @Namespace private var namespace
 
-  /// As on iOS: a horizontal bar of several buttons starts blending earlier,
-  /// so the glass does not pinch between them.
+  /// As on iOS: a value the caller passed is used as is (#201). By default a
+  /// horizontal bar of several buttons starts blending earlier (80), so the
+  /// glass does not pinch between them; any other group uses 40.
   private var effectiveSpacingForGlass: CGFloat {
+    if let explicit = model.spacingForGlass { return explicit }
     if model.axis == .horizontal, model.buttons.count >= 2 {
-      return max(model.spacingForGlass, 80)
+      return 80
     }
-    return model.spacingForGlass
+    return 40
   }
 
   var body: some View {
