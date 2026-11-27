@@ -1,3 +1,28 @@
+## 2.14.0
+
+> `CNScrollEdgeEffect.onAppearanceChanged` reports the band's light or dark appearance, so Flutter content in the band can match it (#199). An explicit `CNGlassButtonGroup.spacingForGlass` below `spacing` now keeps the buttons apart, and a change of `axis`, `spacing` or `spacingForGlass` reaches a group that is already up (#201). A `CNGlassButtonGroup` in the window's right safe-area inset stays centred in its frame (#198).
+
+### Added — `CNScrollEdgeEffect.onAppearanceChanged` (#199)
+- Over dark content iOS 26 draws a soft band dark and switches the native content in it, such as a navigation bar's title, to its dark appearance. Flutter content in the band can't follow that by itself. The new callback reports the band's `Brightness`: once when the effect starts, then on each switch.
+- A `hard` band, and the opaque band shown with Reduce Transparency, is the page's colour, so it stays light on a light page.
+- iOS 27 doesn't switch the band, not even a `soft` one, and keeps the status bar dark over it too. The callback then reports `light` once.
+- iOS only. Where the native effect isn't drawn, the callback isn't called.
+
+### Fixed — `CNGlassButtonGroup.spacingForGlass` (#201)
+- **An explicit value below `spacing` is used as is.** Before, a horizontal group of 2+ buttons always used at least 80, so its buttons always merged into one shape. Now `spacing: 14, spacingForGlass: 10` gives two capsules, which blend only when they come closer than 10.
+- **A value at or above `spacing` on a horizontal group of 2+ buttons still uses at least 80.** A smaller blend distance pinches the merged glass between the buttons. The example's `spacingForGlass: 40` looks the same as before.
+- **`spacingForGlass` is now `double?` and null by default.** Null keeps the old defaults: 80 for a horizontal group of 2+ buttons, 40 for any other group. Code that only passes a value needs no change. Code that reads the field as a `double` needs a null check.
+- **Changes reach a group that is already up.** A change of `axis`, `spacing` or `spacingForGlass` was only recorded on the Dart side, so the native group kept the layout it was created with. It is now sent to the iOS and macOS views, and the group updates in place.
+
+### Fixed — `CNGlassButtonGroup` off-centre in the safe-area inset (#198)
+A group in the window's right safe-area inset could be laid out against the narrower safe area, so its glass sat left of the frame Flutter gave it: 22 pt left in iPhone Duo's 84 pt system strip, in portrait and landscape. Its SwiftUI host now ignores the window's safe area, as `CNButton`'s has since #184. iOS only.
+
+Thanks to:
+- @LucasLau00, for the report in #198;
+- @Ashhad08, for #199 and #201 and PRs #200 and #202. Both ship with changes:
+  - #200 also reports the starting appearance, so content keeps up when the effect is created again.
+  - #202 keeps the 80 pt floor when `spacingForGlass` merges a horizontal group, and adds the layout update.
+
 ## 2.13.0
 
 > `CNScrollEdgeEffect` follows the system's own style by default: soft on iOS 26, hard on iOS 27, like the native bars around it (#195).
