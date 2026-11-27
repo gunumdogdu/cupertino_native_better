@@ -149,8 +149,8 @@ class CNScrollEdgeEffect extends StatefulWidget {
   /// leaves only the blur.
   final Color? backgroundColor;
 
-  /// Called when iOS switches the effect between its light and dark
-  /// appearance, with the new one.
+  /// Called with the effect's light or dark appearance: once when the
+  /// effect starts, then each time iOS switches it.
   ///
   /// Over dark content iOS draws the effect dark, and native content in the
   /// band, such as a navigation bar's title, switches to its dark
@@ -166,9 +166,17 @@ class CNScrollEdgeEffect extends StatefulWidget {
   /// )
   /// ```
   ///
-  /// It is called only on a switch, not for the starting appearance, which
-  /// is [brightness] (the app's brightness by default). A change of
-  /// [brightness] switches the appearance too, and is reported.
+  /// The starting appearance is [brightness] (the app's brightness by
+  /// default). It is reported too, so content keeps up when the effect is
+  /// created again, for example after it was removed while dark. A change of
+  /// [brightness] switches the appearance as well, and is reported.
+  ///
+  /// iOS 26 darkens a soft band (the default `automatic` style there) over
+  /// dark content. A `hard` band, and the opaque band shown with Reduce
+  /// Transparency, is the page's colour, so it stays light on a light page.
+  /// iOS 27 doesn't switch the band, not even a `soft` one, and keeps the
+  /// status bar dark over it too. Only the native effect reports: the
+  /// callback isn't called where the effect isn't drawn.
   final ValueChanged<Brightness>? onAppearanceChanged;
 
   /// The extra height the view takes past [height], so the soft end of the
@@ -358,7 +366,10 @@ class _CNScrollEdgeEffectState extends State<CNScrollEdgeEffect> {
     _lastStyle = widget.style.name;
     _lastColor = _color(context);
     // The native view starts in this appearance and reports only switches.
+    // Report it once here, so content that followed an earlier effect (one
+    // removed while dark, say) matches this one.
     _lastAppearance = _isDark ? Brightness.dark : Brightness.light;
+    widget.onAppearanceChanged?.call(_lastAppearance!);
     // The view was created with the value from the build, before the scroll
     // view's layout: always send the current one once.
     _lastUnderneath = double.nan;

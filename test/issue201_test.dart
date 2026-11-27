@@ -24,12 +24,24 @@ void main() {
       calls.add(call);
       return null;
     });
-    addTearDown(
-      () => messenger.setMockMethodCallHandler(
-        SystemChannels.platform_views,
-        null,
-      ),
-    );
+    for (var id = 0; id < 20; id++) {
+      messenger.setMockMethodCallHandler(
+        MethodChannel('CupertinoNativeGlassButtonGroup_$id'),
+        (call) async {
+          calls.add(call);
+          return null;
+        },
+      );
+    }
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(SystemChannels.platform_views, null);
+      for (var id = 0; id < 20; id++) {
+        messenger.setMockMethodCallHandler(
+          MethodChannel('CupertinoNativeGlassButtonGroup_$id'),
+          null,
+        );
+      }
+    });
   }
 
   Map<Object?, Object?> creationParams() {
@@ -41,7 +53,11 @@ void main() {
         as Map<Object?, Object?>;
   }
 
-  Future<void> pumpGroup(WidgetTester tester, {double? spacingForGlass}) async {
+  Future<void> pumpGroup(
+    WidgetTester tester, {
+    double spacing = 14,
+    double? spacingForGlass,
+  }) async {
     debugDefaultTargetPlatformOverride = Platform.isIOS
         ? TargetPlatform.iOS
         : TargetPlatform.macOS;
@@ -50,7 +66,7 @@ void main() {
       CupertinoApp(
         home: Center(
           child: CNGlassButtonGroup(
-            spacing: 14,
+            spacing: spacing,
             spacingForGlass: spacingForGlass,
             buttons: [
               CNButtonData.icon(
@@ -99,6 +115,34 @@ void main() {
   ) async {
     await pumpGroup(tester, spacingForGlass: 10);
     expect(creationParams()['spacingForGlass'], 10.0);
+    await tearDownView(tester);
+  }, skip: skip);
+
+  testWidgets('a changed spacing or spacingForGlass reaches the existing '
+      'native group', (tester) async {
+    await pumpGroup(tester, spacingForGlass: 10);
+    final created = calls.where((c) => c.method == 'create').length;
+    List<Map<Object?, Object?>> layouts() => [
+      for (final c in calls)
+        if (c.method == 'updateLayout') c.arguments as Map<Object?, Object?>,
+    ];
+    expect(layouts(), isEmpty);
+
+    await pumpGroup(tester, spacing: 4, spacingForGlass: 10);
+    expect(layouts().single, {
+      'axis': 'horizontal',
+      'spacing': 4.0,
+      'spacingForGlass': 10.0,
+    });
+
+    calls.clear();
+    await pumpGroup(tester, spacing: 4);
+    expect(layouts().single['spacingForGlass'], isNull, reason: 'default');
+    expect(
+      calls.where((c) => c.method == 'create').length,
+      0,
+      reason: 'updated in place, not created again ($created before)',
+    );
     await tearDownView(tester);
   }, skip: skip);
 }

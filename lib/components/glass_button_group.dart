@@ -57,10 +57,9 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// or vertically (Axis.vertical).
   /// The [spacing] controls the spacing between buttons in the layout (HStack/VStack).
   /// The [spacingForGlass] controls how Liquid Glass effects blend together:
-  /// glass shapes closer than it blend into each other. Set it larger than
-  /// [spacing] for buttons that merge, or smaller for buttons that stay
-  /// separate and blend only when they come closer. When null, a horizontal
-  /// group of 2+ buttons uses 80 and any other group uses 40.
+  /// glass shapes closer than it blend into each other. Set it smaller than
+  /// [spacing] for buttons that stay separate and blend only when they come
+  /// closer. See [spacingForGlass] for the defaults.
   const CNGlassButtonGroup({
     super.key,
     required this.buttons,
@@ -102,8 +101,14 @@ class CNGlassButtonGroup extends StatefulWidget {
   /// the native `GlassEffectContainer(spacing:)`.
   ///
   /// When null (the default), a horizontal group of 2+ buttons uses 80 so
-  /// that the glass does not pinch between them, and any other group uses
-  /// 40. A value you pass is used as is.
+  /// that the merged glass doesn't pinch between them, and any other group
+  /// uses 40.
+  ///
+  /// A value below [spacing] keeps the buttons apart as separate capsules,
+  /// which blend only when they come closer than it, and is used as is. A
+  /// value at or above [spacing] merges the buttons; a horizontal group of
+  /// 2+ buttons then uses at least 80, so the shape stays a smooth bar.
+  /// Changing it, [spacing] or [axis] updates the native group in place.
   final double? spacingForGlass;
 
   /// When true (default), destroys the native group's PlatformView while a
@@ -489,6 +494,13 @@ class _CNGlassButtonGroupState extends State<CNGlassButtonGroup>
     }
 
     if (axisChanged || spacingChanged || spacingForGlassChanged) {
+      // Before, these were only recorded, so an existing native group kept
+      // the layout it was created with (#201).
+      await ch.invokeMethod('updateLayout', {
+        'axis': widget.axis == Axis.horizontal ? 'horizontal' : 'vertical',
+        'spacing': widget.spacing,
+        'spacingForGlass': widget.spacingForGlass,
+      });
       _lastAxis = widget.axis;
       _lastSpacing = widget.spacing;
       _lastSpacingForGlass = widget.spacingForGlass;

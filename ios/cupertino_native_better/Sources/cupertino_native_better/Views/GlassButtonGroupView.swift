@@ -25,15 +25,17 @@ struct GlassButtonGroupSwiftUI: View {
   @ObservedObject var viewModel: GlassButtonGroupViewModel
   @Namespace private var namespace
 
-  /// A value the caller passed is used as is (#201). By default a horizontal
-  /// bar of several buttons uses 80, so the blend starts earlier and the
-  /// glass does not pinch between the icons; any other group uses 40.
+  /// The `GlassEffectContainer` spacing: glass shapes closer than it blend.
+  /// By default a horizontal bar of several buttons uses 80, so the blend
+  /// starts earlier and the merged glass doesn't pinch between the icons;
+  /// any other group uses 40. A value the caller passes below `spacing`
+  /// keeps the buttons apart, and is used as is (#201). At or above it the
+  /// buttons merge, and such a bar keeps at least 80 so it doesn't pinch.
   private var effectiveSpacingForGlass: CGFloat {
-    if let explicit = viewModel.spacingForGlass { return explicit }
-    if viewModel.axis == .horizontal, viewModel.buttons.count >= 2 {
-      return 80
-    }
-    return 40
+    let bar = viewModel.axis == .horizontal && viewModel.buttons.count >= 2
+    guard let explicit = viewModel.spacingForGlass else { return bar ? 80 : 40 }
+    if bar, explicit >= viewModel.spacing { return max(explicit, 80) }
+    return explicit
   }
 
   @ViewBuilder
@@ -442,6 +444,11 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
     let swiftUIView = GlassButtonGroupSwiftUI(viewModel: viewModel)
 
     self.hostingController = UIHostingController(rootView: swiftUIView)
+    // Flutter places the group, so the host must not take the window's safe
+    // area, as for CNButton (#184): a group in a landscape side strip or the
+    // iPhone Duo's system strip was otherwise laid out against a narrower
+    // area after a rotation, off-centre in its frame (#198).
+    self.hostingController.safeAreaRegions = []
 
     self.hostingController.view.backgroundColor = .clear
     // Configure hosting controller to ignore safe areas and remove any padding
@@ -539,6 +546,22 @@ class GlassButtonGroupPlatformView: NSObject, FlutterPlatformView {
         } else {
           result(FlutterError(code: "bad_args", message: "Missing buttons", details: nil))
         }
+      case "updateLayout":
+        // A changed axis, spacing or spacingForGlass (#201); before, an
+        // existing view kept the ones it was created with. A missing
+        // spacingForGlass goes back to the default.
+        let args = call.arguments as? [String: Any] ?? [:]
+        if let axis = args["axis"] as? String {
+          self.viewModel.axis = axis == "horizontal" ? .horizontal : .vertical
+        }
+        if let spacing = args["spacing"] as? NSNumber {
+          self.viewModel.spacing = CGFloat(truncating: spacing)
+        }
+        self.viewModel.spacingForGlass = (args["spacingForGlass"] as? NSNumber).map {
+          CGFloat(truncating: $0)
+        }
+        self.hostingController.view.setNeedsLayout()
+        result(nil)
       case "setBrightness":
         if let args = call.arguments as? [String: Any],
            let isDark = (args["isDark"] as? NSNumber)?.boolValue {

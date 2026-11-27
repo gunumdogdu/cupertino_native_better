@@ -111,15 +111,16 @@ struct MacGlassButtonGroupSwiftUI: View {
   @ObservedObject var model: MacGlassButtonGroupModel
   @Namespace private var namespace
 
-  /// As on iOS: a value the caller passed is used as is (#201). By default a
-  /// horizontal bar of several buttons starts blending earlier (80), so the
-  /// glass does not pinch between them; any other group uses 40.
+  /// As on iOS: by default a horizontal bar of several buttons starts
+  /// blending earlier (80), so the glass doesn't pinch between them; any
+  /// other group uses 40. A value the caller passes below `spacing` keeps
+  /// the buttons apart, and is used as is (#201). At or above it the buttons
+  /// merge, and such a bar keeps at least 80.
   private var effectiveSpacingForGlass: CGFloat {
-    if let explicit = model.spacingForGlass { return explicit }
-    if model.axis == .horizontal, model.buttons.count >= 2 {
-      return 80
-    }
-    return 40
+    let bar = model.axis == .horizontal && model.buttons.count >= 2
+    guard let explicit = model.spacingForGlass else { return bar ? 80 : 40 }
+    if bar, explicit >= model.spacing { return max(explicit, 80) }
+    return explicit
   }
 
   var body: some View {
@@ -368,6 +369,19 @@ class GlassButtonGroupNSView: NSView {
         } else {
           result(FlutterError(code: "bad_args", message: "Missing buttons", details: nil))
         }
+      case "updateLayout":
+        // As on iOS (#201): a changed axis, spacing or spacingForGlass.
+        if let axis = args?["axis"] as? String {
+          self.model.axis = axis == "vertical" ? .vertical : .horizontal
+        }
+        if let spacing = args?["spacing"] as? NSNumber {
+          self.model.spacing = CGFloat(truncating: spacing)
+        }
+        self.model.spacingForGlass = (args?["spacingForGlass"] as? NSNumber).map {
+          CGFloat(truncating: $0)
+        }
+        self.updateBadgesAfterLayout()
+        result(nil)
       case "setBrightness":
         if let isDark = (args?["isDark"] as? NSNumber)?.boolValue {
           self.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
