@@ -210,6 +210,10 @@
 //     (automatic), soft, hard, back to automatic, off and the end of the
 //     list, printing `CNB_SHOT`; PROBE=edgetabs for
 //     CNTabScaffold's bottomScrollEdgeEffect, NOEFFECT=true without it)
+//   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue198
+//     (#198 CNGlassButtonGroup in the safe-area inset; AUTO=true rotates the
+//     app and prints `CNB_SHOT`; PROBE=issue199 for #199, the scroll edge
+//     band's appearance, and PROBE=issue201 for #201, spacingForGlass)
 //   flutter run -t lib/pr_probe_entry.dart --dart-define=PROBE=issue154
 //     (#153 and #154, the former as issue153; AUTO=true flips #153's third
 //     row / steps #154's counter and remounts it, printing `CNB_SHOT`)
@@ -310,6 +314,9 @@ import 'demos/issue192_search_bar_sheet_paint_test.dart';
 import 'demos/issue151_thumbless_slider_seek_test.dart';
 import 'demos/issue153_button_label_color_light_dark_test.dart';
 import 'demos/issue154_button_label_width_padding_test.dart';
+import 'demos/issue198_glass_group_safe_area_test.dart';
+import 'demos/issue199_scroll_edge_appearance_test.dart';
+import 'demos/issue201_glass_group_spacing_test.dart';
 import 'demos/scroll_edge_effect.dart';
 
 const String _probe = String.fromEnvironment('PROBE', defaultValue: 'pr67');
@@ -569,6 +576,15 @@ class _ProbeApp extends StatelessWidget {
         autoCycle: _auto,
         effect: !bool.fromEnvironment('NOEFFECT'),
       );
+    }
+    if (_probe == 'issue198') {
+      return const Issue198GlassGroupSafeAreaTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue199') {
+      return const Issue199ScrollEdgeAppearanceTestPage(autoCycle: _auto);
+    }
+    if (_probe == 'issue201') {
+      return const Issue201GlassGroupSpacingTestPage(autoCycle: _auto);
     }
     if (_probe == 'edge') {
       return const ScrollEdgeEffectDemoPage(autoCycle: _auto);
